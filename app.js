@@ -1834,7 +1834,7 @@ function applyVibes() {
     let toolbar, dragHandle, editButton, deleteButton, addButton;
     let actionZones = [];
     let draggedInfo = null;
-    let moveModeInfo = null; // NEW: To track if we are in "move mode"
+    let moveModeInfo = null;
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
@@ -1868,8 +1868,14 @@ function applyVibes() {
             border: 1px dashed #61afef;
             z-index: 99999; position: absolute;
             box-sizing: border-box; cursor: pointer;
+            transition: transform 0.1s ease-out, background-color 0.1s;
         }
         .vibe-action-zone:hover { background: rgba(152, 195, 121, 0.7); border-color: #98c379; }
+        .vibe-action-zone.drag-over {
+            background: rgba(152, 195, 121, 0.9) !important;
+            border-color: #98c379 !important;
+            transform: scale(1.05);
+        }
         .vibe-dragging-ghost { opacity: 0.4 !important; }
     \`;
 
@@ -2061,27 +2067,53 @@ function applyVibes() {
             const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
             if (action === 'add') {
                 window.parent.postMessage({ type: 'vibe-node-add-request', targetNodeId, position }, '*');
-            } else if (action === 'move') {
+            } else if (action === 'move' && sourceNodeId) { // Check sourceNodeId from click-move
                  window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
             }
-            clearActionZones();
+            clearSelection();
         }
-    }, true); // Use capture to handle it before our main handleClick
+    }, true);
+
+    // --- DRAG AND DROP LOGIC ---
+    document.addEventListener('dragstart', (e) => {
+        // The ondragstart handler on the button sets draggedInfo
+    });
 
     document.addEventListener('dragend', () => {
         if (draggedInfo) draggedInfo.element.classList.remove('vibe-dragging-ghost');
         draggedInfo = null;
+        document.querySelectorAll('.vibe-action-zone.drag-over').forEach(z => z.classList.remove('drag-over'));
         clearActionZones();
     });
 
-    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        const zone = e.target.closest('.vibe-action-zone');
+        if (zone) {
+            zone.classList.add('drag-over');
+        }
+    });
+
+    document.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        const zone = e.target.closest('.vibe-action-zone');
+        if (zone) {
+            zone.classList.remove('drag-over');
+        }
+    });
+
+    document.addEventListener('dragover', e => e.preventDefault()); // This is crucial for drop to work
 
     document.addEventListener('drop', (e) => {
         e.preventDefault();
-        if (e.target.classList.contains('vibe-action-zone')) {
-             e.target.click();
+        const zone = e.target.closest('.vibe-action-zone');
+        if (zone && draggedInfo) {
+            const { targetNodeId, position } = zone.dataset;
+            const { sourceNodeId } = draggedInfo;
+            window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
         }
     });
+
 
     function enableInspect() {
         if (inspectEnabled) return;
