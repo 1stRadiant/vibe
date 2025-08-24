@@ -1,5 +1,3 @@
-
-
 import { DataBase } from './database.js';
 
 const db = new DataBase();
@@ -1832,10 +1830,11 @@ function applyVibes() {
     window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
-    let selectedEl = null; // For persistent selection on click
+    let selectedEl = null;
     let toolbar, dragHandle, editButton, deleteButton, addButton;
     let actionZones = [];
     let draggedInfo = null;
+    let moveModeInfo = null; // NEW: To track if we are in "move mode"
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
@@ -1863,6 +1862,7 @@ function applyVibes() {
         }
         #vibe-inspector-toolbar button:hover { background: #5c6370; }
         #vibe-inspector-drag-handle { cursor: move; }
+        #vibe-inspector-drag-handle.move-active { background-color: #98c379; color: #1a1a1a; }
         .vibe-action-zone {
             background: rgba(97, 175, 239, 0.5);
             border: 1px dashed #61afef;
@@ -1927,13 +1927,23 @@ function applyVibes() {
         toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 5) + 'px';
         toolbar.style.left = (rect.left + window.scrollX) + 'px';
         
+        const toggleMoveMode = (e) => {
+            e.stopPropagation();
+            if (moveModeInfo && moveModeInfo.sourceNodeId === targetInfo.nodeId) {
+                clearActionZones();
+            } else {
+                moveModeInfo = { sourceNodeId: targetInfo.nodeId };
+                dragHandle.classList.add('move-active');
+                createActionableZones('move', targetInfo.nodeId);
+            }
+        };
+
         addButton.onclick = (e) => { e.stopPropagation(); createActionableZones('add', targetInfo.nodeId); };
         editButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*'); };
         deleteButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*'); };
+        dragHandle.onclick = toggleMoveMode;
 
-        if (isTouchDevice) {
-            dragHandle.onclick = (e) => { e.stopPropagation(); createActionableZones('move', targetInfo.nodeId); };
-        } else {
+        if (!isTouchDevice) {
             dragHandle.draggable = true;
             dragHandle.ondragstart = (e) => {
                 e.stopPropagation();
@@ -1958,7 +1968,7 @@ function applyVibes() {
     }
 
     function handleMouseOver(e) {
-        if (!inspectEnabled || selectedEl || document.querySelector('.vibe-action-zone')) return;
+        if (!inspectEnabled || selectedEl || moveModeInfo) return;
         const targetInfo = getNodeIdForElement(e.target);
         if (targetInfo) {
             if (hoverEl && hoverEl !== targetInfo.element) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
@@ -1976,24 +1986,32 @@ function applyVibes() {
 
     function handleClick(e) {
         if (!inspectEnabled) return;
+        
+        const isActionZoneClick = e.target.classList.contains('vibe-action-zone');
+        const isToolbarClick = toolbar && toolbar.contains(e.target);
 
-        if (e.target.classList.contains('vibe-action-zone') || (toolbar && toolbar.contains(e.target))) {
-            return; // Let other handlers manage clicks on zones or the toolbar itself
+        if (isToolbarClick) return;
+
+        if (!isActionZoneClick) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
+
         const targetInfo = getNodeIdForElement(e.target);
 
+        if (moveModeInfo && !isActionZoneClick) {
+            clearActionZones();
+            return;
+        }
+
         if (targetInfo) {
-            if (selectedEl === targetInfo.element) return; // Already selected
+            if (selectedEl === targetInfo.element) return;
             clearSelection();
             selectedEl = targetInfo.element;
             selectedEl.classList.add('__vibe-inspect-highlight-selected');
             if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             updateToolbar(targetInfo);
-        } else {
+        } else if (!isActionZoneClick) {
             clearSelection();
         }
     }
@@ -2034,9 +2052,10 @@ function applyVibes() {
     function clearActionZones() {
         actionZones.forEach(zone => zone.remove());
         actionZones = [];
+        moveModeInfo = null;
+        if (dragHandle) dragHandle.classList.remove('move-active');
     }
     
-    // This handler now only manages action zone clicks
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('vibe-action-zone')) {
             const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
@@ -2047,7 +2066,7 @@ function applyVibes() {
             }
             clearActionZones();
         }
-    });
+    }, true); // Use capture to handle it before our main handleClick
 
     document.addEventListener('dragend', () => {
         if (draggedInfo) draggedInfo.element.classList.remove('vibe-dragging-ghost');
@@ -2060,7 +2079,7 @@ function applyVibes() {
     document.addEventListener('drop', (e) => {
         e.preventDefault();
         if (e.target.classList.contains('vibe-action-zone')) {
-             e.target.click(); // Delegate drop to the zone's click handler
+             e.target.click();
         }
     });
 
@@ -2070,7 +2089,7 @@ function applyVibes() {
         createToolbar();
         document.addEventListener('mouseover', handleMouseOver);
         document.addEventListener('mouseout', handleMouseOut);
-        document.addEventListener('click', handleClick, true); // Use capture phase
+        document.addEventListener('click', handleClick, true);
     }
 
     function disableInspect() {
