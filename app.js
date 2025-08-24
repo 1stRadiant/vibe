@@ -11,9 +11,8 @@ const toggleInspectButton = document.getElementById('toggle-inspect-button');
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 
-// Start Page elements
-const startPage = document.getElementById('start-page');
-const mainContainer = document.querySelector('.container');
+// Start Page elements (now a tab with id 'start')
+const startPage = document.getElementById('start');
 const projectPromptInput = document.getElementById('project-prompt-input');
 const generateProjectButton = document.getElementById('generate-project-button');
 const startPageGenerationOutput = document.getElementById('start-page-generation-output');
@@ -500,7 +499,8 @@ function findNodeById(id, node = vibeTree) {
 
 function renderEditor(node) {
     const nodeEl = document.createElement('div');
-    nodeEl.className = `vibe-node type-${node.type}`;
+    // Each node will start collapsed, showing only its header.
+    nodeEl.className = `vibe-node type-${node.type} collapsed`;
     // Any HTML node can be a container for other nodes.
     const isContainer = node.type === 'container' || node.type === 'html';
     const showCodeButton = node.type !== 'container';
@@ -514,19 +514,21 @@ function renderEditor(node) {
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
             <span class="id">
-                ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse">▶</button>` : ''}
+                ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse Children">▶</button>` : '<span class="collapse-placeholder"></span>'}
                 ${node.id}
             </span>
             <span class="type">${node.type}</span>
         </div>
-        <textarea class="description-input" rows="3" placeholder="Describe the purpose of this component...">${node.description}</textarea>
-        <div class="button-group">
-            <button class="update-button" data-id="${node.id}">Update Vibe</button>
-            ${isContainer ? `<button class="add-child-button" data-id="${node.id}">+ Add Child</button>` : ''}
-            ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
-            ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
+        <div class="vibe-node-content">
+            <textarea class="description-input" rows="3" placeholder="Describe the purpose of this component...">${node.description}</textarea>
+            <div class="button-group">
+                <button class="update-button" data-id="${node.id}">Update Vibe</button>
+                ${isContainer ? `<button class="add-child-button" data-id="${node.id}">+ Add Child</button>` : ''}
+                ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
+                ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
+            </div>
+            ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;"></textarea>` : ''}
         </div>
-        ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;"></textarea>` : ''}
     `;
 
     // Render children (collapsed by default if any)
@@ -683,7 +685,9 @@ ${fullTreeString}
 
 function refreshAllUI() {
     logToConsole('Refreshing entire UI: Vibe Editor, Website Preview, and Full Code.', 'info');
-    renderVibeEditorUI(); 
+    editorContainer.innerHTML = '';
+    editorContainer.appendChild(renderEditor(vibeTree));
+    addEventListeners(); // Re-add listeners to new buttons
     applyVibes();
     // Invalidate flowchart since code has changed
     flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Code has changed. Click "Generate Flowchart" to create an updated diagram.</div>';
@@ -697,7 +701,7 @@ function refreshAllUI() {
     // This ensures the file system reflects the active project's files immediately.
     renderFileTree();
 
-    updateUndoRedoUI(); 
+    updateUndoRedoUI(); // NEW: reflect availability after any UI refresh
     autoSaveProject();
 }
 
@@ -910,7 +914,7 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     "type": "html",
     "description": "The main header container for the page.",
     "code": "<header id=\"main-header\"></header>",
-    "selector": "#whole-page",
+    "selector": "#${parentNode.id}",
     "position": "beforeend",
     "children": [
         {
@@ -942,9 +946,9 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     try {
         let jsonResponse = rawResponse.trim();
         // The AI might wrap the response in markdown. Let's strip it.
-        const fence = jsonResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence[1]) {
-            jsonResponse = fence[1];
+        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
+        if (jsonMatch && jsonMatch[2]) {
+            jsonResponse = jsonMatch[2];
         }
 
         const childrenArray = JSON.parse(jsonResponse);
@@ -1116,7 +1120,7 @@ function parseHtmlToVibeTree(fullCode) {
             // The system sometimes wraps user JS in an IIFE. Let's unwrap it if it exists.
             const iifeMatch = code.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
             if (iifeMatch) {
-                code = iifeMatch[1];
+                code = iifeMatch[1].trim();
             }
 
             jsNodes.push({
@@ -1320,7 +1324,8 @@ async function processCodeAndRefreshUI(fullCode) {
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode);
         vibeTree = newVibeTree;
 
-        renderVibeEditorUI(); 
+        editorContainer.innerHTML = '';
+        editorContainer.appendChild(renderEditor(vibeTree));
         applyVibes();
         showFullCode(); 
         logToConsole("Update from code complete. UI refreshed.", 'info');
@@ -1378,13 +1383,7 @@ async function handleFileUpload() {
 
         // Process with AI to decompose into Vibe Tree and refresh UI
         await processCodeAndRefreshUI(fileContent);
-
-        // If user triggered upload from the start page (rare), move them into the main UI
-        if (startPage.classList.contains('active')) {
-            startPage.classList.remove('active');
-            mainContainer.classList.add('active');
-        }
-
+        
         // Persist project
         autoSaveProject();
         logToConsole(`HTML project '${currentProjectId}' imported and processed with AI.`, 'info');
@@ -1657,15 +1656,11 @@ async function handleZipUpload() {
         // Apply and persist
         vibeTree = newTree;
         db.saveProject(currentProjectId, vibeTree);
-
-        // Transition to main UI if on start page
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
-
+        
         resetHistory();
         historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
 
-        renderVibeEditorUI(); 
+        refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
         logToConsole(`ZIP project '${currentProjectId}' imported successfully using ${usedAI ? 'AI decomposition' : 'client parser'}.`, 'info');
 
@@ -2089,11 +2084,13 @@ function applyVibes() {
 
 function showFullCode() {
     const fullCode = generateFullCodeString();
-    fullCodeEditor.value = fullCode; 
+    fullCodeEditor.value = fullCode; // Use value for textarea
     logToConsole('Displaying full website code.', 'info');
 }
 
 function hideFullCode() {
+    // This function is no longer needed as the code view is a persistent tab.
+    // fullCodeModal.style.display = 'none';
 }
 
 function addEventListeners() {
@@ -2113,9 +2110,9 @@ function addEventListeners() {
     document.querySelectorAll('.collapse-toggle').forEach(button => {
         button.addEventListener('click', handleCollapseToggle);
     });
-    // NEW: card navigation
-    document.querySelectorAll('.vibe-card.is-container').forEach(card => {
-        card.addEventListener('click', handleCardNavigation);
+    // New: click header to expand/collapse node content
+    document.querySelectorAll('.vibe-node-header').forEach(header => {
+        header.addEventListener('click', handleNodeContentToggle);
     });
 }
 
@@ -2134,7 +2131,7 @@ function logToAgent(message, type = 'info') {
     msgEl.innerHTML = message;
     
     agentOutput.appendChild(msgEl);
-    agentOutput.scrollTop = agentOutput.scrollHeight; 
+    agentOutput.scrollTop = agentOutput.scrollHeight; // Auto-scroll
 }
 
 function getAgentSystemPrompt() {
@@ -2203,14 +2200,14 @@ async function handleFixError(errorMessage, fixButton) {
     agentPromptInput.value = `Fix this error:\n${errorMessage}`;
     runAgentButton.disabled = true;
     runAgentButton.innerHTML = 'Agent is fixing... <div class="loading-spinner"></div>';
-    agentOutput.innerHTML = ''; 
-    agentConversationHistory = []; 
+    agentOutput.innerHTML = ''; // Clear previous logs
+    agentConversationHistory = []; // Clear history for a new task
     logToAgent(`<strong>New Task:</strong> Fix a runtime error.`, 'plan');
     logToAgent(`<strong>Error Details:</strong>\n<pre>${errorMessage}</pre>`, 'info');
     logToAgent('Analyzing current code structure...', 'info');
 
     const fullTreeString = JSON.stringify(vibeTree, null, 2);
-    const systemPrompt = getAgentSystemPrompt(); 
+    const systemPrompt = getAgentSystemPrompt(); // The existing agent prompt is well-suited for this.
 
     const userPrompt = `A runtime error was detected in the application. Your task is to analyze the error message and the application's code structure to find the root cause and fix it.
 
@@ -2240,9 +2237,9 @@ ${fullTreeString}
         logToAgent(`The AI fix failed: ${error.message}. Check the main console for more details.`, 'error');
         alert(`The AI Agent encountered an error while trying to fix the issue: ${error.message}`);
     } finally {
-        runAgentButton.disabled = !geminiApiKey; 
+        runAgentButton.disabled = !geminiApiKey; // Reset to its normal state based on API key presence
         runAgentButton.innerHTML = 'Run Agent';
-        agentPromptInput.value = ''; 
+        agentPromptInput.value = ''; // Clear the prompt
         // The fix button is part of the log entry and will be gone if the console is cleared.
         // If it still exists, we can re-enable it, but it's probably better to leave it as is.
         // It's a one-shot action per error instance.
@@ -2311,10 +2308,7 @@ function executeAgentPlan(agentDecision, agentLogger) {
         }
     }
     
-    renderVibeEditorUI(); 
-    applyVibes();
-    // Switch to preview tab to show the result.
-    document.querySelector('.tab-button[data-tab="preview"]').click();
+    refreshAllUI();
 }
 
 async function handleRunAgent() {
@@ -2459,7 +2453,9 @@ async function handleCreateNode() {
 
     console.log(`Added new node "${newNodeId}" to parent "${parentId}".`);
 
-    renderVibeEditorUI(); 
+    editorContainer.innerHTML = '';
+    editorContainer.appendChild(renderEditor(vibeTree));
+    addEventListeners();
     closeModal();
     autoSaveProject();
 }
@@ -2505,7 +2501,7 @@ function handleSaveEditedNode() {
 
     let codeChanged = false;
     if (newCode !== prevCode) {
-        recordHistory(`Edit code in modal for ${nodeId}`); 
+        recordHistory(`Edit code in modal for ${nodeId}`); // NEW: history before code change
         node.code = newCode;
         codeChanged = true;
     }
@@ -2528,7 +2524,7 @@ function handleSaveEditedNode() {
                 }
                 await updateNodeByDescription(nodeId, newDescription, saveBtn);
             } else {
-                renderVibeEditorUI(); 
+                refreshAllUI();
             }
             closeEditNodeModal();
             logToConsole(`Node '${nodeId}' updated from Element Editor.`, 'info');
@@ -2572,7 +2568,7 @@ window.addEventListener('message', (event) => {
 // --- Full Code Search Logic ---
 let searchState = {
     term: '',
-    matches: [], 
+    matches: [], // array of start indices
     currentIndex: -1
 };
 
@@ -2592,7 +2588,7 @@ function performSearch() {
     if (searchState.term !== searchTerm) {
         searchState.term = searchTerm;
         searchState.matches = [];
-        const regex = new RegExp(searchTerm, 'gi'); 
+        const regex = new RegExp(searchTerm, 'gi'); // g for global, i for case-insensitive
         let match;
         while ((match = regex.exec(code)) !== null) {
             searchState.matches.push(match.index);
@@ -2692,7 +2688,7 @@ function initializeMermaid() {
     // Initialize Mermaid.js
     window.mermaid.initialize({
         startOnLoad: false,
-        theme: 'dark', 
+        theme: 'dark', // Use 'dark' or 'neutral' for dark backgrounds
         fontFamily: "'Inter', sans-serif",
         themeVariables: {
             background: '#282c34',
@@ -2711,7 +2707,7 @@ function initializeMermaid() {
 
 function populateProjectList() {
     const projects = db.listProjects();
-    projectListContainer.innerHTML = ''; 
+    projectListContainer.innerHTML = ''; // Clear existing list
 
     if (projects.length === 0) {
         noProjectsMessage.style.display = 'block';
@@ -2742,14 +2738,10 @@ function handleLoadProject(event) {
         console.log(`Project '${projectId}' loaded.`);
         logToConsole(`Project '${projectId}' loaded successfully.`, 'info');
         
-        // Transition to the main editor view
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
-        
-        renderVibeEditorUI(); 
-        applyVibes();
+        refreshAllUI();
+
         // After generation, set a new baseline snapshot (no immediate undo unless user changes)
-        historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
+        historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         updateUndoRedoUI();
 
         // Ensure a multi-file layout exists in the file system for this project
@@ -2769,7 +2761,7 @@ function handleDeleteProject(event) {
     if (confirm(`Are you sure you want to permanently delete project '${projectId}'?`)) {
         db.deleteProject(projectId);
         console.log(`Project '${projectId}' deleted.`);
-        populateProjectList(); 
+        populateProjectList(); // Refresh the list
     }
 }
 
@@ -2817,7 +2809,7 @@ projectListContainer.addEventListener('click', (event) => {
 // Files tab implementation
 let filesState = {
     selectedPath: null,
-    clipboard: null 
+    clipboard: null // { path, meta }
 };
 
 // Build a nested tree from flat file paths
@@ -2864,7 +2856,7 @@ function renderFileTree() {
                 row.className = 'file-row';
                 const icon = document.createElement('span');
                 icon.className = 'file-icon';
-                icon.textContent = child.type === 'folder' ? '' : '';
+                icon.textContent = child.type === 'folder' ? '📁' : '📄';
                 const name = document.createElement('span');
                 name.className = 'file-name';
                 name.textContent = child.name;
@@ -3161,6 +3153,8 @@ async function handleFilesDelete() {
 }
 
 // Wait for the DOM to be fully loaded before running initialization logic.
+// This is crucial for ensuring that scripts loaded in the <head>, like Mermaid.js,
+// are available before our module tries to use them.
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed. Initializing application.");
     
@@ -3247,8 +3241,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
-    startPage.classList.add('active');
-    mainContainer.classList.remove('active');
+
+    // The initial state is now handled by the 'active' classes in the HTML.
+    // This old logic is no longer needed.
+    // startPage.classList.add('active');
+    // mainContainer.classList.remove('active');
 
     // Initialize history baseline
     resetHistory();
@@ -3261,10 +3258,9 @@ function resetToStartPage() {
 
     // Reset history when starting fresh
     resetHistory();
-
-    // Reset UI
-    mainContainer.classList.remove('active');
-    startPage.classList.add('active');
+    
+    // Switch to the start tab
+    document.querySelector('.tab-button[data-tab="start"]').click();
 
     // Reset start page form
     projectPromptInput.value = '';
@@ -3289,9 +3285,11 @@ function resetToStartPage() {
 
 /* --- Missing helpers (safe stubs to prevent runtime errors if not defined elsewhere) --- */
 async function buildAssetUrlMap() {
+    // Map project assets (if any) to object URLs. No-op stub for now.
     return {};
 }
 function injectAssetRewriterScript(doc, assetMap) {
+    // Optionally rewrite asset URLs in the preview. No-op stub for now.
 }
 /* --- End stubs --- */
 
@@ -3316,7 +3314,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
         if (node.type === 'container') {
             const newChildren = await generateCompleteSubtree(node);
             node.children = newChildren;
-            renderVibeEditorUI(); 
+            refreshAllUI();
         } else {
             const systemPrompt = getAgentSystemPrompt();
             const fullTreeString = JSON.stringify(vibeTree, null, 2);
@@ -3334,7 +3332,7 @@ ${fullTreeString}
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.innerHTML = originalHtml;
+            buttonEl.innerHTML = originalHtml || 'Save & Update Vibe';
         }
     }
 }
@@ -3545,10 +3543,7 @@ async function handleGenerateProject() {
         populateProjectList();
 
         // Transition to main editor UI
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
-
-        renderVibeEditorUI(); 
+        refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
         logToConsole(`New project '${currentProjectId}' created from prompt.`, 'info');
     } catch (e) {
@@ -3660,6 +3655,10 @@ If helpful, you may infer likely behavior from the code and ids/classes. Output 
 }
 
 function handleCollapseToggle(event) {
+    // This function now only handles the expansion/collapse of child node lists.
+    // It should stop propagation to prevent the parent header click from firing.
+    event.stopPropagation();
+
     const btn = event.currentTarget;
     const nodeEl = btn.closest('.vibe-node');
     if (!nodeEl) return;
@@ -3678,169 +3677,15 @@ function handleCollapseToggle(event) {
     }
 }
 
-// --- NEW: Vibe Editor Navigation State ---
-let editorNavPath = ['whole-page'];
-
-// --- NEW: Vibe Editor Card Rendering ---
-
 /**
- * Main function to render the entire Vibe Editor UI, including breadcrumbs and cards.
+ * Handles toggling the visibility of a node's main content (description, buttons).
+ * This is triggered by clicking anywhere on the node's header.
+ * @param {MouseEvent} event
  */
-function renderVibeEditorUI(direction = 'none') {
-    editorContainer.innerHTML = ''; 
+function handleNodeContentToggle(event) {
+    const header = event.currentTarget;
+    const nodeEl = header.closest('.vibe-node');
+    if (!nodeEl) return;
 
-    const currentParentId = editorNavPath[editorNavPath.length - 1];
-    const parentNode = findNodeById(currentParentId);
-
-    if (!parentNode) {
-        console.error(`renderVibeEditorUI: Could not find parent node with id "${currentParentId}"`);
-        editorNavPath = ['whole-page']; 
-        renderVibeEditorUI(); 
-        return;
-    }
-    
-    // 1. Render Breadcrumbs
-    const breadcrumbsEl = document.createElement('div');
-    breadcrumbsEl.id = 'vibe-breadcrumbs';
-    editorNavPath.forEach((nodeId, index) => {
-        const item = document.createElement('span');
-        item.className = 'breadcrumb-item';
-        item.textContent = nodeId;
-        item.dataset.index = index;
-        
-        // Add click handler to navigate back, unless it's the last item
-        if (index < editorNavPath.length - 1) {
-            item.addEventListener('click', handleBreadcrumbClick);
-        } else {
-            item.classList.add('active');
-        }
-
-        breadcrumbsEl.appendChild(item);
-
-        if (index < editorNavPath.length - 1) {
-            const separator = document.createElement('span');
-            separator.className = 'breadcrumb-separator';
-            separator.textContent = '>';
-            breadcrumbsEl.appendChild(separator);
-        }
-    });
-    editorContainer.appendChild(breadcrumbsEl);
-
-    // 2. Render Cards
-    const cardsContainer = document.createElement('div');
-    cardsContainer.id = 'vibe-cards-container';
-
-    // Add animation classes for incoming cards
-    if (direction === 'forward') {
-        cardsContainer.classList.add('anim-in-forward');
-    } else if (direction === 'backward') {
-        cardsContainer.classList.add('anim-in-backward');
-    }
-
-    const nodesToRender = parentNode.children || [];
-
-    if (nodesToRender.length === 0) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.className = 'vibe-empty-message';
-        emptyMessage.textContent = `This component (${parentNode.id}) has no children. Use "+ Add Child" to add one.`;
-        cardsContainer.appendChild(emptyMessage);
-    } else {
-        nodesToRender.forEach(node => {
-            cardsContainer.appendChild(renderCard(node));
-        });
-    }
-
-    editorContainer.appendChild(cardsContainer);
-    addEventListeners(); 
-}
-
-/**
- * Renders a single vibe node as a card.
- * @param {object} node - The vibe node to render.
- * @returns {HTMLElement} The card element.
- */
-function renderCard(node) {
-    const cardEl = document.createElement('div');
-    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
-    const isContainer = node.type === 'container' || (node.type === 'html' && hasChildren);
-    const showCodeButton = node.type !== 'container';
-    const isHeadNode = node.type === 'head';
-
-    cardEl.className = `vibe-card type-${node.type} ${isContainer ? 'is-container' : ''}`;
-    
-    if (isContainer) {
-        cardEl.title = 'Click to view children';
-        cardEl.dataset.navId = node.id; 
-    }
-
-    cardEl.innerHTML = `
-        <div class="vibe-card-header">
-            <span class="id">${node.id} ${isContainer ? '<span class="has-children-indicator">➔</span>' : ''}</span>
-            <span class="type">${node.type}</span>
-        </div>
-        <textarea class="description-input" rows="3" placeholder="Describe the purpose of this component...">${node.description}</textarea>
-        <div class="button-group">
-            <button class="update-button" data-id="${node.id}">Update Vibe</button>
-            ${(node.type === 'container' || node.type === 'html') ? `<button class="add-child-button" data-id="${node.id}">+ Add Child</button>` : ''}
-        </div>
-         <div class="code-actions">
-            ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
-            ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
-        </div>
-        ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;"></textarea>` : ''}
-    `;
-
-    return cardEl;
-}
-
-/**
- * Handles clicks on breadcrumb items to navigate up the tree.
- * @param {Event} event
- */
-function handleBreadcrumbClick(event) {
-    const index = parseInt(event.currentTarget.dataset.index, 10);
-    // Slice the path to the clicked item's level + 1 (to include it)
-    const newPath = editorNavPath.slice(0, index + 1);
-    navigateVibeEditor(newPath, 'backward');
-}
-
-/**
- * Handles clicks on container cards to navigate into them.
- * @param {Event} event
- */
-function handleCardNavigation(event) {
-    // Ensure we're not clicking a button or textarea inside the card
-    if (event.target.closest('button, textarea')) {
-        return;
-    }
-    const card = event.currentTarget;
-    const navId = card.dataset.navId;
-    if (navId) {
-        const newPath = [...editorNavPath, navId];
-        navigateVibeEditor(newPath, 'forward');
-    }
-}
-
-/**
- * Handles the animation and state change for Vibe Editor navigation.
- * @param {string[]} newPath - The new navigation path array.
- * @param {'forward'|'backward'} direction - The direction of navigation.
- */
-function navigateVibeEditor(newPath, direction) {
-    const cardsContainer = document.getElementById('vibe-cards-container');
-    if (!cardsContainer) {
-        // Fallback for safety: if no container, just re-render directly.
-        editorNavPath = newPath;
-        renderVibeEditorUI();
-        return;
-    }
-
-    const animationClass = direction === 'forward' ? 'anim-out-forward' : 'anim-out-backward';
-    cardsContainer.classList.add(animationClass);
-
-    // Wait for the animation to finish before re-rendering the view.
-    cardsContainer.addEventListener('animationend', () => {
-        editorNavPath = newPath;
-        renderVibeEditorUI(direction);
-    }, { once: true });
+    nodeEl.classList.toggle('collapsed');
 }
