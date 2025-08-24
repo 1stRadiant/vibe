@@ -11,9 +11,9 @@ const toggleInspectButton = document.getElementById('toggle-inspect-button');
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 
-// Start Page elements
-const startPage = document.getElementById('start-page');
-const mainContainer = document.querySelector('.container');
+// Start Page elements (now a tab with id 'start')
+const startPage = document.getElementById('start'); // CORRECTED: Was 'start-page'
+// REMOVED: mainContainer is no longer used
 const projectPromptInput = document.getElementById('project-prompt-input');
 const generateProjectButton = document.getElementById('generate-project-button');
 const startPageGenerationOutput = document.getElementById('start-page-generation-output');
@@ -1385,12 +1385,6 @@ async function handleFileUpload() {
         // Process with AI to decompose into Vibe Tree and refresh UI
         await processCodeAndRefreshUI(fileContent);
 
-        // If user triggered upload from the start page (rare), move them into the main UI
-        if (startPage.classList.contains('active')) {
-            startPage.classList.remove('active');
-            mainContainer.classList.add('active');
-        }
-
         // Persist project
         autoSaveProject();
         logToConsole(`HTML project '${currentProjectId}' imported and processed with AI.`, 'info');
@@ -1663,10 +1657,6 @@ async function handleZipUpload() {
         // Apply and persist
         vibeTree = newTree;
         db.saveProject(currentProjectId, vibeTree);
-
-        // Transition to main UI if on start page
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
 
         resetHistory();
         historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
@@ -3079,17 +3069,13 @@ function handleLoadProject(event) {
         console.log(`Project '${projectId}' loaded.`);
         logToConsole(`Project '${projectId}' loaded successfully.`, 'info');
         
-        // Transition to the main editor view
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
-        
         refreshAllUI();
 
-        // After generation, set a new baseline snapshot (no immediate undo unless user changes)
+        // After loading, set a new baseline snapshot
         historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         updateUndoRedoUI();
 
-        // Ensure a multi-file layout exists in the file system for this project
+        // Ensure a multi-file layout exists for this project
         autoSaveProject();
 
         // Switch to the preview tab to show the result
@@ -3121,8 +3107,6 @@ function autoSaveProject() {
         const { files } = assembleMultiFileBundle(vibeTree);
 
         // Write every file in the bundle into the per-project file store
-        // - Strings are saved as text files
-        // - Uint8Array are saved as binary files with inferred MIME types
         for (const [path, content] of files.entries()) {
             if (content instanceof Uint8Array) {
                 const mime = guessMimeType(path);
@@ -3498,8 +3482,6 @@ async function handleFilesDelete() {
 }
 
 // Wait for the DOM to be fully loaded before running initialization logic.
-// This is crucial for ensuring that scripts loaded in the <head>, like Mermaid.js,
-// are available before our module tries to use them.
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed. Initializing application.");
     
@@ -3522,7 +3504,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uploadZipButton) uploadZipButton.addEventListener('click', handleZipUpload);
         if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
 
-        // Files tab actions (NEW)
+        // Files tab actions
         if (filesUploadButton) filesUploadButton.addEventListener('click', handleFilesUpload);
         if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
         if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
@@ -3559,7 +3541,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Edit Node modal
         if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
         if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
-        // AI Improve Description
         if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
 
         // API provider and keys
@@ -3586,9 +3567,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
-    startPage.classList.add('active');
-    mainContainer.classList.remove('active');
 
+    // REMOVED: Initial state is set in HTML, this caused the error.
+    
     // Initialize history baseline
     resetHistory();
 });
@@ -3601,18 +3582,17 @@ function resetToStartPage() {
     // Reset history when starting fresh
     resetHistory();
 
-    // Reset UI
-    mainContainer.classList.remove('active');
-    startPage.classList.add('active');
+    // CORRECTED: Switch to the start tab
+    document.querySelector('.tab-button[data-tab="start"]').click();
 
     // Reset start page form
     projectPromptInput.value = '';
     newProjectIdInput.value = '';
     startPageGenerationOutput.style.display = 'none';
-    generateProjectButton.disabled = !geminiApiKey;
+    generateProjectButton.disabled = !(geminiApiKey || nscaleApiKey);
     newProjectContainer.style.display = 'block';
 
-    // Clear UI elements in the main container for a clean slate
+    // Clear UI elements in other tabs
     editorContainer.innerHTML = '';
     const previewDoc = previewContainer.contentWindow.document;
     previewDoc.open();
@@ -3805,22 +3785,15 @@ Constraints:
 
 /**
  * Create a brand new project from a high-level prompt.
- * - Validates/normalizes the project ID
- * - Calls AI to generate a complete subtree for the root container
- * - Saves the project and prepares multi-file layout
- * - Switches to the main editor UI
  */
 async function handleGenerateProject() {
     try {
-        // Validate API availability
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
         if (!keyIsAvailable) {
             alert(`Please add your ${currentAIProvider === 'gemini' ? 'Gemini' : 'nscale'} API Key in Settings to generate a project.`);
-            
             return;
         }
 
-        // Read inputs
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase();
         const prompt = (projectPromptInput.value || '').trim();
 
@@ -3830,22 +3803,14 @@ async function handleGenerateProject() {
             return;
         }
 
-        // Normalize/validate project ID (kebab-case)
-        desiredId = desiredId
-            .replace(/\s+/g, '-')
-            .replace(/[^a-z0-9\-]/g, '')
-            .replace(/^-+|-+$/g, '');
-
-        if (!desiredId) {
-            desiredId = `project-${Date.now()}`;
-        }
+        desiredId = desiredId.replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').replace(/^-+|-+$/g, '');
+        if (!desiredId) desiredId = `project-${Date.now()}`;
         if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(desiredId)) {
-            alert('Project ID must be in kebab-case (letters, numbers, hyphens). Example: my-awesome-site');
+            alert('Project ID must be in kebab-case. Example: my-awesome-site');
             newProjectIdInput.focus();
             return;
         }
 
-        // Ensure unique
         const existing = db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
@@ -3853,13 +3818,11 @@ async function handleGenerateProject() {
             projectId = `${desiredId}-${suffix++}`;
         }
 
-        // UI: show generation panel
         newProjectContainer.style.display = 'none';
         startPageGenerationOutput.style.display = 'block';
         generationStatusText.textContent = 'Generating your project...';
         liveCodeOutput.textContent = '';
 
-        // Build a fresh root tree using the prompt
         vibeTree = {
             id: 'whole-page',
             type: 'container',
@@ -3867,27 +3830,18 @@ async function handleGenerateProject() {
             children: []
         };
 
-        // Generate complete subtree (children) for root
         const children = await generateCompleteSubtree(vibeTree);
         vibeTree.children = children;
 
-        // Assign as current project and persist
         currentProjectId = projectId;
         resetHistory();
         historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
 
-        // Show generated code on the start page
-        const fullCode = generateFullCodeString(vibeTree);
-        liveCodeOutput.textContent = fullCode;
+        liveCodeOutput.textContent = generateFullCodeString(vibeTree);
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
-        // Save project + assemble multi-file layout
         autoSaveProject();
         populateProjectList();
-
-        // Transition to main editor UI
-        startPage.classList.remove('active');
-        mainContainer.classList.add('active');
 
         refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
@@ -3896,7 +3850,6 @@ async function handleGenerateProject() {
         console.error('Project generation failed:', e);
         generationStatusText.textContent = 'Generation failed.';
         alert(`Failed to generate project: ${e.message}`);
-        // Restore start page form so user can try again
         newProjectContainer.style.display = 'block';
     }
 }
