@@ -2061,10 +2061,10 @@ function applyVibes() {
         clearActionZones();
         Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
             if (actionType === 'move' && nodeId === sourceNodeId) return;
-            const element = document.getElementById(elementId);
-            if (!element) return;
+            const targetElement = document.getElementById(elementId);
+            if (!targetElement) return;
 
-            const rect = element.getBoundingClientRect();
+            const rect = targetElement.getBoundingClientRect();
             const createZone = (position, top, left, width, height) => {
                 const zone = document.createElement('div');
                 zone.className = 'vibe-action-zone';
@@ -2083,8 +2083,8 @@ function applyVibes() {
             createZone('before', rect.top - 5, rect.left, rect.width, 10);
             createZone('after', rect.bottom - 5, rect.left, rect.width, 10);
             
-            const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(element.tagName);
-            if (isContainerTag || element.children.length > 0) {
+            const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(targetElement.tagName);
+            if (isContainerTag || targetElement.children.length > 0) {
                  createZone('inside', rect.top + 5, rect.left, rect.width, rect.height - 10);
             }
         });
@@ -2148,24 +2148,27 @@ function applyVibes() {
         list.innerHTML = '';
         Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
             if (nodeId === sourceNodeId) return;
-            const targetElement = document.getElementById(elementId);
-            if (!targetElement) return;
+            const destinationElement = document.getElementById(elementId);
+            if (!destinationElement) return;
 
             const li = document.createElement('li');
-            li.textContent = \`<${targetElement.tagName.toLowerCase()}>#${elementId}\`;
+            li.textContent = \`<${destinationElement.tagName.toLowerCase()}>#${elementId}\`;
             li.dataset.nodeId = nodeId;
             
             li.onclick = () => {
                 if (mobileMoveTargetHighlight) mobileMoveTargetHighlight.classList.remove('__vibe-inspect-preview-highlight');
                 list.querySelectorAll('li.selected').forEach(i => i.classList.remove('selected'));
                 li.classList.add('selected');
-                targetElement.classList.add('__vibe-inspect-preview-highlight');
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                mobileMoveTargetHighlight = targetElement;
-                selectedTargetInfo = { nodeId, element: targetElement };
+                
+                destinationElement.classList.add('__vibe-inspect-preview-highlight');
+                destinationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                mobileMoveTargetHighlight = destinationElement;
+                selectedTargetInfo = { nodeId, element: destinationElement };
+                
                 beforeBtn.disabled = false;
                 afterBtn.disabled = false;
-                const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(targetElement.tagName);
+                const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(destinationElement.tagName);
                 insideBtn.disabled = !isContainerTag;
             };
             list.appendChild(li);
