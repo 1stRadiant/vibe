@@ -842,11 +842,11 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         const data = await response.json();
         console.info('--- Gemini Response Received ---');
 
-        if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content.parts[0].text) {
+        if (!data.candidates || data.candidates.length === 0 || !data.candidates.content.parts.text) {
              throw new Error('Invalid response structure from Gemini API.');
         }
 
-        const content = data.candidates[0].content.parts[0].text;
+        const content = data.candidates.content.parts.text;
         
         logToConsole('Successfully received response from Gemini.', 'info');
         logDetailed('Raw Gemini Response', content);
@@ -961,8 +961,8 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         let jsonResponse = rawResponse.trim();
         // The AI might wrap the response in markdown. Let's strip it.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2];
+        if (jsonMatch && jsonMatch) {
+            jsonResponse = jsonMatch;
         }
 
         const childrenArray = JSON.parse(jsonResponse);
@@ -1010,18 +1010,18 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         const data = await response.json();
         console.info('--- nscale Response Received ---');
 
-        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
+        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices.message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
-        let content = data.choices[0].message.content;
+        let content = data.choices.message.content;
         logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-            if (jsonMatch && jsonMatch[1]) {
-                content = jsonMatch[1];
+            if (jsonMatch && jsonMatch) {
+                content = jsonMatch;
             }
         }
 
@@ -1115,7 +1115,7 @@ function parseHtmlToVibeTree(fullCode) {
         if (!scriptTag.src && scriptTag.textContent.trim()) {
             let code = scriptTag.textContent.trim();
             const iifeMatch = code.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-            if (iifeMatch) code = iifeMatch[1].trim();
+            if (iifeMatch) code = iifeMatch.trim();
 
             jsNodes.push({
                 id: `page-script-${index + 1}`,
@@ -1220,8 +1220,8 @@ async function decomposeCodeIntoVibeTree(fullCode) {
     function tryParseVarious(text) {
         try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence[1]) {
-            try { return JSON.parse(fence[1]); } catch {}
+        if (fence && fence) {
+            try { return JSON.parse(fence); } catch {}
         }
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
@@ -1299,7 +1299,7 @@ async function handleUpdateTreeFromCode() {
 }
 
 async function handleFileUpload() {
-    const file = htmlFileInput.files[0];
+    const file = htmlFileInput.files;
     if (!file) {
         alert("Please select an HTML file to upload.");
         return;
@@ -1486,7 +1486,7 @@ async function buildCombinedHtmlFromZip(jszip, indexPath) {
  * Import a ZIP multi-file project.
  */
 async function handleZipUpload() {
-    const file = zipFileInput.files && zipFileInput.files[0];
+    const file = zipFileInput.files && zipFileInput.files;
     if (!file) {
         alert("Please select a ZIP file to upload.");
         return;
@@ -1504,7 +1504,7 @@ async function handleZipUpload() {
         const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
         if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
-        const indexPath = htmlCandidates[0];
+        const indexPath = htmlCandidates;
         logToConsole(`Using entry point: ${indexPath}`, 'info');
 
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
@@ -1815,8 +1815,8 @@ function buildElementIdToNodeIdMap(node = vibeTree, map = {}) {
     if (!node) return map;
     if (node.type === 'html' && typeof node.code === 'string') {
         const m = node.code.match(/\bid\s*=\s*"([^"]+)"/i);
-        if (m && m[1]) {
-            map[m[1]] = node.id;
+        if (m && m) {
+            map[m] = node.id;
         }
     }
     if (Array.isArray(node.children)) {
@@ -1943,7 +1943,7 @@ function applyVibes() {
             const allTargets = Object.entries(window.__vibeIdToNodeId).map(([elementId, nodeId]) => {
                 const el = document.getElementById(elementId);
                 const tag = el ? el.tagName.toLowerCase() : '';
-                const label = `${nodeId} (${tag}#${elementId})`;
+                const label = \`\${nodeId} (\${tag}#\${elementId})\`;
                 return { nodeId, label };
             });
             window.parent.postMessage({
@@ -2326,7 +2326,7 @@ async function handleRunAgent() {
 
     agentConversationHistory.push({ role: 'user', content: agentUserPrompt });
     if (agentConversationHistory.length > 10) {
-        agentConversationHistory = [agentConversationHistory[0], ...agentConversationHistory.slice(-9)];
+        agentConversationHistory = [agentConversationHistory, ...agentConversationHistory.slice(-9)];
     }
 
     try {
@@ -2586,7 +2586,7 @@ function recalculateSelectors(parentNode) {
         
         const idMatch = child.code.match(/id="([^"]+)"/);
         if (idMatch) {
-            lastHtmlSiblingId = idMatch[1];
+            lastHtmlSiblingId = idMatch;
         } else {
             console.warn(`Node ${child.id} lacks an 'id' attribute, which may break layout.`);
             lastHtmlSiblingId = child.id; // Fallback, not ideal
@@ -3372,7 +3372,7 @@ function buildBasicMermaidFromTree(tree) {
 function extractMermaidFromText(text) {
     if (!text) return '';
     const mermaidFence = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-    if (mermaidFence && mermaidFence[1]) return mermaidFence[1];
+    if (mermaidFence && mermaidFence) return mermaidFence;
     if (text.trim().startsWith('graph')) return text.trim();
     return '';
 }
@@ -3511,7 +3511,7 @@ async function handleAiImproveDescription() {
         
         let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
