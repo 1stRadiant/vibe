@@ -1835,8 +1835,6 @@ function applyVibes() {
     let actionZones = [];
     let draggedInfo = null;
     let moveModeInfo = null;
-    let mobileMovePanel = null;
-    let mobileMoveTargetHighlight = null;
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
@@ -1850,11 +1848,6 @@ function applyVibes() {
             outline: 3px solid #61afef !important;
             outline-offset: 2px !important;
             box-shadow: 0 0 12px rgba(97, 175, 239, 0.9) !important;
-        }
-        .__vibe-inspect-preview-highlight {
-            outline: 3px solid #98c379 !important;
-            box-shadow: 0 0 10px #98c379, inset 0 0 20px rgba(152, 195, 121, 0.3) !important;
-            transition: all 0.2s;
         }
         #vibe-inspector-toolbar {
             position: absolute; z-index: 100000;
@@ -1884,38 +1877,6 @@ function applyVibes() {
             transform: scale(1.05);
         }
         .vibe-dragging-ghost { opacity: 0.4 !important; }
-
-        #vibe-move-panel {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-            z-index: 100001; display: none; align-items: center; justify-content: center;
-        }
-        #vibe-move-panel-content {
-            background: #282c34; color: #abb2bf;
-            padding: 20px; border-radius: 8px; border: 1px solid #444;
-            width: 90%; max-width: 400px; box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-            display: flex; flex-direction: column; max-height: 80vh;
-        }
-        #vibe-move-panel h3 { margin: 0 0 10px; color: #61afef; }
-        #vibe-move-list {
-            list-style: none; padding: 0; margin: 0 0 15px 0;
-            overflow-y: auto; border: 1px solid #444; background: #21252b;
-            border-radius: 4px; flex-grow: 1;
-        }
-        #vibe-move-list li {
-            padding: 10px; border-bottom: 1px solid #33373f;
-            cursor: pointer; transition: background-color 0.2s;
-        }
-        #vibe-move-list li:hover { background-color: #3a3f4b; }
-        #vibe-move-list li.selected { background-color: #61afef; color: #1a1a1a; }
-        #vibe-move-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
-        #vibe-move-actions button {
-             background: #4b5263; color: #f0f0f0; border: none; padding: 12px;
-             border-radius: 4px; font-size: 1em; cursor: pointer;
-        }
-        #vibe-move-actions button:hover:not(:disabled) { background: #5c6370; }
-        #vibe-move-actions button:disabled { background: #33373f; cursor: not-allowed; opacity: 0.5; }
-        #vibe-move-cancel-btn { grid-column: 1 / -1; background: #e06c75; color: #1a1a1a; }
     \`;
 
     function getNodeIdForElement(el) {
@@ -1938,33 +1899,28 @@ function applyVibes() {
         toolbar = document.createElement('div');
         toolbar.id = 'vibe-inspector-toolbar';
         
-        addButton = document.createElement('button'); addButton.textContent = '➕'; addButton.title = 'Add New Component Here';
-        dragHandle = document.createElement('button'); dragHandle.id = 'vibe-inspector-drag-handle'; dragHandle.textContent = '✥'; dragHandle.title = 'Move Element';
-        editButton = document.createElement('button'); editButton.textContent = '✎'; editButton.title = 'Edit Component';
-        deleteButton = document.createElement('button'); deleteButton.textContent = '🗑️'; deleteButton.title = 'Delete Component';
+        addButton = document.createElement('button');
+        addButton.textContent = '➕';
+        addButton.title = 'Add New Component Here';
+
+        dragHandle = document.createElement('button');
+        dragHandle.id = 'vibe-inspector-drag-handle';
+        dragHandle.textContent = '✥';
+        dragHandle.title = 'Move Element';
+
+        editButton = document.createElement('button');
+        editButton.textContent = '✎';
+        editButton.title = 'Edit Component';
+
+        deleteButton = document.createElement('button');
+        deleteButton.textContent = '🗑️';
+        deleteButton.title = 'Delete Component';
 
         toolbar.appendChild(addButton);
         toolbar.appendChild(dragHandle);
         toolbar.appendChild(editButton);
         toolbar.appendChild(deleteButton);
         document.body.appendChild(toolbar);
-
-        mobileMovePanel = document.createElement('div');
-        mobileMovePanel.id = 'vibe-move-panel';
-        mobileMovePanel.innerHTML = \`
-            <div id="vibe-move-panel-content">
-                <h3>Move Element To...</h3>
-                <p>Select a destination. It will be highlighted in the preview.</p>
-                <ul id="vibe-move-list"></ul>
-                <div id="vibe-move-actions">
-                    <button id="vibe-move-before-btn" disabled>Before</button>
-                    <button id="vibe-move-inside-btn" disabled>Inside</button>
-                    <button id="vibe-move-after-btn" disabled>After</button>
-                    <button id="vibe-move-cancel-btn">Cancel</button>
-                </div>
-            </div>
-        \`;
-        document.body.appendChild(mobileMovePanel);
     }
     
     function updateToolbar(targetInfo) {
@@ -1977,25 +1933,21 @@ function applyVibes() {
         toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 5) + 'px';
         toolbar.style.left = (rect.left + window.scrollX) + 'px';
         
-        const moveHandler = (e) => {
+        const toggleMoveMode = (e) => {
             e.stopPropagation();
-            if (isTouchDevice) {
-                showMovePanel(targetInfo.nodeId);
+            if (moveModeInfo && moveModeInfo.sourceNodeId === targetInfo.nodeId) {
+                clearActionZones();
             } else {
-                 if (moveModeInfo && moveModeInfo.sourceNodeId === targetInfo.nodeId) {
-                    clearActionZones();
-                } else {
-                    moveModeInfo = { sourceNodeId: targetInfo.nodeId };
-                    dragHandle.classList.add('move-active');
-                    createActionableZones('move', targetInfo.nodeId);
-                }
+                moveModeInfo = { sourceNodeId: targetInfo.nodeId };
+                dragHandle.classList.add('move-active');
+                createActionableZones('move', targetInfo.nodeId);
             }
         };
 
         addButton.onclick = (e) => { e.stopPropagation(); createActionableZones('add', targetInfo.nodeId); };
         editButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*'); };
         deleteButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*'); };
-        dragHandle.onclick = moveHandler;
+        dragHandle.onclick = toggleMoveMode;
 
         if (!isTouchDevice) {
             dragHandle.draggable = true;
@@ -2013,7 +1965,9 @@ function applyVibes() {
     }
 
     function clearSelection() {
-        if (selectedEl) selectedEl.classList.remove('__vibe-inspect-highlight-selected');
+        if (selectedEl) {
+            selectedEl.classList.remove('__vibe-inspect-highlight-selected');
+        }
         selectedEl = null;
         updateToolbar(null);
         clearActionZones();
@@ -2038,13 +1992,24 @@ function applyVibes() {
 
     function handleClick(e) {
         if (!inspectEnabled) return;
+        
         const isActionZoneClick = e.target.classList.contains('vibe-action-zone');
         const isToolbarClick = toolbar && toolbar.contains(e.target);
+
         if (isToolbarClick) return;
-        if (!isActionZoneClick) e.preventDefault(); e.stopPropagation();
+
+        if (!isActionZoneClick) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
 
         const targetInfo = getNodeIdForElement(e.target);
-        if (moveModeInfo && !isActionZoneClick) { clearActionZones(); return; }
+
+        if (moveModeInfo && !isActionZoneClick) {
+            clearActionZones();
+            return;
+        }
+
         if (targetInfo) {
             if (selectedEl === targetInfo.element) return;
             clearSelection();
@@ -2059,12 +2024,14 @@ function applyVibes() {
 
     function createActionableZones(actionType, sourceNodeId) {
         clearActionZones();
-        Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
+        Object.values(window.__vibeIdToNodeId).forEach(nodeId => {
             if (actionType === 'move' && nodeId === sourceNodeId) return;
-            const targetElement = document.getElementById(elementId);
-            if (!targetElement) return;
 
-            const rect = targetElement.getBoundingClientRect();
+            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
+            if (!el) return;
+
+            const rect = el.getBoundingClientRect();
+            
             const createZone = (position, top, left, width, height) => {
                 const zone = document.createElement('div');
                 zone.className = 'vibe-action-zone';
@@ -2082,9 +2049,7 @@ function applyVibes() {
 
             createZone('before', rect.top - 5, rect.left, rect.width, 10);
             createZone('after', rect.bottom - 5, rect.left, rect.width, 10);
-            
-            const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(targetElement.tagName);
-            if (isContainerTag || targetElement.children.length > 0) {
+            if (el.children.length > 0 || actionType === 'add') {
                  createZone('inside', rect.top + 5, rect.left, rect.width, rect.height - 10);
             }
         });
@@ -2102,12 +2067,17 @@ function applyVibes() {
             const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
             if (action === 'add') {
                 window.parent.postMessage({ type: 'vibe-node-add-request', targetNodeId, position }, '*');
-            } else if (action === 'move' && sourceNodeId) {
+            } else if (action === 'move' && sourceNodeId) { // Check sourceNodeId from click-move
                  window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
             }
             clearSelection();
         }
     }, true);
+
+    // --- DRAG AND DROP LOGIC ---
+    document.addEventListener('dragstart', (e) => {
+        // The ondragstart handler on the button sets draggedInfo
+    });
 
     document.addEventListener('dragend', () => {
         if (draggedInfo) draggedInfo.element.classList.remove('vibe-dragging-ghost');
@@ -2115,17 +2085,25 @@ function applyVibes() {
         document.querySelectorAll('.vibe-action-zone.drag-over').forEach(z => z.classList.remove('drag-over'));
         clearActionZones();
     });
+
     document.addEventListener('dragenter', (e) => {
         e.preventDefault();
         const zone = e.target.closest('.vibe-action-zone');
-        if (zone) zone.classList.add('drag-over');
+        if (zone) {
+            zone.classList.add('drag-over');
+        }
     });
+
     document.addEventListener('dragleave', (e) => {
         e.preventDefault();
         const zone = e.target.closest('.vibe-action-zone');
-        if (zone) zone.classList.remove('drag-over');
+        if (zone) {
+            zone.classList.remove('drag-over');
+        }
     });
-    document.addEventListener('dragover', e => e.preventDefault());
+
+    document.addEventListener('dragover', e => e.preventDefault()); // This is crucial for drop to work
+
     document.addEventListener('drop', (e) => {
         e.preventDefault();
         const zone = e.target.closest('.vibe-action-zone');
@@ -2136,67 +2114,6 @@ function applyVibes() {
         }
     });
 
-    function showMovePanel(sourceNodeId) {
-        const panelContent = mobileMovePanel.querySelector('#vibe-move-panel-content');
-        const list = panelContent.querySelector('#vibe-move-list');
-        const beforeBtn = panelContent.querySelector('#vibe-move-before-btn');
-        const insideBtn = panelContent.querySelector('#vibe-move-inside-btn');
-        const afterBtn = panelContent.querySelector('#vibe-move-after-btn');
-        const cancelBtn = panelContent.querySelector('#vibe-move-cancel-btn');
-        let selectedTargetInfo = null;
-
-        list.innerHTML = '';
-        Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
-            if (nodeId === sourceNodeId) return;
-            const destinationElement = document.getElementById(elementId);
-            if (!destinationElement) return;
-
-            const li = document.createElement('li');
-            li.textContent = \`<${destinationElement.tagName.toLowerCase()}>#${elementId}\`;
-            li.dataset.nodeId = nodeId;
-            
-            li.onclick = () => {
-                if (mobileMoveTargetHighlight) mobileMoveTargetHighlight.classList.remove('__vibe-inspect-preview-highlight');
-                list.querySelectorAll('li.selected').forEach(i => i.classList.remove('selected'));
-                li.classList.add('selected');
-                
-                destinationElement.classList.add('__vibe-inspect-preview-highlight');
-                destinationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                mobileMoveTargetHighlight = destinationElement;
-                selectedTargetInfo = { nodeId, element: destinationElement };
-                
-                beforeBtn.disabled = false;
-                afterBtn.disabled = false;
-                const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(destinationElement.tagName);
-                insideBtn.disabled = !isContainerTag;
-            };
-            list.appendChild(li);
-        });
-
-        const hidePanel = () => {
-             if (mobileMoveTargetHighlight) mobileMoveTargetHighlight.classList.remove('__vibe-inspect-preview-highlight');
-             mobileMoveTargetHighlight = null;
-             mobileMovePanel.style.display = 'none';
-        };
-        
-        const moveAction = (position) => {
-            if (!selectedTargetInfo) return;
-            window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId: selectedTargetInfo.nodeId, position }, '*');
-            hidePanel();
-        };
-
-        beforeBtn.onclick = () => moveAction('before');
-        insideBtn.onclick = () => moveAction('inside');
-        afterBtn.onclick = () => moveAction('after');
-        cancelBtn.onclick = hidePanel;
-        
-        beforeBtn.disabled = true;
-        insideBtn.disabled = true;
-        afterBtn.disabled = true;
-        
-        mobileMovePanel.style.display = 'flex';
-    }
 
     function enableInspect() {
         if (inspectEnabled) return;
