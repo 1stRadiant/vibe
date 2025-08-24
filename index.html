@@ -11,50 +11,17 @@
 </head>
 <body>
 
-    <div id="start-page" class="active">
-        <div class="start-page-content">
-            <div class="start-header">
-                <h1>Vibe Coding System</h1>
-                <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
-            </div>
-
-            <div id="existing-projects-container">
-                <h2>Your Projects</h2>
-                <div id="project-list">
-                    <!-- Project list will be dynamically populated here -->
-                </div>
-                <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
-            </div>
-
-            <div id="new-project-container">
-                 <h2>Create a New Project</h2>
-                 <p>Enter a unique ID and a description to generate a new website.</p>
-                 <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                 <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                 <button id="generate-project-button">Generate & Save Project</button>
-            </div>
-
-            <div id="start-page-generation-output" style="display: none;">
-                <div id="generation-status-container">
-                    <h3 id="generation-status-text">Generating your project...</h3>
-                    <div class="loading-spinner"></div>
-                </div>
-                <div id="live-code-container">
-                    <pre><code id="live-code-output" class="language-html"></code></pre>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="container">
+    <!-- The new main layout that is always visible -->
+    <div class="main-layout">
         <div class="tabs">
+            <button class="tab-button active" data-tab="start">Start</button> <!-- New "Start" tab, active by default -->
             <button class="tab-button" data-tab="preview">Live Preview</button>
             <button class="tab-button" data-tab="editor">Vibe Editor</button>
             <button class="tab-button" data-tab="agent">Agent</button>
             <button class="tab-button" data-tab="flowchart">Flowchart</button>
             <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
             <button class="tab-button" data-tab="files">Files</button>
-            <button class="tab-button active" data-tab="code">Full Code</button>
+            <button class="tab-button" data-tab="code">Full Code</button>
 
             <!-- New: Undo/Redo toolbar buttons -->
             <div class="tabs-spacer"></div>
@@ -65,6 +32,43 @@
         </div>
 
         <div class="tab-content-area">
+            <!-- The old start page is now a tab-content item -->
+            <div id="start" class="tab-content active">
+                <div class="start-page-content">
+                    <div class="start-header">
+                        <h1>Vibe Coding System</h1>
+                        <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+                    </div>
+
+                    <div id="existing-projects-container">
+                        <h2>Your Projects</h2>
+                        <div id="project-list">
+                            <!-- Project list will be dynamically populated here -->
+                        </div>
+                        <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                    </div>
+
+                    <div id="new-project-container">
+                         <h2>Create a New Project</h2>
+                         <p>Enter a unique ID and a description to generate a new website.</p>
+                         <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                         <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                         <button id="generate-project-button">Generate & Save Project</button>
+                    </div>
+
+                    <div id="start-page-generation-output" style="display: none;">
+                        <div id="generation-status-container">
+                            <h3 id="generation-status-text">Generating your project...</h3>
+                            <div class="loading-spinner"></div>
+                        </div>
+                        <div id="live-code-container">
+                            <pre><code id="live-code-output" class="language-html"></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All other tab content remains here -->
             <div id="preview" class="tab-content">
                 <div class="preview-container">
                     <div class="preview-header">
@@ -156,7 +160,7 @@
                 </div>
             </div>
 
-            <div id="code" class="tab-content active">
+            <div id="code" class="tab-content">
                 <div class="full-code-container">
                     <h3>Full Website Code</h3>
                     <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
@@ -190,7 +194,7 @@
         </div>
     </div>
 
-    <!-- Modal for adding a new node -->
+    <!-- Modals remain unchanged -->
     <div id="add-node-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -216,13 +220,11 @@
         </div>
     </div>
 
-    <!-- Modal for API Settings -->
     <div id="settings-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-settings-modal-button">&times;</span>
             <h2>API Settings</h2>
             
-            <!-- AI Provider Selection -->
             <div class="ai-provider-container">
                 <h3>AI Provider</h3>
                 <select id="ai-provider-select">
@@ -231,9 +233,7 @@
                 </select>
             </div>
 
-            <!-- Gemini Settings Container -->
             <div id="gemini-settings-container">
-                <!-- Gemini Model Selection -->
                 <div class="ai-provider-container">
                     <h3>Gemini Model</h3>
                     <select id="gemini-model-select">
@@ -249,7 +249,6 @@
                     </select>
                 </div>
 
-                <!-- Gemini API Key Container -->
                 <div id="gemini-api-key-container" class="api-key-container">
                     <h3>Gemini API Key</h3>
                     <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
@@ -258,7 +257,6 @@
                 </div>
             </div>
 
-            <!-- nscale API Key Container -->
             <div id="nscale-api-key-container" class="api-key-container" style="display: none;">
                 <h3>nscale API Key</h3>
                 <input type="password" id="nscale-api-key-input" placeholder="Enter your nscale API Key here...">
@@ -268,7 +266,6 @@
         </div>
     </div>
 
-    <!-- Modal for Editing a Vibe Node -->
     <div id="edit-node-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-edit-node-modal-button">&times;</span>
@@ -282,7 +279,6 @@
 
             <label for="edit-node-description">Description</label>
             <textarea id="edit-node-description" rows="3" placeholder="Describe the purpose of this component..."></textarea>
-            <!-- NEW: AI helper to improve description -->
             <button id="ai-improve-description-button" class="action-button" style="margin-top: 10px;">
                 AI: Improve Description
             </button>
