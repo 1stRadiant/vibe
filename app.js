@@ -1,3 +1,5 @@
+
+
 import { DataBase } from './database.js';
 
 const db = new DataBase();
@@ -1830,10 +1832,10 @@ function applyVibes() {
     window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
+    let selectedEl = null; // For persistent selection on click
     let toolbar, dragHandle, editButton, deleteButton, addButton;
     let actionZones = [];
     let draggedInfo = null;
-    let toolbarHideTimeout;
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
@@ -1841,7 +1843,12 @@ function applyVibes() {
             outline: 2px solid #e5c07b !important;
             outline-offset: 2px !important;
             box-shadow: 0 0 8px rgba(229, 192, 123, 0.8) !important;
-            position: relative;
+            cursor: pointer;
+        }
+        .__vibe-inspect-highlight-selected {
+            outline: 3px solid #61afef !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 12px rgba(97, 175, 239, 0.9) !important;
         }
         #vibe-inspector-toolbar {
             position: absolute; z-index: 100000;
@@ -1864,7 +1871,6 @@ function applyVibes() {
         }
         .vibe-action-zone:hover { background: rgba(152, 195, 121, 0.7); border-color: #98c379; }
         .vibe-dragging-ghost { opacity: 0.4 !important; }
-        .vibe-move-active { cursor: grabbing !important; }
     \`;
 
     function getNodeIdForElement(el) {
@@ -1909,19 +1915,14 @@ function applyVibes() {
         toolbar.appendChild(editButton);
         toolbar.appendChild(deleteButton);
         document.body.appendChild(toolbar);
-        
-        // Toolbar visibility logic
-        toolbar.addEventListener('mouseover', () => clearTimeout(toolbarHideTimeout));
-        toolbar.addEventListener('mouseout', handleMouseOut);
     }
     
     function updateToolbar(targetInfo) {
-        clearTimeout(toolbarHideTimeout);
-        if (!targetInfo) {
-            toolbarHideTimeout = setTimeout(() => toolbar.style.display = 'none', 100);
+        if (!targetInfo || !selectedEl) {
+            toolbar.style.display = 'none';
             return;
         }
-        const rect = targetInfo.element.getBoundingClientRect();
+        const rect = selectedEl.getBoundingClientRect();
         toolbar.style.display = 'flex';
         toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 5) + 'px';
         toolbar.style.left = (rect.left + window.scrollX) + 'px';
@@ -1947,22 +1948,53 @@ function applyVibes() {
         }
     }
 
+    function clearSelection() {
+        if (selectedEl) {
+            selectedEl.classList.remove('__vibe-inspect-highlight-selected');
+        }
+        selectedEl = null;
+        updateToolbar(null);
+        clearActionZones();
+    }
+
     function handleMouseOver(e) {
-        if (!inspectEnabled || document.querySelector('.vibe-action-zone')) return;
+        if (!inspectEnabled || selectedEl || document.querySelector('.vibe-action-zone')) return;
         const targetInfo = getNodeIdForElement(e.target);
         if (targetInfo) {
             if (hoverEl && hoverEl !== targetInfo.element) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             hoverEl = targetInfo.element;
             hoverEl.classList.add('__vibe-inspect-highlight-hover');
-            updateToolbar(targetInfo);
         }
     }
     
     function handleMouseOut(e) {
-        if (hoverEl && !hoverEl.contains(e.relatedTarget) && e.relatedTarget !== toolbar && !toolbar.contains(e.relatedTarget)) {
+        if (hoverEl && !hoverEl.contains(e.relatedTarget)) {
             hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             hoverEl = null;
-            updateToolbar(null);
+        }
+    }
+
+    function handleClick(e) {
+        if (!inspectEnabled) return;
+
+        if (e.target.classList.contains('vibe-action-zone') || (toolbar && toolbar.contains(e.target))) {
+            return; // Let other handlers manage clicks on zones or the toolbar itself
+        }
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const targetInfo = getNodeIdForElement(e.target);
+
+        if (targetInfo) {
+            if (selectedEl === targetInfo.element) return; // Already selected
+            clearSelection();
+            selectedEl = targetInfo.element;
+            selectedEl.classList.add('__vibe-inspect-highlight-selected');
+            if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+            updateToolbar(targetInfo);
+        } else {
+            clearSelection();
         }
     }
 
@@ -2003,7 +2035,8 @@ function applyVibes() {
         actionZones.forEach(zone => zone.remove());
         actionZones = [];
     }
-
+    
+    // This handler now only manages action zone clicks
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('vibe-action-zone')) {
             const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
@@ -2012,9 +2045,6 @@ function applyVibes() {
             } else if (action === 'move') {
                  window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
             }
-            clearActionZones();
-        } else if(actionZones.length > 0) {
-            // Click outside any zone to cancel
             clearActionZones();
         }
     });
@@ -2040,6 +2070,7 @@ function applyVibes() {
         createToolbar();
         document.addEventListener('mouseover', handleMouseOver);
         document.addEventListener('mouseout', handleMouseOut);
+        document.addEventListener('click', handleClick, true); // Use capture phase
     }
 
     function disableInspect() {
@@ -2047,9 +2078,9 @@ function applyVibes() {
         inspectEnabled = false;
         document.removeEventListener('mouseover', handleMouseOver);
         document.removeEventListener('mouseout', handleMouseOut);
+        document.removeEventListener('click', handleClick, true);
         if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-        updateToolbar(null);
-        clearActionZones();
+        clearSelection();
     }
     
     window.addEventListener('message', function(event) {
