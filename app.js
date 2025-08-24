@@ -1949,7 +1949,6 @@ function applyVibes() {
         toolbar.appendChild(deleteButton);
         document.body.appendChild(toolbar);
 
-        // Create mobile move panel
         mobileMovePanel = document.createElement('div');
         mobileMovePanel.id = 'vibe-move-panel';
         mobileMovePanel.innerHTML = \`
@@ -2060,12 +2059,12 @@ function applyVibes() {
 
     function createActionableZones(actionType, sourceNodeId) {
         clearActionZones();
-        Object.values(window.__vibeIdToNodeId).forEach(nodeId => {
+        Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
             if (actionType === 'move' && nodeId === sourceNodeId) return;
-            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            const rect = element.getBoundingClientRect();
             const createZone = (position, top, left, width, height) => {
                 const zone = document.createElement('div');
                 zone.className = 'vibe-action-zone';
@@ -2083,7 +2082,9 @@ function applyVibes() {
 
             createZone('before', rect.top - 5, rect.left, rect.width, 10);
             createZone('after', rect.bottom - 5, rect.left, rect.width, 10);
-            if (el.children.length > 0 || actionType === 'add') {
+            
+            const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(element.tagName);
+            if (isContainerTag || element.children.length > 0) {
                  createZone('inside', rect.top + 5, rect.left, rect.width, rect.height - 10);
             }
         });
@@ -2136,31 +2137,36 @@ function applyVibes() {
     });
 
     function showMovePanel(sourceNodeId) {
-        const list = mobileMovePanel.querySelector('#vibe-move-list');
-        const beforeBtn = mobileMovePanel.querySelector('#vibe-move-before-btn');
-        const insideBtn = mobileMovePanel.querySelector('#vibe-move-inside-btn');
-        const afterBtn = mobileMovePanel.querySelector('#vibe-move-after-btn');
-        const cancelBtn = mobileMovePanel.querySelector('#vibe-move-cancel-btn');
+        const panelContent = mobileMovePanel.querySelector('#vibe-move-panel-content');
+        const list = panelContent.querySelector('#vibe-move-list');
+        const beforeBtn = panelContent.querySelector('#vibe-move-before-btn');
+        const insideBtn = panelContent.querySelector('#vibe-move-inside-btn');
+        const afterBtn = panelContent.querySelector('#vibe-move-after-btn');
+        const cancelBtn = panelContent.querySelector('#vibe-move-cancel-btn');
         let selectedTargetInfo = null;
 
         list.innerHTML = '';
         Object.entries(window.__vibeIdToNodeId).forEach(([elementId, nodeId]) => {
             if (nodeId === sourceNodeId) return;
-            const el = document.getElementById(elementId);
-            if (!el) return;
+            const targetElement = document.getElementById(elementId);
+            if (!targetElement) return;
+
             const li = document.createElement('li');
-            li.textContent = \`<${el.tagName.toLowerCase()}>#${elementId}\`;
+            li.textContent = \`<${targetElement.tagName.toLowerCase()}>#${elementId}\`;
             li.dataset.nodeId = nodeId;
+            
             li.onclick = () => {
                 if (mobileMoveTargetHighlight) mobileMoveTargetHighlight.classList.remove('__vibe-inspect-preview-highlight');
                 list.querySelectorAll('li.selected').forEach(i => i.classList.remove('selected'));
                 li.classList.add('selected');
-                el.classList.add('__vibe-inspect-preview-highlight');
-                mobileMoveTargetHighlight = el;
-                selectedTargetInfo = { nodeId, element: el };
+                targetElement.classList.add('__vibe-inspect-preview-highlight');
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                mobileMoveTargetHighlight = targetElement;
+                selectedTargetInfo = { nodeId, element: targetElement };
                 beforeBtn.disabled = false;
                 afterBtn.disabled = false;
-                insideBtn.disabled = (el.children.length === 0 && !['div','section','main','header','footer'].includes(el.tagName.toLowerCase()));
+                const isContainerTag = ['DIV', 'SECTION', 'MAIN', 'HEADER', 'FOOTER', 'ARTICLE', 'ASIDE', 'NAV'].includes(targetElement.tagName);
+                insideBtn.disabled = !isContainerTag;
             };
             list.appendChild(li);
         });
@@ -2181,6 +2187,10 @@ function applyVibes() {
         insideBtn.onclick = () => moveAction('inside');
         afterBtn.onclick = () => moveAction('after');
         cancelBtn.onclick = hidePanel;
+        
+        beforeBtn.disabled = true;
+        insideBtn.disabled = true;
+        afterBtn.disabled = true;
         
         mobileMovePanel.style.display = 'flex';
     }
