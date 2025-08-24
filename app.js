@@ -12,8 +12,7 @@ const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 
 // Start Page elements (now a tab with id 'start')
-const startPage = document.getElementById('start'); // CORRECTED: Was 'start-page'
-// REMOVED: mainContainer is no longer used
+const startPage = document.getElementById('start');
 const projectPromptInput = document.getElementById('project-prompt-input');
 const generateProjectButton = document.getElementById('generate-project-button');
 const startPageGenerationOutput = document.getElementById('start-page-generation-output');
@@ -97,6 +96,10 @@ const newNodeIdInput = document.getElementById('new-node-id');
 const newNodeDescriptionInput = document.getElementById('new-node-description');
 const newNodeTypeInput = document.getElementById('new-node-type');
 const addNodeError = document.getElementById('add-node-error');
+// NEW: Hidden fields for inspector-based adding
+const addNodeTargetIdInput = document.getElementById('add-node-target-id');
+const addNodePositionInput = document.getElementById('add-node-position');
+
 
 // Edit Node Modal elements
 const editNodeModal = document.getElementById('edit-node-modal');
@@ -959,14 +962,6 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         console.log("Successfully parsed generated subtree from AI.");
         logToConsole(`Successfully generated ${childrenArray.length} new components.`, 'info');
         
-        // --- Live code update on start page (now handled by streaming) ---
-        // if (startPage.classList.contains('active')) {
-        //     let tempTree = JSON.parse(JSON.stringify(vibeTree));
-        //     tempTree.children = childrenArray;
-        //     liveCodeOutput.textContent = generateFullCodeString(tempTree);
-        // }
-        // --- End live code update ---
-
         return childrenArray;
     } catch (e) {
         console.error("Failed to parse subtree JSON from AI:", rawResponse);
@@ -994,8 +989,6 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
             body: JSON.stringify({
                 model: NSCALE_MODEL,
                 messages: messages,
-                // nscale API might not have a dedicated JSON mode, so we request it in the prompt.
-                // The parsing logic will handle the response.
             })
         });
 
@@ -1015,7 +1008,6 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
-        // If JSON is expected, attempt to clean and parse it.
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
             if (jsonMatch && jsonMatch[1]) {
@@ -1034,7 +1026,6 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
 
 /**
  * Parses a full HTML string into a vibeTree structure using the DOMParser API.
- * This is a non-AI, client-side alternative to decomposeCodeIntoVibeTree.
  * @param {string} fullCode The full HTML content as a string.
  * @returns {object} A vibeTree object.
  */
@@ -1058,7 +1049,6 @@ function parseHtmlToVibeTree(fullCode) {
     // 1. Process <head> content
     const headContent = [];
     doc.head.childNodes.forEach(child => {
-        // We capture meta, title, link but exclude style (handled separately) and script (handled separately)
         if (child.nodeType === Node.ELEMENT_NODE && !['STYLE', 'SCRIPT'].includes(child.tagName)) {
             headContent.push(child.outerHTML);
         }
@@ -1071,7 +1061,7 @@ function parseHtmlToVibeTree(fullCode) {
         code: headContent.join('\n')
     };
 
-    // 2. Process CSS from <style> tags in the <head>
+    // 2. Process CSS from <style> tags
     const styleTags = Array.from(doc.head.querySelectorAll('style'));
     styleTags.forEach((styleTag, index) => {
         if (styleTag.textContent.trim()) {
@@ -1089,14 +1079,10 @@ function parseHtmlToVibeTree(fullCode) {
     let lastElementId = null;
 
     bodyChildren.forEach((element, index) => {
-        // Skip script tags when creating HTML nodes
-        if (element.tagName.toLowerCase() === 'script') {
-            return;
-        }
+        if (element.tagName.toLowerCase() === 'script') return;
       
         let elementId = element.id;
         if (!elementId) {
-            // Generate a descriptive ID if one doesn't exist.
             elementId = `${element.tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-section-${index}`;
             element.id = elementId;
         }
@@ -1113,16 +1099,13 @@ function parseHtmlToVibeTree(fullCode) {
         lastElementId = elementId;
     });
 
-    // 4. Process JS from <script> tags inside the body (and head)
+    // 4. Process JS from <script> tags
     const scriptTags = Array.from(doc.querySelectorAll('script'));
     scriptTags.forEach((scriptTag, index) => {
         if (!scriptTag.src && scriptTag.textContent.trim()) {
             let code = scriptTag.textContent.trim();
-            // The system sometimes wraps user JS in an IIFE. Let's unwrap it if it exists.
             const iifeMatch = code.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-            if (iifeMatch) {
-                code = iifeMatch[1].trim();
-            }
+            if (iifeMatch) code = iifeMatch[1].trim();
 
             jsNodes.push({
                 id: `page-script-${index + 1}`,
@@ -1133,7 +1116,6 @@ function parseHtmlToVibeTree(fullCode) {
         }
     });
     
-    // Assemble the children array in the correct order: head -> HTML -> CSS -> JS
     vibeTree.children = [headNode, ...htmlNodes, ...cssNodes, ...jsNodes];
     
     console.log("Client-side parsing complete. Generated Vibe Tree:", vibeTree);
@@ -1226,52 +1208,16 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
     // Helper: try progressively more aggressive JSON extraction strategies
     function tryParseVarious(text) {
-        // 1) Trim and try direct JSON
-        try {
-            const direct = JSON.parse(text.trim());
-            return direct;
-        } catch {}
-
-        // 2) Strip fenced blocks like ```json ... ```
+        try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
         if (fence && fence[1]) {
-            try {
-                return JSON.parse(fence[1]);
-            } catch {}
+            try { return JSON.parse(fence[1]); } catch {}
         }
-
-        // 3) Find first '{' and last '}' and attempt to parse that slice
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            const slice = text.slice(firstBrace, lastBrace + 1);
-            try {
-                return JSON.parse(slice);
-            } catch {}
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+            try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch {}
         }
-
-        // 4) Attempt to collect a balanced JSON object by scanning braces
-        let start = text.indexOf('{');
-        while (start !== -1) {
-            let depth = 0;
-            for (let i = start; i < text.length; i++) {
-                const ch = text[i];
-                if (ch === '{') depth++;
-                else if (ch === '}') {
-                    depth--;
-                    if (depth === 0) {
-                        const candidate = text.slice(start, i + 1);
-                        try {
-                            return JSON.parse(candidate);
-                        } catch (parseError) {
-                            break; // try next start
-                        }
-                    }
-                }
-            }
-            start = text.indexOf('{', start + 1);
-        }
-
         return null;
     }
 
@@ -1279,7 +1225,6 @@ async function decomposeCodeIntoVibeTree(fullCode) {
         const parsed = tryParseVarious(rawResponse);
 
         if (!parsed) {
-            // Fallback: client-side parser to keep processing from failing
             console.warn("AI did not return valid JSON. Falling back to client-side HTML parser.");
             logToConsole('AI returned invalid JSON; using client-side HTML parser instead.', 'warn');
             return parseHtmlToVibeTree(fullCode);
@@ -1294,8 +1239,7 @@ async function decomposeCodeIntoVibeTree(fullCode) {
         console.log("Successfully parsed decomposed vibe tree from AI.");
         return parsed;
     } catch (e) {
-        // Final safety net: fallback to client-side parsing
-        console.warn("Failed to parse vibe tree JSON from AI, using client-side parser. Raw response logged.", e);
+        console.warn("Failed to parse vibe tree JSON from AI, using client-side parser.", e);
         logToConsole(`AI JSON parse failed (${e.message}); using client-side parser.`, 'warn');
         return parseHtmlToVibeTree(fullCode);
     }
@@ -1319,24 +1263,16 @@ async function processCodeAndRefreshUI(fullCode) {
     logToConsole(`Processing full code to update vibe tree.`, 'info');
     
     try {
-        // Record before replacement
         recordHistory('Process full code (replace tree)');
-
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode);
         vibeTree = newVibeTree;
-
-        editorContainer.innerHTML = '';
-        editorContainer.appendChild(renderEditor(vibeTree));
-        applyVibes();
-        showFullCode(); 
+        refreshAllUI();
         logToConsole("Update from code complete. UI refreshed.", 'info');
         document.querySelector('.tab-button[data-tab="preview"]').click();
-        // Update last snapshot since vibeTree changed significantly
         historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         autoSaveProject();
-
     } catch (error) {
-        console.error("Flattened to update vibes from full code:", error);
+        console.error("Failed to update vibes from full code:", error);
         logToConsole(`Failed to process code: ${error.message}`, 'error');
         alert(`An error occurred during processing: ${error.message}. Check the console for details.`);
     } finally {
@@ -1360,11 +1296,9 @@ async function handleFileUpload() {
     }
     logToConsole(`File selected: ${file.name} (${file.type})`, 'info');
     if (!file.type.includes('html')) {
-        console.warn(`File selected is not of type text/html. It is: ${file.type}. Proceeding anyway.`);
-        logToConsole(`Warning: Selected file is not of type text/html. It is: ${file.type}. Proceeding anyway.`, 'warn');
+        logToConsole(`Warning: Selected file is not text/html. Proceeding anyway.`, 'warn');
     }
 
-    // Create/assign a project ID from the filename and ensure uniqueness before processing
     const baseId = file.name.replace(/\.(html|htm)$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
     let projectId = baseId || `html-project-${Date.now()}`;
     const existing = db.listProjects();
@@ -1379,15 +1313,10 @@ async function handleFileUpload() {
     
     reader.onload = async (event) => {
         const fileContent = event.target.result;
-        // Show code in the Full Code editor
         fullCodeEditor.value = fileContent;
-
-        // Process with AI to decompose into Vibe Tree and refresh UI
         await processCodeAndRefreshUI(fileContent);
-
-        // Persist project
         autoSaveProject();
-        logToConsole(`HTML project '${currentProjectId}' imported and processed with AI.`, 'info');
+        logToConsole(`HTML project '${currentProjectId}' imported and processed.`, 'info');
     };
 
     reader.onerror = (error) => {
@@ -1428,16 +1357,11 @@ function guessMimeType(filename) {
 
 /**
  * Utility: Normalize and resolve paths like a browser would for relative URLs, using a base path.
- * basePath should be a directory-like path (e.g. 'site/' or 'site/subdir/').
  */
 function resolveZipPath(basePath, relativePath) {
-    if (!relativePath) return '';
-    // If it's already absolute (starts with / or has a protocol), return as-is
-    if (/^[a-z]+:\/\//i.test(relativePath) || relativePath.startsWith('data:') || relativePath.startsWith('blob:')) return relativePath;
+    if (!relativePath || /^[a-z]+:\/\//i.test(relativePath) || relativePath.startsWith('data:') || relativePath.startsWith('blob:')) return relativePath;
     if (relativePath.startsWith('/')) {
-        // Treat leading slash as root of zip (strip leading slash)
-        relativePath = relativePath.replace(/^\//, '');
-        return relativePath;
+        return relativePath.replace(/^\//, '');
     }
 
     const baseParts = basePath.split('/').filter(Boolean);
@@ -1462,7 +1386,6 @@ function rewriteCssUrls(cssText, resolverCb) {
         let raw = p1.trim().replace(/^['"]|['"]$/g, '');
         const resolved = resolverCb(raw);
         if (!resolved) return match;
-        // Keep quotes if original had them
         const hadQuotes = /^['"].*['"]$/.test(p1.trim());
         return `url(${hadQuotes ? `"${resolved}"` : resolved})`;
     });
@@ -1470,130 +1393,87 @@ function rewriteCssUrls(cssText, resolverCb) {
 
 /**
  * Build a DOM from index.html text, inline local CSS/JS from ZIP, and rewrite asset URLs to blob: URLs.
- * Returns { combinedHtml, blobUrlMap } where combinedHtml is a complete HTML string safe to render with srcdoc,
- * and blobUrlMap maps zip paths to created blob object URLs.
  */
 async function buildCombinedHtmlFromZip(jszip, indexPath) {
-    // Map every file path in zip to Blob and object URL
     const fileNames = Object.keys(jszip.files);
-    const fileBlobs = {};
     const blobUrlMap = {};
 
-    // First pass: build Blob and object URL map
     for (const name of fileNames) {
         const file = jszip.files[name];
         if (file.dir) continue;
         const mime = guessMimeType(name);
-        const content = await file.async(mime.startsWith('text/') || mime === 'application/javascript' || mime === 'application/json' ? 'text' : 'uint8array');
-        let blob;
-        if (typeof content === 'string') {
-            blob = new Blob([content], { type: mime });
-        } else {
-            blob = new Blob([content], { type: mime });
-        }
-        fileBlobs[name] = { blob, mime };
+        const content = await file.async('uint8array');
+        const blob = new Blob([content], { type: mime });
         try {
             blobUrlMap[name] = URL.createObjectURL(blob);
         } catch (e) {
-            // Fallback: no URL, keep undefined
             console.warn(`Failed to create object URL for ${name}:`, e);
         }
     }
 
-    // Helper to find if a path exists in zip (case-sensitive)
-    const zipHas = (p) => !!jszip.files[p];
-
-    // Load and parse index.html
     const indexText = await jszip.files[indexPath].async('text');
     const parser = new DOMParser();
     const doc = parser.parseFromString(indexText, 'text/html');
+    const indexDir = indexPath.includes('/') ? indexPath.split('/').slice(0, -1).join('/') + '/' : '';
 
-    // Base directory of index.html (for resolving relative refs)
-    const indexDir = indexPath.split('/').slice(0, -1).join('/') + (indexPath.includes('/') ? '/' : '');
-
-    // Inline <link rel="stylesheet" href="..."> if it points to a zip file
     const linkNodes = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
     for (const link of linkNodes) {
         const href = link.getAttribute('href').trim();
         const resolved = resolveZipPath(indexDir, href);
-        if (zipHas(resolved)) {
+        if (jszip.files[resolved]) {
             const cssTextRaw = await jszip.files[resolved].async('text');
-            // Rewrite url(...) inside CSS
-            const cssDir = resolved.split('/').slice(0, -1).join('/') + (resolved.includes('/') ? '/' : '');
+            const cssDir = resolved.includes('/') ? resolved.split('/').slice(0, -1).join('/') + '/' : '';
             const cssText = rewriteCssUrls(cssTextRaw, (assetPath) => {
                 const assetResolved = resolveZipPath(cssDir, assetPath);
                 return blobUrlMap[assetResolved] || assetPath;
             });
-
             const style = doc.createElement('style');
             style.textContent = cssText;
             link.replaceWith(style);
         }
     }
 
-    // Inline <script src="..."></script> where src points to a zip file
     const scriptNodes = Array.from(doc.querySelectorAll('script[src]'));
     for (const s of scriptNodes) {
         const src = s.getAttribute('src').trim();
         const resolved = resolveZipPath(indexDir, src);
-        if (zipHas(resolved)) {
+        if (jszip.files[resolved]) {
             const code = await jszip.files[resolved].async('text');
             const inline = doc.createElement('script');
             inline.textContent = code;
-            // Preserve type if present
-            const type = s.getAttribute('type');
-            if (type) inline.setAttribute('type', type);
+            if (s.type) inline.type = s.type;
             s.replaceWith(inline);
         }
     }
 
-    // Rewrite common asset attributes to blob URLs if present in zip
     const assetAttrTargets = [
-        { selector: 'img[src]', attr: 'src' },
-        { selector: 'video[src]', attr: 'src' },
-        { selector: 'audio[src]', attr: 'src' },
-        { selector: 'source[src]', attr: 'src' },
-        { selector: 'link[rel~="icon"][href]', attr: 'href' },
-        { selector: 'link[rel~="apple-touch-icon"][href]', attr: 'href' },
-        { selector: 'link[rel~="manifest"][href]', attr: 'href' }
+        { selector: 'img[src], video[src], audio[src], source[src]', attr: 'src' },
+        { selector: 'link[rel~="icon"], link[rel~="apple-touch-icon"], link[rel~="manifest"]', attr: 'href' }
     ];
     for (const { selector, attr } of assetAttrTargets) {
-        const nodes = Array.from(doc.querySelectorAll(selector));
-        for (const node of nodes) {
+        doc.querySelectorAll(selector).forEach(node => {
             const val = node.getAttribute(attr);
-            if (!val) continue;
+            if (!val) return;
             const resolved = resolveZipPath(indexDir, val.trim());
-            if (blobUrlMap[resolved]) {
-                node.setAttribute(attr, blobUrlMap[resolved]);
-            }
-        }
+            if (blobUrlMap[resolved]) node.setAttribute(attr, blobUrlMap[resolved]);
+        });
     }
 
-    // Optional: handle img srcset (basic)
-    const imgWithSrcset = Array.from(doc.querySelectorAll('img[srcset]'));
-    for (const img of imgWithSrcset) {
-        const srcset = img.getAttribute('srcset');
-        if (!srcset) continue;
-        const parts = srcset.split(',').map(s => s.trim()).filter(Boolean);
-        const rewritten = parts.map(part => {
+    doc.querySelectorAll('img[srcset]').forEach(img => {
+        const srcset = img.getAttribute('srcset') || '';
+        const rewritten = srcset.split(',').map(s => s.trim()).filter(Boolean).map(part => {
             const [urlPart, sizePart] = part.split(/\s+/);
             const resolved = resolveZipPath(indexDir, urlPart);
-            const newUrl = blobUrlMap[resolved] || urlPart;
-            return sizePart ? `${newUrl} ${sizePart}` : newUrl;
+            return (blobUrlMap[resolved] || urlPart) + (sizePart ? ` ${sizePart}` : '');
         }).join(', ');
         img.setAttribute('srcset', rewritten);
-    }
+    });
 
-    const serializer = new XMLSerializer();
-    const combinedHtml = serializer.serializeToString(doc);
-    return { combinedHtml, blobUrlMap };
+    return { combinedHtml: new XMLSerializer().serializeToString(doc), blobUrlMap };
 }
 
 /**
- * Import a ZIP multi-file project:
- * - Find index.html
- * - Inline local CSS/JS and rewrite asset URLs to blob:
- * - Decompose with AI into a vibe tree (fallback to client-side parser on failure)
+ * Import a ZIP multi-file project.
  */
 async function handleZipUpload() {
     const file = zipFileInput.files && zipFileInput.files[0];
@@ -1601,37 +1481,25 @@ async function handleZipUpload() {
         alert("Please select a ZIP file to upload.");
         return;
     }
-    logToConsole(`ZIP selected: ${file.name} (${file.type || 'application/zip'})`, 'info');
+    logToConsole(`ZIP selected: ${file.name}`, 'info');
 
-    // Disable button during processing
     const originalText = uploadZipButton.innerHTML;
     uploadZipButton.disabled = true;
     uploadZipButton.innerHTML = 'Processing ZIP... <div class="loading-spinner"></div>';
 
     try {
-        if (!window.JSZip) {
-            throw new Error('JSZip library failed to load.');
-        }
+        if (!window.JSZip) throw new Error('JSZip library failed to load.');
 
         const jszip = await JSZip.loadAsync(file);
-
-        // Find an index.html (prefer shortest path)
         const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
-        if (htmlCandidates.length === 0) {
-            throw new Error('No index.html found in ZIP.');
-        }
-        // Choose the one with the fewest path segments
+        if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
         const indexPath = htmlCandidates[0];
         logToConsole(`Using entry point: ${indexPath}`, 'info');
 
-        // Build combined HTML with inlined CSS/JS and rewritten assets
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
-
-        // Show code in Full Code tab/editor
         fullCodeEditor.value = combinedHtml;
 
-        // Create project ID from zip filename and ensure uniqueness
         const derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         let projectId = derivedId || `zip-project-${Date.now()}`;
         const existing = db.listProjects();
@@ -1641,29 +1509,16 @@ async function handleZipUpload() {
         }
         currentProjectId = projectId;
 
-        // Try AI-based decomposition first
-        let newTree = null;
-        let usedAI = false;
-        try {
-            logToConsole('Decomposing ZIP website with AI into Vibe Tree...', 'info');
-            newTree = await decomposeCodeIntoVibeTree(combinedHtml);
-            usedAI = true;
-        } catch (aiErr) {
-            console.warn('AI decomposition failed, falling back to client-side parsing.', aiErr);
-            logToConsole(`AI decomposition failed (${aiErr.message}). Falling back to client-side parser.`, 'warn');
-            newTree = parseHtmlToVibeTree(combinedHtml);
-        }
+        logToConsole('Decomposing ZIP website into Vibe Tree...', 'info');
+        const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
 
-        // Apply and persist
         vibeTree = newTree;
         db.saveProject(currentProjectId, vibeTree);
 
         resetHistory();
-        historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
-
         refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
-        logToConsole(`ZIP project '${currentProjectId}' imported successfully using ${usedAI ? 'AI decomposition' : 'client parser'}.`, 'info');
+        logToConsole(`ZIP project '${currentProjectId}' imported successfully.`, 'info');
 
     } catch (e) {
         console.error('ZIP import failed:', e);
@@ -1961,36 +1816,27 @@ function buildElementIdToNodeIdMap(node = vibeTree, map = {}) {
 }
 
 /**
- * Applies the current vibeTree to the preview iframe:
- * - Generates full HTML from the vibe tree
- * - Injects an inspector helper script and node map
- * - Ensures JS runs inside the iframe
+ * Applies the current vibeTree to the preview iframe with an advanced inspector.
  */
 function applyVibes() {
     try {
         const doc = previewContainer.contentWindow.document;
-        // Generate the full page HTML
         let html = generateFullCodeString();
-
-        // Build elementId -> nodeId map for click-to-edit
         const idToNodeMap = buildElementIdToNodeIdMap();
 
-        // Inspector script injection (existing)
         const inspectorScript = `
 <script>
 (function(){
     window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
-    let toolbar, dragHandle, editButton, deleteButton;
-    let dropZones = [];
-    let draggedNodeId = null;
+    let toolbar, dragHandle, editButton, deleteButton, addButton;
+    let actionZones = [];
+    let draggedInfo = null;
+    let toolbarHideTimeout;
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
-        .__vibe-inspect-highlight-all {
-            outline: 1px dashed #56b6c2 !important; 
-            outline-offset: 1px !important;
-        }
         .__vibe-inspect-highlight-hover {
             outline: 2px solid #e5c07b !important;
             outline-offset: 2px !important;
@@ -1998,40 +1844,27 @@ function applyVibes() {
             position: relative;
         }
         #vibe-inspector-toolbar {
-            position: absolute;
-            z-index: 99999;
-            background-color: #282c34;
-            border: 1px solid #61afef;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-            display: none;
-            align-items: center;
-            padding: 2px;
-            gap: 2px;
+            position: absolute; z-index: 100000;
+            background-color: #282c34; border: 1px solid #61afef;
+            border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            display: none; align-items: center; padding: 3px; gap: 3px;
         }
         #vibe-inspector-toolbar button {
-            background: #4b5263;
-            color: #f0f0f0;
-            border: none;
-            padding: 5px;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 16px;
-            line-height: 1;
+            background: #4b5263; color: #f0f0f0; border: none;
+            padding: 6px 8px; cursor: pointer; border-radius: 3px;
+            font-size: 16px; line-height: 1; transition: background-color 0.2s;
         }
         #vibe-inspector-toolbar button:hover { background: #5c6370; }
         #vibe-inspector-drag-handle { cursor: move; }
-        .vibe-drop-zone {
-            background: rgba(97, 175, 239, 0.4);
+        .vibe-action-zone {
+            background: rgba(97, 175, 239, 0.5);
             border: 1px dashed #61afef;
-            z-index: 99998;
-            position: absolute;
-            pointer-events: none; /* Allow events to pass through to elements underneath */
+            z-index: 99999; position: absolute;
+            box-sizing: border-box; cursor: pointer;
         }
-        .vibe-dragging-ghost {
-            opacity: 0.5;
-            outline: 2px dashed #98c379;
-        }
+        .vibe-action-zone:hover { background: rgba(152, 195, 121, 0.7); border-color: #98c379; }
+        .vibe-dragging-ghost { opacity: 0.4 !important; }
+        .vibe-move-active { cursor: grabbing !important; }
     \`;
 
     function getNodeIdForElement(el) {
@@ -2054,64 +1887,71 @@ function applyVibes() {
         toolbar = document.createElement('div');
         toolbar.id = 'vibe-inspector-toolbar';
         
+        addButton = document.createElement('button');
+        addButton.textContent = '➕';
+        addButton.title = 'Add New Component Here';
+
         dragHandle = document.createElement('button');
         dragHandle.id = 'vibe-inspector-drag-handle';
         dragHandle.textContent = '✥';
         dragHandle.title = 'Move Element';
-        dragHandle.draggable = true;
 
         editButton = document.createElement('button');
         editButton.textContent = '✎';
-        editButton.title = 'Edit Element';
+        editButton.title = 'Edit Component';
 
         deleteButton = document.createElement('button');
         deleteButton.textContent = '🗑️';
-        deleteButton.title = 'Delete Element';
+        deleteButton.title = 'Delete Component';
 
+        toolbar.appendChild(addButton);
         toolbar.appendChild(dragHandle);
         toolbar.appendChild(editButton);
         toolbar.appendChild(deleteButton);
         document.body.appendChild(toolbar);
-
-        dragHandle.addEventListener('dragstart', handleDragStart);
-        document.body.addEventListener('dragend', handleDragEnd);
-        document.body.addEventListener('dragover', handleDragOver);
-        document.body.addEventListener('drop', handleDrop);
+        
+        // Toolbar visibility logic
+        toolbar.addEventListener('mouseover', () => clearTimeout(toolbarHideTimeout));
+        toolbar.addEventListener('mouseout', handleMouseOut);
     }
     
     function updateToolbar(targetInfo) {
+        clearTimeout(toolbarHideTimeout);
         if (!targetInfo) {
-            toolbar.style.display = 'none';
+            toolbarHideTimeout = setTimeout(() => toolbar.style.display = 'none', 100);
             return;
         }
         const rect = targetInfo.element.getBoundingClientRect();
         toolbar.style.display = 'flex';
-        toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 4) + 'px';
+        toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 5) + 'px';
         toolbar.style.left = (rect.left + window.scrollX) + 'px';
         
-        // Remove old listeners
-        const newEdit = editButton.cloneNode(true);
-        editButton.parentNode.replaceChild(newEdit, editButton);
-        editButton = newEdit;
-        
-        const newDelete = deleteButton.cloneNode(true);
-        deleteButton.parentNode.replaceChild(newDelete, deleteButton);
-        deleteButton = newDelete;
+        addButton.onclick = (e) => { e.stopPropagation(); createActionableZones('add', targetInfo.nodeId); };
+        editButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*'); };
+        deleteButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*'); };
 
-        // Add new listeners
-        editButton.onclick = () => window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*');
-        deleteButton.onclick = () => window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*');
-        
-        dragHandle.dataset.nodeId = targetInfo.nodeId;
+        if (isTouchDevice) {
+            dragHandle.onclick = (e) => { e.stopPropagation(); createActionableZones('move', targetInfo.nodeId); };
+        } else {
+            dragHandle.draggable = true;
+            dragHandle.ondragstart = (e) => {
+                e.stopPropagation();
+                draggedInfo = { nodeId: targetInfo.nodeId, element: targetInfo.element };
+                e.dataTransfer.setData('text/plain', targetInfo.nodeId);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => {
+                    targetInfo.element.classList.add('vibe-dragging-ghost');
+                    createActionableZones('move', targetInfo.nodeId);
+                }, 0);
+            };
+        }
     }
 
     function handleMouseOver(e) {
-        if (!inspectEnabled) return;
+        if (!inspectEnabled || document.querySelector('.vibe-action-zone')) return;
         const targetInfo = getNodeIdForElement(e.target);
         if (targetInfo) {
-            if (hoverEl && hoverEl !== targetInfo.element) {
-                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-            }
+            if (hoverEl && hoverEl !== targetInfo.element) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             hoverEl = targetInfo.element;
             hoverEl.classList.add('__vibe-inspect-highlight-hover');
             updateToolbar(targetInfo);
@@ -2119,132 +1959,102 @@ function applyVibes() {
     }
     
     function handleMouseOut(e) {
-        if (hoverEl) {
-             // Basic check to see if we're moving to a child or the toolbar itself
-            if (!hoverEl.contains(e.relatedTarget) && e.relatedTarget !== toolbar && !toolbar.contains(e.relatedTarget)) {
-                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-                updateToolbar(null);
-                hoverEl = null;
-            }
+        if (hoverEl && !hoverEl.contains(e.relatedTarget) && e.relatedTarget !== toolbar && !toolbar.contains(e.relatedTarget)) {
+            hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+            hoverEl = null;
+            updateToolbar(null);
         }
     }
 
-    // Drag and Drop Handlers
-    function handleDragStart(e) {
-        const nodeId = e.target.dataset.nodeId;
-        if (!nodeId) return;
-        draggedNodeId = nodeId;
-        e.dataTransfer.setData('text/plain', nodeId);
-        e.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => { // Use timeout to allow ghost image to be created
-            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
-            if(el) el.classList.add('vibe-dragging-ghost');
-            createDropZones();
-        }, 0);
-    }
-
-    function handleDragEnd(e) {
-        const el = document.querySelector(\`[id="\${draggedNodeId.replace('html-','')}"]\`);
-        if(el) el.classList.remove('vibe-dragging-ghost');
-        draggedNodeId = null;
-        clearDropZones();
-    }
-    
-    function handleDragOver(e) {
-        e.preventDefault(); 
-        e.dataTransfer.dropEffect = 'move';
-    }
-
-    function handleDrop(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent parent elements from handling the drop
-        const sourceNodeId = draggedNodeId;
-        const targetInfo = getNodeIdForElement(e.target);
-        if (!sourceNodeId || !targetInfo || sourceNodeId === targetInfo.nodeId) return;
-
-        const rect = targetInfo.element.getBoundingClientRect();
-        const dropY = e.clientY;
-        const dropPos = (dropY - rect.top) / rect.height;
-        let position;
-        
-        // Simple logic: top third -> before, bottom third -> after, middle -> inside
-        if (dropPos < 0.33) {
-            position = 'before';
-        } else if (dropPos > 0.66) {
-            position = 'after';
-        } else {
-            position = 'inside';
-        }
-        
-        window.parent.postMessage({
-            type: 'vibe-node-move',
-            sourceNodeId,
-            targetNodeId: targetInfo.nodeId,
-            position
-        }, '*');
-    }
-
-    function createDropZones() {
-        clearDropZones();
+    function createActionableZones(actionType, sourceNodeId) {
+        clearActionZones();
         Object.values(window.__vibeIdToNodeId).forEach(nodeId => {
-            if (nodeId === draggedNodeId) return;
+            if (actionType === 'move' && nodeId === sourceNodeId) return;
+
             const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
             if (!el) return;
 
             const rect = el.getBoundingClientRect();
             
-            // "before" zone
-            const beforeZone = document.createElement('div');
-            beforeZone.className = 'vibe-drop-zone';
-            beforeZone.style.top = (rect.top + window.scrollY - 4) + 'px';
-            beforeZone.style.left = (rect.left + window.scrollX) + 'px';
-            beforeZone.style.width = rect.width + 'px';
-            beforeZone.style.height = '8px';
-            document.body.appendChild(beforeZone);
-            dropZones.push(beforeZone);
-            
-            // "after" zone
-            const afterZone = document.createElement('div');
-            afterZone.className = 'vibe-drop-zone';
-            afterZone.style.top = (rect.bottom + window.scrollY - 4) + 'px';
-            afterZone.style.left = (rect.left + window.scrollX) + 'px';
-            afterZone.style.width = rect.width + 'px';
-            afterZone.style.height = '8px';
-            document.body.appendChild(afterZone);
-            dropZones.push(afterZone);
+            const createZone = (position, top, left, width, height) => {
+                const zone = document.createElement('div');
+                zone.className = 'vibe-action-zone';
+                zone.style.top = (top + window.scrollY) + 'px';
+                zone.style.left = (left + window.scrollX) + 'px';
+                zone.style.width = width + 'px';
+                zone.style.height = height + 'px';
+                zone.dataset.action = actionType;
+                zone.dataset.targetNodeId = nodeId;
+                zone.dataset.position = position;
+                if(sourceNodeId) zone.dataset.sourceNodeId = sourceNodeId;
+                document.body.appendChild(zone);
+                actionZones.push(zone);
+            };
+
+            createZone('before', rect.top - 5, rect.left, rect.width, 10);
+            createZone('after', rect.bottom - 5, rect.left, rect.width, 10);
+            if (el.children.length > 0 || actionType === 'add') {
+                 createZone('inside', rect.top + 5, rect.left, rect.width, rect.height - 10);
+            }
         });
     }
 
-    function clearDropZones() {
-        dropZones.forEach(zone => zone.remove());
-        dropZones = [];
+    function clearActionZones() {
+        actionZones.forEach(zone => zone.remove());
+        actionZones = [];
     }
 
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('vibe-action-zone')) {
+            const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
+            if (action === 'add') {
+                window.parent.postMessage({ type: 'vibe-node-add-request', targetNodeId, position }, '*');
+            } else if (action === 'move') {
+                 window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
+            }
+            clearActionZones();
+        } else if(actionZones.length > 0) {
+            // Click outside any zone to cancel
+            clearActionZones();
+        }
+    });
+
+    document.addEventListener('dragend', () => {
+        if (draggedInfo) draggedInfo.element.classList.remove('vibe-dragging-ghost');
+        draggedInfo = null;
+        clearActionZones();
+    });
+
+    document.addEventListener('dragover', e => e.preventDefault());
+
+    document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.target.classList.contains('vibe-action-zone')) {
+             e.target.click(); // Delegate drop to the zone's click handler
+        }
+    });
 
     function enableInspect() {
         if (inspectEnabled) return;
         inspectEnabled = true;
         createToolbar();
-        
         document.addEventListener('mouseover', handleMouseOver);
         document.addEventListener('mouseout', handleMouseOut);
-        document.body.style.cursor = 'default';
     }
 
     function disableInspect() {
         if (!inspectEnabled) return;
         inspectEnabled = false;
-        
         document.removeEventListener('mouseover', handleMouseOver);
         document.removeEventListener('mouseout', handleMouseOut);
         if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
         updateToolbar(null);
+        clearActionZones();
     }
     
     window.addEventListener('message', function(event) {
-        const data = event.data || {};
-        if (data.type === 'toggle-inspect') { 
-            if (data.enabled) enableInspect(); else disableInspect(); 
+        if (event.data.type === 'toggle-inspect') { 
+            if (event.data.enabled) enableInspect(); else disableInspect(); 
         }
     });
 })();
@@ -2256,12 +2066,10 @@ function applyVibes() {
             html += inspectorScript;
         }
 
-        // Write to iframe, then inject asset rewriter with current project asset map
         doc.open();
         doc.write(html);
         doc.close();
 
-        // After document is ready, rewrite asset URLs
         (async () => {
             const assetMap = await buildAssetUrlMap();
             injectAssetRewriterScript(doc, assetMap);
@@ -2272,6 +2080,7 @@ function applyVibes() {
     }
 }
 
+
 function showFullCode() {
     const fullCode = generateFullCodeString();
     fullCodeEditor.value = fullCode; // Use value for textarea
@@ -2280,7 +2089,6 @@ function showFullCode() {
 
 function hideFullCode() {
     // This function is no longer needed as the code view is a persistent tab.
-    // fullCodeModal.style.display = 'none';
 }
 
 function addEventListeners() {
@@ -2296,11 +2104,9 @@ function addEventListeners() {
     document.querySelectorAll('.save-code-button').forEach(button => {
         button.addEventListener('click', handleSaveCode);
     });
-    // New: collapse/expand toggles
     document.querySelectorAll('.collapse-toggle').forEach(button => {
         button.addEventListener('click', handleCollapseToggle);
     });
-    // New: click header to expand/collapse node content
     document.querySelectorAll('.vibe-node-header').forEach(header => {
         header.addEventListener('click', handleNodeContentToggle);
     });
@@ -2430,9 +2236,6 @@ ${fullTreeString}
         runAgentButton.disabled = !geminiApiKey; // Reset to its normal state based on API key presence
         runAgentButton.innerHTML = 'Run Agent';
         agentPromptInput.value = ''; // Clear the prompt
-        // The fix button is part of the log entry and will be gone if the console is cleared.
-        // If it still exists, we can re-enable it, but it's probably better to leave it as is.
-        // It's a one-shot action per error instance.
     }
 }
 
@@ -2447,7 +2250,6 @@ function executeAgentPlan(agentDecision, agentLogger) {
         throw new Error("AI returned a malformed plan object. Check console for details.");
     }
 
-    // Record before applying AI changes
     recordHistory('Agent plan execution');
 
     agentLogger(`<strong>Plan:</strong> ${agentDecision.plan}`, 'plan');
@@ -2459,42 +2261,31 @@ function executeAgentPlan(agentDecision, agentLogger) {
 
             if (nodeToUpdate) {
                 if (nodeToUpdate.type === 'container') {
-                    agentLogger(`Warning: Agent tried to update container node \`${nodeId}\`, which is not allowed. Skipping.`, 'warn');
+                    agentLogger(`Warning: Agent tried to update container node \`${nodeId}\`, skipping.`, 'warn');
                     continue;
                 }
                 agentLogger(`<strong>Updating Node:</strong> \`${nodeId}\` (${nodeToUpdate.type})`, 'action');
                 if (newDescription) nodeToUpdate.description = newDescription;
                 if (typeof newCode === 'string') nodeToUpdate.code = newCode;
             } else {
-                agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`. Skipping.`, 'warn');
-                continue;
+                agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`, skipping.`, 'warn');
             }
         } else if (action.actionType === 'create') {
             const { parentId, newNode } = action;
             const parentNode = findNodeById(parentId);
             if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
-                if (!newNode || !newNode.id) {
-                     agentLogger(`Warning: AI tried to create an invalid node (missing data or ID). Skipping.`, 'warn');
+                if (!newNode || !newNode.id || findNodeById(newNode.id)) {
+                     agentLogger(`Warning: AI tried to create an invalid or duplicate node \`${newNode.id}\`. Skipping.`, 'warn');
                      continue;
                 }
-                if (findNodeById(newNode.id)) {
-                    agentLogger(`Warning: AI tried to create a node with a duplicate ID \`${newNode.id}\`. Skipping.`, 'warn');
-                    continue;
-                }
-
-                if (!parentNode.children) {
-                    parentNode.children = [];
-                }
-
-                agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentId}\` (${parentNode.type})`, 'action');
+                if (!parentNode.children) parentNode.children = [];
+                agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentId}\``, 'action');
                 parentNode.children.push(newNode);
             } else {
-                agentLogger(`Warning: AI wanted to create a node under an invalid or non-container parent \`${parentId}\`. Skipping.`, 'warn');
-                continue;
+                agentLogger(`Warning: AI wanted to create node under invalid parent \`${parentId}\`. Skipping.`, 'warn');
             }
         } else {
-            agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType || 'undefined'}\`. Skipping.`, 'warn');
-            continue;
+            agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType}\`. Skipping.`, 'warn');
         }
     }
     
@@ -2503,58 +2294,32 @@ function executeAgentPlan(agentDecision, agentLogger) {
 
 async function handleRunAgent() {
     const userPrompt = agentPromptInput.value.trim();
-    if (!userPrompt) {
-        alert("Please enter a description of the change you want to make.");
-        return;
-    }
+    if (!userPrompt) return;
 
     runAgentButton.disabled = true;
     runAgentButton.innerHTML = 'Agent is thinking... <div class="loading-spinner"></div>';
-    // Don't clear previous logs to show history
     logToAgent(`<strong>You:</strong> ${userPrompt}`, 'user');
 
-    // The agent now gets the FULL tree with code.
     const fullTreeString = JSON.stringify(vibeTree, null, 2);
-
     const systemPrompt = getAgentSystemPrompt();
+    const agentUserPrompt = `User Request: "${userPrompt}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
 
-    const agentUserPrompt = `User Request: "${userPrompt}"
-
-Full Vibe Tree:
-\`\`\`json
-${fullTreeString}
-\`\`\``;
-
-    // Add new message to history
     agentConversationHistory.push({ role: 'user', content: agentUserPrompt });
-
-    // Keep history from getting too long
     if (agentConversationHistory.length > 10) {
-        // Keep the first message (initial context) and the last 9 messages
-        agentConversationHistory = [
-            agentConversationHistory[0], 
-            ...agentConversationHistory.slice(-9)
-        ];
+        agentConversationHistory = [agentConversationHistory[0], ...agentConversationHistory.slice(-9)];
     }
 
     try {
         const rawResponse = await callAI(systemPrompt, agentUserPrompt, true);
-        
-        // Add AI response to history for the next turn
         agentConversationHistory.push({ role: 'model', content: rawResponse });
-
         const agentDecision = JSON.parse(rawResponse);
         executeAgentPlan(agentDecision, logToAgent);
-        
-        logToAgent('Changes applied. The website has been updated and reloaded.', 'info');
-        // Switch to preview tab to show the result.
+        logToAgent('Changes applied.', 'info');
         document.querySelector('.tab-button[data-tab="preview"]').click();
-
     } catch (error) {
         console.error("AI agent failed:", error);
-        logToAgent(`The AI agent failed: ${error.message}. Check the main console for more details.`, 'error');
-        alert(`The AI Agent encountered an error while trying to fix the issue: ${error.message}`);
-        // Remove the last user prompt from history if the call failed
+        logToAgent(`The AI agent failed: ${error.message}.`, 'error');
+        alert(`The AI Agent encountered an error: ${error.message}`);
         agentConversationHistory.pop();
     } finally {
         runAgentButton.disabled = !(geminiApiKey || nscaleApiKey);
@@ -2567,6 +2332,8 @@ ${fullTreeString}
 function handleAddChildClick(event) {
     const parentId = event.target.dataset.id;
     addNodeParentIdInput.value = parentId;
+    addNodeTargetIdInput.value = ''; // Clear inspector-specific fields
+    addNodePositionInput.value = '';
     newNodeIdInput.value = '';
     newNodeDescriptionInput.value = '';
     newNodeTypeInput.value = 'html';
@@ -2584,6 +2351,8 @@ async function handleCreateNode() {
     const newNodeId = newNodeIdInput.value.trim();
     const newNodeType = newNodeTypeInput.value;
     const newDescription = newNodeDescriptionInput.value.trim() || `A new, empty ${newNodeType} component.`;
+    const targetId = addNodeTargetIdInput.value;
+    const position = addNodePositionInput.value;
 
     addNodeError.textContent = '';
 
@@ -2593,62 +2362,48 @@ async function handleCreateNode() {
     }
 
     if (findNodeById(newNodeId)) {
-        addNodeError.textContent = 'This ID is already in use. Please choose a unique one.';
+        addNodeError.textContent = 'This ID is already in use.';
         return;
     }
 
     const parentNode = findNodeById(parentId);
     if (!parentNode) {
-        console.error(`Parent node with id "${parentId}" not found.`);
-        addNodeError.textContent = 'An internal error occurred. Parent node not found.';
+        addNodeError.textContent = 'Internal error: Parent node not found.';
         return;
     }
 
-    // Record before modification
-    recordHistory(`Create node ${newNodeId} under ${parentId}`);
+    recordHistory(`Create node ${newNodeId}`);
 
-    if (!parentNode.children) {
-        parentNode.children = [];
-    }
+    if (!parentNode.children) parentNode.children = [];
 
-    const newNode = {
-        id: newNodeId,
-        type: newNodeType,
-        description: newDescription,
-        code: ''
-    };
+    const newNode = { id: newNodeId, type: newNodeType, description: newDescription, code: '' };
     
-    if (newNodeType === 'html') {
-        let lastHtmlSiblingId = null;
-        if(parentNode.children) {
-            for (let i = parentNode.children.length - 1; i >= 0; i--) {
-                const sibling = parentNode.children[i];
-                if (sibling.type === 'html' && sibling.id) {
-                    lastHtmlSiblingId = sibling.id;
-                    break;
-                }
+    // Handle insertion logic
+    let inserted = false;
+    if (targetId && position) {
+        const targetIndex = parentNode.children.findIndex(c => c.id === targetId);
+        if (targetIndex !== -1) {
+            if (position === 'before') {
+                parentNode.children.splice(targetIndex, 0, newNode);
+            } else { // 'after'
+                parentNode.children.splice(targetIndex + 1, 0, newNode);
             }
-        }
-        
-        if (lastHtmlSiblingId) {
-             newNode.selector = `#${lastHtmlSiblingId}`;
-             newNode.position = 'afterend';
-        } else {
-             newNode.selector = `#${parentNode.id}`;
-             newNode.position = 'beforeend';
+            inserted = true;
         }
     }
-
-    parentNode.children.push(newNode);
-
+    
+    if (!inserted) {
+        parentNode.children.push(newNode); // Default to adding at the end
+    }
+    
+    recalculateSelectors(parentNode);
+    
     console.log(`Added new node "${newNodeId}" to parent "${parentId}".`);
-
-    editorContainer.innerHTML = '';
-    editorContainer.appendChild(renderEditor(vibeTree));
-    addEventListeners();
+    refreshAllUI();
     closeModal();
     autoSaveProject();
 }
+
 
 // --- Edit Node Modal Logic ---
 function openEditNodeModal(nodeId) {
@@ -2662,7 +2417,6 @@ function openEditNodeModal(nodeId) {
     editNodeTypeInput.value = node.type;
     editNodeDescriptionInput.value = node.description || '';
     editNodeCodeInput.value = node.code || '';
-    // Enable/disable AI button based on API key availability
     const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
     if (aiImproveDescriptionButton) {
         aiImproveDescriptionButton.disabled = !keyIsAvailable;
@@ -2683,20 +2437,11 @@ function handleSaveEditedNode() {
         return;
     }
 
-    const prevDescription = node.description || '';
-    const prevCode = node.code || '';
-
     const newDescription = editNodeDescriptionInput.value;
     const newCode = editNodeCodeInput.value;
 
-    let codeChanged = false;
-    if (newCode !== prevCode) {
-        recordHistory(`Edit code in modal for ${nodeId}`); // NEW: history before code change
-        node.code = newCode;
-        codeChanged = true;
-    }
-
-    const descChanged = newDescription !== prevDescription;
+    const descChanged = newDescription !== (node.description || '');
+    const codeChanged = newCode !== (node.code || '');
 
     if (!descChanged && !codeChanged) {
         closeEditNodeModal();
@@ -2707,11 +2452,12 @@ function handleSaveEditedNode() {
 
     (async () => {
         try {
+            if (codeChanged) {
+                recordHistory(`Edit code in modal for ${nodeId}`);
+                node.code = newCode;
+            }
             if (descChanged) {
-                // Record before description change (if not already recorded due to code change)
-                if (!codeChanged) {
-                    recordHistory(`Edit description in modal for ${nodeId}`);
-                }
+                if (!codeChanged) recordHistory(`Edit description in modal for ${nodeId}`);
                 await updateNodeByDescription(nodeId, newDescription, saveBtn);
             } else {
                 refreshAllUI();
@@ -2729,13 +2475,8 @@ function handleSaveEditedNode() {
 let inspectEnabled = false;
 function toggleInspectMode() {
     inspectEnabled = !inspectEnabled;
-    if (inspectEnabled) {
-        toggleInspectButton.classList.add('inspect-active');
-        toggleInspectButton.textContent = 'Disable Inspect';
-    } else {
-        toggleInspectButton.classList.remove('inspect-active');
-        toggleInspectButton.textContent = 'Enable Inspect';
-    }
+    toggleInspectButton.classList.toggle('inspect-active', inspectEnabled);
+    toggleInspectButton.textContent = inspectEnabled ? 'Disable Inspect' : 'Enable Inspect';
     try {
         previewContainer.contentWindow.postMessage({ type: 'toggle-inspect', enabled: inspectEnabled }, '*');
     } catch (e) {
@@ -2745,17 +2486,8 @@ function toggleInspectMode() {
 
 // --- NEW: Inspector Tree Manipulation ---
 
-/**
- * Finds a node and its parent in the tree.
- * @param {string} id - The ID of the node to find.
- * @param {object} node - The current node in the traversal.
- * @param {object|null} parent - The parent of the current node.
- * @returns {{node: object, parent: object}|null}
- */
 function findNodeAndParentById(id, node = vibeTree, parent = null) {
-    if (node.id === id) {
-        return { node, parent };
-    }
+    if (node.id === id) return { node, parent };
     if (node.children) {
         for (const child of node.children) {
             const found = findNodeAndParentById(id, child, node);
@@ -2765,11 +2497,6 @@ function findNodeAndParentById(id, node = vibeTree, parent = null) {
     return null;
 }
 
-
-/**
- * Deletes a node from the vibeTree after user confirmation.
- * @param {string} nodeId - The ID of the node to delete.
- */
 function deleteNode(nodeId) {
     const result = findNodeAndParentById(nodeId);
     if (!result || !result.parent) {
@@ -2783,7 +2510,6 @@ function deleteNode(nodeId) {
         const index = parent.children.indexOf(node);
         if (index > -1) {
             parent.children.splice(index, 1);
-            // After deleting, recalculate selectors for subsequent siblings
             recalculateSelectors(parent);
             logToConsole(`Node '${nodeId}' deleted.`, 'info');
             refreshAllUI();
@@ -2791,12 +2517,6 @@ function deleteNode(nodeId) {
     }
 }
 
-/**
- * Moves a node within the vibeTree.
- * @param {string} sourceNodeId - The ID of the node to move.
- * @param {string} targetNodeId - The ID of the node to move relative to.
- * @param {'before'|'after'|'inside'} position - Where to move the node.
- */
 function moveNode(sourceNodeId, targetNodeId, position) {
     const sourceResult = findNodeAndParentById(sourceNodeId);
     const targetResult = findNodeAndParentById(targetNodeId);
@@ -2811,13 +2531,9 @@ function moveNode(sourceNodeId, targetNodeId, position) {
     const { node: sourceNode, parent: sourceParent } = sourceResult;
     const { node: targetNode, parent: targetParent } = targetResult;
 
-    // 1. Remove source node from its original location
     const sourceIndex = sourceParent.children.indexOf(sourceNode);
-    if (sourceIndex > -1) {
-        sourceParent.children.splice(sourceIndex, 1);
-    }
+    if (sourceIndex > -1) sourceParent.children.splice(sourceIndex, 1);
 
-    // 2. Add source node to its new location
     if (position === 'inside') {
         if (!targetNode.children) targetNode.children = [];
         targetNode.children.push(sourceNode);
@@ -2832,44 +2548,69 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         recalculateSelectors(targetParent);
     }
     
-    // After any move, we must also recalculate the selectors for the original parent's children
-    if(sourceParent !== targetParent) {
-       recalculateSelectors(sourceParent);
-    }
+    if(sourceParent !== targetParent) recalculateSelectors(sourceParent);
 
     logToConsole(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`, 'info');
     refreshAllUI();
 }
 
-/**
- * Iterates through a parent node's HTML children and corrects their `selector` and `position` properties.
- * @param {object} parentNode - The node whose children need recalculating.
- */
 function recalculateSelectors(parentNode) {
-    if (!parentNode || !parentNode.children) return;
+    if (!parentNode || !Array.isArray(parentNode.children)) return;
 
     const htmlChildren = parentNode.children.filter(c => c.type === 'html');
     let lastHtmlSiblingId = null;
 
     htmlChildren.forEach((child, index) => {
-        if (index === 0) {
-            child.selector = `#${parentNode.id}`;
-            child.position = 'beforeend';
-        } else {
-            child.selector = `#${lastHtmlSiblingId}`;
-            child.position = 'afterend';
-        }
-        // The ID used for the selector must be extracted from the node's code.
+        child.selector = (index === 0) ? `#${parentNode.id}` : `#${lastHtmlSiblingId}`;
+        child.position = (index === 0) ? 'beforeend' : 'afterend';
+        
         const idMatch = child.code.match(/id="([^"]+)"/);
         if (idMatch) {
             lastHtmlSiblingId = idMatch[1];
         } else {
-            // If a node in the chain has no ID, selector logic breaks. We should log a warning.
-            console.warn(`Node ${child.id} is an HTML sibling but lacks an 'id' attribute in its code, which may break layout.`);
-            // Fallback to using its node ID, though this isn't ideal
-            lastHtmlSiblingId = child.id;
+            console.warn(`Node ${child.id} lacks an 'id' attribute, which may break layout.`);
+            lastHtmlSiblingId = child.id; // Fallback, not ideal
         }
     });
+}
+
+/**
+ * NEW: Handles the request to add a new node from the inspector.
+ * It determines the correct parent and pre-fills the 'Add Node' modal.
+ * @param {string} targetNodeId The ID of the node to add relative to.
+ * @param {'before'|'after'|'inside'} position The desired position.
+ */
+function handleAddNodeFromInspect(targetNodeId, position) {
+    const targetResult = findNodeAndParentById(targetNodeId);
+    if (!targetResult) {
+        logToConsole(`Cannot add node: target '${targetNodeId}' not found.`, 'error');
+        return;
+    }
+
+    const { node: targetNode, parent: targetParent } = targetResult;
+    let parentForNewNode, targetForPositioning, positionForNewNode;
+
+    if (position === 'inside') {
+        parentForNewNode = targetNode;
+        targetForPositioning = null; // Will be added to the end of the new parent
+        positionForNewNode = 'beforeend'; // Not strictly needed, but for clarity
+    } else {
+        parentForNewNode = targetParent;
+        targetForPositioning = targetNode;
+        positionForNewNode = position;
+    }
+    
+    // Reset modal fields
+    addNodeTargetIdInput.value = targetForPositioning ? targetForPositioning.id : '';
+    addNodePositionInput.value = positionForNewNode || '';
+    addNodeParentIdInput.value = parentForNewNode.id;
+    newNodeIdInput.value = '';
+    newNodeDescriptionInput.value = '';
+    newNodeTypeInput.value = 'html';
+    addNodeError.textContent = '';
+    
+    addNodeModal.style.display = 'block';
+    newNodeIdInput.focus();
 }
 
 
@@ -2884,13 +2625,16 @@ window.addEventListener('message', (event) => {
             }
             break;
         case 'vibe-node-delete':
-            if (data.nodeId) {
-                 deleteNode(data.nodeId);
-            }
+            if (data.nodeId) deleteNode(data.nodeId);
             break;
         case 'vibe-node-move':
             if (data.sourceNodeId && data.targetNodeId && data.position) {
                  moveNode(data.sourceNodeId, data.targetNodeId, data.position);
+            }
+            break;
+        case 'vibe-node-add-request':
+            if (data.targetNodeId && data.position) {
+                handleAddNodeFromInspect(data.targetNodeId, data.position);
             }
             break;
     }
@@ -2910,16 +2654,14 @@ function performSearch() {
     
     if (!searchTerm) {
         searchState = { term: '', matches: [], currentIndex: -1 };
-        // Clear selection
         fullCodeEditor.setSelectionRange(0, 0);
         return;
     }
 
-    // Only re-calculate matches if the search term changes
     if (searchState.term !== searchTerm) {
         searchState.term = searchTerm;
         searchState.matches = [];
-        const regex = new RegExp(searchTerm, 'gi'); // g for global, i for case-insensitive
+        const regex = new RegExp(searchTerm, 'gi');
         let match;
         while ((match = regex.exec(code)) !== null) {
             searchState.matches.push(match.index);
@@ -2947,25 +2689,19 @@ function findPrevMatch() {
 }
 
 function highlightCurrentMatch() {
-    if (searchState.currentIndex < 0 || searchState.matches.length === 0) return;
-
+    if (searchState.currentIndex < 0) return;
     const start = searchState.matches[searchState.currentIndex];
     const end = start + searchState.term.length;
-
     fullCodeEditor.focus();
     fullCodeEditor.setSelectionRange(start, end);
-
     searchResultsCount.textContent = `Match ${searchState.currentIndex + 1} of ${searchState.matches.length}`;
 }
 
 function handleSearchInput() {
-    // We use a small debounce to avoid searching on every single keystroke
     let debounceTimer;
     return () => {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            performSearch();
-        }, 250);
+        debounceTimer = setTimeout(performSearch, 250);
     };
 }
 
@@ -2979,24 +2715,15 @@ function handleTabSwitching() {
 
         const tabId = button.dataset.tab;
 
-        // When the console tab is clicked, hide the error indicator.
-        if (tabId === 'console') {
-            consoleErrorIndicator.classList.remove('active');
-        }
+        if (tabId === 'console') consoleErrorIndicator.classList.remove('active');
         
-        // Update button active state
         tabs.querySelector('.active').classList.remove('active');
         button.classList.add('active');
         
-        // Update content active state
         tabContents.querySelector('.tab-content.active').classList.remove('active');
-        const newActiveContent = tabContents.querySelector(`#${tabId}`);
-        newActiveContent.classList.add('active');
+        tabContents.querySelector(`#${tabId}`).classList.add('active');
 
-        // Special action for the full code tab
-        if (tabId === 'code') {
-            showFullCode();
-        }
+        if (tabId === 'code') showFullCode();
         if (tabId === 'files') {
             renderFileTree();
             if (filesPreviewEl) {
@@ -3007,29 +2734,18 @@ function handleTabSwitching() {
 }
 
 function initializeMermaid() {
-    // This check ensures we don't try to initialize if the script failed to load.
     if (typeof window.mermaid === 'undefined') {
-        console.error("Mermaid library not found. Flowchart functionality will be disabled.");
+        console.error("Mermaid library not found.");
         if(generateFlowchartButton) {
             generateFlowchartButton.disabled = true;
             generateFlowchartButton.title = "Mermaid.js library failed to load.";
         }
         return;
     }
-    // Initialize Mermaid.js
     window.mermaid.initialize({
         startOnLoad: false,
-        theme: 'dark', // Use 'dark' or 'neutral' for dark backgrounds
+        theme: 'dark',
         fontFamily: "'Inter', sans-serif",
-        themeVariables: {
-            background: '#282c34',
-            primaryColor: '#3a3f4b',
-            primaryTextColor: '#f0f0f0',
-            primaryBorderColor: '#61afef',
-            lineColor: '#abb2bf',
-            secondaryColor: '#98c379',
-            tertiaryColor: '#e06c75'
-        }
     });
     console.log("Mermaid.js initialized.");
 }
@@ -3038,25 +2754,22 @@ function initializeMermaid() {
 
 function populateProjectList() {
     const projects = db.listProjects();
-    projectListContainer.innerHTML = ''; // Clear existing list
+    projectListContainer.innerHTML = ''; 
 
-    if (projects.length === 0) {
-        noProjectsMessage.style.display = 'block';
-    } else {
-        noProjectsMessage.style.display = 'none';
-        projects.forEach(projectId => {
-            const projectItem = document.createElement('div');
-            projectItem.className = 'project-list-item';
-            projectItem.innerHTML = `
-                <span class="project-id-text">${projectId}</span>
-                <div class="project-item-buttons">
-                    <button class="load-project-button action-button" data-id="${projectId}">Load</button>
-                    <button class="delete-project-button" data-id="${projectId}">Delete</button>
-                </div>
-            `;
-            projectListContainer.appendChild(projectItem);
-        });
-    }
+    noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
+    
+    projects.forEach(projectId => {
+        const projectItem = document.createElement('div');
+        projectItem.className = 'project-list-item';
+        projectItem.innerHTML = `
+            <span class="project-id-text">${projectId}</span>
+            <div class="project-item-buttons">
+                <button class="load-project-button action-button" data-id="${projectId}">Load</button>
+                <button class="delete-project-button" data-id="${projectId}">Delete</button>
+            </div>
+        `;
+        projectListContainer.appendChild(projectItem);
+    });
 }
 
 function handleLoadProject(event) {
@@ -3070,17 +2783,10 @@ function handleLoadProject(event) {
         logToConsole(`Project '${projectId}' loaded successfully.`, 'info');
         
         refreshAllUI();
-
-        // After loading, set a new baseline snapshot
-        historyState.lastSnapshotSerialized = serializeTree(vibeTree);
-        updateUndoRedoUI();
-
-        // Ensure a multi-file layout exists for this project
+        resetHistory();
         autoSaveProject();
 
-        // Switch to the preview tab to show the result
         document.querySelector('.tab-button[data-tab="preview"]').click();
-
     } else {
         console.error(`Could not load project '${projectId}'.`);
         alert(`Error: Could not find project data for '${projectId}'.`);
@@ -3099,18 +2805,13 @@ function handleDeleteProject(event) {
 function autoSaveProject() {
     if (!currentProjectId || !vibeTree) return;
 
-    // Always persist the latest vibe tree JSON
     db.saveProject(currentProjectId, vibeTree);
 
     try {
-        // Build a multi-file bundle (index.html linking external CSS/JS files)
         const { files } = assembleMultiFileBundle(vibeTree);
-
-        // Write every file in the bundle into the per-project file store
         for (const [path, content] of files.entries()) {
             if (content instanceof Uint8Array) {
-                const mime = guessMimeType(path);
-                db.saveBinaryFile(currentProjectId, path, content, mime);
+                db.saveBinaryFile(currentProjectId, path, content, guessMimeType(path));
             } else {
                 db.saveTextFile(currentProjectId, path, String(content));
             }
@@ -3119,10 +2820,8 @@ function autoSaveProject() {
         console.warn('Failed to assemble/write multi-file bundle:', e);
     }
 
-    // Keep Files tab in sync
     renderFileTree();
-
-    logToConsole(`Project '${currentProjectId}' auto-saved (multi-file layout).`, 'info');
+    logToConsole(`Project '${currentProjectId}' auto-saved.`, 'info');
 }
 
 // Add event listeners for project management buttons
@@ -3199,13 +2898,11 @@ function renderFileTree() {
                     childUl.className = 'files-ul';
                     li.appendChild(childUl);
                     renderNode(child, childUl);
-                    // Click on folder toggles collapse/expand
                     row.addEventListener('click', (e) => {
                         e.stopPropagation();
                         childUl.style.display = childUl.style.display === 'none' ? '' : 'none';
                     });
                 } else {
-                    // File click selects
                     li.addEventListener('click', (e) => {
                         e.stopPropagation();
                         selectFile(child.path, li);
@@ -3220,10 +2917,8 @@ function renderFileTree() {
 
 function selectFile(path, liEl) {
     filesState.selectedPath = path;
-    // Highlight
     filesTreeEl.querySelectorAll('li.selected').forEach(li => li.classList.remove('selected'));
     if (liEl) liEl.classList.add('selected');
-    // Preview
     renderFilePreview(path);
 }
 
@@ -3247,37 +2942,29 @@ async function renderFilePreview(path) {
             </div>
         `;
 
-        const copyBtnHandler = () => {
-            navigator.clipboard.writeText(path).then(() => {
-                logToConsole(`Asset path copied: ${path}`, 'info');
-            });
-        };
+        const copyBtnHandler = () => navigator.clipboard.writeText(path).then(() => logToConsole(`Asset path copied: ${path}`, 'info'));
 
         if (meta.isBinary) {
             const blob = await db.getFileBlob(currentProjectId, path);
             const url = URL.createObjectURL(blob);
+            let previewEl;
             if (meta.mime.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.className = 'files-preview-image';
-                img.src = url;
-                filesPreviewEl.appendChild(img);
+                previewEl = document.createElement('img');
+                previewEl.className = 'files-preview-image';
             } else if (meta.mime.startsWith('video/')) {
-                const video = document.createElement('video');
-                video.className = 'files-preview-video';
-                video.controls = true;
-                video.src = url;
-                filesPreviewEl.appendChild(video);
+                previewEl = document.createElement('video');
+                previewEl.className = 'files-preview-video';
+                previewEl.controls = true;
             } else if (meta.mime.startsWith('audio/')) {
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                audio.src = url;
-                filesPreviewEl.appendChild(audio);
+                previewEl = document.createElement('audio');
+                previewEl.controls = true;
             } else {
-                const binMsg = document.createElement('div');
-                binMsg.className = 'files-preview-placeholder';
-                binMsg.textContent = 'Binary file preview not supported.';
-                filesPreviewEl.appendChild(binMsg);
+                previewEl = document.createElement('div');
+                previewEl.className = 'files-preview-placeholder';
+                previewEl.textContent = 'Binary file preview not supported.';
             }
+            if (previewEl.src !== undefined) previewEl.src = url;
+            filesPreviewEl.appendChild(previewEl);
             filesPreviewEl.appendChild(info);
             filesPreviewEl.querySelector('#copy-asset-path').addEventListener('click', copyBtnHandler);
         } else {
@@ -3317,19 +3004,14 @@ function ensureProjectForFiles() {
 async function handleFilesUpload() {
     if (!ensureProjectForFiles()) return;
     const files = Array.from(filesUploadInput.files || []);
-    if (files.length === 0) {
-        alert('Select one or more files to upload.');
-        return;
-    }
+    if (files.length === 0) return;
     for (const f of files) {
         try {
             const path = `assets/${f.name}`;
             if (f.type.startsWith('text/') || ['application/json', 'application/javascript'].includes(f.type)) {
-                const text = await f.text();
-                await db.saveTextFile(currentProjectId, path, text);
+                await db.saveTextFile(currentProjectId, path, await f.text());
             } else {
-                const buf = new Uint8Array(await f.arrayBuffer());
-                await db.saveBinaryFile(currentProjectId, path, buf, f.type || guessMimeType(f.name));
+                await db.saveBinaryFile(currentProjectId, path, new Uint8Array(await f.arrayBuffer()), f.type || guessMimeType(f.name));
             }
             logToConsole(`Uploaded: ${path}`, 'info');
         } catch (e) {
@@ -3346,9 +3028,7 @@ async function handleFilesNewFolder() {
     if (!ensureProjectForFiles()) return;
     const name = prompt('New folder path (e.g., assets/images):', 'assets/new-folder');
     if (!name) return;
-    const safe = name.replace(/^\/+|\/+$/g, '');
-    // Create a placeholder to persist folder in flat storage
-    const keepPath = `${safe}/.keep`;
+    const keepPath = `${name.replace(/^\/+|\/+$/g, '')}/.keep`;
     await db.saveTextFile(currentProjectId, keepPath, '');
     renderFileTree();
     autoSaveProject();
@@ -3358,23 +3038,17 @@ async function handleFilesNewFile() {
     if (!ensureProjectForFiles()) return;
     const path = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
     if (!path) return;
-    const safe = path.replace(/^\/+/, '');
-    await db.saveTextFile(currentProjectId, safe, '');
+    await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
     renderFileTree();
-    selectFile(safe);
+    selectFile(path);
     autoSaveProject();
 }
 
 async function handleFilesDownload() {
-    if (!ensureProjectForFiles()) return;
-    const path = filesState.selectedPath;
-    if (!path) {
-        alert('Select a file to download.');
-        return;
-    }
+    if (!ensureProjectForFiles() || !filesState.selectedPath) return;
     try {
-        const blob = await db.getFileBlob(currentProjectId, path);
-        triggerBlobDownload(blob, path.split('/').pop());
+        const blob = await db.getFileBlob(currentProjectId, filesState.selectedPath);
+        triggerBlobDownload(blob, filesState.selectedPath.split('/').pop());
     } catch (e) {
         console.error('Download failed:', e);
         alert(`Download failed: ${e.message}`);
@@ -3382,39 +3056,26 @@ async function handleFilesDownload() {
 }
 
 function handleFilesCopy() {
-    if (!ensureProjectForFiles()) return;
-    const path = filesState.selectedPath;
-    if (!path) {
-        alert('Select a file to copy.');
-        return;
-    }
-    const meta = db.getFileMeta(currentProjectId, path);
-    if (!meta) {
-        alert('File not found.');
-        return;
-    }
-    filesState.clipboard = { path, meta };
-    logToConsole(`Copied file to clipboard: ${path}`, 'info');
+    if (!ensureProjectForFiles() || !filesState.selectedPath) return;
+    const meta = db.getFileMeta(currentProjectId, filesState.selectedPath);
+    if (!meta) return;
+    filesState.clipboard = { path: filesState.selectedPath, meta };
+    logToConsole(`Copied file to clipboard: ${filesState.selectedPath}`, 'info');
 }
 
 async function handleFilesPaste() {
-    if (!ensureProjectForFiles()) return;
+    if (!ensureProjectForFiles() || !filesState.clipboard) return;
     const clip = filesState.clipboard;
-    if (!clip) {
-        alert('Clipboard is empty. Copy a file first.');
-        return;
-    }
     const baseName = clip.path.split('/').pop();
-    const dir = clip.path.split('/').slice(0, -1).join('/');
-    let newName = baseName.replace(/(\.[^.]*)$/, ' copy$1');
-    if (newName === baseName) newName = `${baseName} copy`;
+    const dir = clip.path.includes('/') ? clip.path.split('/').slice(0, -1).join('/') : '';
+    let newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ' copy$1') : `${baseName} copy`;
     let dest = dir ? `${dir}/${newName}` : newName;
 
-    // Ensure unique
     const existing = new Set(db.listFiles(currentProjectId));
     let i = 2;
     while (existing.has(dest)) {
-        dest = dir ? `${dir}/${newName.replace(/(\.[^.]*)?$/, ` ${i}$1`)}` : `${newName.replace(/(\.[^.]*)?$/, ` ${i}$1`)}`;
+        newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ` copy ${i}$1`) : `${baseName} copy ${i}`;
+        dest = dir ? `${dir}/${newName}` : newName;
         i++;
     }
 
@@ -3437,21 +3098,16 @@ async function handleFilesPaste() {
 }
 
 async function handleFilesRename() {
-    if (!ensureProjectForFiles()) return;
+    if (!ensureProjectForFiles() || !filesState.selectedPath) return;
     const path = filesState.selectedPath;
-    if (!path) {
-        alert('Select a file to rename.');
-        return;
-    }
     const newPath = prompt('New path/name:', path);
     if (!newPath || newPath === path) return;
-    const safeNew = newPath.replace(/^\/+/, '');
     try {
-        await db.renameFile(currentProjectId, path, safeNew);
+        await db.renameFile(currentProjectId, path, newPath.replace(/^\/+/, ''));
         renderFileTree();
-        selectFile(safeNew);
+        selectFile(newPath);
         autoSaveProject();
-        logToConsole(`Renamed: ${path} -> ${safeNew}`, 'info');
+        logToConsole(`Renamed: ${path} -> ${newPath}`, 'info');
     } catch (e) {
         console.error('Rename failed:', e);
         alert(`Rename failed: ${e.message}`);
@@ -3459,20 +3115,14 @@ async function handleFilesRename() {
 }
 
 async function handleFilesDelete() {
-    if (!ensureProjectForFiles()) return;
+    if (!ensureProjectForFiles() || !filesState.selectedPath) return;
     const path = filesState.selectedPath;
-    if (!path) {
-        alert('Select a file to delete.');
-        return;
-    }
     if (!confirm(`Delete file "${path}"? This cannot be undone.`)) return;
     try {
         db.deleteFile(currentProjectId, path);
         filesState.selectedPath = null;
         renderFileTree();
-        if (filesPreviewEl) {
-            filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file to preview it here.</div>';
-        }
+        if (filesPreviewEl) filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file.</div>';
         autoSaveProject();
         logToConsole(`Deleted: ${path}`, 'info');
     } catch (e) {
@@ -3481,30 +3131,18 @@ async function handleFilesDelete() {
     }
 }
 
-// Wait for the DOM to be fully loaded before running initialization logic.
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM fully loaded and parsed. Initializing application.");
+    console.log("DOM fully loaded. Initializing application.");
     
     function bindEventListeners() {
-        // Tabs
         handleTabSwitching();
-
-        // Preview inspect
         if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
-
-        // Undo/Redo
         if (undoButton) undoButton.addEventListener('click', doUndo);
         if (redoButton) redoButton.addEventListener('click', doRedo);
-
-        // Full code processing
         if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-
-        // File uploads and downloads
         if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', handleFileUpload);
         if (uploadZipButton) uploadZipButton.addEventListener('click', handleZipUpload);
         if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-
-        // Files tab actions
         if (filesUploadButton) filesUploadButton.addEventListener('click', handleFilesUpload);
         if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
         if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
@@ -3513,49 +3151,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
         if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
         if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
-
-        // Search
         if (searchInput) searchInput.addEventListener('input', handleSearchInput());
         if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
         if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
-
-        // Agent
         if (runAgentButton) runAgentButton.addEventListener('click', handleRunAgent);
-
-        // Flowchart
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
-
-        // Start page: new project
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
-
-        // Settings modal open/close
+        
         const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
         if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
         if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
         if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
-
-        // Add Node modal
         if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
         if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
-
-        // Edit Node modal
         if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
         if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
         if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
-
-        // API provider and keys
         if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-        if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => {
-            localStorage.setItem('geminiModel', geminiModelSelect.value);
-            console.info(`Gemini model set to: ${geminiModelSelect.value}`);
-        });
+        if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
         if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
         if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
-
-        // New Project button in tabs
         if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
 
-        // Close modals when clicking outside
         window.addEventListener('click', (event) => {
             if (event.target === settingsModal) settingsModal.style.display = 'none';
             if (event.target === addNodeModal) addNodeModal.style.display = 'none';
@@ -3567,10 +3184,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
-
-    // REMOVED: Initial state is set in HTML, this caused the error.
-    
-    // Initialize history baseline
     resetHistory();
 });
 
@@ -3578,42 +3191,26 @@ function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
-
-    // Reset history when starting fresh
     resetHistory();
-
-    // CORRECTED: Switch to the start tab
     document.querySelector('.tab-button[data-tab="start"]').click();
-
-    // Reset start page form
     projectPromptInput.value = '';
     newProjectIdInput.value = '';
     startPageGenerationOutput.style.display = 'none';
     generateProjectButton.disabled = !(geminiApiKey || nscaleApiKey);
     newProjectContainer.style.display = 'block';
-
-    // Clear UI elements in other tabs
     editorContainer.innerHTML = '';
-    const previewDoc = previewContainer.contentWindow.document;
-    previewDoc.open();
-    previewDoc.write('<!DOCTYPE html><html><head></head><body></body></html>');
-    previewDoc.close();
+    previewContainer.contentWindow.document.body.innerHTML = '';
     agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
-    flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website\'s logic.</div>';
+    flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     consoleOutput.innerHTML = '';
     fullCodeEditor.value = '';
     populateProjectList();
     logToConsole("Ready for new project.", "info");
 }
 
-/* --- Missing helpers (safe stubs to prevent runtime errors if not defined elsewhere) --- */
-async function buildAssetUrlMap() {
-    // Map project assets (if any) to object URLs. No-op stub for now.
-    return {};
-}
-function injectAssetRewriterScript(doc, assetMap) {
-    // Optionally rewrite asset URLs in the preview. No-op stub for now.
-}
+/* --- Missing helpers (safe stubs) --- */
+async function buildAssetUrlMap() { return {}; }
+function injectAssetRewriterScript(doc, assetMap) {}
 /* --- End stubs --- */
 
 /* --- Allow editing descriptions from the Edit Component modal --- */
@@ -3621,11 +3218,9 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
     const node = findNodeById(nodeId);
     if (!node) throw new Error(`Node not found: ${nodeId}`);
 
-    // Record state before change
     recordHistory(`Edit description for ${nodeId} (modal)`);
     node.description = newDescription;
 
-    // Show loading state if a button is provided
     let originalHtml = '';
     if (buttonEl) {
         originalHtml = buttonEl.innerHTML;
@@ -3641,12 +3236,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
         } else {
             const systemPrompt = getAgentSystemPrompt();
             const fullTreeString = JSON.stringify(vibeTree, null, 2);
-            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.
-
-Full Vibe Tree:
-\`\`\`json
-${fullTreeString}
-\`\`\``;
+            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
             const agentDecision = JSON.parse(rawResponse);
@@ -3664,117 +3254,64 @@ ${fullTreeString}
 function buildBasicMermaidFromTree(tree) {
     let graph = 'graph TD\n';
     const addNode = (node, parentId = null) => {
-        const safeId = node.id.replace(/[^a-zA-Z0-9_]/g, '_');
+        const safeId = (node.id || 'node').replace(/[^a-zA-Z0-9_]/g, '_');
         const label = `${node.id}\\n(${node.type})`;
         graph += `  ${safeId}["${label}"]\n`;
-        if (parentId) {
-            graph += `  ${parentId} --> ${safeId}\n`;
-        }
+        if (parentId) graph += `  ${parentId} --> ${safeId}\n`;
         if (Array.isArray(node.children)) {
             node.children.forEach(child => addNode(child, safeId));
         }
     };
-    addNode(tree, null);
+    addNode(tree);
     return graph;
 }
 
 function extractMermaidFromText(text) {
     if (!text) return '';
-    // Prefer fenced mermaid block
     const mermaidFence = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-    if (mermaidFence && mermaidFence[1]) {
-        return mermaidFence[1];
-    }
-    // Any fenced code block
-    const codeFence = text.match(/```[\s\S]*?\n([\s\S]*?)\n```/);
-    if (codeFence && codeFence[1] && codeFence[1].trim().startsWith('graph')) {
-        return codeFence[1].trim();
-    }
-    // Try to find a line starting with "graph"
-    const graphIdx = text.indexOf('graph ');
-    if (graphIdx !== -1) {
-        return text.slice(graphIdx).trim();
-    }
-    return text.trim();
+    if (mermaidFence && mermaidFence[1]) return mermaidFence[1];
+    if (text.trim().startsWith('graph')) return text.trim();
+    return '';
 }
 
 async function renderMermaidInto(container, graphText) {
     container.innerHTML = '';
     const el = document.createElement('div');
     el.className = 'mermaid';
-    // ID for mermaid to target.
-    const mermaidId = `mermaid-graph-${Date.now()}`;
-    el.id = mermaidId;
     el.textContent = graphText;
     container.appendChild(el);
     try {
-        // mermaid.init can return a promise that rejects on parse error. We must await it.
         await window.mermaid.run({ nodes: [el] });
     } catch (e) {
         console.error('Mermaid render error:', e);
-        logToConsole(`Flowchart render error: ${e.message}`, 'error');
-        container.innerHTML = `<div class="flowchart-placeholder">Flowchart render error: ${e.message}</div>`;
-        // Re-throw to allow the caller to handle fallback logic.
+        container.innerHTML = `<div class="flowchart-placeholder">Render error: ${e.message}</div>`;
         throw e;
     }
 }
 
 async function handleGenerateFlowchart() {
-    if (typeof window.mermaid === 'undefined') {
-        logToConsole('Mermaid not available.', 'warn');
-        return;
-    }
+    if (typeof window.mermaid === 'undefined') return;
 
-    // UI: loading state
     const originalText = generateFlowchartButton.innerHTML;
     generateFlowchartButton.disabled = true;
-    generateFlowchartButton.innerHTML = 'Generating with AI... <div class="loading-spinner"></div>';
-    flowchartOutput.innerHTML = '<div class="flowchart-placeholder">AI is analyzing your project and drawing a flowchart...</div>';
+    generateFlowchartButton.innerHTML = 'Generating... <div class="loading-spinner"></div>';
+    flowchartOutput.innerHTML = '<div class="flowchart-placeholder">AI is analyzing your project...</div>';
 
-    // Build prompts
-    const systemPrompt = `You are a senior frontend architect. Given a "vibe tree" describing a website as nested components (head, html, css, javascript nodes) with code and relationships, produce a clear Mermaid diagram that explains the app's structure and behavior.
-
-Return ONLY a Mermaid definition. No explanations, no markdown besides an optional \`\`\`mermaid fence. Prefer a left-to-right or top-down layout.
-
-Guidelines:
-- Use "graph TD" (top-down) or "graph LR" (left-to-right).
-- Show key sections (header, main, footer, modals) as nodes.
-- Group nodes by type when helpful: CSS, JS, Head.
-- **CRITICAL**: Use correct Mermaid syntax for links/edges: '-->' for a standard arrow, '---' for a line, '-.->' for a dotted line with arrow. Do not use long chains of dashes like '----------'.
-- Draw DOM containment edges (parent --> child html).
-- Draw dependency/behavior edges from JS to the elements they manipulate or listen to. Label edges like 'click', 'updates text', 'fetches', 'toggles class'.
-- Include important IDs/classes in node labels when available.
-- Keep it concise and readable.`;
-
-    const userPrompt = `Create a Mermaid diagram for this website code structure.
-
-Vibe Tree JSON:
-\`\`\`json
-${JSON.stringify(vibeTree, null, 2)}
-\`\`\`
-
-Constraints:
-- Output must be ONLY the Mermaid graph definition string, starting with "graph ".
-- If unsure about some interactions, infer reasonable relationships from descriptions and code.`;
+    const systemPrompt = `You are a senior frontend architect. Given a "vibe tree" describing a website, produce a clear Mermaid diagram explaining its structure and behavior. Return ONLY a Mermaid definition. Prefer "graph TD". Use correct syntax like '-->'. Show key sections, group nodes by type, and draw edges for DOM containment and JS interactions.`;
+    const userPrompt = `Create a Mermaid diagram for this website code structure.\n\nVibe Tree JSON:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
     try {
         const aiText = await callAI(systemPrompt, userPrompt, false);
         const mermaidText = extractMermaidFromText(aiText);
-
-        if (!mermaidText || !/^graph\s+(TD|LR)/i.test(mermaidText)) {
-            throw new Error('AI did not return a valid Mermaid graph.');
-        }
-
+        if (!mermaidText) throw new Error('AI did not return a valid Mermaid graph.');
         await renderMermaidInto(flowchartOutput, mermaidText);
         logToConsole('AI-generated flowchart rendered.', 'info');
     } catch (e) {
-        console.warn('AI flowchart generation failed, falling back to basic graph:', e);
-        logToConsole(`AI flowchart failed (${e.message}). Falling back to a basic structure graph.`, 'warn');
-        const basic = buildBasicMermaidFromTree(vibeTree);
+        console.warn('AI flowchart failed, falling back to basic graph:', e);
+        logToConsole(`AI flowchart failed (${e.message}). Falling back to basic graph.`, 'warn');
         try {
-            await renderMermaidInto(flowchartOutput, basic);
+            await renderMermaidInto(flowchartOutput, buildBasicMermaidFromTree(vibeTree));
         } catch (fallbackError) {
-             console.error('Fallback flowchart failed to render:', fallbackError);
              flowchartOutput.innerHTML = `<div class="flowchart-placeholder">Could not render flowchart.</div>`;
         }
     } finally {
@@ -3790,53 +3327,35 @@ async function handleGenerateProject() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
         if (!keyIsAvailable) {
-            alert(`Please add your ${currentAIProvider === 'gemini' ? 'Gemini' : 'nscale'} API Key in Settings to generate a project.`);
+            alert(`Please add your API Key in Settings to generate a project.`);
             return;
         }
 
-        let desiredId = (newProjectIdInput.value || '').trim().toLowerCase();
         const prompt = (projectPromptInput.value || '').trim();
-
         if (!prompt) {
-            alert('Please enter a short description for your new project.');
-            projectPromptInput.focus();
+            alert('Please enter a description for your new project.');
             return;
         }
 
-        desiredId = desiredId.replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '').replace(/^-+|-+$/g, '');
+        let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
-        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(desiredId)) {
-            alert('Project ID must be in kebab-case. Example: my-awesome-site');
-            newProjectIdInput.focus();
-            return;
-        }
-
+        
         const existing = db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
-        while (existing.includes(projectId)) {
-            projectId = `${desiredId}-${suffix++}`;
-        }
+        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
 
         newProjectContainer.style.display = 'none';
         startPageGenerationOutput.style.display = 'block';
         generationStatusText.textContent = 'Generating your project...';
         liveCodeOutput.textContent = '';
 
-        vibeTree = {
-            id: 'whole-page',
-            type: 'container',
-            description: prompt,
-            children: []
-        };
-
-        const children = await generateCompleteSubtree(vibeTree);
-        vibeTree.children = children;
+        vibeTree = { id: 'whole-page', type: 'container', description: prompt, children: [] };
+        vibeTree.children = await generateCompleteSubtree(vibeTree);
 
         currentProjectId = projectId;
         resetHistory();
-        historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
-
+        
         liveCodeOutput.textContent = generateFullCodeString(vibeTree);
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
@@ -3845,7 +3364,7 @@ async function handleGenerateProject() {
 
         refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
-        logToConsole(`New project '${currentProjectId}' created from prompt.`, 'info');
+        logToConsole(`New project '${currentProjectId}' created.`, 'info');
     } catch (e) {
         console.error('Project generation failed:', e);
         generationStatusText.textContent = 'Generation failed.';
@@ -3865,84 +3384,37 @@ async function handleAiImproveDescription() {
 
     const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
     if (!keyIsAvailable) {
-        alert(`Please add your ${currentAIProvider === 'gemini' ? 'Gemini' : 'nscale'} API Key in Settings to use AI features.`);
-        
+        alert(`Please add your API Key in Settings to use AI features.`);
         return;
     }
 
-    // UI loading state
     const originalHtml = aiImproveDescriptionButton.innerHTML;
     aiImproveDescriptionButton.disabled = true;
     aiImproveDescriptionButton.innerHTML = 'Analyzing... <div class="loading-spinner"></div>';
     editNodeError.textContent = '';
 
     try {
-        const systemPrompt = `You are a senior frontend engineer and technical writer.
-Given a website component (its type, code, and context within a page), write an improved, more detailed description
-in 2–5 concise sentences. Focus on intent, structure, behavior, interactions, dependencies, accessibility hooks (ids/aria/roles),
-and how it fits into the page. Output plain text only. No code fences, no markdown.`;
+        const systemPrompt = `You are a senior frontend engineer and technical writer. Given a website component (its type, code, and context), write an improved, more detailed description in 2-5 concise sentences. Focus on intent, structure, behavior, interactions, and dependencies. Output plain text only.`;
 
-        // Provide compact context for accuracy
         const context = {
-            node: {
-                id: node.id,
-                type: node.type,
-                currentDescription: node.description || '',
-                code: node.code || ''
-            },
+            node: { id: node.id, type: node.type, currentDescription: node.description || '', code: node.code || '' },
             parent: (() => {
-                // Find parent id/type for context
-                const stack = [vibeTree];
-                while (stack.length) {
-                    const cur = stack.pop();
-                    if (Array.isArray(cur.children)) {
-                        for (const ch of cur.children) {
-                            if (ch.id === node.id) {
-                                return { id: cur.id, type: cur.type };
-                            }
-                            stack.push(ch);
-                        }
-                    }
-                }
-                return null;
+                const res = findNodeAndParentById(node.id);
+                return res && res.parent ? { id: res.parent.id, type: res.parent.type } : null;
             })(),
-            siblingIds: (() => {
-                const result = [];
-                const stack = [vibeTree];
-                while (stack.length) {
-                    const cur = stack.pop();
-                    if (Array.isArray(cur.children)) {
-                        const idx = cur.children.findIndex(c => c.id === node.id);
-                        if (idx !== -1) {
-                            cur.children.forEach((c, i) => { if (i !== idx) result.push(c.id); });
-                            return result;
-                        }
-                        cur.children.forEach(c => stack.push(c));
-                    }
-                }
-                return result;
-            })()
         };
 
-        const userPrompt = `Improve the component description.
-
-Component Context (JSON):
-${JSON.stringify(context, null, 2)}
-
-If helpful, you may infer likely behavior from the code and ids/classes. Output plain text only.`;
-
-        const aiText = await callAI(systemPrompt, userPrompt, false);
-        // Clean potential markdown fences
-        let improved = aiText.trim();
+        const userPrompt = `Improve the component description.\n\nComponent Context (JSON):\n${JSON.stringify(context, null, 2)}`;
+        
+        let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced && fenced[0]) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
-        // Apply to textarea (do not auto-save yet; user can review/edit)
         if (improved) {
             editNodeDescriptionInput.value = improved;
             logToConsole(`AI generated a richer description for "${node.id}".`, 'info');
         } else {
-            editNodeError.textContent = 'AI returned an empty response. Please try again.';
+            editNodeError.textContent = 'AI returned an empty response.';
         }
     } catch (e) {
         console.error('AI Improve Description failed:', e);
@@ -3954,37 +3426,17 @@ If helpful, you may infer likely behavior from the code and ids/classes. Output 
 }
 
 function handleCollapseToggle(event) {
-    // This function now only handles the expansion/collapse of child node lists.
-    // It should stop propagation to prevent the parent header click from firing.
     event.stopPropagation();
-
     const btn = event.currentTarget;
-    const nodeEl = btn.closest('.vibe-node');
-    if (!nodeEl) return;
-    const childrenEl = nodeEl.querySelector(':scope > .children');
+    const childrenEl = btn.closest('.vibe-node').querySelector(':scope > .children');
     if (!childrenEl) return;
 
-    const isCollapsed = childrenEl.classList.contains('collapsed');
-    if (isCollapsed) {
-        childrenEl.classList.remove('collapsed');
-        btn.setAttribute('aria-expanded', 'true');
-        btn.textContent = '▼';
-    } else {
-        childrenEl.classList.add('collapsed');
-        btn.setAttribute('aria-expanded', 'false');
-        btn.textContent = '▶';
-    }
+    const isCollapsed = childrenEl.classList.toggle('collapsed');
+    btn.setAttribute('aria-expanded', String(!isCollapsed));
+    btn.textContent = isCollapsed ? '▶' : '▼';
 }
 
-/**
- * Handles toggling the visibility of a node's main content (description, buttons).
- * This is triggered by clicking anywhere on the node's header.
- * @param {MouseEvent} event
- */
 function handleNodeContentToggle(event) {
     const header = event.currentTarget;
-    const nodeEl = header.closest('.vibe-node');
-    if (!nodeEl) return;
-
-    nodeEl.classList.toggle('collapsed');
+    header.closest('.vibe-node').classList.toggle('collapsed');
 }
