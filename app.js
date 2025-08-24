@@ -11,8 +11,9 @@ const toggleInspectButton = document.getElementById('toggle-inspect-button');
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 
-// Start Page elements (now a tab with id 'start')
-const startPage = document.getElementById('start');
+// Start Page elements
+const startPage = document.getElementById('start-page');
+const mainContainer = document.querySelector('.container');
 const projectPromptInput = document.getElementById('project-prompt-input');
 const generateProjectButton = document.getElementById('generate-project-button');
 const startPageGenerationOutput = document.getElementById('start-page-generation-output');
@@ -1383,7 +1384,13 @@ async function handleFileUpload() {
 
         // Process with AI to decompose into Vibe Tree and refresh UI
         await processCodeAndRefreshUI(fileContent);
-        
+
+        // If user triggered upload from the start page (rare), move them into the main UI
+        if (startPage.classList.contains('active')) {
+            startPage.classList.remove('active');
+            mainContainer.classList.add('active');
+        }
+
         // Persist project
         autoSaveProject();
         logToConsole(`HTML project '${currentProjectId}' imported and processed with AI.`, 'info');
@@ -1656,7 +1663,11 @@ async function handleZipUpload() {
         // Apply and persist
         vibeTree = newTree;
         db.saveProject(currentProjectId, vibeTree);
-        
+
+        // Transition to main UI if on start page
+        startPage.classList.remove('active');
+        mainContainer.classList.add('active');
+
         resetHistory();
         historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
 
@@ -1981,81 +1992,270 @@ function applyVibes() {
     window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
-    const highlightCss = document.createElement('style');
-    highlightCss.textContent = \`
-.__vibe-inspect-highlight-all {
-    outline: 1px dashed #56b6c2 !important; 
-    outline-offset: 1px !important;
-    box-shadow: 0 0 5px rgba(86, 182, 194, 0.5) !important; 
-}
-.__vibe-inspect-highlight-hover {
-    outline: 2px solid #e5c07b !important;
-    outline-offset: 2px !important;
-    cursor: crosshair !important;
-    box-shadow: 0 0 8px rgba(229, 192, 123, 0.8) !important;
-}
-\`;
-    document.head.appendChild(highlightCss);
+    let toolbar, dragHandle, editButton, deleteButton;
+    let dropZones = [];
+    let draggedNodeId = null;
 
-    function setHighlight(el) {
-        if (hoverEl && hoverEl !== el) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-        hoverEl = el;
-        if (hoverEl) hoverEl.classList.add('__vibe-inspect-highlight-hover');
-    }
-    function clearHighlight() { if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover'); hoverEl = null; }
-    
+    const inspectorStyles = \`
+        .__vibe-inspect-highlight-all {
+            outline: 1px dashed #56b6c2 !important; 
+            outline-offset: 1px !important;
+        }
+        .__vibe-inspect-highlight-hover {
+            outline: 2px solid #e5c07b !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 8px rgba(229, 192, 123, 0.8) !important;
+            position: relative;
+        }
+        #vibe-inspector-toolbar {
+            position: absolute;
+            z-index: 99999;
+            background-color: #282c34;
+            border: 1px solid #61afef;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            padding: 2px;
+            gap: 2px;
+        }
+        #vibe-inspector-toolbar button {
+            background: #4b5263;
+            color: #f0f0f0;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 16px;
+            line-height: 1;
+        }
+        #vibe-inspector-toolbar button:hover { background: #5c6370; }
+        #vibe-inspector-drag-handle { cursor: move; }
+        .vibe-drop-zone {
+            background: rgba(97, 175, 239, 0.4);
+            border: 1px dashed #61afef;
+            z-index: 99998;
+            position: absolute;
+            pointer-events: none; /* Allow events to pass through to elements underneath */
+        }
+        .vibe-dragging-ghost {
+            opacity: 0.5;
+            outline: 2px dashed #98c379;
+        }
+    \`;
+
     function getNodeIdForElement(el) {
         let cur = el;
-        while (cur && cur !== document.body && cur !== document.documentElement) {
-            if (cur.id && window.__vibeIdToNodeId[cur.id]) return window.__vibeIdToNodeId[cur.id];
+        while (cur && cur.tagName !== 'BODY') {
+            if (cur.id && window.__vibeIdToNodeId[cur.id]) {
+                return { nodeId: window.__vibeIdToNodeId[cur.id], element: cur };
+            }
             cur = cur.parentElement;
         }
         return null;
     }
-    function handleMouseOver(e) { if (!inspectEnabled) return; const el = e.target; if (!(el instanceof Element)) return; setHighlight(el); e.stopPropagation(); }
-    function handleClick(e) {
+
+    function createToolbar() {
+        if (document.getElementById('vibe-inspector-toolbar')) return;
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = inspectorStyles;
+        document.head.appendChild(styleSheet);
+
+        toolbar = document.createElement('div');
+        toolbar.id = 'vibe-inspector-toolbar';
+        
+        dragHandle = document.createElement('button');
+        dragHandle.id = 'vibe-inspector-drag-handle';
+        dragHandle.textContent = '✥';
+        dragHandle.title = 'Move Element';
+        dragHandle.draggable = true;
+
+        editButton = document.createElement('button');
+        editButton.textContent = '✎';
+        editButton.title = 'Edit Element';
+
+        deleteButton = document.createElement('button');
+        deleteButton.textContent = '🗑️';
+        deleteButton.title = 'Delete Element';
+
+        toolbar.appendChild(dragHandle);
+        toolbar.appendChild(editButton);
+        toolbar.appendChild(deleteButton);
+        document.body.appendChild(toolbar);
+
+        dragHandle.addEventListener('dragstart', handleDragStart);
+        document.body.addEventListener('dragend', handleDragEnd);
+        document.body.addEventListener('dragover', handleDragOver);
+        document.body.addEventListener('drop', handleDrop);
+    }
+    
+    function updateToolbar(targetInfo) {
+        if (!targetInfo) {
+            toolbar.style.display = 'none';
+            return;
+        }
+        const rect = targetInfo.element.getBoundingClientRect();
+        toolbar.style.display = 'flex';
+        toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 4) + 'px';
+        toolbar.style.left = (rect.left + window.scrollX) + 'px';
+        
+        // Remove old listeners
+        const newEdit = editButton.cloneNode(true);
+        editButton.parentNode.replaceChild(newEdit, editButton);
+        editButton = newEdit;
+        
+        const newDelete = deleteButton.cloneNode(true);
+        deleteButton.parentNode.replaceChild(newDelete, deleteButton);
+        deleteButton = newDelete;
+
+        // Add new listeners
+        editButton.onclick = () => window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*');
+        deleteButton.onclick = () => window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*');
+        
+        dragHandle.dataset.nodeId = targetInfo.nodeId;
+    }
+
+    function handleMouseOver(e) {
         if (!inspectEnabled) return;
-        e.preventDefault(); e.stopPropagation();
-        const target = e.target;
-        const nodeId = getNodeIdForElement(target);
-        if (nodeId) {
-            window.parent.postMessage({ type: 'vibe-node-click', nodeId: nodeId }, '*');
-        } else {
-            const nearestWithId = target.closest('[id]');
-            if (nearestWithId && nearestWithId.id) window.parent.postMessage({ type: 'vibe-node-click', nodeId: nearestWithId.id }, '*');
+        const targetInfo = getNodeIdForElement(e.target);
+        if (targetInfo) {
+            if (hoverEl && hoverEl !== targetInfo.element) {
+                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+            }
+            hoverEl = targetInfo.element;
+            hoverEl.classList.add('__vibe-inspect-highlight-hover');
+            updateToolbar(targetInfo);
         }
     }
-    function enableInspect() {
-        if (inspectEnabled) return; inspectEnabled = true;
-
-        // Highlight all inspectable elements
-        for (const elementId in window.__vibeIdToNodeId) {
-            const el = document.getElementById(elementId);
-            if (el) {
-                el.classList.add('__vibe-inspect-highlight-all');
+    
+    function handleMouseOut(e) {
+        if (hoverEl) {
+             // Basic check to see if we're moving to a child or the toolbar itself
+            if (!hoverEl.contains(e.relatedTarget) && e.relatedTarget !== toolbar && !toolbar.contains(e.relatedTarget)) {
+                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+                updateToolbar(null);
+                hoverEl = null;
             }
         }
-
-        document.addEventListener('mouseover', handleMouseOver, true);
-        document.addEventListener('click', handleClick, true);
-        document.body.style.cursor = 'crosshair';
     }
-    function disableInspect() {
-        if (!inspectEnabled) return; inspectEnabled = false;
 
-        // Remove all highlights
-        document.querySelectorAll('.__vibe-inspect-highlight-all').forEach(el => {
-            el.classList.remove('__vibe-inspect-highlight-all');
+    // Drag and Drop Handlers
+    function handleDragStart(e) {
+        const nodeId = e.target.dataset.nodeId;
+        if (!nodeId) return;
+        draggedNodeId = nodeId;
+        e.dataTransfer.setData('text/plain', nodeId);
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => { // Use timeout to allow ghost image to be created
+            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
+            if(el) el.classList.add('vibe-dragging-ghost');
+            createDropZones();
+        }, 0);
+    }
+
+    function handleDragEnd(e) {
+        const el = document.querySelector(\`[id="\${draggedNodeId.replace('html-','')}"]\`);
+        if(el) el.classList.remove('vibe-dragging-ghost');
+        draggedNodeId = null;
+        clearDropZones();
+    }
+    
+    function handleDragOver(e) {
+        e.preventDefault(); 
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent parent elements from handling the drop
+        const sourceNodeId = draggedNodeId;
+        const targetInfo = getNodeIdForElement(e.target);
+        if (!sourceNodeId || !targetInfo || sourceNodeId === targetInfo.nodeId) return;
+
+        const rect = targetInfo.element.getBoundingClientRect();
+        const dropY = e.clientY;
+        const dropPos = (dropY - rect.top) / rect.height;
+        let position;
+        
+        // Simple logic: top third -> before, bottom third -> after, middle -> inside
+        if (dropPos < 0.33) {
+            position = 'before';
+        } else if (dropPos > 0.66) {
+            position = 'after';
+        } else {
+            position = 'inside';
+        }
+        
+        window.parent.postMessage({
+            type: 'vibe-node-move',
+            sourceNodeId,
+            targetNodeId: targetInfo.nodeId,
+            position
+        }, '*');
+    }
+
+    function createDropZones() {
+        clearDropZones();
+        Object.values(window.__vibeIdToNodeId).forEach(nodeId => {
+            if (nodeId === draggedNodeId) return;
+            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
+            if (!el) return;
+
+            const rect = el.getBoundingClientRect();
+            
+            // "before" zone
+            const beforeZone = document.createElement('div');
+            beforeZone.className = 'vibe-drop-zone';
+            beforeZone.style.top = (rect.top + window.scrollY - 4) + 'px';
+            beforeZone.style.left = (rect.left + window.scrollX) + 'px';
+            beforeZone.style.width = rect.width + 'px';
+            beforeZone.style.height = '8px';
+            document.body.appendChild(beforeZone);
+            dropZones.push(beforeZone);
+            
+            // "after" zone
+            const afterZone = document.createElement('div');
+            afterZone.className = 'vibe-drop-zone';
+            afterZone.style.top = (rect.bottom + window.scrollY - 4) + 'px';
+            afterZone.style.left = (rect.left + window.scrollX) + 'px';
+            afterZone.style.width = rect.width + 'px';
+            afterZone.style.height = '8px';
+            document.body.appendChild(afterZone);
+            dropZones.push(afterZone);
         });
-        clearHighlight(); // This will clear the hover highlight
-
-        document.removeEventListener('mouseover', handleMouseOver, true);
-        document.removeEventListener('click', handleClick, true);
-        document.body.style.cursor = '';
     }
+
+    function clearDropZones() {
+        dropZones.forEach(zone => zone.remove());
+        dropZones = [];
+    }
+
+
+    function enableInspect() {
+        if (inspectEnabled) return;
+        inspectEnabled = true;
+        createToolbar();
+        
+        document.addEventListener('mouseover', handleMouseOver);
+        document.addEventListener('mouseout', handleMouseOut);
+        document.body.style.cursor = 'default';
+    }
+
+    function disableInspect() {
+        if (!inspectEnabled) return;
+        inspectEnabled = false;
+        
+        document.removeEventListener('mouseover', handleMouseOver);
+        document.removeEventListener('mouseout', handleMouseOut);
+        if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+        updateToolbar(null);
+    }
+    
     window.addEventListener('message', function(event) {
         const data = event.data || {};
-        if (data.type === 'toggle-inspect') { if (data.enabled) enableInspect(); else disableInspect(); }
+        if (data.type === 'toggle-inspect') { 
+            if (data.enabled) enableInspect(); else disableInspect(); 
+        }
     });
 })();
 <\/script>`;
@@ -2553,15 +2753,156 @@ function toggleInspectMode() {
     }
 }
 
+// --- NEW: Inspector Tree Manipulation ---
+
+/**
+ * Finds a node and its parent in the tree.
+ * @param {string} id - The ID of the node to find.
+ * @param {object} node - The current node in the traversal.
+ * @param {object|null} parent - The parent of the current node.
+ * @returns {{node: object, parent: object}|null}
+ */
+function findNodeAndParentById(id, node = vibeTree, parent = null) {
+    if (node.id === id) {
+        return { node, parent };
+    }
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findNodeAndParentById(id, child, node);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+
+/**
+ * Deletes a node from the vibeTree after user confirmation.
+ * @param {string} nodeId - The ID of the node to delete.
+ */
+function deleteNode(nodeId) {
+    const result = findNodeAndParentById(nodeId);
+    if (!result || !result.parent) {
+        logToConsole(`Cannot delete node '${nodeId}': not found or is root.`, 'error');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete the element "${nodeId}"?`)) {
+        recordHistory(`Delete node ${nodeId}`);
+        const { node, parent } = result;
+        const index = parent.children.indexOf(node);
+        if (index > -1) {
+            parent.children.splice(index, 1);
+            // After deleting, recalculate selectors for subsequent siblings
+            recalculateSelectors(parent);
+            logToConsole(`Node '${nodeId}' deleted.`, 'info');
+            refreshAllUI();
+        }
+    }
+}
+
+/**
+ * Moves a node within the vibeTree.
+ * @param {string} sourceNodeId - The ID of the node to move.
+ * @param {string} targetNodeId - The ID of the node to move relative to.
+ * @param {'before'|'after'|'inside'} position - Where to move the node.
+ */
+function moveNode(sourceNodeId, targetNodeId, position) {
+    const sourceResult = findNodeAndParentById(sourceNodeId);
+    const targetResult = findNodeAndParentById(targetNodeId);
+
+    if (!sourceResult || !targetResult) {
+        logToConsole('Move failed: source or target node not found.', 'error');
+        return;
+    }
+
+    recordHistory(`Move node ${sourceNodeId}`);
+
+    const { node: sourceNode, parent: sourceParent } = sourceResult;
+    const { node: targetNode, parent: targetParent } = targetResult;
+
+    // 1. Remove source node from its original location
+    const sourceIndex = sourceParent.children.indexOf(sourceNode);
+    if (sourceIndex > -1) {
+        sourceParent.children.splice(sourceIndex, 1);
+    }
+
+    // 2. Add source node to its new location
+    if (position === 'inside') {
+        if (!targetNode.children) targetNode.children = [];
+        targetNode.children.push(sourceNode);
+        recalculateSelectors(targetNode);
+    } else {
+        const targetIndex = targetParent.children.indexOf(targetNode);
+        if (position === 'before') {
+            targetParent.children.splice(targetIndex, 0, sourceNode);
+        } else { // 'after'
+            targetParent.children.splice(targetIndex + 1, 0, sourceNode);
+        }
+        recalculateSelectors(targetParent);
+    }
+    
+    // After any move, we must also recalculate the selectors for the original parent's children
+    if(sourceParent !== targetParent) {
+       recalculateSelectors(sourceParent);
+    }
+
+    logToConsole(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`, 'info');
+    refreshAllUI();
+}
+
+/**
+ * Iterates through a parent node's HTML children and corrects their `selector` and `position` properties.
+ * @param {object} parentNode - The node whose children need recalculating.
+ */
+function recalculateSelectors(parentNode) {
+    if (!parentNode || !parentNode.children) return;
+
+    const htmlChildren = parentNode.children.filter(c => c.type === 'html');
+    let lastHtmlSiblingId = null;
+
+    htmlChildren.forEach((child, index) => {
+        if (index === 0) {
+            child.selector = `#${parentNode.id}`;
+            child.position = 'beforeend';
+        } else {
+            child.selector = `#${lastHtmlSiblingId}`;
+            child.position = 'afterend';
+        }
+        // The ID used for the selector must be extracted from the node's code.
+        const idMatch = child.code.match(/id="([^"]+)"/);
+        if (idMatch) {
+            lastHtmlSiblingId = idMatch[1];
+        } else {
+            // If a node in the chain has no ID, selector logic breaks. We should log a warning.
+            console.warn(`Node ${child.id} is an HTML sibling but lacks an 'id' attribute in its code, which may break layout.`);
+            // Fallback to using its node ID, though this isn't ideal
+            lastHtmlSiblingId = child.id;
+        }
+    });
+}
+
+
 // Listen for element click messages from the iframe
 window.addEventListener('message', (event) => {
     const data = event.data || {};
-    if (data.type === 'vibe-node-click' && data.nodeId) {
-        // Disable inspect after a selection to avoid accidental further clicks
-        if (inspectEnabled) {
-            toggleInspectMode();
-        }
-        openEditNodeModal(data.nodeId);
+    switch (data.type) {
+        case 'vibe-node-click':
+            if (data.nodeId) {
+                if (inspectEnabled) toggleInspectMode();
+                openEditNodeModal(data.nodeId);
+            }
+            break;
+        case 'vibe-node-delete':
+            if (data.nodeId) {
+                 deleteNode(data.nodeId);
+            }
+            break;
+        case 'vibe-node-move':
+            if (data.sourceNodeId && data.targetNodeId && data.position) {
+                 moveNode(data.sourceNodeId, data.targetNodeId, data.position);
+            }
+            break;
     }
 });
 
@@ -2737,6 +3078,10 @@ function handleLoadProject(event) {
         vibeTree = projectData;
         console.log(`Project '${projectId}' loaded.`);
         logToConsole(`Project '${projectId}' loaded successfully.`, 'info');
+        
+        // Transition to the main editor view
+        startPage.classList.remove('active');
+        mainContainer.classList.add('active');
         
         refreshAllUI();
 
@@ -3241,11 +3586,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
-
-    // The initial state is now handled by the 'active' classes in the HTML.
-    // This old logic is no longer needed.
-    // startPage.classList.add('active');
-    // mainContainer.classList.remove('active');
+    startPage.classList.add('active');
+    mainContainer.classList.remove('active');
 
     // Initialize history baseline
     resetHistory();
@@ -3258,9 +3600,10 @@ function resetToStartPage() {
 
     // Reset history when starting fresh
     resetHistory();
-    
-    // Switch to the start tab
-    document.querySelector('.tab-button[data-tab="start"]').click();
+
+    // Reset UI
+    mainContainer.classList.remove('active');
+    startPage.classList.add('active');
 
     // Reset start page form
     projectPromptInput.value = '';
@@ -3543,6 +3886,9 @@ async function handleGenerateProject() {
         populateProjectList();
 
         // Transition to main editor UI
+        startPage.classList.remove('active');
+        mainContainer.classList.add('active');
+
         refreshAllUI();
         document.querySelector('.tab-button[data-tab="preview"]').click();
         logToConsole(`New project '${currentProjectId}' created from prompt.`, 'info');
