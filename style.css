@@ -11,31 +11,40 @@ body {
     overflow-y: auto; /* Allow body scroll when content overflows */
 }
 
-.container {
-    display: none; /* Initially hidden */
+/* New main layout that holds the tabs and content area */
+.main-layout {
+    display: flex;
     flex-direction: column;
-    gap: 0; /* No gap between tabs and content */
+    gap: 0;
     width: 100%;
     max-width: 1600px;
-    height: calc(100vh - 40px); /* Full height minus body padding */
+    height: calc(100vh - 40px);
     margin: auto;
 }
 
+/* Old .container rules are removed as the element is gone. */
+.container {
+   /* This class is no longer used for layout */
+}
 .container.active {
-    display: flex;
+   /* This class is no longer used for layout */
 }
 
-/* Start Page Styles */
-#start-page {
-    display: none;
-    width: 100%;
+
+/* Start Page Styles: Remove display toggling and center the content block */
+#start {
+    /* No display properties needed, handled by .tab-content */
+}
+
+#start .start-page-content {
+    margin: 40px auto; /* Center the content block with some top margin */
     max-width: 700px;
+    background-color: #282c34;
+    padding: 40px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
     text-align: center;
-    margin: auto;
-}
-
-#start-page.active {
-    display: block;
 }
 
 .start-header {
@@ -45,14 +54,6 @@ body {
     border-bottom: 1px solid #444;
     padding-bottom: 20px;
     margin-bottom: 20px;
-}
-
-.start-page-content {
-    background-color: #282c34;
-    padding: 40px;
-    border-radius: 8px;
-    border: 1px solid #444;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
 }
 
 .start-page-content h1 {
@@ -359,8 +360,8 @@ button.delete-project-button:hover {
     width: 100%;
     padding: 10px;
     background-color: #21252b;
-    color: #f0f0f0;
     border: 1px solid #444;
+    color: #f0f0f0;
     border-radius: 4px;
     font-family: 'Inter', sans-serif;
     font-size: 1em;
@@ -1041,7 +1042,6 @@ button.update-button:disabled {
     display: flex;
     flex-direction: column;
     height: 100%;
-    margin: auto; /* Center the placeholder text */
 }
 
 .flowchart-controls {
@@ -1111,26 +1111,33 @@ button.update-button:disabled {
     margin-bottom: 10px;
     font-family: 'Roboto Mono', monospace;
     gap: 8px;
+    cursor: pointer; /* Indicate the header is clickable */
+    transition: background-color 0.2s;
+    padding: 2px 4px; /* Add slight padding for hover effect */
+    border-radius: 4px;
+}
+
+.vibe-node:not(.collapsed) .vibe-node-header {
+    margin-bottom: 15px; /* Increase spacing when expanded */
+}
+
+.vibe-node-header:hover {
+    background-color: #3a3f4b;
 }
 
 .vibe-node-header .id {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-weight: bold;
     color: #e5c07b;
     font-size: 1.1em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
-.has-children-indicator {
-    font-size: 0.9em;
-    color: #61afef;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-.vibe-node.is-container:hover .has-children-indicator {
-    opacity: 1;
+.collapse-placeholder {
+    display: inline-block;
+    width: 24px; /* Match width of the collapse button */
+    height: 24px;
 }
 
 .vibe-node-header .type {
@@ -1140,21 +1147,6 @@ button.update-button:disabled {
     border-radius: 4px;
     font-size: 0.8em;
     text-transform: uppercase;
-}
-
-.collapse-toggle {
-    appearance: none;
-    border: 1px solid #4b5263;
-    background: #33373f;
-    color: #abb2bf;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-family: 'Roboto Mono', monospace;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
     justify-content: center;
     line-height: 1;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -1170,6 +1162,10 @@ button.update-button:disabled {
     background-color: #3a3f4b;
 }
 
+.vibe-node.collapsed > .vibe-node-content {
+    display: none;
+}
+
 .vibe-node .children {
     margin-top: 10px;
     padding-left: 20px;
@@ -1179,173 +1175,6 @@ button.update-button:disabled {
 
 .vibe-node .children.collapsed {
     display: none;
-}
-
-/* NEW Vibe Editor Card Styles */
-#vibe-breadcrumbs {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 20px;
-    padding: 8px;
-    background-color: #21252b;
-    border-radius: 4px;
-    font-family: 'Roboto Mono', monospace;
-    flex-wrap: wrap;
-}
-
-.breadcrumb-item {
-    color: #abb2bf;
-    padding: 4px 8px;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.breadcrumb-item:hover {
-    background-color: #3a3f4b;
-    color: #fff;
-}
-
-.breadcrumb-item.active {
-    color: #61afef;
-    font-weight: bold;
-    cursor: default;
-}
-
-.breadcrumb-item.active:hover {
-    background-color: transparent;
-}
-
-.breadcrumb-separator {
-    color: #5c6370;
-}
-
-#vibe-cards-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 15px;
-}
-
-/* NEW: Vibe card animations */
-@keyframes slideOutLeft {
-    from { opacity: 1; transform: translateX(0); }
-    to { opacity: 0; transform: translateX(-30px); }
-}
-
-@keyframes slideInFromRight {
-    from { opacity: 0; transform: translateX(30px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideOutRight {
-    from { opacity: 1; transform: translateX(0); }
-    to { opacity: 0; transform: translateX(30px); }
-}
-
-@keyframes slideInFromLeft {
-    from { opacity: 0; transform: translateX(-30px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-#vibe-cards-container.anim-out-forward {
-    animation: slideOutLeft 0.25s ease-out forwards;
-}
-
-#vibe-cards-container.anim-in-forward {
-    animation: slideInFromRight 0.25s ease-out forwards;
-}
-
-#vibe-cards-container.anim-out-backward {
-    animation: slideOutRight 0.25s ease-out forwards;
-}
-
-#vibe-cards-container.anim-in-backward {
-    animation: slideInFromLeft 0.25s ease-out forwards;
-}
-
-.vibe-empty-message {
-    color: #5c6370;
-    font-style: italic;
-    grid-column: 1 / -1; /* Span all columns */
-    text-align: center;
-    padding: 20px;
-}
-
-.vibe-card {
-    background-color: #2c313a;
-    border: 1px solid #444;
-    border-radius: 6px;
-    padding: 15px;
-    display: flex;
-    flex-direction: column;
-    transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.vibe-card.is-container {
-    cursor: pointer;
-    border-left: 4px solid #61afef;
-}
-
-.vibe-card.is-container:hover {
-    box-shadow: 0 0 8px rgba(97, 175, 239, 0.3);
-    border-color: #61afef;
-}
-
-.vibe-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    font-family: 'Roboto Mono', monospace;
-}
-
-.vibe-card-header .id {
-    font-weight: bold;
-    color: #e5c07b;
-    font-size: 1.1em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.has-children-indicator {
-    font-size: 0.9em;
-    color: #61afef;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-.vibe-card.is-container:hover .has-children-indicator {
-    opacity: 1;
-}
-
-.vibe-card-header .type {
-    background-color: #4b5263;
-    color: #f0f0f0;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.8em;
-    text-transform: uppercase;
-}
-
-.vibe-card .description-input {
-    margin-bottom: 15px;
-    flex-grow: 1; /* Allow description to take up space */
-}
-
-.vibe-card .button-group {
-    margin-top: auto; /* Push buttons to the bottom */
-}
-
-.vibe-card .code-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.vibe-card .code-actions > button {
-    flex-grow: 1;
 }
 
 .description-input {
