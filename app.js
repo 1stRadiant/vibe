@@ -1,6 +1,51 @@
+
 import { DataBase } from './database.js';
 
 const db = new DataBase();
+
+// NEW: Monkey-patching component library functionality onto the db instance.
+// In a real application, these methods would be part of the DataBase class.
+const COMPONENT_LIBRARY_KEY = '_vibe_component_library';
+
+db.getComponentLibrary = function() {
+    try {
+        const libraryStr = localStorage.getItem(COMPONENT_LIBRARY_KEY);
+        return libraryStr ? JSON.parse(libraryStr) : {};
+    } catch (e) {
+        console.error("Failed to load component library:", e);
+        return {};
+    }
+};
+
+db.saveComponentLibrary = function(library) {
+    try {
+        localStorage.setItem(COMPONENT_LIBRARY_KEY, JSON.stringify(library));
+    } catch (e) {
+        console.error("Failed to save component library:", e);
+    }
+};
+
+db.listComponents = function() {
+    return Object.values(this.getComponentLibrary());
+};
+
+db.getComponent = function(componentId) {
+    return this.getComponentLibrary()[componentId] || null;
+};
+
+db.saveComponent = function(component) {
+    const library = this.getComponentLibrary();
+    library[component.id] = component;
+    this.saveComponentLibrary(library);
+};
+
+db.deleteComponent = function(componentId) {
+    const library = this.getComponentLibrary();
+    delete library[componentId];
+    this.saveComponentLibrary(library);
+};
+
+
 window.db = db; // Make db globally accessible if needed for debugging
 
 const previewContainer = document.getElementById('website-preview');
@@ -80,6 +125,26 @@ const filesCopyButton = document.getElementById('files-copy-button');
 const filesPasteButton = document.getElementById('files-paste-button');
 const filesRenameButton = document.getElementById('files-rename-button');
 const filesDeleteButton = document.getElementById('files-delete-button');
+
+// NEW: Context Tab elements
+const contextComponentList = document.getElementById('context-component-list');
+const addNewComponentButton = document.getElementById('add-new-component-button');
+const contextComponentViewer = document.getElementById('context-component-viewer');
+
+// NEW: Context Component Modal elements
+const contextComponentModal = document.getElementById('context-component-modal');
+const closeComponentModalButton = document.getElementById('close-context-modal-button');
+const saveComponentButton = document.getElementById('save-component-button');
+const deleteComponentButton = document.getElementById('delete-component-button');
+const componentIdInput = document.getElementById('component-id-input');
+const componentNameInput = document.getElementById('component-name-input');
+const componentDescriptionInput = document.getElementById('component-description-input');
+const componentHtmlInput = document.getElementById('component-html-input');
+const componentCssInput = document.getElementById('component-css-input');
+const componentJsInput = document.getElementById('component-js-input');
+const componentModalError = document.getElementById('component-modal-error');
+const componentModalTitle = document.getElementById('component-modal-title');
+
 
 // Settings Modal elements
 const settingsModal = document.getElementById('settings-modal');
@@ -709,6 +774,37 @@ function refreshAllUI() {
     autoSaveProject();
 }
 
+/**
+ * Gets the component library formatted as a string for AI injection.
+ * @returns {string} The formatted context string.
+ */
+function getComponentContextForAI() {
+    const components = db.listComponents();
+    if (components.length === 0) {
+        return '';
+    }
+
+    let contextString = "\n\n--- AVAILABLE CUSTOM COMPONENTS ---\n";
+    contextString += "Here is a library of pre-defined components. When a user's request matches the description of one of these, you should use its code as a starting point or insert it directly.\n\n";
+
+    components.forEach(comp => {
+        contextString += `### Component: ${comp.name} (ID: ${comp.id})\n`;
+        contextString += `**Description:** ${comp.description}\n`;
+        if (comp.html) {
+            contextString += "**HTML:**\n```html\n" + comp.html + "\n```\n";
+        }
+        if (comp.css) {
+            contextString += "**CSS:**\n```css\n" + comp.css + "\n```\n";
+        }
+        if (comp.javascript) {
+            contextString += "**JavaScript:**\n```javascript\n" + comp.javascript + "\n```\n";
+        }
+        contextString += "---\n";
+    });
+
+    return contextString;
+}
+
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     console.info('--- Calling AI ---');
     let assetsNote = '';
@@ -723,20 +819,25 @@ ${files.slice(0, 50).map(p => `- ${p}`).join('\n')}${files.length > 50 ? `\n...a
 When you need to embed an image/video/font/etc., reference it directly by its path (e.g., src="assets/images/logo.png").`;
         }
     } catch {}
+
+    // NEW: Get component context and augment the system prompt
+    const componentContext = getComponentContextForAI();
+    const augmentedSystemPrompt = systemPrompt + componentContext;
     const augmentedUserPrompt = userPrompt + assetsNote;
 
     logToConsole('Sending request to AI model...', 'info');
-    logDetailed('System Prompt Sent to AI', systemPrompt);
+    logDetailed('System Prompt Sent to AI', augmentedSystemPrompt);
     logDetailed('User Prompt Sent to AI', augmentedUserPrompt);
 
     if (currentAIProvider === 'nscale') {
         if (streamCallback) {
             console.warn("Streaming is not supported for nscale provider in this implementation.");
         }
-        return callNscaleAI(systemPrompt, augmentedUserPrompt, forJson);
+        return callNscaleAI(augmentedSystemPrompt, augmentedUserPrompt, forJson);
     }
-    return callGeminiAI(systemPrompt, augmentedUserPrompt, forJson, streamCallback);
+    return callGeminiAI(augmentedSystemPrompt, augmentedUserPrompt, forJson, streamCallback);
 }
+
 
 async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     if (!geminiApiKey) {
@@ -2812,8 +2913,16 @@ function handleTabSwitching() {
                 filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file to preview it here.</div>';
             }
         }
+        // NEW: Handle context tab activation
+        if (tabId === 'context') {
+            renderComponentList();
+            if(contextComponentViewer) {
+                 contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
+            }
+        }
     });
 }
+
 
 function initializeMermaid() {
     if (typeof window.mermaid === 'undefined') {
@@ -2915,6 +3024,212 @@ projectListContainer.addEventListener('click', (event) => {
         handleDeleteProject(event);
     }
 });
+
+// =============================
+// CONTEXT / COMPONENT LIBRARY
+// =============================
+
+/**
+ * Opens the modal to add a new component or edit an existing one.
+ * @param {string|null} componentId - The ID of the component to edit, or null to create a new one.
+ */
+function openComponentModal(componentId = null) {
+    componentModalError.textContent = '';
+    const isEditing = componentId !== null;
+
+    if (isEditing) {
+        const component = db.getComponent(componentId);
+        if (!component) {
+            console.error(`Component not found: ${componentId}`);
+            return;
+        }
+        componentModalTitle.textContent = 'Edit Component';
+        componentIdInput.value = component.id;
+        componentIdInput.readOnly = true;
+        componentNameInput.value = component.name;
+        componentDescriptionInput.value = component.description || '';
+        componentHtmlInput.value = component.html || '';
+        componentCssInput.value = component.css || '';
+        componentJsInput.value = component.javascript || '';
+        deleteComponentButton.style.display = 'inline-block';
+        deleteComponentButton.dataset.id = component.id;
+    } else {
+        componentModalTitle.textContent = 'Add New Component';
+        componentIdInput.value = '';
+        componentIdInput.readOnly = false;
+        componentNameInput.value = '';
+        componentDescriptionInput.value = '';
+        componentHtmlInput.value = '';
+        componentCssInput.value = '';
+        componentJsInput.value = '';
+        deleteComponentButton.style.display = 'none';
+    }
+
+    contextComponentModal.style.display = 'block';
+    componentNameInput.focus();
+}
+
+/**
+ * Closes the component management modal.
+ */
+function closeComponentModal() {
+    contextComponentModal.style.display = 'none';
+}
+
+/**
+ * Saves a component from the modal form data to the database.
+ */
+function handleSaveComponent() {
+    const id = componentIdInput.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+    const name = componentNameInput.value.trim();
+    const isEditing = componentIdInput.readOnly;
+
+    componentModalError.textContent = '';
+    if (!id || !name) {
+        componentModalError.textContent = 'ID and Name are required.';
+        return;
+    }
+
+    if (!isEditing && db.getComponent(id)) {
+        componentModalError.textContent = 'This Component ID is already in use.';
+        return;
+    }
+
+    const component = {
+        id,
+        name,
+        description: componentDescriptionInput.value.trim(),
+        html: componentHtmlInput.value.trim(),
+        css: componentCssInput.value.trim(),
+        javascript: componentJsInput.value.trim(),
+    };
+
+    db.saveComponent(component);
+    logToConsole(`Component '${name}' saved.`, 'info');
+    closeComponentModal();
+    renderComponentList();
+    // Select the newly saved/edited component
+    selectComponentForPreview(id);
+}
+
+/**
+ * Deletes the selected component after confirmation.
+ */
+function handleDeleteComponentFromModal() {
+    const componentId = deleteComponentButton.dataset.id;
+    if (componentId && confirm(`Are you sure you want to delete the component "${componentId}"?`)) {
+        db.deleteComponent(componentId);
+        logToConsole(`Component '${componentId}' deleted.`, 'info');
+        closeComponentModal();
+        renderComponentList();
+        contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
+    }
+}
+
+/**
+ * Renders the list of available components in the Context tab.
+ */
+function renderComponentList() {
+    if (!contextComponentList) return;
+    const components = db.listComponents();
+    contextComponentList.innerHTML = '';
+
+    if (components.length === 0) {
+        contextComponentList.innerHTML = '<p class="empty-list-message">No components yet. Click "Add New Component" to create one.</p>';
+        return;
+    }
+
+    components.sort((a, b) => a.name.localeCompare(b.name));
+
+    components.forEach(comp => {
+        const item = document.createElement('div');
+        item.className = 'component-list-item';
+        item.dataset.id = comp.id;
+        item.innerHTML = `
+            <span class="component-name">${comp.name}</span>
+            <span class="component-id">(${comp.id})</span>
+        `;
+        item.addEventListener('click', () => selectComponentForPreview(comp.id));
+        contextComponentList.appendChild(item);
+    });
+}
+
+
+/**
+ * Renders a preview and the code for a selected component.
+ * @param {string} componentId - The ID of the component to preview.
+ */
+function selectComponentForPreview(componentId) {
+    if (!contextComponentViewer) return;
+
+    // Highlight the selected item in the list
+    contextComponentList.querySelectorAll('.component-list-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.id === componentId);
+    });
+    
+    const component = db.getComponent(componentId);
+    if (!component) {
+        contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Component not found.</div>';
+        return;
+    }
+    
+    const previewHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { margin: 0; padding: 10px; font-family: sans-serif; background-color: #fff; color: #111; }
+                ${component.css || ''}
+            </style>
+        </head>
+        <body>
+            ${component.html || ''}
+            <script>
+                (function(){
+                    try {
+                        ${component.javascript || ''}
+                    } catch(e) { console.error(e); }
+                })();
+            <\/script>
+        </body>
+        </html>
+    `;
+    
+    contextComponentViewer.innerHTML = `
+        <div class="component-viewer-header">
+            <h3>${component.name}</h3>
+            <p>${component.description || 'No description.'}</p>
+            <button class="action-button" id="edit-selected-component-button">Edit</button>
+        </div>
+        <div class="component-preview-container">
+            <h4>Preview</h4>
+            <iframe id="context-preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+        <div class="component-code-container">
+            <h4>Code Snippets</h4>
+            <details open>
+                <summary>HTML</summary>
+                <textarea readonly>${component.html || ''}</textarea>
+            </details>
+            <details>
+                <summary>CSS</summary>
+                <textarea readonly>${component.css || ''}</textarea>
+            </details>
+            <details>
+                <summary>JavaScript</summary>
+                <textarea readonly>${component.javascript || ''}</textarea>
+            </details>
+        </div>
+    `;
+
+    const iframe = contextComponentViewer.querySelector('#context-preview-frame');
+    iframe.srcdoc = previewHtml;
+
+    contextComponentViewer.querySelector('#edit-selected-component-button').addEventListener('click', () => {
+        openComponentModal(componentId);
+    });
+}
+
 
 // Files tab implementation
 let filesState = {
@@ -3240,6 +3555,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
         
+        // NEW: Context tab event listeners
+        if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
+        if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
+        if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
+        if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+
         const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
         if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
         if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
@@ -3259,6 +3580,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (event.target === settingsModal) settingsModal.style.display = 'none';
             if (event.target === addNodeModal) addNodeModal.style.display = 'none';
             if (event.target === editNodeModal) editNodeModal.style.display = 'none';
+            if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
         });
     }
     
@@ -3266,6 +3588,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
+    renderComponentList(); // NEW: Initialize component list
     resetHistory();
 });
 
