@@ -323,6 +323,14 @@
         <div class="modal-content">
             <span class="close-button" id="close-context-modal-button">&times;</span>
             <h2 id="component-modal-title">Add New Component</h2>
+            
+            <!-- NEW: AI Generation Section -->
+            <div class="component-ai-generator">
+                <label for="component-ai-prompt-input">Generate with AI:</label>
+                <textarea id="component-ai-prompt-input" rows="3" placeholder="Describe the component you want to create, e.g., 'a responsive card with an image, title, and call-to-action button'"></textarea>
+                <button id="generate-component-button" class="action-button">Generate Component</button>
+            </div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #4b5263;">
     
             <label for="component-id-input">Component ID (unique, kebab-case):</label>
             <input type="text" id="component-id-input" placeholder="e.g., responsive-navbar">
