@@ -1,4 +1,3 @@
-
 import { DataBase } from './database.js';
 
 const db = new DataBase();
@@ -144,6 +143,9 @@ const componentCssInput = document.getElementById('component-css-input');
 const componentJsInput = document.getElementById('component-js-input');
 const componentModalError = document.getElementById('component-modal-error');
 const componentModalTitle = document.getElementById('component-modal-title');
+// NEW: AI generation elements for component modal
+const componentAiPromptInput = document.getElementById('component-ai-prompt-input');
+const generateComponentButton = document.getElementById('generate-component-button');
 
 
 // Settings Modal elements
@@ -3065,8 +3067,16 @@ function openComponentModal(componentId = null) {
         deleteComponentButton.style.display = 'none';
     }
 
+    // Always clear AI prompt field when opening
+    if(componentAiPromptInput) componentAiPromptInput.value = '';
+
     contextComponentModal.style.display = 'block';
-    componentNameInput.focus();
+    // Focus on AI prompt if creating new, otherwise focus on name
+    if (isEditing) {
+        componentNameInput.focus();
+    } else {
+        componentAiPromptInput.focus();
+    }
 }
 
 /**
@@ -3075,6 +3085,73 @@ function openComponentModal(componentId = null) {
 function closeComponentModal() {
     contextComponentModal.style.display = 'none';
 }
+
+/**
+ * Uses AI to generate a component based on a user prompt and populates the modal fields.
+ */
+async function handleAiGenerateComponent() {
+    const prompt = componentAiPromptInput.value.trim();
+    if (!prompt) {
+        componentModalError.textContent = 'Please enter a description for the AI to generate a component.';
+        return;
+    }
+
+    // UI feedback
+    const originalText = generateComponentButton.innerHTML;
+    generateComponentButton.disabled = true;
+    generateComponentButton.innerHTML = 'Generating... <div class="loading-spinner"></div>';
+    componentModalError.textContent = '';
+
+    try {
+        const systemPrompt = `You are an expert frontend developer creating reusable, framework-agnostic web components. Your task is to generate a single, self-contained component based on a user's prompt.
+
+        **OUTPUT FORMAT:** You MUST respond with a single, valid JSON object and nothing else. Do not include any explanatory text, comments, or markdown formatting outside of the JSON object itself.
+
+        **JSON SCHEMA:**
+        {
+          "id": "string // A unique, descriptive, kebab-case identifier derived from the prompt (e.g., 'dark-mode-toggle').",
+          "name": "string // A human-readable, Title Case display name (e.g., 'Dark Mode Toggle').",
+          "description": "string // A concise, one-sentence summary of the component's purpose and usage.",
+          "html": "string // The complete, self-contained HTML snippet for the component.",
+          "css": "string // The corresponding CSS, scoped to the component using classes from the HTML.",
+          "javascript": "string // The necessary JavaScript to make the component interactive, preferably wrapped in an IIFE to avoid global scope pollution."
+        }`;
+
+        const userPrompt = `Generate a component based on the following request: "${prompt}"`;
+        
+        logToConsole(`Generating component with AI from prompt: "${prompt}"`, 'info');
+        
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const aiComponent = JSON.parse(rawResponse);
+
+        // Validate the response
+        if (!aiComponent.id || !aiComponent.name || !aiComponent.html) {
+            throw new Error("AI response is missing required fields (id, name, html).");
+        }
+
+        // Populate the form fields
+        componentIdInput.value = aiComponent.id || '';
+        componentNameInput.value = aiComponent.name || '';
+        componentDescriptionInput.value = aiComponent.description || '';
+        componentHtmlInput.value = aiComponent.html || '';
+        componentCssInput.value = aiComponent.css || '';
+        componentJsInput.value = aiComponent.javascript || '';
+        
+        logToConsole(`AI successfully generated component '${aiComponent.name}'. Please review and save.`, 'info');
+        componentAiPromptInput.value = ''; // Clear the prompt
+
+    } catch (error) {
+        console.error("AI Component Generation Failed:", error);
+        const errorMessage = `AI generation failed: ${error.message}. Please check the console for details.`;
+        componentModalError.textContent = errorMessage;
+        logToConsole(errorMessage, 'error');
+    } finally {
+        // Restore button
+        generateComponentButton.disabled = false;
+        generateComponentButton.innerHTML = 'Generate Component';
+    }
+}
+
 
 /**
  * Saves a component from the modal form data to the database.
@@ -3560,6 +3637,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
         if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
         if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+        // NEW: AI component generator button
+        if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
 
         const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
         if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
