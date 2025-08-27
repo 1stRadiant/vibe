@@ -129,6 +129,11 @@ const filesDeleteButton = document.getElementById('files-delete-button');
 const contextComponentList = document.getElementById('context-component-list');
 const addNewComponentButton = document.getElementById('add-new-component-button');
 const contextComponentViewer = document.getElementById('context-component-viewer');
+// NEW: Context Import/Export elements
+const downloadContextButton = document.getElementById('download-context-button');
+const uploadContextButton = document.getElementById('upload-context-button');
+const contextUploadInput = document.getElementById('context-upload-input');
+
 
 // NEW: Context Component Modal elements
 const contextComponentModal = document.getElementById('context-component-modal');
@@ -3307,6 +3312,104 @@ function selectComponentForPreview(componentId) {
     });
 }
 
+/**
+ * Handles the download of the entire component library as a JSON file.
+ */
+function handleDownloadContext() {
+    try {
+        const library = db.getComponentLibrary();
+        if (Object.keys(library).length === 0) {
+            alert("Component library is empty. Nothing to download.");
+            return;
+        }
+        const libraryJson = JSON.stringify(library, null, 2);
+        const blob = new Blob([libraryJson], { type: 'application/json' });
+        triggerBlobDownload(blob, 'vibe-component-library.json');
+        logToConsole('Component library downloaded successfully.', 'info');
+    } catch (e) {
+        console.error("Failed to download component library:", e);
+        logToConsole(`Failed to download library: ${e.message}`, 'error');
+        alert(`An error occurred while preparing the download: ${e.message}`);
+    }
+}
+
+/**
+ * Triggers the hidden file input to upload a context library.
+ */
+function handleUploadContextTrigger() {
+    contextUploadInput.click();
+}
+
+/**
+ * Processes the uploaded component library file.
+ * @param {Event} event - The file input change event.
+ */
+async function processContextUpload(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    logToConsole(`Context library file selected: ${file.name}`, 'info');
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+        try {
+            const text = e.target.result;
+            const newLibrary = JSON.parse(text);
+
+            // Basic validation
+            if (typeof newLibrary !== 'object' || newLibrary === null || Array.isArray(newLibrary)) {
+                throw new Error("Invalid format. The file must contain a JSON object.");
+            }
+
+            const componentCount = Object.keys(newLibrary).length;
+            const currentCount = db.listComponents().length;
+
+            if (!confirm(`This will replace your current library of ${currentCount} components with the new library of ${componentCount} components. Are you sure you want to continue?`)) {
+                logToConsole("Context library import cancelled by user.", "info");
+                return;
+            }
+
+            // More validation - check if values are component-like
+            for (const key in newLibrary) {
+                const comp = newLibrary[key];
+                if (typeof comp !== 'object' || !comp.id || !comp.name) {
+                     logToConsole(`Warning: Imported component with key '${key}' is missing 'id' or 'name'. Importing anyway.`, 'warn');
+                }
+                if (key !== comp.id) {
+                     logToConsole(`Warning: Component key '${key}' does not match component.id '${comp.id}'. The library will still be saved.`, 'warn');
+                }
+            }
+
+            db.saveComponentLibrary(newLibrary);
+            logToConsole(`Successfully imported ${componentCount} components.`, 'info');
+            
+            // Refresh UI
+            renderComponentList();
+            if (contextComponentViewer) {
+                contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
+            }
+
+        } catch (error) {
+            console.error("Failed to upload/process context library:", error);
+            logToConsole(`Failed to import library: ${error.message}`, 'error');
+            alert(`Error importing library: ${error.message}`);
+        } finally {
+            // Reset the input so the user can upload the same file again if they need to
+            contextUploadInput.value = '';
+        }
+    };
+
+    reader.onerror = (error) => {
+        console.error("Error reading context file:", error);
+        alert("An error occurred while reading the file.");
+    };
+
+    reader.readAsText(file);
+}
+
 
 // Files tab implementation
 let filesState = {
@@ -3637,8 +3740,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
         if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
         if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
-        // NEW: AI component generator button
         if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
+        if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
+        if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
+        if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
 
         const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
         if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
