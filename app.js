@@ -1738,27 +1738,30 @@ function generateFullCodeString(tree = vibeTree) {
         if (!nodes) return currentHtml;
 
         const htmlNodes = nodes.filter(n => n.type === 'html');
-        // A simple sort to respect selector/position logic
-        htmlNodes.sort((a, b) => {
-            if (a.position === 'beforeend' && b.position === 'afterend') return -1;
-            if (a.position === 'afterend' && b.position === 'beforeend') return 1;
-            return 0;
-        });
         
         htmlNodes.forEach(node => {
-            // If the node has children, its code is just the container. We recursively build the inner part.
+            let finalCode = node.code;
+            // Inject a data-attribute for the inspector to find the node.
+            // This is more reliable than relying on the 'id' attribute.
+            if (finalCode && finalCode.trim().startsWith('<')) {
+                 finalCode = finalCode.replace(
+                    /<([a-zA-Z0-9\-]+)/, 
+                    `<$1 data-vibe-node-id="${node.id}"`
+                );
+            }
+
             if (node.children && node.children.length > 0) {
                  const innerHtml = buildHtmlRecursive(node.children);
                  const wrapper = document.createElement('div');
-                 wrapper.innerHTML = node.code;
+                 wrapper.innerHTML = finalCode; // Use the modified code
                  if(wrapper.firstElementChild) {
                      wrapper.firstElementChild.innerHTML = innerHtml;
                      currentHtml += wrapper.innerHTML + '\n';
                  } else {
-                     currentHtml += node.code + '\n'; // Fallback
+                     currentHtml += finalCode + '\n'; // Fallback
                  }
             } else {
-                 currentHtml += node.code + '\n';
+                 currentHtml += finalCode + '\n'; // Use the modified code
             }
         });
         return currentHtml;
@@ -2000,35 +2003,16 @@ async function handleDownloadProjectZip() {
 }
 
 /**
- * Build a map of elementId -> vibeNodeId by scanning HTML nodes' code for id="...".
- */
-function buildElementIdToNodeIdMap(node = vibeTree, map = {}) {
-    if (!node) return map;
-    if (node.type === 'html' && typeof node.code === 'string') {
-        const m = node.code.match(/\bid\s*=\s*"([^"]+)"/i);
-        if (m && m[1]) {
-            map[m[1]] = node.id;
-        }
-    }
-    if (Array.isArray(node.children)) {
-        node.children.forEach(child => buildElementIdToNodeIdMap(child, map));
-    }
-    return map;
-}
-
-/**
  * Applies the current vibeTree to the preview iframe with an advanced inspector.
  */
 function applyVibes() {
     try {
         const doc = previewContainer.contentWindow.document;
         let html = generateFullCodeString();
-        const idToNodeMap = buildElementIdToNodeIdMap();
 
         const inspectorScript = `
 <script>
 (function(){
-    window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
 
@@ -2048,12 +2032,12 @@ function applyVibes() {
     \`;
 
     function getNodeIdForElement(el) {
-        let cur = el;
-        while (cur && cur.tagName !== 'BODY') {
-            if (cur.id && window.__vibeIdToNodeId[cur.id]) {
-                return { nodeId: window.__vibeIdToNodeId[cur.id], element: cur };
-            }
-            cur = cur.parentElement;
+        const closest = el.closest('[data-vibe-node-id]');
+        if (closest) {
+            return {
+                nodeId: closest.dataset.vibeNodeId,
+                element: closest
+            };
         }
         return null;
     }
@@ -2069,12 +2053,18 @@ function applyVibes() {
     function handleMouseOver(e) {
         if (!inspectEnabled) return;
         const targetInfo = getNodeIdForElement(e.target);
+        
         if (targetInfo) {
             if (hoverEl && hoverEl !== targetInfo.element) {
                 hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             }
             hoverEl = targetInfo.element;
             hoverEl.classList.add('__vibe-inspect-highlight-hover');
+        } else {
+             if (hoverEl) {
+                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+                hoverEl = null;
+            }
         }
     }
     
