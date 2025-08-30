@@ -1431,3 +1431,55 @@ button.update-button:disabled {
     padding: 10px;
     border-radius: 6px;
 }
+
+/* --- Vibe Editor Drag and Drop Styles --- */
+.vibe-node {
+    /* Required for positioning the drop indicator */
+    position: relative; 
+}
+
+.vibe-node .drag-handle {
+    cursor: grab;
+    opacity: 0.5;
+    margin-right: 8px;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 4px;
+    user-select: none; /* Prevent text selection while dragging */
+}
+
+.vibe-node .drag-handle:hover {
+    opacity: 1;
+}
+
+/* Style for the node being dragged */
+.vibe-node.dragging {
+    opacity: 0.4;
+    background: #3c414d;
+}
+
+/* Change cursor to 'grabbing' when dragging */
+.vibe-node.dragging .drag-handle,
+body.is-dragging-vibe .drag-handle {
+    cursor: grabbing;
+}
+
+/* Drop indicator lines that appear above or below target nodes */
+.drop-indicator-before::before,
+.drop-indicator-after::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-color: #61afef; /* A bright blue to indicate drop target */
+    z-index: 10;
+}
+
+.drop-indicator-before::before {
+    top: -2px;
+}
+
+.drop-indicator-after::after {
+    bottom: -2px;
+}
