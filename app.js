@@ -1299,7 +1299,7 @@ async function decomposeCodeIntoVibeTree(fullCode) {
     *   You MUST correctly assign unique IDs to HTML elements used as containers or selector targets.
 
 4.  **CSS DECOMPOSITION:**
-    *   Extract content of <style> tags into `css` nodes.
+    *   Extract content of <style> tags into \`css\` nodes.
 
 5.  **JAVASCRIPT FUNCTION DECOMPOSITION (CRITICAL):**
     *   Instead of one large \`javascript\` node, break down script content.
