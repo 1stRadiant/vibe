@@ -765,17 +765,15 @@ function refreshAllUI() {
     logToConsole('Refreshing entire UI: Vibe Editor, Website Preview, and Full Code.', 'info');
 
     // Preserve the expanded/collapsed state of the editor nodes
-    const expandedNodeIds = new Set();
+    const expandedNodeStates = new Map(); // nodeId -> { content: boolean, children: boolean }
     if (editorContainer) {
-        editorContainer.querySelectorAll('.vibe-node:not(.collapsed)').forEach(nodeEl => {
-            if (nodeEl.dataset.nodeId) {
-                expandedNodeIds.add(nodeEl.dataset.nodeId);
-            }
-        });
-        editorContainer.querySelectorAll('.vibe-node .collapse-toggle[aria-expanded="true"]').forEach(button => {
-            const nodeId = button.closest('.vibe-node')?.dataset.nodeId;
+        editorContainer.querySelectorAll('.vibe-node').forEach(nodeEl => {
+            const nodeId = nodeEl.dataset.nodeId;
             if (nodeId) {
-                expandedNodeIds.add(nodeId);
+                const isContentCollapsed = nodeEl.classList.contains('collapsed');
+                const childrenEl = nodeEl.querySelector(':scope > .children');
+                const isChildrenCollapsed = childrenEl ? childrenEl.classList.contains('collapsed') : true;
+                expandedNodeStates.set(nodeId, { content: !isContentCollapsed, children: !isChildrenCollapsed });
             }
         });
     }
@@ -784,19 +782,21 @@ function refreshAllUI() {
     editorContainer.appendChild(renderEditor(vibeTree));
 
     // Restore the expanded/collapsed state
-    if (expandedNodeIds.size > 0) {
-        expandedNodeIds.forEach(nodeId => {
+    if (expandedNodeStates.size > 0) {
+        expandedNodeStates.forEach((state, nodeId) => {
             const nodeEl = editorContainer.querySelector(`.vibe-node[data-node-id="${nodeId}"]`);
             if (nodeEl) {
-                nodeEl.classList.remove('collapsed');
-                const childrenEl = nodeEl.querySelector(':scope > .children');
-                if (childrenEl) {
-                    childrenEl.classList.remove('collapsed');
+                if (state.content) {
+                    nodeEl.classList.remove('collapsed');
                 }
+                const childrenEl = nodeEl.querySelector(':scope > .children');
                 const toggleBtn = nodeEl.querySelector(':scope > .vibe-node-header .collapse-toggle');
-                if (toggleBtn) {
-                    toggleBtn.setAttribute('aria-expanded', 'true');
-                    toggleBtn.textContent = '▼';
+                if (childrenEl && toggleBtn) {
+                    if (state.children) {
+                        childrenEl.classList.remove('collapsed');
+                        toggleBtn.setAttribute('aria-expanded', 'true');
+                        toggleBtn.textContent = '▼';
+                    }
                 }
             }
         });
@@ -1738,7 +1738,13 @@ function generateFullCodeString(tree = vibeTree) {
         if (!nodes) return currentHtml;
 
         const htmlNodes = nodes.filter(n => n.type === 'html');
-
+        // A simple sort to respect selector/position logic
+        htmlNodes.sort((a, b) => {
+            if (a.position === 'beforeend' && b.position === 'afterend') return -1;
+            if (a.position === 'afterend' && b.position === 'beforeend') return 1;
+            return 0;
+        });
+        
         htmlNodes.forEach(node => {
             // If the node has children, its code is just the container. We recursively build the inner part.
             if (node.children && node.children.length > 0) {
@@ -1816,6 +1822,11 @@ function buildHtmlBodyFromTree(tree = vibeTree) {
         if (!nodes) return currentHtml;
 
         const htmlNodes = nodes.filter(n => n.type === 'html');
+        htmlNodes.sort((a, b) => {
+            if (a.position === 'beforeend' && b.position === 'afterend') return -1;
+            if (a.position === 'afterend' && b.position === 'beforeend') return 1;
+            return 0;
+        });
         
         htmlNodes.forEach(node => {
             if (node.children && node.children.length > 0) {
@@ -1841,7 +1852,6 @@ function buildHtmlBodyFromTree(tree = vibeTree) {
     }
     return htmlContent.trim();
 }
-
 
 /**
  * Extract head content from the tree or return default.
@@ -2021,12 +2031,6 @@ function applyVibes() {
     window.__vibeIdToNodeId = ${JSON.stringify(idToNodeMap)};
     let inspectEnabled = false;
     let hoverEl = null;
-    let selectedEl = null;
-    let toolbar, dragHandle, editButton, deleteButton, addButton;
-    let actionZones = [];
-    let draggedInfo = null;
-    let moveModeInfo = null;
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     const inspectorStyles = \`
         .__vibe-inspect-highlight-hover {
@@ -2035,39 +2039,12 @@ function applyVibes() {
             box-shadow: 0 0 8px rgba(229, 192, 123, 0.8) !important;
             cursor: pointer;
         }
-        .__vibe-inspect-highlight-selected {
+        .__vibe-inspect-highlight-clicked {
             outline: 3px solid #61afef !important;
             outline-offset: 2px !important;
             box-shadow: 0 0 12px rgba(97, 175, 239, 0.9) !important;
+            transition: all 0.5s ease-out !important;
         }
-        #vibe-inspector-toolbar {
-            position: absolute; z-index: 100000;
-            background-color: #282c34; border: 1px solid #61afef;
-            border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            display: none; align-items: center; padding: 3px; gap: 3px;
-        }
-        #vibe-inspector-toolbar button {
-            background: #4b5263; color: #f0f0f0; border: none;
-            padding: 6px 8px; cursor: pointer; border-radius: 3px;
-            font-size: 16px; line-height: 1; transition: background-color 0.2s;
-        }
-        #vibe-inspector-toolbar button:hover { background: #5c6370; }
-        #vibe-inspector-drag-handle { cursor: move; }
-        #vibe-inspector-drag-handle.move-active { background-color: #98c379; color: #1a1a1a; }
-        .vibe-action-zone {
-            background: rgba(97, 175, 239, 0.5);
-            border: 1px dashed #61afef;
-            z-index: 99999; position: absolute;
-            box-sizing: border-box; cursor: pointer;
-            transition: transform 0.1s ease-out, background-color 0.1s;
-        }
-        .vibe-action-zone:hover { background: rgba(152, 195, 121, 0.7); border-color: #98c379; }
-        .vibe-action-zone.drag-over {
-            background: rgba(152, 195, 121, 0.9) !important;
-            border-color: #98c379 !important;
-            transform: scale(1.05);
-        }
-        .vibe-dragging-ghost { opacity: 0.4 !important; }
     \`;
 
     function getNodeIdForElement(el) {
@@ -2080,95 +2057,22 @@ function applyVibes() {
         }
         return null;
     }
-
-    function createToolbar() {
-        if (document.getElementById('vibe-inspector-toolbar')) return;
+    
+    function ensureInspectorStyles() {
+        if (document.getElementById('vibe-inspector-styles')) return;
         const styleSheet = document.createElement('style');
+        styleSheet.id = 'vibe-inspector-styles';
         styleSheet.textContent = inspectorStyles;
         document.head.appendChild(styleSheet);
-
-        toolbar = document.createElement('div');
-        toolbar.id = 'vibe-inspector-toolbar';
-        
-        addButton = document.createElement('button');
-        addButton.textContent = '➕';
-        addButton.title = 'Add New Component Here';
-
-        dragHandle = document.createElement('button');
-        dragHandle.id = 'vibe-inspector-drag-handle';
-        dragHandle.textContent = '✥';
-        dragHandle.title = 'Move Element';
-
-        editButton = document.createElement('button');
-        editButton.textContent = '✎';
-        editButton.title = 'Edit Component';
-
-        deleteButton = document.createElement('button');
-        deleteButton.textContent = '🗑️';
-        deleteButton.title = 'Delete Component';
-
-        toolbar.appendChild(addButton);
-        toolbar.appendChild(dragHandle);
-        toolbar.appendChild(editButton);
-        toolbar.appendChild(deleteButton);
-        document.body.appendChild(toolbar);
-    }
-    
-    function updateToolbar(targetInfo) {
-        if (!targetInfo || !selectedEl) {
-            toolbar.style.display = 'none';
-            return;
-        }
-        const rect = selectedEl.getBoundingClientRect();
-        toolbar.style.display = 'flex';
-        toolbar.style.top = (rect.top + window.scrollY - toolbar.offsetHeight - 5) + 'px';
-        toolbar.style.left = (rect.left + window.scrollX) + 'px';
-        
-        const toggleMoveMode = (e) => {
-            e.stopPropagation();
-            if (moveModeInfo && moveModeInfo.sourceNodeId === targetInfo.nodeId) {
-                clearActionZones();
-            } else {
-                moveModeInfo = { sourceNodeId: targetInfo.nodeId };
-                dragHandle.classList.add('move-active');
-                createActionableZones('move', targetInfo.nodeId);
-            }
-        };
-
-        addButton.onclick = (e) => { e.stopPropagation(); createActionableZones('add', targetInfo.nodeId); };
-        editButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*'); };
-        deleteButton.onclick = (e) => { e.stopPropagation(); window.parent.postMessage({ type: 'vibe-node-delete', nodeId: targetInfo.nodeId }, '*'); };
-        dragHandle.onclick = toggleMoveMode;
-
-        if (!isTouchDevice) {
-            dragHandle.draggable = true;
-            dragHandle.ondragstart = (e) => {
-                e.stopPropagation();
-                draggedInfo = { nodeId: targetInfo.nodeId, element: targetInfo.element };
-                e.dataTransfer.setData('text/plain', targetInfo.nodeId);
-                e.dataTransfer.effectAllowed = 'move';
-                setTimeout(() => {
-                    targetInfo.element.classList.add('vibe-dragging-ghost');
-                    createActionableZones('move', targetInfo.nodeId);
-                }, 0);
-            };
-        }
-    }
-
-    function clearSelection() {
-        if (selectedEl) {
-            selectedEl.classList.remove('__vibe-inspect-highlight-selected');
-        }
-        selectedEl = null;
-        updateToolbar(null);
-        clearActionZones();
     }
 
     function handleMouseOver(e) {
-        if (!inspectEnabled || selectedEl || moveModeInfo) return;
+        if (!inspectEnabled) return;
         const targetInfo = getNodeIdForElement(e.target);
         if (targetInfo) {
-            if (hoverEl && hoverEl !== targetInfo.element) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+            if (hoverEl && hoverEl !== targetInfo.element) {
+                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
+            }
             hoverEl = targetInfo.element;
             hoverEl.classList.add('__vibe-inspect-highlight-hover');
         }
@@ -2184,132 +2088,29 @@ function applyVibes() {
     function handleClick(e) {
         if (!inspectEnabled) return;
         
-        const isActionZoneClick = e.target.classList.contains('vibe-action-zone');
-        const isToolbarClick = toolbar && toolbar.contains(e.target);
-
-        if (isToolbarClick) return;
-
-        if (!isActionZoneClick) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
         const targetInfo = getNodeIdForElement(e.target);
 
-        if (moveModeInfo && !isActionZoneClick) {
-            clearActionZones();
-            return;
-        }
-
         if (targetInfo) {
-            if (selectedEl === targetInfo.element) return;
-            clearSelection();
-            selectedEl = targetInfo.element;
-            selectedEl.classList.add('__vibe-inspect-highlight-selected');
-            if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-            updateToolbar(targetInfo);
-        } else if (!isActionZoneClick) {
-            clearSelection();
-        }
-    }
+            e.preventDefault();
+            e.stopPropagation();
 
-    function createActionableZones(actionType, sourceNodeId) {
-        clearActionZones();
-        Object.values(window.__vibeIdToNodeId).forEach(nodeId => {
-            if (actionType === 'move' && nodeId === sourceNodeId) return;
+            window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*');
 
-            const el = document.querySelector(\`[id="\${nodeId.replace('html-','')}"]\`);
-            if (!el) return;
-
-            const rect = el.getBoundingClientRect();
-            
-            const createZone = (position, top, left, width, height) => {
-                const zone = document.createElement('div');
-                zone.className = 'vibe-action-zone';
-                zone.style.top = (top + window.scrollY) + 'px';
-                zone.style.left = (left + window.scrollX) + 'px';
-                zone.style.width = width + 'px';
-                zone.style.height = height + 'px';
-                zone.dataset.action = actionType;
-                zone.dataset.targetNodeId = nodeId;
-                zone.dataset.position = position;
-                if(sourceNodeId) zone.dataset.sourceNodeId = sourceNodeId;
-                document.body.appendChild(zone);
-                actionZones.push(zone);
-            };
-
-            createZone('before', rect.top - 5, rect.left, rect.width, 10);
-            createZone('after', rect.bottom - 5, rect.left, rect.width, 10);
-            if (el.children.length > 0 || actionType === 'add') {
-                 createZone('inside', rect.top + 5, rect.left, rect.width, rect.height - 10);
+            if (hoverEl) {
+                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
             }
-        });
+            const el = targetInfo.element;
+            el.classList.add('__vibe-inspect-highlight-clicked');
+            setTimeout(() => {
+                el.classList.remove('__vibe-inspect-highlight-clicked');
+            }, 500);
+        }
     }
-
-    function clearActionZones() {
-        actionZones.forEach(zone => zone.remove());
-        actionZones = [];
-        moveModeInfo = null;
-        if (dragHandle) dragHandle.classList.remove('move-active');
-    }
-    
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('vibe-action-zone')) {
-            const { action, targetNodeId, position, sourceNodeId } = e.target.dataset;
-            if (action === 'add') {
-                window.parent.postMessage({ type: 'vibe-node-add-request', targetNodeId, position }, '*');
-            } else if (action === 'move' && sourceNodeId) { // Check sourceNodeId from click-move
-                 window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
-            }
-            clearSelection();
-        }
-    }, true);
-
-    // --- DRAG AND DROP LOGIC ---
-    document.addEventListener('dragstart', (e) => {
-        // The ondragstart handler on the button sets draggedInfo
-    });
-
-    document.addEventListener('dragend', () => {
-        if (draggedInfo) draggedInfo.element.classList.remove('vibe-dragging-ghost');
-        draggedInfo = null;
-        document.querySelectorAll('.vibe-action-zone.drag-over').forEach(z => z.classList.remove('drag-over'));
-        clearActionZones();
-    });
-
-    document.addEventListener('dragenter', (e) => {
-        e.preventDefault();
-        const zone = e.target.closest('.vibe-action-zone');
-        if (zone) {
-            zone.classList.add('drag-over');
-        }
-    });
-
-    document.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        const zone = e.target.closest('.vibe-action-zone');
-        if (zone) {
-            zone.classList.remove('drag-over');
-        }
-    });
-
-    document.addEventListener('dragover', e => e.preventDefault()); // This is crucial for drop to work
-
-    document.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const zone = e.target.closest('.vibe-action-zone');
-        if (zone && draggedInfo) {
-            const { targetNodeId, position } = zone.dataset;
-            const { sourceNodeId } = draggedInfo;
-            window.parent.postMessage({ type: 'vibe-node-move', sourceNodeId, targetNodeId, position }, '*');
-        }
-    });
-
 
     function enableInspect() {
         if (inspectEnabled) return;
         inspectEnabled = true;
-        createToolbar();
+        ensureInspectorStyles();
         document.addEventListener('mouseover', handleMouseOver);
         document.addEventListener('mouseout', handleMouseOut);
         document.addEventListener('click', handleClick, true);
@@ -2322,7 +2123,7 @@ function applyVibes() {
         document.removeEventListener('mouseout', handleMouseOut);
         document.removeEventListener('click', handleClick, true);
         if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-        clearSelection();
+        hoverEl = null;
     }
     
     window.addEventListener('message', function(event) {
@@ -3010,7 +2811,6 @@ window.addEventListener('message', (event) => {
     switch (data.type) {
         case 'vibe-node-click':
             if (data.nodeId) {
-                if (inspectEnabled) toggleInspectMode();
                 openEditNodeModal(data.nodeId);
             }
             break;
