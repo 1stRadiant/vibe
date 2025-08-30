@@ -992,7 +992,7 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
 
 1.  **Component Node Object:** Each object in the array must have:
     *   id: A unique, descriptive, kebab-case identifier (e.g., "main-header", "feature-section-styles").
-    *   type: "head", "html", "css", or "javascript". Only the root "whole-page" container should have a "head" child.
+    *   type: "head", "html", "css", "javascript", or "js-function". Only the root "whole-page" container should have a "head" child.
     *   description: A concise, one-sentence summary of what this specific component does.
     *   code: The raw code for the component. For HTML, this can be a container tag with its children defined in a nested array.
     *   children: (Optional) For html nodes that act as containers, provide a nested array of child component nodes.
@@ -1011,7 +1011,9 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
 3.  **HEAD NODE:**
     *   If the parent is "whole-page", you MUST generate a single "head" node with id: "head-content". This node should contain standard meta tags and a relevant <title>.
 
-4.  **GLOBAL SCOPE:** CSS and JavaScript nodes should generally be children of the "whole-page" container to apply globally, unless they are extremely specific to a deeply nested component.
+4.  **GLOBAL SCOPE:** CSS nodes should generally be children of the "whole-page" container to apply globally.
+
+5.  **JAVASCRIPT FUNCTIONS:** For interactivity, create individual nodes with \`type: "js-function"\` for each piece of logic. Give them descriptive IDs like \`function-handle-form-submission\`. The code should be the full function definition. Use a \`javascript\` node for any global setup code that isn't a function.
 
 **EXAMPLE of a valid response for a simple portfolio page:**
 [
@@ -1044,6 +1046,12 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     "type": "css",
     "description": "Basic styles for the header.",
     "code": "header { background-color: #333; color: white; }"
+  },
+  {
+    "id": "function-handle-click",
+    "type": "js-function",
+    "description": "Handles clicks on the header.",
+    "code": "function handleClick() { console.log('Header clicked'); }"
   }
 ]`;
 
@@ -1211,16 +1219,43 @@ function parseHtmlToVibeTree(fullCode) {
     const scriptTags = Array.from(doc.querySelectorAll('script'));
     scriptTags.forEach((scriptTag, index) => {
         if (!scriptTag.src && scriptTag.textContent.trim()) {
-            let code = scriptTag.textContent.trim();
-            const iifeMatch = code.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-            if (iifeMatch) code = iifeMatch[1].trim();
+            let remainingCode = scriptTag.textContent;
 
-            jsNodes.push({
-                id: `page-script-${index + 1}`,
-                type: 'javascript',
-                description: 'JavaScript logic from an inline <script> tag.',
-                code: code
-            });
+            // Regex to find "function functionName(...) { ... }"
+            const functionRegex = /((async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\([\s\S]*?\)\s*\{[\s\S]*?\})/g;
+            let match;
+            
+            while ((match = functionRegex.exec(scriptTag.textContent)) !== null) {
+                const functionCode = match[0];
+                const functionName = match[3];
+
+                const kebabCaseName = functionName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
+
+                jsNodes.push({
+                    id: `function-${kebabCaseName}-${index}`,
+                    type: 'js-function',
+                    description: `The ${functionName} function.`,
+                    code: functionCode
+                });
+
+                remainingCode = remainingCode.replace(functionCode, '');
+            }
+
+            // The rest of the code is considered global
+            remainingCode = remainingCode.trim();
+            if (remainingCode) {
+                 const iifeMatch = remainingCode.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
+                 if (iifeMatch) remainingCode = iifeMatch[1].trim();
+                 
+                 if (remainingCode) {
+                    jsNodes.push({
+                        id: `global-script-${index + 1}`,
+                        type: 'javascript',
+                        description: 'Global-scope JavaScript logic and event listeners.',
+                        code: remainingCode
+                    });
+                 }
+            }
         }
     });
     
@@ -1248,7 +1283,7 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
 2.  **Component Nodes:** Each object in a children array must have:
     *   id: A unique, descriptive, kebab-case identifier (e.g., "main-header", "feature-section-styles").
-    *   type: "head", "html", "css", or "javascript".
+    *   type: "head", "html", "css", "javascript", or "js-function".
     *   description: A concise, one-sentence summary of what this specific component does.
     *   code: The raw code for the component. Do not include <style> or <script> tags. For parent HTML nodes, this should be the outer wrapper element. For the 'head' node, this is the combined content of all meta, title, and link tags.
     *   children: (Optional) A nested array of child component nodes.
@@ -1263,10 +1298,17 @@ async function decomposeCodeIntoVibeTree(fullCode) {
         *   Every subsequent HTML node in that same children array must use the ID of the *immediately preceding* HTML sibling as its selector (e.g., "#immediate-previous-sibling-id") and position: "afterend".
     *   You MUST correctly assign unique IDs to HTML elements used as containers or selector targets.
 
-4.  **CSS & JS DECOMPOSITION:**
-    *   Extract content of <style> and <script> tags into css and javascript nodes. These should typically be children of the "whole-page" root container, not nested deep inside HTML nodes, unless they are extremely specific to one component.
+4.  **CSS DECOMPOSITION:**
+    *   Extract content of <style> tags into `css` nodes.
 
-5 **HEAD DECOMPOSITION:**
+5.  **JAVASCRIPT FUNCTION DECOMPOSITION (CRITICAL):**
+    *   Instead of one large \`javascript\` node, break down script content.
+    *   Place any code in the global scope (variable declarations, top-level event listeners) into a single node with \`type: "javascript"\`, and a descriptive \`id\` like \`"global-event-listeners"\`.
+    *   Extract each JavaScript function (\`function doSomething() {...}\` or \`const doSomething = () => {...}\`) into its own separate node with \`type: "js-function"\`.
+    *   The \`id\` for a function node should be \`function-\` followed by the function name in kebab-case (e.g., \`"id": "function-do-something"\`).
+    *   The \`code\` property for a \`js-function\` node must contain the entire function definition.
+
+6.  **HEAD DECOMPOSITION:**
     *   Create a single node with type: "head" and id: "head-content".
     *   Its code property should be a string containing all <meta>, <title>, and <link> tags from the original HTML's <head>.
 
@@ -1305,6 +1347,12 @@ async function decomposeCodeIntoVibeTree(fullCode) {
       "type": "css",
       "description": "Basic styles for the header.",
       "code": "header { background-color: #333; color: white; }"
+    },
+    {
+      "id": "function-update-header",
+      "type": "js-function",
+      "description": "Updates the header text.",
+      "code": "function updateHeader() { document.getElementById('header-title').querySelector('h1').textContent = 'New Title'; }"
     }
   ]
 }
@@ -1687,6 +1735,9 @@ function generateFullCodeString(tree = vibeTree) {
             case 'javascript':
                 jsContent += node.code + '\n\n';
                 break;
+            case 'js-function':
+                jsContent += node.code + '\n\n';
+                break;
         }
         if (node.children) {
             node.children.forEach(child => traverse(child, currentTree));
@@ -1790,7 +1841,9 @@ function collectCssJsNodes(tree = vibeTree) {
     const jsNodes = [];
     const traverse = (node) => {
         if (node.type === 'css' && node.code) cssNodes.push(node);
-        if (node.type === 'javascript' && node.code) jsNodes.push(node);
+        if ((node.type === 'javascript' || node.type === 'js-function') && node.code) {
+            jsNodes.push(node);
+        }
         if (node.children) node.children.forEach(traverse);
     };
     traverse(tree);
@@ -2348,7 +2401,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
       "parentId": "the-id-of-the-container-node-for-the-new-component",
       "newNode": {
          "id": "new-unique-kebab-case-id",
-         "type": "html" | "css" | "javascript",
+         "type": "html" | "css" | "javascript" | "js-function",
          "description": "A concise description of the new component.",
          "code": "The full code for the new component.",
          "selector": "#some-existing-element",
@@ -2364,6 +2417,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
 - For **'update'** actions, provide the nodeId, newDescription, and the complete newCode. The newCode must be the full code, not a diff. The head node can also be updated this way.
 - For **'create'** actions, provide the parentId and a complete newNode object.
   - The newNode.id must be unique and in kebab-case.
+  - For new \`js-function\` nodes, the code must be a complete function definition. They do not need a selector or position.
   - For new HTML nodes, you MUST correctly define the selector and position to place it correctly in the DOM. Chain off existing elements.
 - The response must be a single, valid JSON object and nothing else.`;
 }
