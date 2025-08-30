@@ -763,8 +763,45 @@ ${fullTreeString}
 
 function refreshAllUI() {
     logToConsole('Refreshing entire UI: Vibe Editor, Website Preview, and Full Code.', 'info');
+
+    // Preserve the expanded/collapsed state of the editor nodes
+    const expandedNodeIds = new Set();
+    if (editorContainer) {
+        editorContainer.querySelectorAll('.vibe-node:not(.collapsed)').forEach(nodeEl => {
+            if (nodeEl.dataset.nodeId) {
+                expandedNodeIds.add(nodeEl.dataset.nodeId);
+            }
+        });
+        editorContainer.querySelectorAll('.vibe-node .collapse-toggle[aria-expanded="true"]').forEach(button => {
+            const nodeId = button.closest('.vibe-node')?.dataset.nodeId;
+            if (nodeId) {
+                expandedNodeIds.add(nodeId);
+            }
+        });
+    }
+
     editorContainer.innerHTML = '';
     editorContainer.appendChild(renderEditor(vibeTree));
+
+    // Restore the expanded/collapsed state
+    if (expandedNodeIds.size > 0) {
+        expandedNodeIds.forEach(nodeId => {
+            const nodeEl = editorContainer.querySelector(`.vibe-node[data-node-id="${nodeId}"]`);
+            if (nodeEl) {
+                nodeEl.classList.remove('collapsed');
+                const childrenEl = nodeEl.querySelector(':scope > .children');
+                if (childrenEl) {
+                    childrenEl.classList.remove('collapsed');
+                }
+                const toggleBtn = nodeEl.querySelector(':scope > .vibe-node-header .collapse-toggle');
+                if (toggleBtn) {
+                    toggleBtn.setAttribute('aria-expanded', 'true');
+                    toggleBtn.textContent = '▼';
+                }
+            }
+        });
+    }
+
     addEventListeners(); // Re-add listeners to new buttons
     applyVibes();
     // Invalidate flowchart since code has changed
@@ -772,7 +809,7 @@ function refreshAllUI() {
 
     // Update the full code view if it's the active tab
     if (document.getElementById('code').classList.contains('active')) {
-        showFullCode(); 
+        showFullCode();
     }
 
     // NEW: keep the Files tab in sync with the currently loaded project
@@ -782,6 +819,7 @@ function refreshAllUI() {
     updateUndoRedoUI(); // NEW: reflect availability after any UI refresh
     autoSaveProject();
 }
+
 
 /**
  * Gets the component library formatted as a string for AI injection.
@@ -1700,13 +1738,7 @@ function generateFullCodeString(tree = vibeTree) {
         if (!nodes) return currentHtml;
 
         const htmlNodes = nodes.filter(n => n.type === 'html');
-        // A simple sort to respect selector/position logic
-        htmlNodes.sort((a, b) => {
-            if (a.position === 'beforeend' && b.position === 'afterend') return -1;
-            if (a.position === 'afterend' && b.position === 'beforeend') return 1;
-            return 0;
-        });
-        
+
         htmlNodes.forEach(node => {
             // If the node has children, its code is just the container. We recursively build the inner part.
             if (node.children && node.children.length > 0) {
@@ -1784,11 +1816,6 @@ function buildHtmlBodyFromTree(tree = vibeTree) {
         if (!nodes) return currentHtml;
 
         const htmlNodes = nodes.filter(n => n.type === 'html');
-        htmlNodes.sort((a, b) => {
-            if (a.position === 'beforeend' && b.position === 'afterend') return -1;
-            if (a.position === 'afterend' && b.position === 'beforeend') return 1;
-            return 0;
-        });
         
         htmlNodes.forEach(node => {
             if (node.children && node.children.length > 0) {
@@ -1814,6 +1841,7 @@ function buildHtmlBodyFromTree(tree = vibeTree) {
     }
     return htmlContent.trim();
 }
+
 
 /**
  * Extract head content from the tree or return default.
