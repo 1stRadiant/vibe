@@ -575,26 +575,19 @@ function findNodeById(id, node = vibeTree) {
 
 function renderEditor(node) {
     const nodeEl = document.createElement('div');
-    // Each node will start collapsed, showing only its header.
     nodeEl.className = `vibe-node type-${node.type} collapsed`;
-    // NEW: Make nodes draggable and add a data-id for identification.
-    nodeEl.draggable = true;
+    // Set a data attribute on the main element for drop target identification
     nodeEl.dataset.nodeId = node.id;
 
-    // Any HTML node can be a container for other nodes.
     const isContainer = node.type === 'container' || node.type === 'html';
     const showCodeButton = node.type !== 'container';
-
-    // Special handling for the head node: it's not a container for other nodes in the UI
-    // but it has editable code.
     const isHeadNode = node.type === 'head';
-
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
 
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
-            <!-- NEW: Drag handle for reordering -->
-            <span class="drag-handle" title="Drag to reorder">✥</span>
+            <!-- FIX: Make only the handle draggable -->
+            <span class="drag-handle" title="Drag to reorder" draggable="true">✥</span>
             <span class="id">
                 ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse Children">▶</button>` : '<span class="collapse-placeholder"></span>'}
                 ${node.id}
@@ -613,7 +606,6 @@ function renderEditor(node) {
         </div>
     `;
 
-    // Render children (collapsed by default if any)
     if (hasChildren) {
         const childrenEl = document.createElement('div');
         childrenEl.className = 'children collapsed';
@@ -1434,7 +1426,7 @@ async function processCodeAndRefreshUI(fullCode) {
         vibeTree = newVibeTree;
         refreshAllUI();
         logToConsole("Update from code complete. UI refreshed.", 'info');
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
         historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         autoSaveProject();
     } catch (error) {
@@ -1683,7 +1675,7 @@ async function handleZipUpload() {
 
         resetHistory();
         refreshAllUI();
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
         logToConsole(`ZIP project '${currentProjectId}' imported successfully.`, 'info');
 
     } catch (e) {
@@ -2348,18 +2340,18 @@ function hideFullCode() {
 let draggedNodeId = null;
 
 function handleDragStart(event) {
-    // Ensure the drag is initiated from the handle, but the target is the whole node
-    if (!event.target.classList.contains('drag-handle')) {
+    // FIX: The event target is the handle itself. Find the closest parent node.
+    const targetNode = event.target.closest('.vibe-node');
+    if (!targetNode) {
         event.preventDefault();
         return;
     }
-    const targetNode = event.target.closest('.vibe-node');
-    if (!targetNode) return;
     
     draggedNodeId = targetNode.dataset.nodeId;
     event.dataTransfer.setData('text/plain', draggedNodeId);
     event.dataTransfer.effectAllowed = 'move';
     
+    // Defer adding class to allow browser to capture clean drag image
     setTimeout(() => {
         targetNode.classList.add('dragging');
         document.body.classList.add('is-dragging-vibe');
@@ -2370,17 +2362,19 @@ function handleDragOver(event) {
     event.preventDefault(); 
     const targetNode = event.target.closest('.vibe-node');
     
+    // Clear any existing indicators first
     document.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach(el => {
         el.classList.remove('drop-indicator-before', 'drop-indicator-after');
     });
 
     if (!targetNode || targetNode.dataset.nodeId === draggedNodeId) {
-        return;
+        return; // Can't drop on itself or outside a node
     }
 
     const rect = targetNode.getBoundingClientRect();
     const isAfter = event.clientY > rect.top + rect.height / 2;
     
+    // Apply the indicator class to show where the drop will occur
     if (isAfter) {
         targetNode.classList.add('drop-indicator-after');
     } else {
@@ -2389,9 +2383,9 @@ function handleDragOver(event) {
 }
 
 function handleDragLeave(event) {
-    const related = event.relatedTarget ? event.relatedTarget.closest('.vibe-node') : null;
+    // When leaving a node, remove its indicator
     const current = event.target.closest('.vibe-node');
-    if (current && current !== related) {
+    if (current) {
         current.classList.remove('drop-indicator-before', 'drop-indicator-after');
     }
 }
@@ -2399,6 +2393,12 @@ function handleDragLeave(event) {
 function handleDrop(event) {
     event.preventDefault();
     const targetNodeEl = event.target.closest('.vibe-node');
+    
+    // Clean up indicators immediately
+    document.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach(el => {
+        el.classList.remove('drop-indicator-before', 'drop-indicator-after');
+    });
+    
     if (!targetNodeEl || !draggedNodeId || targetNodeEl.dataset.nodeId === draggedNodeId) {
         return;
     }
@@ -2407,18 +2407,16 @@ function handleDrop(event) {
     const rect = targetNodeEl.getBoundingClientRect();
     const position = event.clientY > rect.top + rect.height / 2 ? 'after' : 'before';
 
-    // The inspector moveNode function is perfect for this purpose
+    // The inspector's moveNode function is repurposed here for reordering
     moveNode(draggedNodeId, targetNodeId, position);
 }
 
 function handleDragEnd() {
+    // Universal cleanup for the end of a drag operation (whether dropped successfully or cancelled)
     const draggingElement = document.querySelector('.vibe-node.dragging');
     if (draggingElement) {
         draggingElement.classList.remove('dragging');
     }
-    document.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach(el => {
-        el.classList.remove('drop-indicator-before', 'drop-indicator-after');
-    });
     document.body.classList.remove('is-dragging-vibe');
     draggedNodeId = null;
 }
@@ -2870,8 +2868,6 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         return;
     }
 
-    recordHistory(`Move node ${sourceNodeId}`);
-
     const { node: sourceNode, parent: sourceParent } = sourceResult;
     const { node: targetNode, parent: targetParent } = targetResult;
     
@@ -2886,6 +2882,8 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         current = result ? result.parent : null;
     }
 
+    recordHistory(`Move node ${sourceNodeId}`);
+
     // Remove source from its original location
     const sourceIndex = sourceParent.children.indexOf(sourceNode);
     if (sourceIndex > -1) {
@@ -2895,11 +2893,11 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         return;
     }
 
-    if (position === 'inside') { // This logic is for the inspector, not editor drag/drop
+    if (position === 'inside') {
         if (!targetNode.children) targetNode.children = [];
         targetNode.children.push(sourceNode);
         recalculateSelectors(targetNode);
-    } else { // Logic for before/after, used by both inspector and editor drag/drop
+    } else {
         const targetIndex = targetParent.children.indexOf(targetNode);
         if (position === 'before') {
             targetParent.children.splice(targetIndex, 0, sourceNode);
