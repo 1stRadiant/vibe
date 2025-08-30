@@ -1436,6 +1436,7 @@ button.update-button:disabled {
 .vibe-node {
     /* Required for positioning the drop indicator */
     position: relative; 
+    text-align: left;
 }
 
 .vibe-node .drag-handle {
