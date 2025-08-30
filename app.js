@@ -577,6 +577,10 @@ function renderEditor(node) {
     const nodeEl = document.createElement('div');
     // Each node will start collapsed, showing only its header.
     nodeEl.className = `vibe-node type-${node.type} collapsed`;
+    // NEW: Make nodes draggable and add a data-id for identification.
+    nodeEl.draggable = true;
+    nodeEl.dataset.nodeId = node.id;
+
     // Any HTML node can be a container for other nodes.
     const isContainer = node.type === 'container' || node.type === 'html';
     const showCodeButton = node.type !== 'container';
@@ -589,6 +593,8 @@ function renderEditor(node) {
 
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
+            <!-- NEW: Drag handle for reordering -->
+            <span class="drag-handle" title="Drag to reorder">✥</span>
             <span class="id">
                 ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse Children">▶</button>` : '<span class="collapse-placeholder"></span>'}
                 ${node.id}
@@ -749,6 +755,10 @@ ${fullTreeString}
             
             executeAgentPlan(agentDecision, consoleLogger);
         }
+        
+        // NEW: Automatically switch to the preview tab after a successful update.
+        switchToTab('preview');
+
     } catch (error) {
         console.error("Failed to update vibes:", error);
         logToConsole(`An error occurred during the update: ${error.message}. Check the console for details.`, 'error');
@@ -2334,6 +2344,87 @@ function hideFullCode() {
     // This function is no longer needed as the code view is a persistent tab.
 }
 
+// --- NEW: Vibe Editor Drag and Drop ---
+let draggedNodeId = null;
+
+function handleDragStart(event) {
+    // Ensure the drag is initiated from the handle, but the target is the whole node
+    if (!event.target.classList.contains('drag-handle')) {
+        event.preventDefault();
+        return;
+    }
+    const targetNode = event.target.closest('.vibe-node');
+    if (!targetNode) return;
+    
+    draggedNodeId = targetNode.dataset.nodeId;
+    event.dataTransfer.setData('text/plain', draggedNodeId);
+    event.dataTransfer.effectAllowed = 'move';
+    
+    setTimeout(() => {
+        targetNode.classList.add('dragging');
+        document.body.classList.add('is-dragging-vibe');
+    }, 0);
+}
+
+function handleDragOver(event) {
+    event.preventDefault(); 
+    const targetNode = event.target.closest('.vibe-node');
+    
+    document.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach(el => {
+        el.classList.remove('drop-indicator-before', 'drop-indicator-after');
+    });
+
+    if (!targetNode || targetNode.dataset.nodeId === draggedNodeId) {
+        return;
+    }
+
+    const rect = targetNode.getBoundingClientRect();
+    const isAfter = event.clientY > rect.top + rect.height / 2;
+    
+    if (isAfter) {
+        targetNode.classList.add('drop-indicator-after');
+    } else {
+        targetNode.classList.add('drop-indicator-before');
+    }
+}
+
+function handleDragLeave(event) {
+    const related = event.relatedTarget ? event.relatedTarget.closest('.vibe-node') : null;
+    const current = event.target.closest('.vibe-node');
+    if (current && current !== related) {
+        current.classList.remove('drop-indicator-before', 'drop-indicator-after');
+    }
+}
+
+function handleDrop(event) {
+    event.preventDefault();
+    const targetNodeEl = event.target.closest('.vibe-node');
+    if (!targetNodeEl || !draggedNodeId || targetNodeEl.dataset.nodeId === draggedNodeId) {
+        return;
+    }
+    
+    const targetNodeId = targetNodeEl.dataset.nodeId;
+    const rect = targetNodeEl.getBoundingClientRect();
+    const position = event.clientY > rect.top + rect.height / 2 ? 'after' : 'before';
+
+    // The inspector moveNode function is perfect for this purpose
+    moveNode(draggedNodeId, targetNodeId, position);
+}
+
+function handleDragEnd() {
+    const draggingElement = document.querySelector('.vibe-node.dragging');
+    if (draggingElement) {
+        draggingElement.classList.remove('dragging');
+    }
+    document.querySelectorAll('.drop-indicator-before, .drop-indicator-after').forEach(el => {
+        el.classList.remove('drop-indicator-before', 'drop-indicator-after');
+    });
+    document.body.classList.remove('is-dragging-vibe');
+    draggedNodeId = null;
+}
+// --- End Drag and Drop ---
+
+
 function addEventListeners() {
     document.querySelectorAll('.update-button').forEach(button => {
         button.addEventListener('click', handleUpdate);
@@ -2353,6 +2444,15 @@ function addEventListeners() {
     document.querySelectorAll('.vibe-node-header').forEach(header => {
         header.addEventListener('click', handleNodeContentToggle);
     });
+
+    // NEW: Add drag-and-drop listeners to the editor container using event delegation
+    if (editorContainer) {
+        editorContainer.addEventListener('dragstart', handleDragStart);
+        editorContainer.addEventListener('dragover', handleDragOver);
+        editorContainer.addEventListener('dragleave', handleDragLeave);
+        editorContainer.addEventListener('drop', handleDrop);
+        editorContainer.addEventListener('dragend', handleDragEnd);
+    }
 }
 
 // --- Agent Logic ---
@@ -2434,7 +2534,7 @@ async function handleFixError(errorMessage, fixButton) {
     logToConsole(`Attempting to fix error: "${errorMessage.split('\n')[0]}..."`, 'info');
 
     // Switch to the Agent tab to show progress
-    document.querySelector('.tab-button[data-tab="agent"]').click();
+    switchToTab('agent');
     
     // Use the agent's UI elements for visual feedback
     agentPromptInput.value = `Fix this error:\n${errorMessage}`;
@@ -2470,7 +2570,7 @@ ${fullTreeString}
         
         logToAgent('Fix applied. The website has been updated and reloaded.', 'info');
         // Switch to preview tab to show the result.
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
 
     } catch (error) {
         console.error("AI fix failed:", error);
@@ -2559,7 +2659,7 @@ async function handleRunAgent() {
         const agentDecision = JSON.parse(rawResponse);
         executeAgentPlan(agentDecision, logToAgent);
         logToAgent('Changes applied.', 'info');
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
     } catch (error) {
         console.error("AI agent failed:", error);
         logToAgent(`The AI agent failed: ${error.message}.`, 'error');
@@ -2774,15 +2874,32 @@ function moveNode(sourceNodeId, targetNodeId, position) {
 
     const { node: sourceNode, parent: sourceParent } = sourceResult;
     const { node: targetNode, parent: targetParent } = targetResult;
+    
+    // Prevent moving a parent into one of its own children
+    let current = targetParent;
+    while(current) {
+        if (current.id === sourceNodeId) {
+            logToConsole('Move failed: cannot move a parent node into one of its children.', 'error');
+            return;
+        }
+        const result = findNodeAndParentById(current.id);
+        current = result ? result.parent : null;
+    }
 
+    // Remove source from its original location
     const sourceIndex = sourceParent.children.indexOf(sourceNode);
-    if (sourceIndex > -1) sourceParent.children.splice(sourceIndex, 1);
+    if (sourceIndex > -1) {
+        sourceParent.children.splice(sourceIndex, 1);
+    } else {
+        logToConsole('Move failed: source node not found in its parent.', 'error');
+        return;
+    }
 
-    if (position === 'inside') {
+    if (position === 'inside') { // This logic is for the inspector, not editor drag/drop
         if (!targetNode.children) targetNode.children = [];
         targetNode.children.push(sourceNode);
         recalculateSelectors(targetNode);
-    } else {
+    } else { // Logic for before/after, used by both inspector and editor drag/drop
         const targetIndex = targetParent.children.indexOf(targetNode);
         if (position === 'before') {
             targetParent.children.splice(targetIndex, 0, sourceNode);
@@ -2792,7 +2909,10 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         recalculateSelectors(targetParent);
     }
     
-    if(sourceParent !== targetParent) recalculateSelectors(sourceParent);
+    // If the parents were different, the old parent might also need recalculation
+    if(sourceParent.id !== targetParent.id) {
+        recalculateSelectors(sourceParent);
+    }
 
     logToConsole(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`, 'info');
     refreshAllUI();
@@ -2949,38 +3069,56 @@ function handleSearchInput() {
     };
 }
 
-function handleTabSwitching() {
+// --- NEW: Refactored Tab Switching Logic ---
+
+/**
+ * Switches the active tab in the main UI.
+ * @param {string} tabId The data-tab value of the tab to switch to.
+ */
+function switchToTab(tabId) {
     const tabs = document.querySelector('.tabs');
     const tabContents = document.querySelector('.tab-content-area');
+    
+    const button = tabs.querySelector(`.tab-button[data-tab="${tabId}"]`);
+    if (!button || button.classList.contains('active')) return; // Do nothing if not found or already active
 
+    // Special handlers for activating certain tabs
+    if (tabId === 'console') consoleErrorIndicator.classList.remove('active');
+
+    // Deactivate current
+    const currentButton = tabs.querySelector('.active');
+    const currentContent = tabContents.querySelector('.tab-content.active');
+    if (currentButton) currentButton.classList.remove('active');
+    if (currentContent) currentContent.classList.remove('active');
+
+    // Activate new
+    button.classList.add('active');
+    const newContent = tabContents.querySelector(`#${tabId}`);
+    if (newContent) newContent.classList.add('active');
+
+    // Post-activation tasks
+    if (tabId === 'code') showFullCode();
+    if (tabId === 'files') {
+        renderFileTree();
+        if (filesPreviewEl) {
+            filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file to preview it here.</div>';
+        }
+    }
+    if (tabId === 'context') {
+        renderComponentList();
+        if(contextComponentViewer) {
+             contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
+        }
+    }
+}
+
+function handleTabSwitching() {
+    const tabs = document.querySelector('.tabs');
     tabs.addEventListener('click', (event) => {
         const button = event.target.closest('.tab-button');
         if (!button) return;
-
         const tabId = button.dataset.tab;
-
-        if (tabId === 'console') consoleErrorIndicator.classList.remove('active');
-        
-        tabs.querySelector('.active').classList.remove('active');
-        button.classList.add('active');
-        
-        tabContents.querySelector('.tab-content.active').classList.remove('active');
-        tabContents.querySelector(`#${tabId}`).classList.add('active');
-
-        if (tabId === 'code') showFullCode();
-        if (tabId === 'files') {
-            renderFileTree();
-            if (filesPreviewEl) {
-                filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file to preview it here.</div>';
-            }
-        }
-        // NEW: Handle context tab activation
-        if (tabId === 'context') {
-            renderComponentList();
-            if(contextComponentViewer) {
-                 contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
-            }
-        }
+        switchToTab(tabId);
     });
 }
 
@@ -3038,7 +3176,7 @@ function handleLoadProject(event) {
         resetHistory();
         autoSaveProject();
 
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
     } else {
         console.error(`Could not load project '${projectId}'.`);
         alert(`Error: Could not find project data for '${projectId}'.`);
@@ -3835,7 +3973,7 @@ function resetToStartPage() {
     currentProjectId = null;
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
     resetHistory();
-    document.querySelector('.tab-button[data-tab="start"]').click();
+    switchToTab('start');
     projectPromptInput.value = '';
     newProjectIdInput.value = '';
     startPageGenerationOutput.style.display = 'none';
@@ -3885,6 +4023,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
             const agentDecision = JSON.parse(rawResponse);
             executeAgentPlan(agentDecision, (msg, t = 'info') => logToConsole(`[ModalUpdate] ${msg}`, t));
         }
+        switchToTab('preview');
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
@@ -4006,7 +4145,7 @@ async function handleGenerateProject() {
         populateProjectList();
 
         refreshAllUI();
-        document.querySelector('.tab-button[data-tab="preview"]').click();
+        switchToTab('preview');
         logToConsole(`New project '${currentProjectId}' created.`, 'info');
     } catch (e) {
         console.error('Project generation failed:', e);
@@ -4080,6 +4219,10 @@ function handleCollapseToggle(event) {
 }
 
 function handleNodeContentToggle(event) {
+    // Do not toggle content if the drag handle was the click target
+    if (event.target.classList.contains('drag-handle')) {
+        return;
+    }
     const header = event.currentTarget;
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
