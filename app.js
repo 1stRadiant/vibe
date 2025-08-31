@@ -183,7 +183,7 @@ const editNodeCodeInput = document.getElementById('edit-node-code');
 const saveEditNodeButton = document.getElementById('save-edit-node-button');
 const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
-// NEW: Save as component button
+// FIX: Define the constant for the save as component button
 const saveAsComponentButton = document.getElementById('save-as-component-button');
 
 // --- On-page Console Logging ---
