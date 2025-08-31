@@ -183,7 +183,6 @@ const editNodeCodeInput = document.getElementById('edit-node-code');
 const saveEditNodeButton = document.getElementById('save-edit-node-button');
 const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
-// FIX: Define the constant for the save as component button
 const saveAsComponentButton = document.getElementById('save-as-component-button');
 
 // --- On-page Console Logging ---
@@ -575,20 +574,20 @@ function findNodeById(id, node = vibeTree) {
     return null;
 }
 
+// FIX: Added the "Save as Component" button directly into the Vibe Editor UI for applicable nodes.
 function renderEditor(node) {
     const nodeEl = document.createElement('div');
     nodeEl.className = `vibe-node type-${node.type} collapsed`;
-    // Set a data attribute on the main element for drop target identification
     nodeEl.dataset.nodeId = node.id;
 
     const isContainer = node.type === 'container' || node.type === 'html';
     const showCodeButton = node.type !== 'container';
     const isHeadNode = node.type === 'head';
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const isSaveable = ['html', 'css', 'js-function'].includes(node.type);
 
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
-            <!-- FIX: Make only the handle draggable -->
             <span class="drag-handle" title="Drag to reorder" draggable="true">✥</span>
             <span class="id">
                 ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse Children">▶</button>` : '<span class="collapse-placeholder"></span>'}
@@ -601,6 +600,7 @@ function renderEditor(node) {
             <div class="button-group">
                 <button class="update-button" data-id="${node.id}">Update Vibe</button>
                 ${isContainer ? `<button class="add-child-button" data-id="${node.id}">+ Add Child</button>` : ''}
+                ${isSaveable ? `<button class="save-as-component-button" data-id="${node.id}" title="Save as reusable component">⊕ Save</button>` : ''}
                 ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
                 ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
             </div>
@@ -2257,6 +2257,10 @@ function addEventListeners() {
     document.querySelectorAll('.save-code-button').forEach(button => {
         button.addEventListener('click', handleSaveCode);
     });
+    // FIX: Add event listener for the new "Save as Component" button in the editor
+    document.querySelectorAll('.save-as-component-button').forEach(button => {
+        button.addEventListener('click', handleSaveNodeAsComponentFromEditor);
+    });
     document.querySelectorAll('.collapse-toggle').forEach(button => {
         button.addEventListener('click', handleCollapseToggle);
     });
@@ -2585,7 +2589,6 @@ function openEditNodeModal(nodeId) {
         aiImproveDescriptionButton.disabled = !keyIsAvailable;
         aiImproveDescriptionButton.title = keyIsAvailable ? '' : 'Add an API key in Settings to use AI.';
     }
-    // NEW: Show/hide "Save as Component" button
     if (saveAsComponentButton) {
         const isSaveable = ['html', 'js-function', 'css'].includes(node.type);
         saveAsComponentButton.style.display = isSaveable ? 'inline-block' : 'none';
@@ -3446,23 +3449,26 @@ async function processContextUpload(event) {
 }
 
 /**
- * NEW: Uses AI to extract a node and its dependencies into a reusable component object.
- * This is triggered from the "Save as Component" button in the edit node modal.
+ * Generic handler to extract a node as a component and open the save modal.
+ * Can be called from the Vibe Editor or the Edit Node modal.
+ * @param {string} nodeId - The ID of the node to extract.
+ * @param {HTMLElement|null} buttonElement - The button that was clicked, for UI feedback.
  */
-async function handleSaveNodeAsComponent() {
-    const nodeId = saveAsComponentButton.dataset.nodeId;
+async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
     if (!nodeId) return;
 
     const node = findNodeById(nodeId);
     if (!node) {
-        editNodeError.textContent = 'Node not found, cannot save as component.';
+        logToConsole(`Node not found, cannot save as component: ${nodeId}`, 'error');
         return;
     }
 
-    const originalHtml = saveAsComponentButton.innerHTML;
-    saveAsComponentButton.disabled = true;
-    saveAsComponentButton.innerHTML = 'Analyzing... <div class="loading-spinner"></div>';
-    editNodeError.textContent = '';
+    let originalHtml = '';
+    if (buttonElement) {
+        originalHtml = buttonElement.innerHTML;
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = 'Analyzing...';
+    }
     
     logToConsole(`AI is analyzing node '${nodeId}' to create a component...`, 'info');
 
@@ -3502,7 +3508,6 @@ async function handleSaveNodeAsComponent() {
         
         logToConsole(`AI analysis complete. Please review and save the new component.`, 'info');
         
-        // Close the current modal and open the component modal, pre-filled with the AI's response
         closeEditNodeModal();
         switchToTab('context');
         openComponentModal(null, extractedComponent);
@@ -3510,12 +3515,29 @@ async function handleSaveNodeAsComponent() {
     } catch (e) {
         console.error("Save as component failed:", e);
         const errorMessage = `AI analysis failed: ${e.message}`;
-        editNodeError.textContent = errorMessage;
         logToConsole(errorMessage, 'error');
+        if (buttonElement) { // Also show error in the modal if it's open
+            const errorEl = buttonElement.closest('.modal-content')?.querySelector('.modal-error');
+            if (errorEl) errorEl.textContent = errorMessage;
+        }
     } finally {
-        saveAsComponentButton.disabled = false;
-        saveAsComponentButton.innerHTML = originalHtml;
+        if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = originalHtml;
+        }
     }
+}
+
+// Handler for the button inside the Edit Node MODAL
+async function handleSaveNodeAsComponent(event) {
+    const nodeId = event.target.dataset.nodeId;
+    await extractAndOpenComponentModal(nodeId, event.target);
+}
+
+// Handler for the button inside the VIBE EDITOR
+async function handleSaveNodeAsComponentFromEditor(event) {
+    const nodeId = event.target.dataset.id;
+    await extractAndOpenComponentModal(nodeId, event.target);
 }
 
 
