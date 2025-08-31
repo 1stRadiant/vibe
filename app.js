@@ -2531,13 +2531,15 @@ function logToChat(message, type = 'model') {
 }
 
 /**
- * Finds all <pre><code> blocks in an element and adds a "Copy" button.
+ * Finds all ``` blocks in an element, converts them to <pre><code>,
+ * and adds action buttons.
  * @param {HTMLElement} parentElement The element containing the AI's response.
  */
 function processChatCodeBlocks(parentElement) {
     // This is a simple markdown-to-HTML conversion for code blocks.
     let htmlContent = parentElement.innerHTML;
     htmlContent = htmlContent.replace(/```(\S*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        // Basic sanitization for the code content to be displayed as HTML
         const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         return `<pre><code class="language-${lang}">${sanitizedCode}</code></pre>`;
     });
@@ -2550,6 +2552,7 @@ function processChatCodeBlocks(parentElement) {
 
         const codeContent = codeEl.textContent;
 
+        // Wrap the <pre> tag in a container div to hold the action buttons
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-code-block-wrapper';
         pre.parentNode.insertBefore(wrapper, pre);
@@ -2646,7 +2649,7 @@ async function handleSendChatMessage() {
     const userPrompt = chatPromptInput.value.trim();
     if (!userPrompt) return;
 
-    const systemPrompt = chatSystemPromptInput.value.trim() || 'You are a helpful AI assistant that provides code snippets and full files upon request. When providing a full file, use a language fence with the file path, like \`\`\`html:index.html.';
+    const systemPrompt = chatSystemPromptInput.value.trim() || 'You are a helpful AI assistant that provides code snippets and full files upon request. When providing a full file, use a language fence with the file path, like ```html:index.html.';
 
     // Disable input while processing
     sendChatButton.disabled = true;
