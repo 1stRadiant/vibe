@@ -2572,26 +2572,27 @@ function processChatCodeBlocks(parentElement) {
         actionsContainer.className = 'chat-code-actions';
         wrapper.appendChild(actionsContainer);
 
-        // Check for file path in language fence (e.g., html:index.html)
-        const langFenceMatch = codeEl.className.match(/language-(\w+):(.+)/);
-        
-        // **BUG FIX**
-        // Check if the match was successful AND it has the file path capture group.
-        if (langFenceMatch && langFenceMatch) {
-            const filePath = langFenceMatch; // Extract the file path STRING.
-            const insertButton = document.createElement('button');
-            insertButton.className = 'insert-code-button';
-            insertButton.textContent = `Insert into ${filePath}`;
-            // Now filePath is a string, so handleInsertCodeIntoFile will work.
-            insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
-            actionsContainer.appendChild(insertButton);
-        } else {
-            const agentButton = document.createElement('button');
-            agentButton.className = 'use-agent-button';
-            agentButton.textContent = 'Use Agent to Insert Snippet';
-            agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
-            actionsContainer.appendChild(agentButton);
-        }
+// Check for file path in language fence (e.g., ```html:index.html)
+const langFenceMatch = codeEl.className.match(/language-(\w+):(.+)/);
+
+// Only show "Insert into" if we actually captured a path
+if (langFenceMatch && langFenceMatch[2]) {
+  const filePathRaw = langFenceMatch[2].trim();
+  const filePath = filePathRaw.replace(/^\/+/, ''); // normalize
+
+  const insertButton = document.createElement('button');
+  insertButton.className = 'insert-code-button';
+  insertButton.textContent = `Insert into ${filePath}`;
+  insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
+  actionsContainer.appendChild(insertButton);
+} else {
+  const agentButton = document.createElement('button');
+  agentButton.className = 'use-agent-button';
+  agentButton.textContent = 'Use Agent to Insert Snippet';
+  agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
+  actionsContainer.appendChild(agentButton);
+}
+
     });
 }
 
