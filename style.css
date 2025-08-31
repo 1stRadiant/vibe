@@ -1106,8 +1106,6 @@ button.update-button:disabled {
 
 .vibe-node-header {
     //display: flex;
-    display:inline;
-    position: fixed;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
@@ -1285,6 +1283,31 @@ button.update-button:disabled {
     margin-top: 10px;
     font-size: 0.9em;
     height: 1.2em;
+}
+
+/* NEW: Styles for the "Save as Component" button and modal button layout */
+#edit-node-modal .button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#edit-node-modal .button-row .action-button {
+    flex: 1; /* Allow buttons to share the space */
+    margin-top: 0; /* Remove individual top margin */
+}
+
+#save-as-component-button {
+    background-color: #c678dd; /* Purple, consistent with AI/Agent actions */
+}
+
+#save-as-component-button:hover:not(:disabled) {
+    background-color: #d18ce8;
+}
+
+#save-as-component-button:disabled {
+    background-color: #4a5058;
+    opacity: 0.7;
 }
 
 /* Files Tab */
