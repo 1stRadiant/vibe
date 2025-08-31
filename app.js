@@ -183,6 +183,8 @@ const editNodeCodeInput = document.getElementById('edit-node-code');
 const saveEditNodeButton = document.getElementById('save-edit-node-button');
 const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
+// NEW: Save as component button
+const saveAsComponentButton = document.getElementById('save-as-component-button');
 
 // --- On-page Console Logging ---
 const consoleOutput = document.getElementById('console-output');
@@ -2583,6 +2585,14 @@ function openEditNodeModal(nodeId) {
         aiImproveDescriptionButton.disabled = !keyIsAvailable;
         aiImproveDescriptionButton.title = keyIsAvailable ? '' : 'Add an API key in Settings to use AI.';
     }
+    // NEW: Show/hide "Save as Component" button
+    if (saveAsComponentButton) {
+        const isSaveable = ['html', 'js-function', 'css'].includes(node.type);
+        saveAsComponentButton.style.display = isSaveable ? 'inline-block' : 'none';
+        saveAsComponentButton.disabled = !keyIsAvailable;
+        saveAsComponentButton.title = keyIsAvailable ? 'Save this node and its dependencies as a reusable component' : 'Add an API key in Settings to use this feature.';
+        saveAsComponentButton.dataset.nodeId = nodeId;
+    }
     editNodeModal.style.display = 'block';
 }
 
@@ -3047,12 +3057,25 @@ projectListContainer.addEventListener('click', (event) => {
 /**
  * Opens the modal to add a new component or edit an existing one.
  * @param {string|null} componentId - The ID of the component to edit, or null to create a new one.
+ * @param {object|null} componentData - Pre-filled data for a new component (e.g., from AI extraction).
  */
-function openComponentModal(componentId = null) {
+function openComponentModal(componentId = null, componentData = null) {
     componentModalError.textContent = '';
-    const isEditing = componentId !== null;
-
-    if (isEditing) {
+    
+    // Case 1: Pre-fill from provided data (e.g., AI extraction)
+    if (componentData) {
+        componentModalTitle.textContent = 'Save New Component';
+        componentIdInput.value = componentData.id || '';
+        componentIdInput.readOnly = false;
+        componentNameInput.value = componentData.name || '';
+        componentDescriptionInput.value = componentData.description || '';
+        componentHtmlInput.value = componentData.html || '';
+        componentCssInput.value = componentData.css || '';
+        componentJsInput.value = componentData.javascript || '';
+        deleteComponentButton.style.display = 'none';
+        
+    // Case 2: Edit an existing component from the library
+    } else if (componentId) {
         const component = db.getComponent(componentId);
         if (!component) {
             console.error(`Component not found: ${componentId}`);
@@ -3068,6 +3091,8 @@ function openComponentModal(componentId = null) {
         componentJsInput.value = component.javascript || '';
         deleteComponentButton.style.display = 'inline-block';
         deleteComponentButton.dataset.id = component.id;
+        
+    // Case 3: Create a new, blank component
     } else {
         componentModalTitle.textContent = 'Add New Component';
         componentIdInput.value = '';
@@ -3084,8 +3109,10 @@ function openComponentModal(componentId = null) {
     if(componentAiPromptInput) componentAiPromptInput.value = '';
 
     contextComponentModal.style.display = 'block';
-    // Focus on AI prompt if creating new, otherwise focus on name
-    if (isEditing) {
+    // Focus based on the context
+    if (componentData) {
+        componentNameInput.focus();
+    } else if (componentId) {
         componentNameInput.focus();
     } else {
         componentAiPromptInput.focus();
@@ -3416,6 +3443,79 @@ async function processContextUpload(event) {
     };
 
     reader.readAsText(file);
+}
+
+/**
+ * NEW: Uses AI to extract a node and its dependencies into a reusable component object.
+ * This is triggered from the "Save as Component" button in the edit node modal.
+ */
+async function handleSaveNodeAsComponent() {
+    const nodeId = saveAsComponentButton.dataset.nodeId;
+    if (!nodeId) return;
+
+    const node = findNodeById(nodeId);
+    if (!node) {
+        editNodeError.textContent = 'Node not found, cannot save as component.';
+        return;
+    }
+
+    const originalHtml = saveAsComponentButton.innerHTML;
+    saveAsComponentButton.disabled = true;
+    saveAsComponentButton.innerHTML = 'Analyzing... <div class="loading-spinner"></div>';
+    editNodeError.textContent = '';
+    
+    logToConsole(`AI is analyzing node '${nodeId}' to create a component...`, 'info');
+
+    try {
+        const systemPrompt = `You are an expert component extractor. Your task is to analyze a website's full structure (a "vibe tree") and extract a specific node, along with all its dependencies, into a self-contained, reusable component.
+
+        **INPUT:**
+        1.  **targetNodeId:** The ID of the vibe node to extract.
+        2.  **fullVibeTree:** The entire JSON structure of the website.
+        
+        **ANALYSIS STEPS:**
+        1.  **Find the HTML:** Locate the target node. Its \`code\` is the root of the component's HTML. If it has children, recursively combine their HTML to form the complete structure.
+        2.  **Find the CSS:** Search all \`css\` nodes in the entire vibe tree. Extract any CSS rules that apply to the target node's HTML (e.g., by its ID, classes, or child element selectors). Combine these into a single CSS block.
+        3.  **Find the JavaScript:** Search all \`javascript\` and \`js-function\` nodes. Extract any code that references the target node's HTML (e.g., via \`document.getElementById\`, \`querySelector\`, or event listeners attached to its elements). Combine this logic into a single script.
+
+        **OUTPUT FORMAT:**
+        You MUST respond with a single, valid JSON object and nothing else.
+        
+        **JSON SCHEMA:**
+        {
+          "id": "string // A suggested unique, kebab-case ID for the new component, based on the original node ID.",
+          "name": "string // A suggested human-readable, Title Case name for the new component.",
+          "description": "string // A concise summary of the component's purpose, derived from the original node's description.",
+          "html": "string // The complete, self-contained HTML for the component, including all children.",
+          "css": "string // All relevant and extracted CSS.",
+          "javascript": "string // All relevant and extracted JavaScript."
+        }`;
+
+        const userPrompt = `Extract the node with ID "${nodeId}" from the following Vibe Tree into a self-contained component.\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
+
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const extractedComponent = JSON.parse(rawResponse);
+
+        if (!extractedComponent.id || !extractedComponent.name) {
+            throw new Error("AI failed to return a valid component structure with id and name.");
+        }
+        
+        logToConsole(`AI analysis complete. Please review and save the new component.`, 'info');
+        
+        // Close the current modal and open the component modal, pre-filled with the AI's response
+        closeEditNodeModal();
+        switchToTab('context');
+        openComponentModal(null, extractedComponent);
+
+    } catch (e) {
+        console.error("Save as component failed:", e);
+        const errorMessage = `AI analysis failed: ${e.message}`;
+        editNodeError.textContent = errorMessage;
+        logToConsole(errorMessage, 'error');
+    } finally {
+        saveAsComponentButton.disabled = false;
+        saveAsComponentButton.innerHTML = originalHtml;
+    }
 }
 
 
@@ -3762,6 +3862,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
         if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
         if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
+        if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
         if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
         if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
         if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
