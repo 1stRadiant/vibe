@@ -106,6 +106,12 @@ const agentPromptInput = document.getElementById('agent-prompt-input');
 const runAgentButton = document.getElementById('run-agent-button');
 const agentOutput = document.getElementById('agent-output');
 
+// Chat tab elements
+const chatSystemPromptInput = document.getElementById('chat-system-prompt-input');
+const chatOutput = document.getElementById('chat-output');
+const chatPromptInput = document.getElementById('chat-prompt-input');
+const sendChatButton = document.getElementById('send-chat-button');
+
 // Flowchart elements
 const generateFlowchartButton = document.getElementById('generate-flowchart-button');
 const flowchartOutput = document.getElementById('flowchart-output');
@@ -330,6 +336,8 @@ window.addEventListener('unhandledrejection', function(event) {
 
 let currentProjectId = null;
 let agentConversationHistory = [];
+let chatConversationHistory = [];
+
 
 // --- AI Configuration ---
 let currentAIProvider = 'gemini'; // 'gemini' or 'nscale'
@@ -498,6 +506,7 @@ function updateFeatureAvailability() {
         button.disabled = !keyIsAvailable;
     });
     runAgentButton.disabled = !keyIsAvailable;
+    sendChatButton.disabled = !keyIsAvailable;
     updateTreeFromCodeButton.disabled = !keyIsAvailable;
     uploadHtmlButton.disabled = !keyIsAvailable;
     generateFlowchartButton.disabled = !keyIsAvailable;
@@ -2495,6 +2504,116 @@ async function handleRunAgent() {
     }
 }
 
+
+// --- Chat Logic ---
+
+/**
+ * Logs a message to the chat UI.
+ * @param {string} message - The message content.
+ * @param {'user' | 'model'} type - The type of message.
+ * @returns {HTMLElement} The created message element.
+ */
+function logToChat(message, type = 'model') {
+    const placeholder = chatOutput.querySelector('.chat-message-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-message log-type-${type}`;
+    
+    // Using textContent is safer for user input and initial model placeholders
+    msgEl.textContent = message;
+    
+    chatOutput.appendChild(msgEl);
+    chatOutput.scrollTop = chatOutput.scrollHeight;
+    return msgEl; // Return the element for streaming updates
+}
+
+/**
+ * Finds all <pre><code> blocks in an element and adds a "Copy" button.
+ * @param {HTMLElement} parentElement The element containing the AI's response.
+ */
+function addCopyButtonsToCodeBlocks(parentElement) {
+    // This is a simple markdown-to-HTML conversion for code blocks.
+    // In a real app, a library like 'marked' would be better.
+    let htmlContent = parentElement.innerHTML;
+    htmlContent = htmlContent.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        // Basic sanitization for the code content to be displayed as HTML
+        const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<pre><code class="language-${lang}">${sanitizedCode}</code></pre>`;
+    });
+    parentElement.innerHTML = htmlContent;
+
+    const codeBlocks = parentElement.querySelectorAll('pre');
+    codeBlocks.forEach(block => {
+        const button = document.createElement('button');
+        button.className = 'copy-code-button';
+        button.textContent = 'Copy';
+        button.addEventListener('click', () => {
+            const code = block.querySelector('code');
+            if (navigator.clipboard && code) {
+                navigator.clipboard.writeText(code.innerText).then(() => {
+                    button.textContent = 'Copied!';
+                    setTimeout(() => { button.textContent = 'Copy'; }, 2000);
+                });
+            }
+        });
+        block.appendChild(button);
+    });
+}
+
+/**
+ * Handles sending a message from the chat input.
+ */
+async function handleSendChatMessage() {
+    const userPrompt = chatPromptInput.value.trim();
+    if (!userPrompt) return;
+
+    const systemPrompt = chatSystemPromptInput.value.trim() || 'You are a helpful AI assistant.';
+
+    // Disable input while processing
+    sendChatButton.disabled = true;
+    chatPromptInput.disabled = true;
+    sendChatButton.innerHTML = '<div class="loading-spinner"></div>';
+    chatPromptInput.value = '';
+
+    logToChat(userPrompt, 'user');
+    chatConversationHistory.push({ role: 'user', content: userPrompt });
+    
+    // Create the AI message container for streaming
+    const aiMessageElement = logToChat('...', 'model');
+    aiMessageElement.innerHTML = ''; // Clear placeholder
+    
+    try {
+        const streamCallback = (chunk) => {
+            // Sanitize chunk before appending to prevent potential XSS from partial HTML
+            const textNode = document.createTextNode(chunk);
+            aiMessageElement.appendChild(textNode);
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+        };
+
+        const fullResponse = await callAI(systemPrompt, userPrompt, false, streamCallback);
+        
+        // Once streaming is done, process the full response for code blocks and formatting
+        aiMessageElement.textContent = fullResponse; // Replace streamed content with final clean content
+        addCopyButtonsToCodeBlocks(aiMessageElement); // This will convert ``` to <pre> and add buttons
+        chatConversationHistory.push({ role: 'model', content: fullResponse });
+
+    } catch (error) {
+        console.error("Chat AI failed:", error);
+        aiMessageElement.textContent = `The AI failed to respond: ${error.message}`;
+        aiMessageElement.classList.add('log-type-error'); // Style as an error
+    } finally {
+        // Re-enable input
+        sendChatButton.disabled = false;
+        chatPromptInput.disabled = false;
+        sendChatButton.innerHTML = 'Send';
+        chatPromptInput.focus();
+    }
+}
+
+
 // --- Add Node Modal Logic ---
 function handleAddChildClick(event) {
     const parentId = event.target.dataset.id;
@@ -2760,7 +2879,7 @@ function recalculateSelectors(parentNode) {
         
         const idMatch = child.code.match(/id="([^"]+)"/);
         if (idMatch) {
-            lastHtmlSiblingId = idMatch[1];
+            lastHtmlSiblingId = idMatch;
         } else {
             console.warn(`Node ${child.id} lacks an 'id' attribute, which may break layout.`);
             lastHtmlSiblingId = child.id; // Fallback, not ideal
@@ -3383,7 +3502,7 @@ function handleUploadContextTrigger() {
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
-    const file = event.target.files[0];
+    const file = event.target.files;
     if (!file) {
         return;
     }
@@ -3864,6 +3983,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (runAgentButton) runAgentButton.addEventListener('click', handleRunAgent);
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+
+        if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
+        if (chatPromptInput) {
+            chatPromptInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSendChatMessage();
+                }
+            });
+        }
         
         // NEW: Context tab event listeners
         if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
@@ -3921,6 +4050,7 @@ function resetToStartPage() {
     editorContainer.innerHTML = '';
     previewContainer.contentWindow.document.body.innerHTML = '';
     agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
+    chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
     flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     consoleOutput.innerHTML = '';
     fullCodeEditor.value = '';
@@ -3990,7 +4120,7 @@ function buildBasicMermaidFromTree(tree) {
 function extractMermaidFromText(text) {
     if (!text) return '';
     const mermaidFence = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-    if (mermaidFence && mermaidFence[1]) return mermaidFence[1];
+    if (mermaidFence && mermaidFence) return mermaidFence;
     if (text.trim().startsWith('graph')) return text.trim();
     return '';
 }
@@ -4129,7 +4259,7 @@ async function handleAiImproveDescription() {
         
         let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
