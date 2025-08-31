@@ -1106,6 +1106,8 @@ button.update-button:disabled {
 
 .vibe-node-header {
     //display: flex;
+    display:inline;
+    position: fixed;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
