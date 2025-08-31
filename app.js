@@ -2536,7 +2536,7 @@ function logToChat(message, type = 'model') {
  * @param {HTMLElement} parentElement The element containing the AI's response.
  */
 function processChatCodeBlocks(parentElement) {
-    // This is a simple markdown-to-HTML conversion for code blocks.
+    // Simple markdown -> code conversion
     let htmlContent = parentElement.innerHTML;
     htmlContent = htmlContent.replace(/```(\S*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2549,21 +2549,23 @@ function processChatCodeBlocks(parentElement) {
         const codeEl = pre.querySelector('code');
         if (!codeEl) return;
 
-        const codeContent = codeEl.textContent;
+        // codeContent should be the raw code (textContent gives decoded text)
+        const codeContent = codeEl.textContent || '';
 
-        // Wrap the <pre> tag in a container div to hold the action buttons
+        // Container wrapper for buttons
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-code-block-wrapper';
         pre.parentNode.insertBefore(wrapper, pre);
         wrapper.appendChild(pre);
 
+        // Copy button
         const copyButton = document.createElement('button');
         copyButton.className = 'copy-code-button';
         copyButton.textContent = 'Copy';
         copyButton.addEventListener('click', () => {
             navigator.clipboard.writeText(codeContent).then(() => {
                 copyButton.textContent = 'Copied!';
-                setTimeout(() => { copyButton.textContent = 'Copy'; }, 2000);
+                setTimeout(() => (copyButton.textContent = 'Copy'), 2000);
             });
         });
         pre.appendChild(copyButton);
@@ -2572,60 +2574,107 @@ function processChatCodeBlocks(parentElement) {
         actionsContainer.className = 'chat-code-actions';
         wrapper.appendChild(actionsContainer);
 
-// Check for file path in language fence (e.g., ```html:index.html)
-const langFenceMatch = codeEl.className.match(/language-(\w+):(.+)/);
+        // Look for language fence with optional file path: language-<lang>:<path>
+        const className = codeEl.className || '';
+        const langFenceMatch = className.match(/^language-([a-z0-9_-]+)(?::(.+))?$/i);
 
-// Only show "Insert into" if we actually captured a path
-if (langFenceMatch && langFenceMatch[2]) {
-  const filePathRaw = langFenceMatch[2].trim();
-  const filePath = filePathRaw.replace(/^\/+/, ''); // normalize
+        if (langFenceMatch && langFenceMatch[2]) {
+            // Extract file path (group 2), normalize it
+            const rawPath = String(langFenceMatch[2] || '').trim();
+            const filePath = rawPath.replace(/^\/+/, ''); // remove leading slashes
 
-  const insertButton = document.createElement('button');
-  insertButton.className = 'insert-code-button';
-  insertButton.textContent = `Insert into ${filePath}`;
-  insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
-  actionsContainer.appendChild(insertButton);
-} else {
-  const agentButton = document.createElement('button');
-  agentButton.className = 'use-agent-button';
-  agentButton.textContent = 'Use Agent to Insert Snippet';
-  agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
-  actionsContainer.appendChild(agentButton);
-}
-
+            const insertButton = document.createElement('button');
+            insertButton.className = 'insert-code-button';
+            insertButton.textContent = `Insert into ${filePath}`;
+            insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
+            actionsContainer.appendChild(insertButton);
+        } else {
+            // fallback: send to agent if there's no explicit file target
+            const agentButton = document.createElement('button');
+            agentButton.className = 'use-agent-button';
+            agentButton.textContent = 'Use Agent to Insert Snippet';
+            agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
+            actionsContainer.appendChild(agentButton);
+        }
     });
 }
 
 /**
  * Handles inserting a code block directly into a project file.
- * @param {string} filePath The path of the file to save.
+ * @param {string|array} filePath The path of the file to save (defensive: accepts malformed input).
  * @param {string} codeContent The code to write to the file.
  */
 async function handleInsertCodeIntoFile(filePath, codeContent) {
     if (!ensureProjectForFiles()) return;
-    
+
+    // Defensive normalisation (handles the previous bug where an array/full match was passed)
+    try {
+        if (Array.isArray(filePath)) {
+            // take the last capture (usually the real path)
+            filePath = filePath[filePath.length - 1];
+        }
+        filePath = String(filePath || '').trim();
+
+        // If something like "language-html:index.html,html,index.html" slipped through,
+        // try to extract the last colon-separated part.
+        if (filePath.includes(':')) {
+            const parts = filePath.split(':').map(p => p.trim()).filter(Boolean);
+            filePath = parts[parts.length - 1] || filePath;
+        }
+
+        filePath = filePath.replace(/^\/+/, ''); // remove leading slashes
+    } catch (e) {
+        console.error('Failed to normalise filePath:', e, filePath);
+        alert('Internal error: bad file path. See console for details.');
+        return;
+    }
+
+    if (!filePath) {
+        alert('Cannot insert: file path is empty or malformed.');
+        return;
+    }
+
     if (!confirm(`Are you sure you want to overwrite '${filePath}' with the provided code?`)) {
         return;
     }
 
+    console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath });
+
     try {
+        // Save
         await db.saveTextFile(currentProjectId, filePath, codeContent);
+
         logToConsole(`File '${filePath}' was updated from Chat.`, 'info');
-        
-        // Refresh the UI to reflect the file change
-        applyVibes();
-        if (document.getElementById('files').classList.contains('active')) {
+        console.info('db.saveTextFile called successfully for', filePath);
+
+        // Refresh file UI so the new/updated file shows up immediately
+        try {
             renderFileTree();
+            // selectFile will update filesState.selectedPath and will call renderFilePreview()
+            selectFile(filePath);
+            // Ensure preview is refreshed (selectFile should already call renderFilePreview; this is extra-safe)
             if (filesState.selectedPath === filePath) {
-                renderFilePreview(filePath);
+                await renderFilePreview(filePath);
             }
+        } catch (uiErr) {
+            console.warn('Failed to refresh file UI after save:', uiErr);
         }
+
+        // Re-run vibe/app preview and autosave project state
+        try {
+            applyVibes();
+        } catch (vibeErr) {
+            console.warn('applyVibes failed after saving file:', vibeErr);
+        }
+
+        autoSaveProject();
     } catch (e) {
         console.error(`Failed to insert code into ${filePath}:`, e);
-        logToConsole(`Failed to save file ${filePath}: ${e.message}`, 'error');
-        alert(`Error saving file: ${e.message}`);
+        logToConsole(`Failed to save file ${filePath}: ${e && e.message ? e.message : e}`, 'error');
+        alert(`Error saving file: ${e && e.message ? e.message : 'unknown error'}`);
     }
 }
+
 
 
 /**
