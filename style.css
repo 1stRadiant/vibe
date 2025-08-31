@@ -1128,7 +1128,7 @@ button.update-button:disabled {
 
 .vibe-node-header {
     display: flex;
-    justify-content: space-between;
+    //justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
     font-family: 'Roboto Mono', monospace;
