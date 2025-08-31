@@ -1531,3 +1531,27 @@ body.is-dragging-vibe .drag-handle {
 .drop-indicator-after::after {
     bottom: -2px;
 }
+
+/* Style for the "Save as Component" button in the editor */
+.button-group > button.save-as-component-button {
+    padding: 10px 15px;
+    background-color: #c678dd; /* Purple */
+    color: #1a1a1a;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0; /* Prevents the button from shrinking */
+    margin-top: 0;
+}
+
+.button-group > button.save-as-component-button:hover:not(:disabled) {
+    background-color: #d18ce8;
+}
+
+.button-group > button.save-as-component-button:disabled {
+    background-color: #4a5058;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
