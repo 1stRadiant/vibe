@@ -2575,12 +2575,14 @@ function processChatCodeBlocks(parentElement) {
         // Check for file path in language fence (e.g., html:index.html)
         const langFenceMatch = codeEl.className.match(/language-(\w+):(.+)/);
         
-        // **BUG FIX is here**
+        // **BUG FIX**
+        // Check if the match was successful AND it has the file path capture group.
         if (langFenceMatch && langFenceMatch) {
-            const filePath = langFenceMatch; // Extract the file path string
+            const filePath = langFenceMatch; // Extract the file path STRING.
             const insertButton = document.createElement('button');
             insertButton.className = 'insert-code-button';
             insertButton.textContent = `Insert into ${filePath}`;
+            // Now filePath is a string, so handleInsertCodeIntoFile will work.
             insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
             actionsContainer.appendChild(insertButton);
         } else {
@@ -3943,7 +3945,6 @@ async function handleFilesNewFile() {
     const pathInput = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
     if (!pathInput) return;
     const path = String(pathInput);
-    console.log("path:"+path)
     await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
     renderFileTree();
     selectFile(path);
