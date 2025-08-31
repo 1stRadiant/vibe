@@ -671,6 +671,28 @@ button.add-child-button:hover {
      background-color: #5c6370;
 }
 
+/* Style for the "Save as Component" button in the editor */
+button.save-as-component-button {
+    padding: 10px 15px;
+    background-color: #c678dd; /* Purple */
+    color: #1a1a1a;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button.save-as-component-button:hover:not(:disabled) {
+    background-color: #d18ce8;
+}
+
+button.save-as-component-button:disabled {
+    background-color: #4a5058;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 .code-editor-display {
     width: 100%;
     box-sizing: border-box;
@@ -1105,7 +1127,7 @@ button.update-button:disabled {
 }
 
 .vibe-node-header {
-    display: flex;
+    //display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
@@ -1285,7 +1307,7 @@ button.update-button:disabled {
     height: 1.2em;
 }
 
-/* NEW: Styles for the "Save as Component" button and modal button layout */
+/* Styles for the "Save as Component" button and modal button layout */
 #edit-node-modal .button-row {
     display: flex;
     gap: 10px;
