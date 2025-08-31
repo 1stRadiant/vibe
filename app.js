@@ -991,11 +991,11 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         const data = await response.json();
         console.info('--- Gemini Response Received ---');
 
-        if (!data.candidates || data.candidates.length === 0 || !data.candidates.content.parts.text) {
+        if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content.parts[0].text) {
              throw new Error('Invalid response structure from Gemini API.');
         }
 
-        const content = data.candidates.content.parts.text;
+        const content = data.candidates[0].content.parts[0].text;
         
         logToConsole('Successfully received response from Gemini.', 'info');
         logDetailed('Raw Gemini Response', content);
@@ -1118,8 +1118,8 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         let jsonResponse = rawResponse.trim();
         // The AI might wrap the response in markdown. Let's strip it.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch) {
-            jsonResponse = jsonMatch;
+        if (jsonMatch && jsonMatch[2]) {
+            jsonResponse = jsonMatch[2];
         }
 
         const childrenArray = JSON.parse(jsonResponse);
@@ -1167,18 +1167,18 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         const data = await response.json();
         console.info('--- nscale Response Received ---');
 
-        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices.message) {
+        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
-        let content = data.choices.message.content;
+        let content = data.choices[0].message.content;
         logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-            if (jsonMatch && jsonMatch) {
-                content = jsonMatch;
+            if (jsonMatch && jsonMatch[1]) {
+                content = jsonMatch[1];
             }
         }
 
@@ -1277,8 +1277,8 @@ function parseHtmlToVibeTree(fullCode) {
             let match;
             
             while ((match = functionRegex.exec(scriptTag.textContent)) !== null) {
-                const functionCode = match;
-                const functionName = match;
+                const functionCode = match[0];
+                const functionName = match[3];
 
                 const kebabCaseName = functionName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
 
@@ -1296,7 +1296,7 @@ function parseHtmlToVibeTree(fullCode) {
             remainingCode = remainingCode.trim();
             if (remainingCode) {
                  const iifeMatch = remainingCode.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-                 if (iifeMatch) remainingCode = iifeMatch.trim();
+                 if (iifeMatch) remainingCode = iifeMatch[1].trim();
                  
                  if (remainingCode) {
                     jsNodes.push({
@@ -1417,8 +1417,8 @@ async function decomposeCodeIntoVibeTree(fullCode) {
     function tryParseVarious(text) {
         try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence) {
-            try { return JSON.parse(fence); } catch {}
+        if (fence && fence[1]) {
+            try { return JSON.parse(fence[1]); } catch {}
         }
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
@@ -1496,7 +1496,7 @@ async function handleUpdateTreeFromCode() {
 }
 
 async function handleFileUpload() {
-    const file = htmlFileInput.files;
+    const file = htmlFileInput.files[0];
     if (!file) {
         alert("Please select an HTML file to upload.");
         return;
@@ -1683,7 +1683,7 @@ async function buildCombinedHtmlFromZip(jszip, indexPath) {
  * Import a ZIP multi-file project.
  */
 async function handleZipUpload() {
-    const file = zipFileInput.files && zipFileInput.files;
+    const file = zipFileInput.files && zipFileInput.files[0];
     if (!file) {
         alert("Please select a ZIP file to upload.");
         return;
@@ -1701,7 +1701,7 @@ async function handleZipUpload() {
         const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
         if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
-        const indexPath = htmlCandidates;
+        const indexPath = htmlCandidates[0];
         logToConsole(`Using entry point: ${indexPath}`, 'info');
 
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
@@ -2482,7 +2482,7 @@ async function handleRunAgent() {
 
     agentConversationHistory.push({ role: 'user', content: agentUserPrompt });
     if (agentConversationHistory.length > 10) {
-        agentConversationHistory = [agentConversationHistory, ...agentConversationHistory.slice(-9)];
+        agentConversationHistory = [agentConversationHistory[0], ...agentConversationHistory.slice(-9)];
     }
 
     try {
@@ -2539,7 +2539,6 @@ function processChatCodeBlocks(parentElement) {
     // This is a simple markdown-to-HTML conversion for code blocks.
     let htmlContent = parentElement.innerHTML;
     htmlContent = htmlContent.replace(/```(\S*)\n([\s\S]*?)```/g, (match, lang, code) => {
-        // Basic sanitization for the code content to be displayed as HTML
         const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         return `<pre><code class="language-${lang}">${sanitizedCode}</code></pre>`;
     });
@@ -2575,9 +2574,10 @@ function processChatCodeBlocks(parentElement) {
 
         // Check for file path in language fence (e.g., html:index.html)
         const langFenceMatch = codeEl.className.match(/language-(\w+):(.+)/);
-        const filePath = langFenceMatch ? langFenceMatch : null;
-
-        if (filePath) {
+        
+        // **BUG FIX is here**
+        if (langFenceMatch && langFenceMatch) {
+            const filePath = langFenceMatch; // Extract the file path string
             const insertButton = document.createElement('button');
             insertButton.className = 'insert-code-button';
             insertButton.textContent = `Insert into ${filePath}`;
@@ -3940,8 +3940,9 @@ async function handleFilesNewFolder() {
 
 async function handleFilesNewFile() {
     if (!ensureProjectForFiles()) return;
-    const path = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
-    if (!path) return;
+    const pathInput = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
+    if (!pathInput) return;
+    const path = String(pathInput);
     await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
     renderFileTree();
     selectFile(path);
