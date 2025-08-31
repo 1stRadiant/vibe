@@ -3943,6 +3943,7 @@ async function handleFilesNewFile() {
     const pathInput = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
     if (!pathInput) return;
     const path = String(pathInput);
+    console.log("path:"+path)
     await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
     renderFileTree();
     selectFile(path);
