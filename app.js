@@ -2607,39 +2607,23 @@ function processChatCodeBlocks(parentElement) {
 async function handleInsertCodeIntoFile(filePath, codeContent) {
     if (!ensureProjectForFiles()) return;
 
-    // FIX: Replaced the previous brittle and confusing normalization logic 
-    // with a more robust and clear implementation. This new block correctly
-    // handles various formats of file paths that might be passed from the chat,
-    // ensuring a clean path is used for saving the file.
     let cleanPath;
     try {
-        // Defensively handle if the input is an array (from a regex match) or a string.
         let pathInput = filePath;
         if (Array.isArray(pathInput)) {
-            // If it's an array, it's likely a regex match result.
-            // Take the last non-empty element as the most probable file path.
             pathInput = [...pathInput].reverse().find(p => p) || '';
         }
-
-        // Now we are sure pathInput is a string.
         cleanPath = String(pathInput || '').trim();
-
-        // The input string might still contain a language prefix (e.g., "html:index.html").
-        // Split by the colon and take the last part.
         if (cleanPath.includes(':')) {
             const parts = cleanPath.split(':');
             cleanPath = parts[parts.length - 1].trim();
         }
-
-        // Finally, remove any leading slashes to ensure a valid relative path.
         cleanPath = cleanPath.replace(/^\/+/, '');
-
     } catch (e) {
         console.error('Failed to normalize file path:', e, { originalPath: filePath });
         alert(`An internal error occurred while processing the file path. See console for details.`);
         return;
     }
-
 
     if (!cleanPath) {
         alert('Cannot insert code: the file path is empty or malformed.');
@@ -2653,39 +2637,95 @@ async function handleInsertCodeIntoFile(filePath, codeContent) {
     console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath: cleanPath });
 
     try {
-        // Save the file using the cleaned path.
+        // Step 1: Save the individual file change to the database.
         await db.saveTextFile(currentProjectId, cleanPath, codeContent);
+        logToConsole(`File '${cleanPath}' was updated from Chat. Rebuilding project...`, 'info');
 
-        logToConsole(`File '${cleanPath}' was updated from Chat.`, 'info');
-        console.info('db.saveTextFile called successfully for', cleanPath);
+        // Step 2: Trigger the new process to rebuild the main vibeTree from all files
+        // and then refresh the entire UI, including the preview.
+        await rebuildAndRefreshFromFiles();
 
-        // Refresh the file UI to show the changes immediately.
-        try {
-            renderFileTree();
-            // Select the newly updated file in the tree to show its new content.
-            selectFile(cleanPath);
-            if (filesState.selectedPath === cleanPath) {
-                await renderFilePreview(cleanPath);
-            }
-        } catch (uiErr) {
-            console.warn('Failed to refresh file UI after save:', uiErr);
-        }
-
-        // Apply changes to the live preview and trigger an auto-save.
-        try {
-            applyVibes();
-        } catch (vibeErr) {
-            console.warn('applyVibes failed after saving file:', vibeErr);
-        }
-
-        autoSaveProject();
     } catch (e) {
-        console.error(`Failed to insert code into ${cleanPath}:`, e);
-        logToConsole(`Failed to save file ${cleanPath}: ${e && e.message ? e.message : e}`, 'error');
-        alert(`Error saving file: ${e && e.message ? e.message : 'unknown error'}`);
+        console.error(`Failed to insert code and refresh for ${cleanPath}:`, e);
+        logToConsole(`Failed to save file and refresh: ${e.message}`, 'error');
+        alert(`Error saving file: ${e.message}`);
     }
 }
 
+/**
+ * Builds a single, combined HTML string from the project files stored in the database
+ * by inlining all linked CSS and JavaScript.
+ * @param {string} projectId The ID of the project to build.
+ * @returns {Promise<string>} A promise that resolves to the full HTML string.
+ */
+async function buildCombinedHtmlFromDb(projectId) {
+    if (!projectId) throw new Error("Project ID is required.");
+
+    const indexText = await db.readTextFile(projectId, 'index.html');
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(indexText, 'text/html');
+
+    // Inline stylesheets
+    const linkNodes = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
+    for (const link of linkNodes) {
+        const href = link.getAttribute('href').trim();
+        try {
+            const cssText = await db.readTextFile(projectId, href);
+            const style = doc.createElement('style');
+            style.textContent = cssText;
+            link.replaceWith(style);
+        } catch (e) {
+            console.warn(`Could not inline stylesheet from DB: ${href}`, e);
+        }
+    }
+
+    // Inline scripts
+    const scriptNodes = Array.from(doc.querySelectorAll('script[src]'));
+    for (const script of scriptNodes) {
+        const src = script.getAttribute('src').trim();
+        try {
+            const jsCode = await db.readTextFile(projectId, src);
+            const inlineScript = doc.createElement('script');
+            inlineScript.textContent = jsCode;
+            if (script.type) inlineScript.type = script.type;
+            script.replaceWith(inlineScript);
+        } catch (e) {
+            console.warn(`Could not inline script from DB: ${src}`, e);
+        }
+    }
+
+    return new XMLSerializer().serializeToString(doc);
+}
+
+
+/**
+ * Orchestrates the process of rebuilding the vibeTree from the file database
+ * and refreshing the entire application UI to reflect the changes.
+ */
+async function rebuildAndRefreshFromFiles() {
+    logToConsole("File changed. Rebuilding Vibe Tree from source files...", "info");
+    
+    try {
+        // 1. Build a single HTML string by inlining all CSS and JS from the DB.
+        const combinedHtml = await buildCombinedHtmlFromDb(currentProjectId);
+        
+        // 2. Decompose this combined HTML back into a Vibe Tree structure.
+        recordHistory('Rebuild tree from file change');
+        const newVibeTree = await decomposeCodeIntoVibeTree(combinedHtml);
+
+        // 3. Update the global Vibe Tree in memory.
+        vibeTree = newVibeTree;
+
+        // 4. Refresh all UI components, which will now use the updated Vibe Tree.
+        refreshAllUI();
+        
+        logToConsole("Vibe Tree rebuilt and UI refreshed successfully.", "info");
+    } catch (error) {
+        console.error("Failed to rebuild Vibe Tree from files:", error);
+        logToConsole(`Error rebuilding from files: ${error.message}`, 'error');
+        alert(`An error occurred while synchronizing file changes: ${error.message}`);
+    }
+}
 
 /**
  * Sends a code snippet to the Agent tab for intelligent insertion.
