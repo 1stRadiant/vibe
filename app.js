@@ -2607,60 +2607,71 @@ function processChatCodeBlocks(parentElement) {
 async function handleInsertCodeIntoFile(filePath, codeContent) {
     if (!ensureProjectForFiles()) return;
 
-    // Defensive normalisation (handles the previous bug where an array/full match was passed)
+    // FIX: Replaced the previous brittle and confusing normalization logic 
+    // with a more robust and clear implementation. This new block correctly
+    // handles various formats of file paths that might be passed from the chat,
+    // ensuring a clean path is used for saving the file.
+    let cleanPath;
     try {
-        if (Array.isArray(filePath)) {
-            // take the last capture (usually the real path)
-            filePath = filePath[filePath.length - 1];
-        }
-        filePath = String(filePath || '').trim();
-
-        // If something like "language-html:index.html,html,index.html" slipped through,
-        // try to extract the last colon-separated part.
-        if (filePath.includes(':')) {
-            const parts = filePath.split(':').map(p => p.trim()).filter(Boolean);
-            filePath = parts[parts.length - 1] || filePath;
+        // Defensively handle if the input is an array (from a regex match) or a string.
+        let pathInput = filePath;
+        if (Array.isArray(pathInput)) {
+            // If it's an array, it's likely a regex match result.
+            // Take the last non-empty element as the most probable file path.
+            pathInput = [...pathInput].reverse().find(p => p) || '';
         }
 
-        filePath = filePath.replace(/^\/+/, ''); // remove leading slashes
+        // Now we are sure pathInput is a string.
+        cleanPath = String(pathInput || '').trim();
+
+        // The input string might still contain a language prefix (e.g., "html:index.html").
+        // Split by the colon and take the last part.
+        if (cleanPath.includes(':')) {
+            const parts = cleanPath.split(':');
+            cleanPath = parts[parts.length - 1].trim();
+        }
+
+        // Finally, remove any leading slashes to ensure a valid relative path.
+        cleanPath = cleanPath.replace(/^\/+/, '');
+
     } catch (e) {
-        console.error('Failed to normalise filePath:', e, filePath);
-        alert('Internal error: bad file path. See console for details.');
+        console.error('Failed to normalize file path:', e, { originalPath: filePath });
+        alert(`An internal error occurred while processing the file path. See console for details.`);
         return;
     }
 
-    if (!filePath) {
-        alert('Cannot insert: file path is empty or malformed.');
+
+    if (!cleanPath) {
+        alert('Cannot insert code: the file path is empty or malformed.');
         return;
     }
 
-    if (!confirm(`Are you sure you want to overwrite '${filePath}' with the provided code?`)) {
+    if (!confirm(`Are you sure you want to overwrite '${cleanPath}' with the provided code?`)) {
         return;
     }
 
-    console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath });
+    console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath: cleanPath });
 
     try {
-        // Save
-        await db.saveTextFile(currentProjectId, filePath, codeContent);
+        // Save the file using the cleaned path.
+        await db.saveTextFile(currentProjectId, cleanPath, codeContent);
 
-        logToConsole(`File '${filePath}' was updated from Chat.`, 'info');
-        console.info('db.saveTextFile called successfully for', filePath);
+        logToConsole(`File '${cleanPath}' was updated from Chat.`, 'info');
+        console.info('db.saveTextFile called successfully for', cleanPath);
 
-        // Refresh file UI so the new/updated file shows up immediately
+        // Refresh the file UI to show the changes immediately.
         try {
             renderFileTree();
-            // selectFile will update filesState.selectedPath and will call renderFilePreview()
-            selectFile(filePath);
-            // Ensure preview is refreshed (selectFile should already call renderFilePreview; this is extra-safe)
-            if (filesState.selectedPath === filePath) {
-                await renderFilePreview(filePath);
+            // Select the newly updated file in the tree to show its new content.
+            selectFile(cleanPath);
+            if (filesState.selectedPath === cleanPath) {
+                await renderFilePreview(cleanPath);
             }
         } catch (uiErr) {
             console.warn('Failed to refresh file UI after save:', uiErr);
         }
 
-        // Re-run vibe/app preview and autosave project state
+        // Apply changes to the live preview and trigger an auto-save.
         try {
             applyVibes();
         } catch (vibeErr) {
@@ -2669,12 +2680,11 @@ async function handleInsertCodeIntoFile(filePath, codeContent) {
 
         autoSaveProject();
     } catch (e) {
-        console.error(`Failed to insert code into ${filePath}:`, e);
-        logToConsole(`Failed to save file ${filePath}: ${e && e.message ? e.message : e}`, 'error');
+        console.error(`Failed to insert code into ${cleanPath}:`, e);
+        logToConsole(`Failed to save file ${cleanPath}: ${e && e.message ? e.message : e}`, 'error');
         alert(`Error saving file: ${e && e.message ? e.message : 'unknown error'}`);
     }
 }
-
 
 
 /**
