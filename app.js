@@ -1008,11 +1008,11 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         const data = await response.json();
         console.info('--- Gemini Response Received ---');
 
-        if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content.parts[0].text) {
+        if (!data.candidates || data.candidates.length === 0 || !data.candidates.content.parts.text) {
              throw new Error('Invalid response structure from Gemini API.');
         }
 
-        const content = data.candidates[0].content.parts[0].text;
+        const content = data.candidates.content.parts.text;
         
         logToConsole('Successfully received response from Gemini.', 'info');
         logDetailed('Raw Gemini Response', content);
@@ -1135,8 +1135,8 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         let jsonResponse = rawResponse.trim();
         // The AI might wrap the response in markdown. Let's strip it.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2];
+        if (jsonMatch && jsonMatch) {
+            jsonResponse = jsonMatch;
         }
 
         const childrenArray = JSON.parse(jsonResponse);
@@ -1184,18 +1184,18 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         const data = await response.json();
         console.info('--- nscale Response Received ---');
 
-        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
+        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices.message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
-        let content = data.choices[0].message.content;
+        let content = data.choices.message.content;
         logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-            if (jsonMatch && jsonMatch[1]) {
-                content = jsonMatch[1];
+            if (jsonMatch && jsonMatch) {
+                content = jsonMatch;
             }
         }
 
@@ -1294,8 +1294,8 @@ function parseHtmlToVibeTree(fullCode) {
             let match;
             
             while ((match = functionRegex.exec(scriptTag.textContent)) !== null) {
-                const functionCode = match[0];
-                const functionName = match[3];
+                const functionCode = match;
+                const functionName = match;
 
                 const kebabCaseName = functionName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
 
@@ -1313,7 +1313,7 @@ function parseHtmlToVibeTree(fullCode) {
             remainingCode = remainingCode.trim();
             if (remainingCode) {
                  const iifeMatch = remainingCode.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-                 if (iifeMatch) remainingCode = iifeMatch[1].trim();
+                 if (iifeMatch) remainingCode = iifeMatch.trim();
                  
                  if (remainingCode) {
                     jsNodes.push({
@@ -1434,8 +1434,8 @@ async function decomposeCodeIntoVibeTree(fullCode) {
     function tryParseVarious(text) {
         try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence[1]) {
-            try { return JSON.parse(fence[1]); } catch {}
+        if (fence && fence) {
+            try { return JSON.parse(fence); } catch {}
         }
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
@@ -1513,7 +1513,7 @@ async function handleUpdateTreeFromCode() {
 }
 
 async function handleFileUpload() {
-    const file = htmlFileInput.files[0];
+    const file = htmlFileInput.files;
     if (!file) {
         alert("Please select an HTML file to upload.");
         return;
@@ -1700,7 +1700,7 @@ async function buildCombinedHtmlFromZip(jszip, indexPath) {
  * Import a ZIP multi-file project.
  */
 async function handleZipUpload() {
-    const file = zipFileInput.files && zipFileInput.files[0];
+    const file = zipFileInput.files && zipFileInput.files;
     if (!file) {
         alert("Please select a ZIP file to upload.");
         return;
@@ -1718,7 +1718,7 @@ async function handleZipUpload() {
         const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
         if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
-        const indexPath = htmlCandidates[0];
+        const indexPath = htmlCandidates;
         logToConsole(`Using entry point: ${indexPath}`, 'info');
 
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
@@ -2499,7 +2499,7 @@ async function handleRunAgent() {
 
     agentConversationHistory.push({ role: 'user', content: agentUserPrompt });
     if (agentConversationHistory.length > 10) {
-        agentConversationHistory = [agentConversationHistory[0], ...agentConversationHistory.slice(-9)];
+        agentConversationHistory = [agentConversationHistory, ...agentConversationHistory.slice(-9)];
     }
 
     try {
@@ -2598,9 +2598,9 @@ function processChatCodeBlocks(parentElement) {
         for (const cls of codeEl.classList) {
             const match = cls.match(filePathRegex);
             // If a class matches the pattern "language-sometype:some/path.html"
-            if (match && match[1]) {
+            if (match && match) {
                 // We've found our target file path.
-                targetFilePath = match[1];
+                targetFilePath = match;
                 break; // Stop searching once we've found it.
             }
         }
@@ -3733,7 +3733,7 @@ function handleUploadContextTrigger() {
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
-    const file = event.target.files;
+    const file = event.target.files[0];
     if (!file) {
         return;
     }
@@ -4201,7 +4201,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', handleFileUpload);
         if (uploadZipButton) uploadZipButton.addEventListener('click', handleZipUpload);
         if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-        if (filesUploadButton) filesUploadButton.addEventListener('click', handleFilesUpload);
+        if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+        if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
         if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
         if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
         if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
@@ -4352,7 +4353,7 @@ function buildBasicMermaidFromTree(tree) {
 function extractMermaidFromText(text) {
     if (!text) return '';
     const mermaidFence = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-    if (mermaidFence && mermaidFence) return mermaidFence;
+    if (mermaidFence && mermaidFence[1]) return mermaidFence[1];
     if (text.trim().startsWith('graph')) return text.trim();
     return '';
 }
@@ -4491,7 +4492,7 @@ async function handleAiImproveDescription() {
         
         let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
