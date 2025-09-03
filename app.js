@@ -865,23 +865,40 @@ function getComponentContextForAI() {
 
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     console.info('--- Calling AI ---');
-    let assetsNote = '';
-    try {
-        const files = currentProjectId ? db.listFiles(currentProjectId) : [];
-        if (files.length) {
-            assetsNote = `
-
-Available project assets (use these paths when referencing assets in HTML/CSS/JS):
-${files.slice(0, 50).map(p => `- ${p}`).join('\n')}${files.length > 50 ? `\n...and ${files.length - 50} more` : ''}
-
-When you need to embed an image/video/font/etc., reference it directly by its path (e.g., src="assets/images/logo.png").`;
+    
+    // --- START OF FIX ---
+    // The previous implementation only sent a list of file *names*.
+    // This new logic reads the *content* of all text-based files in the current project
+    // and prepends it to the user's prompt, giving the AI full context for editing.
+    let fileContext = '';
+    if (currentProjectId) {
+        try {
+            const files = db.listFiles(currentProjectId);
+            if (files.length > 0) {
+                const textFiles = [];
+                for (const path of files) {
+                    const meta = db.getFileMeta(currentProjectId, path);
+                    // Only include files that are not binary.
+                    if (meta && !meta.isBinary) {
+                        const content = await db.readTextFile(currentProjectId, path);
+                        textFiles.push(`--- FILE: ${path} ---\n\`\`\`\n${content}\n\`\`\``);
+                    }
+                }
+                if (textFiles.length > 0) {
+                    fileContext = "Here is the full context of the user's current project files. Use this context to understand and edit the code as requested.\n\n" + textFiles.join('\n\n') + '\n\n';
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to build file context for AI:", e);
         }
-    } catch {}
+    }
+    // --- END OF FIX ---
 
     // NEW: Get component context and augment the system prompt
     const componentContext = getComponentContextForAI();
     const augmentedSystemPrompt = systemPrompt + componentContext;
-    const augmentedUserPrompt = userPrompt + assetsNote;
+    // Prepend the new file context to the user's actual prompt.
+    const augmentedUserPrompt = fileContext + userPrompt;
 
     logToConsole('Sending request to AI model...', 'info');
     logDetailed('System Prompt Sent to AI', augmentedSystemPrompt);
@@ -2776,7 +2793,17 @@ async function handleSendChatMessage() {
     const userPrompt = chatPromptInput.value.trim();
     if (!userPrompt) return;
 
-    const systemPrompt = chatSystemPromptInput.value.trim() || 'You are a helpful AI assistant that provides code snippets and full files upon request. When providing a full file, use a language fence with the file path, like ```html:index.html.';
+    // --- START OF FIX ---
+    // Replaced the old, simple system prompt with a more detailed one.
+    // This new prompt instructs the AI to act as a pair programmer, to use the provided
+    // file context, and to return the *entire* modified file, which is critical
+    // for our file-saving and UI-refreshing logic.
+    const systemPrompt = chatSystemPromptInput.value.trim() || `You are an expert pair programmer. The user will provide you with the full content of their project files and a request to change them.
+1.  Analyze the user's request and the provided file context.
+2.  Identify which file(s) need to be modified.
+3.  When you provide code, you MUST return the **complete, updated content** of the file. Do not provide snippets, diffs, or partial code.
+4.  Enclose the full file content in a markdown code block, and use a language fence that includes the file path. For example: \`\`\`html:index.html ... complete file content ... \`\`\``;
+    // --- END OF FIX ---
 
     // Disable input while processing
     sendChatButton.disabled = true;
@@ -2817,7 +2844,6 @@ async function handleSendChatMessage() {
         chatPromptInput.focus();
     }
 }
-
 
 // --- Add Node Modal Logic ---
 function handleAddChildClick(event) {
