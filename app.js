@@ -2532,33 +2532,85 @@ function logToChat(message, type = 'model') {
 
 /**
  * Finds all ``` blocks in an element, converts them to <pre><code>,
- * and adds action buttons.
+ * and adds action buttons for copying or inserting the code. This version
+ * correctly handles multiple class names on code blocks to reliably find the
+ * target file path.
  * @param {HTMLElement} parentElement The element containing the AI's response.
  */
 function processChatCodeBlocks(parentElement) {
-    // Simple markdown -> code conversion
+    // First, convert markdown ``` blocks to <pre><code> HTML structure.
     let htmlContent = parentElement.innerHTML;
+    // The regex captures the language fence string (e.g., "html:index.html") and the code.
     htmlContent = htmlContent.replace(/```(\S*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // The entire language fence string becomes a class, prefixed with "language-".
         return `<pre><code class="language-${lang}">${sanitizedCode}</code></pre>`;
     });
     parentElement.innerHTML = htmlContent;
 
+    // Now, process each generated <pre> block to add action buttons.
     const pres = parentElement.querySelectorAll('pre');
     pres.forEach(pre => {
         const codeEl = pre.querySelector('code');
         if (!codeEl) return;
 
-        // codeContent should be the raw code (textContent gives decoded text)
         const codeContent = codeEl.textContent || '';
 
-        // Container wrapper for buttons
+        // Create a wrapper for the <pre> tag and its action buttons.
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-code-block-wrapper';
         pre.parentNode.insertBefore(wrapper, pre);
         wrapper.appendChild(pre);
 
-        // Copy button
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'chat-code-actions';
+        wrapper.appendChild(actionsContainer);
+
+        // --- START OF FIX ---
+        // The original code was failing because `codeEl.className` can contain multiple
+        // space-separated classes (e.g., from a syntax highlighter), which broke the regex.
+        // The corrected logic iterates through each class on the element to find the one
+        // that specifies the file path.
+
+        let targetFilePath = null;
+        // This regex looks for a class name that starts with "language-", followed by a type,
+        // a colon, and then captures the file path.
+        const filePathRegex = /^language-(?:[a-z0-9_-]+):(.+)$/i;
+
+        // Iterate through all classes on the <code> element.
+        for (const cls of codeEl.classList) {
+            const match = cls.match(filePathRegex);
+            // If a class matches the pattern "language-sometype:some/path.html"
+            if (match && match[1]) {
+                // We've found our target file path.
+                targetFilePath = match[1];
+                break; // Stop searching once we've found it.
+            }
+        }
+        // --- END OF FIX ---
+
+
+        // If we successfully extracted a file path from the classes...
+        if (targetFilePath) {
+            // Create the "Insert into file" button.
+            const insertButton = document.createElement('button');
+            insertButton.className = 'insert-code-button';
+            insertButton.textContent = `Insert into ${targetFilePath}`;
+
+            // Add a click listener that passes the correctly identified file path.
+            insertButton.addEventListener('click', () => handleInsertCodeIntoFile(targetFilePath, codeContent));
+            actionsContainer.appendChild(insertButton);
+
+        } else {
+            // Fallback: If no file path was specified, show the "Use Agent" button.
+            const agentButton = document.createElement('button');
+            agentButton.className = 'use-agent-button';
+            agentButton.textContent = 'Use Agent to Insert Snippet';
+            agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
+            actionsContainer.appendChild(agentButton);
+        }
+
+        // Always add a "Copy" button.
         const copyButton = document.createElement('button');
         copyButton.className = 'copy-code-button';
         copyButton.textContent = 'Copy';
@@ -2569,33 +2621,6 @@ function processChatCodeBlocks(parentElement) {
             });
         });
         pre.appendChild(copyButton);
-
-        const actionsContainer = document.createElement('div');
-        actionsContainer.className = 'chat-code-actions';
-        wrapper.appendChild(actionsContainer);
-
-        // Look for language fence with optional file path: language-<lang>:<path>
-        const className = codeEl.className || '';
-        const langFenceMatch = className.match(/^language-([a-z0-9_-]+)(?::(.+))?$/i);
-
-        if (langFenceMatch && langFenceMatch[2]) {
-            // Extract file path (group 2), normalize it
-            const rawPath = String(langFenceMatch[2] || '').trim();
-            const filePath = rawPath.replace(/^\/+/, ''); // remove leading slashes
-
-            const insertButton = document.createElement('button');
-            insertButton.className = 'insert-code-button';
-            insertButton.textContent = `Insert into ${filePath}`;
-            insertButton.addEventListener('click', () => handleInsertCodeIntoFile(filePath, codeContent));
-            actionsContainer.appendChild(insertButton);
-        } else {
-            // fallback: send to agent if there's no explicit file target
-            const agentButton = document.createElement('button');
-            agentButton.className = 'use-agent-button';
-            agentButton.textContent = 'Use Agent to Insert Snippet';
-            agentButton.addEventListener('click', () => handleUseAgentToInsertSnippet(codeContent));
-            actionsContainer.appendChild(agentButton);
-        }
     });
 }
 
