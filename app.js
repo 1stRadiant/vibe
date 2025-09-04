@@ -1004,24 +1004,52 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
             return fullResponseText;
         }
 
+        // --- START OF FIX ---
         // Non-streaming path
         const data = await response.json();
         console.info('--- Gemini Response Received ---');
+        // NEW: Log the full raw response for easier debugging of strange API returns.
+        logDetailed('Raw Gemini Response', JSON.stringify(data, null, 2));
 
-        if (!data.candidates || data.candidates.length === 0 || !data.candidates.content.parts.text) {
-             throw new Error('Invalid response structure from Gemini API.');
+        // FIX: Add robust checking for API blocks and other non-standard responses.
+        // The API can return a 200 OK but with a block reason instead of content.
+        if (!data.candidates || data.candidates.length === 0) {
+            if (data.promptFeedback && data.promptFeedback.blockReason) {
+                const reason = data.promptFeedback.blockReason;
+                let details = 'No additional details.';
+                if (data.promptFeedback.safetyRatings) {
+                    details = data.promptFeedback.safetyRatings
+                        .map(r => `${r.category}: ${r.probability}`)
+                        .join(', ');
+                }
+                throw new Error(`Gemini API request was blocked due to safety settings. Reason: ${reason}. Details: ${details}`);
+            }
+             // If there are no candidates and no block reason, the response is invalid.
+             throw new Error('Invalid response from Gemini API: The response contained no valid candidates.');
         }
 
-        const content = data.candidates.content.parts.text;
+        const candidate = data.candidates[0];
+
+        // Also check for a block reason on the candidate itself.
+        if (candidate.finishReason && candidate.finishReason !== "STOP") {
+            // "SAFETY" is a common finish reason when content is blocked.
+            throw new Error(`Gemini API stopped generating text prematurely. Reason: ${candidate.finishReason}`);
+        }
+
+        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0 || typeof candidate.content.parts[0].text !== 'string') {
+             throw new Error('Invalid response structure from Gemini API: The response candidate is missing the expected text content.');
+        }
+
+        const content = candidate.content.parts[0].text;
         
         logToConsole('Successfully received response from Gemini.', 'info');
-        logDetailed('Raw Gemini Response', content);
-
+        
         // On successful call, maybe repopulate the full code view if it's active
         if (document.getElementById('code').classList.contains('active')) {
             showFullCode();
         }
         return content;
+        // --- END OF FIX ---
     } catch(e) {
         console.error("Error calling Gemini AI:", e);
         // The AI might return a valid JSON but with an error message inside.
@@ -1135,8 +1163,8 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         let jsonResponse = rawResponse.trim();
         // The AI might wrap the response in markdown. Let's strip it.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch) {
-            jsonResponse = jsonMatch;
+        if (jsonMatch && jsonMatch[2]) {
+            jsonResponse = jsonMatch[2];
         }
 
         const childrenArray = JSON.parse(jsonResponse);
@@ -1184,18 +1212,18 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         const data = await response.json();
         console.info('--- nscale Response Received ---');
 
-        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices.message) {
+        if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
-        let content = data.choices.message.content;
+        let content = data.choices[0].message.content;
         logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
-            if (jsonMatch && jsonMatch) {
-                content = jsonMatch;
+            if (jsonMatch && jsonMatch[1]) {
+                content = jsonMatch[1];
             }
         }
 
@@ -1294,8 +1322,8 @@ function parseHtmlToVibeTree(fullCode) {
             let match;
             
             while ((match = functionRegex.exec(scriptTag.textContent)) !== null) {
-                const functionCode = match;
-                const functionName = match;
+                const functionCode = match[0];
+                const functionName = match[3];
 
                 const kebabCaseName = functionName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
 
@@ -1313,7 +1341,7 @@ function parseHtmlToVibeTree(fullCode) {
             remainingCode = remainingCode.trim();
             if (remainingCode) {
                  const iifeMatch = remainingCode.match(/^\s*\(\s*function\s*\(\s*\)\s*\{([\s\S]*?)\s*\}\s*\(\s*\);?\s*$/);
-                 if (iifeMatch) remainingCode = iifeMatch.trim();
+                 if (iifeMatch) remainingCode = iifeMatch[1].trim();
                  
                  if (remainingCode) {
                     jsNodes.push({
@@ -1434,8 +1462,8 @@ async function decomposeCodeIntoVibeTree(fullCode) {
     function tryParseVarious(text) {
         try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence) {
-            try { return JSON.parse(fence); } catch {}
+        if (fence && fence[1]) {
+            try { return JSON.parse(fence[1]); } catch {}
         }
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
@@ -1513,7 +1541,7 @@ async function handleUpdateTreeFromCode() {
 }
 
 async function handleFileUpload() {
-    const file = htmlFileInput.files;
+    const file = htmlFileInput.files[0];
     if (!file) {
         alert("Please select an HTML file to upload.");
         return;
@@ -1700,7 +1728,7 @@ async function buildCombinedHtmlFromZip(jszip, indexPath) {
  * Import a ZIP multi-file project.
  */
 async function handleZipUpload() {
-    const file = zipFileInput.files && zipFileInput.files;
+    const file = zipFileInput.files && zipFileInput.files[0];
     if (!file) {
         alert("Please select a ZIP file to upload.");
         return;
@@ -1718,7 +1746,7 @@ async function handleZipUpload() {
         const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
         if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
-        const indexPath = htmlCandidates;
+        const indexPath = htmlCandidates[0];
         logToConsole(`Using entry point: ${indexPath}`, 'info');
 
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
@@ -2499,7 +2527,7 @@ async function handleRunAgent() {
 
     agentConversationHistory.push({ role: 'user', content: agentUserPrompt });
     if (agentConversationHistory.length > 10) {
-        agentConversationHistory = [agentConversationHistory, ...agentConversationHistory.slice(-9)];
+        agentConversationHistory = [agentConversationHistory[0], ...agentConversationHistory.slice(-9)];
     }
 
     try {
@@ -2598,9 +2626,9 @@ function processChatCodeBlocks(parentElement) {
         for (const cls of codeEl.classList) {
             const match = cls.match(filePathRegex);
             // If a class matches the pattern "language-sometype:some/path.html"
-            if (match && match) {
+            if (match && match[1]) {
                 // We've found our target file path.
-                targetFilePath = match;
+                targetFilePath = match[1];
                 break; // Stop searching once we've found it.
             }
         }
@@ -3733,7 +3761,7 @@ function handleUploadContextTrigger() {
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
-    const file = event.target.files[0];
+    const file = event.target.files;
     if (!file) {
         return;
     }
@@ -4199,7 +4227,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (redoButton) redoButton.addEventListener('click', doRedo);
         if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
         if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', handleFileUpload);
-        if (uploadZipButton) uploadZipButton.addEventListener('click', handleZipUpload);
+        if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
+        if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
         if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
         if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
         if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
@@ -4353,7 +4382,7 @@ function buildBasicMermaidFromTree(tree) {
 function extractMermaidFromText(text) {
     if (!text) return '';
     const mermaidFence = text.match(/```mermaid\s*([\s\S]*?)\s*```/i);
-    if (mermaidFence && mermaidFence[1]) return mermaidFence[1];
+    if (mermaidFence && mermaidFence) return mermaidFence;
     if (text.trim().startsWith('graph')) return text.trim();
     return '';
 }
@@ -4492,7 +4521,7 @@ async function handleAiImproveDescription() {
         
         let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced) improved = fenced[0].replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
