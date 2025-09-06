@@ -3778,14 +3778,13 @@ function handleUploadContextTrigger() {
  */
 async function processContextUpload(event) {
     // --- START OF FIX ---
-    // The original code incorrectly used event.target.files (a FileList)
-    // instead of event.target.files (a single File). This caused
-    // subsequent operations like reading the file's name or content to fail.
+    // The code must get the first file from the FileList object.
     const file = event.target.files;
     if (!file) {
-    // --- END OF FIX ---
+        // This case handles the user closing the file dialog without selecting a file.
         return;
     }
+    // --- END OF FIX ---
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
 
@@ -3844,7 +3843,7 @@ async function processContextUpload(event) {
         alert("An error occurred while reading the file.");
     };
 
-    // The reader now correctly receives a single File object.
+    // The reader now correctly receives a single File object to read.
     reader.readAsText(file);
 }
 
