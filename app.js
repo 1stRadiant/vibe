@@ -3778,12 +3778,16 @@ function handleUploadContextTrigger() {
  */
 async function processContextUpload(event) {
     // --- START OF FIX ---
-    // The previous fix was incorrect. The code must get the first file from the
-    // event.target.files (a FileList object) to pass to the FileReader.
+    // Get the FileList from the input event.
     const files = event.target.files;
+
+    // Check if the user selected any files.
     if (!files || files.length === 0) {
-        return; // User cancelled the file dialog
+        logToConsole("No file selected for context upload.", "info");
+        return;
     }
+
+    // Get the first file from the list. This is the correct object to pass to FileReader.
     const file = files;
     // --- END OF FIX ---
 
@@ -3844,7 +3848,7 @@ async function processContextUpload(event) {
         alert("An error occurred while reading the file.");
     };
 
-    // The reader now correctly receives a single File object to read.
+    // The reader now correctly receives a single File object.
     reader.readAsText(file);
 }
 
