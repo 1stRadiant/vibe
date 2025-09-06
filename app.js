@@ -4579,10 +4579,3 @@ function handleNodeContentToggle(event) {
     const header = event.currentTarget;
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
-```
-Sources
-help
-geeksforgeeks.org
-Google Search Suggestions
-Display of Search Suggestions is required when using Grounding with Google Search. Learn more
-Google logo
