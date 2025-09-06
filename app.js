@@ -1961,6 +1961,10 @@ function nodeIdToFileName(id, ext) {
  * Assemble a multi-file project bundle from the current vibe tree.
  * Returns an object { files: Map<path,string>, indexHtml: string }
  */
+/**
+ * Assemble a multi-file project bundle from the current vibe tree.
+ * Returns an object { files: Map<path,string>, indexHtml: string }
+ */
 function assembleMultiFileBundle(tree = vibeTree) {
     const headContent = getHeadContentFromTree(tree);
     const bodyContent = buildHtmlBodyFromTree(tree);
@@ -1984,7 +1988,7 @@ ${bodyContent}
 </body>
 </html>`;
 
-    // Build files map
+    // Build files map, starting with the freshly generated content
     const files = new Map();
     files.set('index.html', indexHtml);
     files.set('project.json', JSON.stringify(tree, null, 2));
@@ -2003,19 +2007,26 @@ ${bodyContent}
         files.set(path, wrapped);
     });
 
-    // Include project asset files
+    // --- START OF FIX ---
+    // Now, include other project assets from the database, but ONLY if they
+    // haven't already been generated from the vibeTree above. This prevents
+    // overwriting new changes with old, stored files.
     try {
-        const assetPaths = db.listFiles(currentProjectId);
-        assetPaths.forEach(p => {
-            files.set(p, db.readFileForExport(currentProjectId, p));
+        const allDbAssetPaths = db.listFiles(currentProjectId);
+        allDbAssetPaths.forEach(p => {
+            // If the file path is NOT in our map of freshly generated files,
+            // then it's an asset (like an image) that we should include.
+            if (!files.has(p)) {
+                files.set(p, db.readFileForExport(currentProjectId, p));
+            }
         });
     } catch (e) {
         console.warn('Failed adding assets to ZIP:', e);
     }
+    // --- END OF FIX ---
 
     return { files, indexHtml };
 }
-
 /**
  * Trigger browser download for a blob.
  */
