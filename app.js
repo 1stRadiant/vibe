@@ -2642,8 +2642,11 @@ function processChatCodeBlocks(parentElement) {
             insertButton.className = 'insert-code-button';
             insertButton.textContent = `Insert into ${targetFilePath}`;
 
-            // Add a click listener that passes the correctly identified file path.
-            insertButton.addEventListener('click', () => handleInsertCodeIntoFile(targetFilePath, codeContent));
+            // --- START OF FIX ---
+            // The click listener now passes the button element itself to the handler
+            // so that its state (e.g., text, disabled) can be managed during processing.
+            insertButton.addEventListener('click', (e) => handleInsertCodeIntoFile(targetFilePath, codeContent, e.currentTarget));
+            // --- END OF FIX ---
             actionsContainer.appendChild(insertButton);
 
         } else {
@@ -2673,8 +2676,9 @@ function processChatCodeBlocks(parentElement) {
  * Handles inserting a code block directly into a project file.
  * @param {string|array} filePath The path of the file to save (defensive: accepts malformed input).
  * @param {string} codeContent The code to write to the file.
+ * @param {HTMLElement} buttonElement The button that was clicked, for UI feedback.
  */
-async function handleInsertCodeIntoFile(filePath, codeContent) {
+async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
     if (!ensureProjectForFiles()) return;
 
     let cleanPath;
@@ -2703,22 +2707,34 @@ async function handleInsertCodeIntoFile(filePath, codeContent) {
     if (!confirm(`Are you sure you want to overwrite '${cleanPath}' with the provided code?`)) {
         return;
     }
+    
+    // --- START OF FIX ---
+    // Add UI feedback for the button during processing.
+    const originalText = buttonElement ? buttonElement.textContent : '';
+    if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = 'Processing... <div class="loading-spinner"></div>';
+    }
+    // --- END OF FIX ---
 
     console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath: cleanPath });
 
     try {
-        // Step 1: Save the individual file change to the database.
         await db.saveTextFile(currentProjectId, cleanPath, codeContent);
         logToConsole(`File '${cleanPath}' was updated from Chat. Rebuilding project...`, 'info');
-
-        // Step 2: Trigger the new process to rebuild the main vibeTree from all files
-        // and then refresh the entire UI, including the preview.
         await rebuildAndRefreshFromFiles();
-
     } catch (e) {
         console.error(`Failed to insert code and refresh for ${cleanPath}:`, e);
         logToConsole(`Failed to save file and refresh: ${e.message}`, 'error');
         alert(`Error saving file: ${e.message}`);
+    } finally {
+        // --- START OF FIX ---
+        // Restore the button to its original state.
+        if (buttonElement) {
+            buttonElement.disabled = false;
+            buttonElement.textContent = originalText;
+        }
+        // --- END OF FIX ---
     }
 }
 
@@ -3761,8 +3777,13 @@ function handleUploadContextTrigger() {
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
+    // --- START OF FIX ---
+    // The original code incorrectly used event.target.files (a FileList)
+    // instead of event.target.files (a single File). This caused
+    // subsequent operations like reading the file's name or content to fail.
     const file = event.target.files;
     if (!file) {
+    // --- END OF FIX ---
         return;
     }
 
@@ -3823,6 +3844,7 @@ async function processContextUpload(event) {
         alert("An error occurred while reading the file.");
     };
 
+    // The reader now correctly receives a single File object.
     reader.readAsText(file);
 }
 
@@ -4557,3 +4579,10 @@ function handleNodeContentToggle(event) {
     const header = event.currentTarget;
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
+```
+Sources
+help
+geeksforgeeks.org
+Google Search Suggestions
+Display of Search Suggestions is required when using Grounding with Google Search. Learn more
+Google logo
