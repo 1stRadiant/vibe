@@ -14,22 +14,21 @@
     <!-- The new main layout that is always visible -->
     <div class="main-layout">
         <div class="tabs">
-            <button class="tab-button active" data-tab="start">Start</button> <!-- New "Start" tab, active by default -->
-            <button class="tab-button" data-tab="preview">Live Preview</button>
-            <button class="tab-button" data-tab="editor">Vibe Editor</button>
-            <button class="tab-button" data-tab="agent">Agent</button>
-            <button class="tab-button" data-tab="chat">Chat</button>
-            <button class="tab-button" data-tab="flowchart">Flowchart</button>
-            <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
-            <button class="tab-button" data-tab="files">Files</button>
-            <!-- NEW: Context Tab Button -->
-            <button class="tab-button" data-tab="context">Context</button>
-            <button class="tab-button" data-tab="code">Full Code</button>
+            <button class="tab-button active" data-tab="start" title="Start">🏠</button>
+            <button class="tab-button" data-tab="preview" title="Live Preview">👁️</button>
+            <button class="tab-button" data-tab="editor" title="Vibe Editor">📝</button>
+            <button class="tab-button" data-tab="agent" title="Agent">🤖</button>
+            <button class="tab-button" data-tab="chat" title="Chat">💬</button>
+            <button class="tab-button" data-tab="flowchart" title="Flowchart">📊</button>
+            <button class="tab-button" data-tab="console" title="Console">💻<span id="console-error-indicator"></span></button>
+            <button class="tab-button" data-tab="files" title="Files">📁</button>
+            <button class="tab-button" data-tab="context" title="Context">📚</button>
+            <button class="tab-button" data-tab="code" title="Full Code">&lt;/&gt;</button>
 
             <!-- New: Undo/Redo toolbar buttons -->
             <div class="tabs-spacer"></div>
             <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
-            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
+            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl/Y or Shift+Ctrl/Cmd+Z)">↷</button>
 
             <button id="new-project-button" title="New Project">+</button>
         </div>
