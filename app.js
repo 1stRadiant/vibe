@@ -3778,12 +3778,13 @@ function handleUploadContextTrigger() {
  */
 async function processContextUpload(event) {
     // --- START OF FIX ---
-    // The code must get the first file from the FileList object.
-    const file = event.target.files;
-    if (!file) {
-        // This case handles the user closing the file dialog without selecting a file.
-        return;
+    // The previous fix was incorrect. The code must get the first file from the
+    // event.target.files (a FileList object) to pass to the FileReader.
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+        return; // User cancelled the file dialog
     }
+    const file = files;
     // --- END OF FIX ---
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
