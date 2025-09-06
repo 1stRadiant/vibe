@@ -3788,7 +3788,7 @@ async function processContextUpload(event) {
     }
 
     // Get the first file from the list. This is the correct object to pass to FileReader.
-    const file = files;
+    const file = files[0];
     // --- END OF FIX ---
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
