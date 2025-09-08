@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>paRoad</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="assets/css/page-styles.css">
+</head>
+<body>
+
+<header><div class="header-left"><button id="hamburger-menu-btn" class="hamburger-menu-btn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+<h1>paRoad</h1>
+</div>
+</header>
+<div id="side-menu" class="side-menu"><a href="#" class="menu-item active" data-tab="plan-tab">Plan Route</a>
+<a href="#" class="menu-item" data-tab="stops-tab">Stops List</a>
+<a href="#" class="menu-item" data-tab="route-tab">Live Route</a>
+<a href="#" class="menu-item" data-tab="ai-tab">AI Assistant</a>
+<a href="#" class="menu-item" data-tab="options-tab">Options</a>
+<a href="#" id="toggle-map-menu-item" class="menu-item">Show Map</a>
+</div>
+<aside><div class="tab-nav">
+            <button class="tab-button active" data-tab="plan-tab">Plan Route</button>
+            <button class="tab-button" data-tab="stops-tab">Stops List</button>
+            <button class="tab-button" data-tab="route-tab">Live Route</button>
+            <button class="tab-button" data-tab="ai-tab">AI Assistant</button>
+            <button class="tab-button" data-tab="options-tab">Options</button>
+            <button class="tab-button" id="toggle-map">Show Map</button>
+        </div>
+<div class="tab-content"><div id="plan-tab" class="tab-pane active"><div class="input-group">
+                    <label for="start-location">Start Location (will be updated on calculation)</label>
+                    <input type="text" id="start-location" placeholder="Type address or postcode..." autocomplete="off">
+                    <div id="start-suggestions" class="suggestions" style="display: none;"></div>
+                    <div id="location-status" class="location-status">Requesting location permission...</div>
+                    <button id="request-location" class="location-permission-btn" style="display: none;">Allow Location Access</button>
+                </div>
+<div class="input-group">
+                    <label for="delivery-location">Add Delivery Stop</label>
+                    <input type="text" id="delivery-location" placeholder="Type address or postcode..." autocomplete="off">
+                    <div id="delivery-suggestions" class="suggestions" style="display: none;"></div>
+                    <label for="stop-notes">Notes (optional)</label>
+                    <textarea id="stop-notes" placeholder="Add notes about this stop..."></textarea>
+                    <button id="add-stop" disabled="">Add Stop</button>
+                </div>
+<div class="postcode-search">
+                    <h3>Postcode Address Search</h3>
+                    <div class="input-group">
+                        <label for="postcode-search">Enter Full Postcode</label>
+                        <input type="text" id="postcode-search" placeholder="e.g. SO16 0AS">
+                        <div class="postcode-buttons">
+                            <button id="search-postcode">Find Addresses</button>
+                            <button id="scan-postcode-btn">Scan Postcode</button>
+                        </div>
+                    </div>
+                    <div id="address-results" class="address-results" style="display: none;"></div>
+                </div>
+<div class="route-options">
+                    <h3>Route Optimization</h3>
+                    <div class="route-option">
+                        <input type="radio" id="optimize-distance" name="route-optimization" value="closest-to-start">
+                        <label for="optimize-distance">Closest to Start</label>
+                    </div>
+                    <div class="route-option">
+                        <input type="radio" id="optimize-time" name="route-optimization" value="time" checked="">
+                        <label for="optimize-time">Fastest Path (TSP)</label>
+                    </div>
+                    <div class="route-option">
+                        <input type="radio" id="optimize-fuel" name="route-optimization" value="fuel">
+                        <label for="optimize-fuel">Fuel Saving</label>
+                    </div>
+                    <div class="route-option">
+                        <input type="radio" id="optimize-cluster" name="route-optimization" value="cluster">
+                        <label for="optimize-cluster">Local Clusters First</label>
+                    </div>
+                    <div class="route-option">
+                        <input type="radio" id="round-trip" name="route-optimization" value="roundtrip">
+                        <label for="round-trip">Round Trip (return to start)</label>
+                    </div>
+                </div>
+<div class="route-constraints">
+                    <h3>Route Constraints</h3>
+                    <div class="input-group">
+                        <label for="start-stop-select">Start at stop</label>
+                        <select id="start-stop-select">
+                            <option value="">Automatic</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="end-stop-select">Finish at stop</label>
+                        <select id="end-stop-select">
+                            <option value="">Automatic</option>
+                        </select>
+                    </div>
+                </div>
+<div class="action-buttons">
+                    <button id="calculate-route" disabled="">Calculate Route</button>
+                </div>
+<div class="action-buttons" style="margin-top: 10px;">
+                    <button id="view-live-route-btn" style="grid-column: 1 / -1;" disabled="">View Live Route</button>
+                </div>
+</div>
+<div id="stops-tab" class="tab-pane">
+                <div class="delivery-stops">
+                    <h3>Delivery Stops (<span id="stop-count">0</span>)</h3>
+                    <div class="stop-list-container">
+                        <ul id="stop-list" class="stop-list"></ul>
+                    </div>
+                </div>
+            </div>
+<div id="route-tab" class="tab-pane"><div class="action-buttons" style="margin-bottom: 15px; grid-template-columns: 1fr;">
+                    <button id="recalculate-route-live">Recalculate Route From Current Location</button>
+                </div>
+<div class="input-group">
+                    <label for="search-live-route">Search Stops</label>
+                    <input type="text" id="search-live-route" placeholder="Search by address, notes, etc...">
+                </div>
+<div id="route-summary" class="route-summary">
+                    <h3>Route Summary</h3>
+                    <p id="route-details"></p>
+                    <ol id="route-sequence"></ol>
+                </div>
+</div>
+<div id="ai-tab" class="tab-pane"><div class="ai-chat-header">
+                    <h3><span class="ai-chat-icon">🤖</span> Delivery Assistant</h3>
+                </div>
+<div class="ai-chat-body" id="ai-chat-body">
+                    <div class="ai-message assistant">
+                        Hello! I'm your delivery assistant. I can help with:
+                        <ul>
+                            <li>Optimal van loading</li>
+                            <li>Route reminders</li>
+                            <li>Parcel placement advice</li>
+                        </ul>
+                        Ask me anything about your route!
+                    </div>
+                </div>
+<div class="ai-chat-quick-actions" id="ai-quick-actions">
+                    <button class="ai-chat-quick-action" data-prompt="How should I load my van?">Loading advice</button>
+                    <button class="ai-chat-quick-action" data-prompt="Any important reminders?">Check reminders</button>
+                    <button class="ai-chat-quick-action" data-prompt="Tell me about my next stop">Next stop info</button>
+                    <button class="ai-chat-quick-action" id="ai-settings-btn">Settings</button>
+                </div>
+<div class="ai-chat-input-container">
+                    <input type="text" class="ai-chat-input" id="ai-chat-input" placeholder="Type your question...">
+                    <button class="ai-chat-send" id="ai-chat-send">→</button>
+                </div>
+</div>
+<div id="options-tab" class="tab-pane"><div class="input-group">
+                    <label>Google Maps API Key</label>
+                    <div class="api-key-container">
+                        <input type="password" id="api-key-input" placeholder="Enter Google Maps API Key">
+                        <button id="save-api-key">Save Key</button>
+                        <span id="api-key-status" class="api-key-status not-set">Not set</span>
+                    </div>
+                </div>
+<div class="action-buttons">
+                    <button id="clear-all" class="clear-btn">Clear All</button>
+                </div>
+</div>
+</div>
+</aside>
+<div id="map"></div>
+<button class="close-map-btn" id="close-map">×</button>
+<div id="notification-permission-banner" class="notification-permission-banner">
+        <p>Enable notifications to get updates on your next stop directly on your device.</p>
+        <button id="enable-notifications">Enable Notifications</button>
+        <button id="dismiss-notifications" class="dismiss">Dismiss</button>
+    </div>
+<div id="note-modal" class="note-modal"><div class="note-modal-content">
+            <div class="note-modal-header">
+                <h3 id="note-modal-title">Stop Notes</h3>
+                <span class="note-modal-close">×</span>
+            </div>
+            <textarea id="note-modal-text" class="note-textarea" placeholder="Enter notes about this stop..."></textarea>
+            <div class="note-modal-footer">
+                <button id="cancel-note" class="clear-btn">Cancel</button>
+                <button id="save-note">Save</button>
+            </div>
+        </div>
+</div>
+<button class="ai-chat-toggle" id="ai-chat-toggle" style="display: none;">
+        <span class="ai-chat-toggle-icon">🤖</span>
+        <span class="ai-chat-toggle-badge" id="ai-notification-badge" style="display: none;">!</span>
+    </button>
+<div class="ai-chat-container" id="ai-chat-container" style="display: none;">
+        <div class="ai-chat-header" id="ai-chat-header">
+            <h3><span class="ai-chat-icon">🤖</span> Delivery Assistant</h3>
+            <button class="ai-chat-close" id="ai-chat-close">×</button>
+        </div>
+        <div class="ai-chat-body" id="ai-chat-body-old">
+            <!-- Content moved to ai-tab -->
+        </div>
+        <div class="ai-chat-quick-actions" id="ai-quick-actions-old">
+            <!-- Content moved to ai-tab -->
+        </div>
+        <div class="ai-chat-input-container" id="ai-chat-input-container-old">
+            <!-- Content moved to ai-tab -->
+        </div>
+    </div>
+<div id="ai-settings-modal" class="ai-settings-modal"><div class="ai-settings-content">
+            <div class="ai-settings-header">
+                <h3>AI Assistant Settings</h3>
+                <span class="ai-settings-close">×</span>
+            </div>
+            <div>
+                <h4>Train AI with Past Routes</h4>
+                <p style="font-size: 0.8em; color: #666; margin-top: -10px;">Provide data about past routes to improve AI suggestions. The AI will learn patterns from this data.</p>
+                <textarea id="ai-training-data" class="ai-training-data" placeholder="Paste past route data here (format: Address1, Notes1; Address2, Notes2; ...)"></textarea>
+                <button id="train-ai">Train AI with This Data</button>
+            </div>
+            <div class="scanner-input">
+                <h4>Parcel Scanner</h4>
+                <input type="text" id="parcel-scan" placeholder="Scan or enter parcel barcode...">
+                <button id="scan-parcel">Find Parcel Info</button>
+            </div>
+            <div class="ai-settings-footer">
+                <button id="close-ai-settings" class="clear-btn">Close</button>
+            </div>
+        </div>
+</div>
+<div id="postcode-scanner-modal" class="scanner-modal"><div class="scanner-modal-content">
+            <div class="scanner-modal-header">
+                <h3>Scan Postcode</h3>
+                <span id="scanner-modal-close" class="scanner-modal-close">×</span>
+            </div>
+            <div class="scanner-body">
+                <video id="scanner-video" playsinline=""></video>
+                <canvas id="scanner-canvas" style="display: none;"></canvas>
+                <div id="scanner-overlay">
+                    <div class="scanner-box"></div>
+                    <p class="scanner-instructions">Position the postcode inside the box</p>
+                </div>
+            </div>
+            <div id="scanner-result-container" style="display: none;">
+                <p>Found postcode: <strong id="scanned-postcode-result"></strong></p>
+                <button id="confirm-postcode-btn">Use this postcode</button>
+                <button id="retry-scan-btn" class="clear-btn">Scan Again</button>
+            </div>
+            <div class="scanner-modal-footer">
+                <p id="scanner-status">Starting camera...</p>
+            </div>
+        </div>
+</div>
+
+    
+    <script src="assets/js/global-variables-and-initialization.js"></script>
+    <script src="assets/js/function-handle-location-input.js"></script>
+    <script src="assets/js/function-display-suggestions.js"></script>
+    <script src="assets/js/function-debounce.js"></script>
+    <script src="assets/js/function-toggle-side-menu.js"></script>
+    <script src="assets/js/function-get-updated-current-location.js"></script>
+    <script src="assets/js/function-toggle-map-visibility.js"></script>
+    <script src="assets/js/function-check-location-permission.js"></script>
+    <script src="assets/js/function-update-permission-ui.js"></script>
+    <script src="assets/js/function-get-current-location.js"></script>
+    <script src="assets/js/function-init.js"></script>
+    <script src="assets/js/function-check-notification-permission.js"></script>
+    <script src="assets/js/function-request-notification-permission.js"></script>
+    <script src="assets/js/function-show-current-stop-notification.js"></script>
+    <script src="assets/js/function-toggle-ai-chat.js"></script>
+    <script src="assets/js/function-update-ai-notification-badge.js"></script>
+    <script src="assets/js/function-add-ai-message.js"></script>
+    <script src="assets/js/function-send-ai-message.js"></script>
+    <script src="assets/js/function-open-ai-settings.js"></script>
+    <script src="assets/js/function-close-ai-settings.js"></script>
+    <script src="assets/js/function-train-ai-with-data.js"></script>
+    <script src="assets/js/function-call-websim-ai.js"></script>
+    <script src="assets/js/function-get-loading-advice.js"></script>
+    <script src="assets/js/function-get-reminders.js"></script>
+    <script src="assets/js/function-get-next-stop-info.js"></script>
+    <script src="assets/js/function-handle-parcel-scan.js"></script>
+    <script src="assets/js/function-get-route-info-for-ai.js"></script>
+    <script src="assets/js/function-open-note-modal.js"></script>
+    <script src="assets/js/function-close-note-modal.js"></script>
+    <script src="assets/js/function-save-note.js"></script>
+    <script src="assets/js/function-request-location-permission.js"></script>
+    <script src="assets/js/function-save-state.js"></script>
+    <script src="assets/js/function-load-saved-state.js"></script>
+    <script src="assets/js/function-search-postcode-for-results.js"></script>
+    <script src="assets/js/function-display-postcode-results.js"></script>
+    <script src="assets/js/function-add-delivery-stop.js"></script>
+    <script src="assets/js/function-remove-delivery-stop.js"></script>
+    <script src="assets/js/function-toggle-stop-completion.js"></script>
+    <script src="assets/js/function-update-delivery-stops-ui.js"></script>
+    <script src="assets/js/function-optimize-route.js"></script>
+    <script src="assets/js/function-two-opt-refinement.js"></script>
+    <script src="assets/js/function-optimize-by-clustering.js"></script>
+    <script src="assets/js/function-calculate-distance.js"></script>
+    <script src="assets/js/function-calculate-route.js"></script>
+    <script src="assets/js/function-update-route-summary-ui.js"></script>
+    <script src="assets/js/function-calculate-total-distance.js"></script>
+    <script src="assets/js/function-clear-route-visualization.js"></script>
+    <script src="assets/js/function-update-map-markers.js"></script>
+    <script src="assets/js/function-draw-route-lines.js"></script>
+    <script src="assets/js/function-switch-tab.js"></script>
+    <script src="assets/js/function-update-current-stop-index.js"></script>
+    <script src="assets/js/function-update-all-uis.js"></script>
+    <script src="assets/js/function-update-view-live-route-button.js"></script>
+    <script src="assets/js/function-update-calculate-route-button.js"></script>
+    <script src="assets/js/function-clear-all.js"></script>
+    <script src="assets/js/function-handle-live-route-search.js"></script>
+    <script src="assets/js/function-update-stop-constraint-dropdowns.js"></script>
+    <script src="assets/js/function-start-postcode-scanner.js"></script>
+    <script src="assets/js/function-stop-postcode-scanner.js"></script>
+    <script src="assets/js/function-start-scan-interval.js"></script>
+    <script src="assets/js/function-scan-frame-for-postcode.js"></script>
+    <script src="assets/js/function-load-google-maps-sdk.js"></script>
+    <script src="assets/js/function-initialize-google-services.js"></script>
+    <script src="assets/js/function-update-api-key-status.js"></script>
+    <script src="assets/js/function-save-api-key.js"></script>
+</body>
+</html>
