@@ -490,7 +490,57 @@ button.delete-project-button:hover {
     flex: 1;
     min-width: 350px;
     max-height: none; /* Let parent handle height */
-    overflow-y: auto; /* Change to auto to allow this pane to scroll */
+}
+
+/* NEW: Editor Header Styles */
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.editor-header-left p {
+    margin: 0;
+    color: #abb2bf;
+    font-size: 0.9em;
+}
+
+.editor-header-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#ai-editor-search-container {
+    display: flex;
+    gap: 8px;
+}
+
+#ai-editor-search-input {
+    background-color: #21252b;
+    border: 1px solid #444;
+    color: #f0f0f0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: 'Inter', sans-serif;
+    width: 250px; /* Or adjust as needed */
+}
+
+#ai-editor-search-input:focus {
+    outline: none;
+    border-color: #c678dd;
+}
+
+#ai-editor-search-button {
+    background-color: #c678dd;
+    color: #1a1a1a;
+}
+
+#vibe-editor {
+    overflow-y: auto; /* Allow this pane to scroll */
 }
 
 .preview-header {
@@ -1312,16 +1362,22 @@ button.update-button:disabled {
     border-radius: 6px;
     margin-bottom: 10px;
     padding: 15px;
-    transition: box-shadow 0.2s;
+    transition: box-shadow 0.2s, border-color 0.3s;
 }
 
 .vibe-node:hover {
-    box-shadow: 0 0 8px rgba(97, 175, 239, 0.3);
+    border-color: #5c6370;
+}
+
+/* NEW: Style for AI Search results */
+.vibe-node.ai-search-highlight {
+    border-color: #c678dd;
+    box-shadow: 0 0 12px rgba(198, 120, 221, 0.5);
 }
 
 .vibe-node-header {
     display: flex;
-    //justify-content: space-between;
+    /* justify-content: space-between; */
     align-items: center;
     margin-bottom: 10px;
     font-family: 'Roboto Mono', monospace;
