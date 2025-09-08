@@ -86,11 +86,18 @@
 
             <div id="editor" class="tab-content">
                  <div class="editor-container">
-                    <h2>Vibe Editor</h2>
-                    <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
-                    
-                    <div class="settings-trigger-container">
-                        <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                    <div class="editor-header">
+                        <div class="editor-header-left">
+                            <h2>Vibe Editor</h2>
+                            <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
+                        </div>
+                        <div class="editor-header-right">
+                             <div id="ai-editor-search-container">
+                                <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                <button id="ai-editor-search-button" class="action-button">Search</button>
+                            </div>
+                            <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                        </div>
                     </div>
 
                     <div id="vibe-editor">
