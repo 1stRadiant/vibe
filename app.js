@@ -79,6 +79,10 @@ const findNextButton = document.getElementById('find-next-button');
 const findPrevButton = document.getElementById('find-prev-button');
 const searchResultsCount = document.getElementById('search-results-count');
 
+// NEW: AI Editor Search elements
+const aiEditorSearchInput = document.getElementById('ai-editor-search-input');
+const aiEditorSearchButton = document.getElementById('ai-editor-search-button');
+
 // File upload elements
 const htmlFileInput = document.getElementById('html-file-input');
 const uploadHtmlButton = document.getElementById('upload-html-button');
@@ -511,6 +515,7 @@ function updateFeatureAvailability() {
     uploadHtmlButton.disabled = !keyIsAvailable;
     generateFlowchartButton.disabled = !keyIsAvailable;
     generateProjectButton.disabled = !keyIsAvailable;
+    aiEditorSearchButton.disabled = !keyIsAvailable; // NEW: Control AI editor search availability
     // The "Fix with AI" buttons are generated dynamically, so we can't disable them here.
     // Instead, we check for the key when the button is created.
 }
@@ -3303,6 +3308,101 @@ function handleSearchInput() {
     };
 }
 
+// --- NEW: Vibe Editor AI Search Logic ---
+
+function clearEditorHighlights() {
+    editorContainer.querySelectorAll('.ai-search-highlight').forEach(el => {
+        el.classList.remove('ai-search-highlight');
+    });
+}
+
+async function handleAiEditorSearch() {
+    const query = aiEditorSearchInput.value.trim();
+    
+    // Clear previous results first
+    clearEditorHighlights();
+    
+    if (!query) {
+        return;
+    }
+
+    const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if (!keyIsAvailable) {
+        alert('Please add your API Key in Settings to use AI search.');
+        return;
+    }
+    
+    const originalButtonText = aiEditorSearchButton.innerHTML;
+    aiEditorSearchButton.disabled = true;
+    aiEditorSearchButton.innerHTML = 'Searching... <div class="loading-spinner"></div>';
+    
+    logToConsole(`Performing AI editor search for: "${query}"`, 'info');
+
+    try {
+        const systemPrompt = `You are an intelligent search engine for a JSON-based component tree called a "Vibe Tree". Your task is to find the most relevant nodes based on a user's natural language query. Analyze the entire tree, including node IDs, descriptions, and code snippets.
+
+**OUTPUT FORMAT:** You MUST respond with a single, valid JSON array of strings, where each string is the \`id\` of a relevant node. Do not include any other text, comments, or markdown.
+
+**Example Response:**
+["main-navigation", "function-toggle-mobile-menu"]`;
+        
+        const userPrompt = `Search Query: "${query}"\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
+
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const resultIds = JSON.parse(rawResponse);
+        
+        if (!Array.isArray(resultIds)) {
+            throw new Error("AI did not return a valid array of node IDs.");
+        }
+        
+        logToConsole(`AI search found ${resultIds.length} relevant nodes.`, 'info');
+        
+        if (resultIds.length > 0) {
+            highlightSearchResults(resultIds);
+        } else {
+            alert(`AI search for "${query}" did not find any matching components.`);
+        }
+        
+    } catch (error) {
+        console.error("AI Editor Search failed:", error);
+        logToConsole(`AI search failed: ${error.message}`, 'error');
+        alert(`An error occurred during the AI search: ${error.message}`);
+    } finally {
+        aiEditorSearchButton.disabled = false;
+        aiEditorSearchButton.innerHTML = originalButtonText;
+    }
+}
+
+function highlightSearchResults(nodeIds) {
+    let firstResultEl = null;
+    
+    nodeIds.forEach(id => {
+        const nodeEl = editorContainer.querySelector(`.vibe-node[data-node-id="${id}"]`);
+        if (nodeEl) {
+            nodeEl.classList.add('ai-search-highlight');
+            if (!firstResultEl) {
+                firstResultEl = nodeEl;
+            }
+            // Also expand its parents so it's visible
+            let parent = nodeEl.parentElement;
+            while(parent && parent !== editorContainer) {
+                if (parent.classList.contains('children') && parent.classList.contains('collapsed')) {
+                    const toggleBtn = parent.closest('.vibe-node')?.querySelector('.collapse-toggle');
+                    if (toggleBtn) {
+                        toggleBtn.click(); // Expand the parent
+                    }
+                }
+                parent = parent.parentElement;
+            }
+        }
+    });
+    
+    // Scroll the first result into view
+    if (firstResultEl) {
+        firstResultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
 // --- NEW: Refactored Tab Switching Logic ---
 
 /**
@@ -3799,7 +3899,7 @@ async function processContextUpload(event) {
     }
 
     // Get the first file from the list. This is the correct object to pass to FileReader.
-    const file = files[0];
+    const file = files;
     // --- END OF FIX ---
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
@@ -4279,6 +4379,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchInput) searchInput.addEventListener('input', handleSearchInput());
         if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
         if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
+        if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
+        if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleAiEditorSearch();
+        });
         if (runAgentButton) runAgentButton.addEventListener('click', handleRunAgent);
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
