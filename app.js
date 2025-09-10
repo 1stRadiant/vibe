@@ -685,8 +685,8 @@ async function handleSaveCode(event) {
         return;
     }
 
-    // Record state before change
-    recordHistory(`Save code for ${nodeId}`);
+    // Record state before change - REMOVED
+    // recordHistory(`Save code for ${nodeId}`);
 
     node.code = newCode;
     logToConsole(`Code for node '${nodeId}' was manually saved.`, 'info');
@@ -719,8 +719,8 @@ async function handleUpdate(event) {
     }
     if (node.description === newDescription && node.type !== 'container' && node.type !== 'head') return;
 
-    // Record state before change
-    recordHistory(`Update description for ${nodeId}`);
+    // Record state before change - REMOVED
+    // recordHistory(`Update description for ${nodeId}`);
 
     button.disabled = true;
     button.innerHTML = 'Updating... <div class="loading-spinner"></div>';
@@ -1520,7 +1520,7 @@ async function processCodeAndRefreshUI(fullCode) {
     logToConsole(`Processing full code to update vibe tree.`, 'info');
     
     try {
-        recordHistory('Process full code (replace tree)');
+        // recordHistory('Process full code (replace tree)'); - REMOVED
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode);
         vibeTree = newVibeTree;
         refreshAllUI();
@@ -2812,7 +2812,7 @@ async function rebuildAndRefreshFromFiles() {
         const combinedHtml = await buildCombinedHtmlFromDb(currentProjectId);
         
         // 2. Decompose this combined HTML back into a Vibe Tree structure.
-        recordHistory('Rebuild tree from file change');
+        // recordHistory('Rebuild tree from file change'); - REMOVED
         const newVibeTree = await decomposeCodeIntoVibeTree(combinedHtml);
 
         // 3. Update the global Vibe Tree in memory.
@@ -2949,7 +2949,7 @@ async function handleCreateNode() {
         return;
     }
 
-    recordHistory(`Create node ${newNodeId}`);
+    // recordHistory(`Create node ${newNodeId}`); - REMOVED
 
     if (!parentNode.children) parentNode.children = [];
 
@@ -3037,11 +3037,11 @@ function handleSaveEditedNode() {
     (async () => {
         try {
             if (codeChanged) {
-                recordHistory(`Edit code in modal for ${nodeId}`);
+                // recordHistory(`Edit code in modal for ${nodeId}`); - REMOVED
                 node.code = newCode;
             }
             if (descChanged) {
-                if (!codeChanged) recordHistory(`Edit description in modal for ${nodeId}`);
+                // if (!codeChanged) recordHistory(`Edit description in modal for ${nodeId}`); - REMOVED
                 await updateNodeByDescription(nodeId, newDescription, saveBtn);
             } else {
                 refreshAllUI();
@@ -3089,7 +3089,7 @@ function deleteNode(nodeId) {
     }
     
     if (confirm(`Are you sure you want to delete the element "${nodeId}"?`)) {
-        recordHistory(`Delete node ${nodeId}`);
+        // recordHistory(`Delete node ${nodeId}`); - REMOVED
         const { node, parent } = result;
         const index = parent.children.indexOf(node);
         if (index > -1) {
@@ -3124,7 +3124,7 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         current = result ? result.parent : null;
     }
 
-    recordHistory(`Move node ${sourceNodeId}`);
+    // recordHistory(`Move node ${sourceNodeId}`); - REMOVED
 
     // Remove source from its original location
     const sourceIndex = sourceParent.children.indexOf(sourceNode);
@@ -4471,7 +4471,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
     const node = findNodeById(nodeId);
     if (!node) throw new Error(`Node not found: ${nodeId}`);
 
-    recordHistory(`Edit description for ${nodeId} (modal)`);
+    // recordHistory(`Edit description for ${nodeId} (modal)`); - REMOVED
     node.description = newDescription;
 
     let originalHtml = '';
