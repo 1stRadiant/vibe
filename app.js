@@ -1166,11 +1166,27 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     
     try {
         let jsonResponse = rawResponse.trim();
-        // The AI might wrap the response in markdown. Let's strip it.
+        
+        // --- START OF FIX ---
+        // The AI can sometimes return conversational text or markdown around the JSON.
+        // This logic is more robust at extracting just the JSON array.
+
+        // 1. Try to find a markdown-fenced JSON block first.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
         if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2];
+            jsonResponse = jsonMatch[2].trim();
         }
+
+        // 2. If no fence is found, or if the result is still not valid,
+        // find the first '[' and last ']' to isolate the array. This handles
+        // cases where the AI adds text before or after the JSON.
+        const startIndex = jsonResponse.indexOf('[');
+        const endIndex = jsonResponse.lastIndexOf(']');
+
+        if (startIndex !== -1 && endIndex > startIndex) {
+            jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
+        }
+        // --- END OF FIX ---
 
         const childrenArray = JSON.parse(jsonResponse);
         if (!Array.isArray(childrenArray)) {
