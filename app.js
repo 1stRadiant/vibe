@@ -3887,19 +3887,22 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
+/**
+ * Processes the uploaded component library file.
+ * @param {Event} event - The file input change event.
+ */
 async function processContextUpload(event) {
-    // --- START OF FIX ---
-    // Get the FileList from the input event.
     const files = event.target.files;
 
-    // Check if the user selected any files.
     if (!files || files.length === 0) {
         logToConsole("No file selected for context upload.", "info");
         return;
     }
 
-    // Get the first file from the list. This is the correct object to pass to FileReader.
-    const file = files;
+    // --- START OF FIX ---
+    // The 'files' variable is a FileList. We need to get the first File object from it.
+    // The original code incorrectly passed the entire FileList object to the reader.
+    const file = files[0];
     // --- END OF FIX ---
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
