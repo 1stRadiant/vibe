@@ -107,8 +107,17 @@ const nscaleApiKeyStatus = document.getElementById('nscale-api-key-status');
 
 // Agent elements
 const agentPromptInput = document.getElementById('agent-prompt-input');
-const runAgentButton = document.getElementById('run-agent-button');
+const runAgentSingleTaskButton = document.getElementById('run-agent-single-task-button'); // Renamed
+const startIterativeSessionButton = document.getElementById('start-iterative-session-button'); // New
 const agentOutput = document.getElementById('agent-output');
+
+// New Iterative Session elements
+const iterativeSessionUI = document.getElementById('iterative-session-ui');
+const iterativePlanDisplay = document.getElementById('iterative-plan-display');
+const iterativeControls = document.getElementById('iterative-controls');
+const acceptContinueButton = document.getElementById('accept-continue-button');
+const requestChangesButton = document.getElementById('request-changes-button');
+const endSessionButton = document.getElementById('end-session-button');
 
 // Chat tab elements
 const chatSystemPromptInput = document.getElementById('chat-system-prompt-input');
@@ -342,6 +351,14 @@ let currentProjectId = null;
 let agentConversationHistory = [];
 let chatConversationHistory = [];
 
+// NEW: State for iterative agent sessions
+let iterativeSessionState = {
+    isActive: false,
+    overallGoal: '',
+    plan: [],
+    currentStepIndex: -1,
+    history: []
+};
 
 // --- AI Configuration ---
 let currentAIProvider = 'gemini'; // 'gemini' or 'nscale'
@@ -509,7 +526,8 @@ function updateFeatureAvailability() {
     document.querySelectorAll('.update-button').forEach(button => {
         button.disabled = !keyIsAvailable;
     });
-    runAgentButton.disabled = !keyIsAvailable;
+    runAgentSingleTaskButton.disabled = !keyIsAvailable;
+    startIterativeSessionButton.disabled = !keyIsAvailable;
     sendChatButton.disabled = !keyIsAvailable;
     updateTreeFromCodeButton.disabled = !keyIsAvailable;
     uploadHtmlButton.disabled = !keyIsAvailable;
@@ -871,10 +889,6 @@ function getComponentContextForAI() {
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     console.info('--- Calling AI ---');
     
-    // --- START OF FIX ---
-    // The previous implementation only sent a list of file *names*.
-    // This new logic reads the *content* of all text-based files in the current project
-    // and prepends it to the user's prompt, giving the AI full context for editing.
     let fileContext = '';
     if (currentProjectId) {
         try {
@@ -883,7 +897,6 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
                 const textFiles = [];
                 for (const path of files) {
                     const meta = db.getFileMeta(currentProjectId, path);
-                    // Only include files that are not binary.
                     if (meta && !meta.isBinary) {
                         const content = await db.readTextFile(currentProjectId, path);
                         textFiles.push(`--- FILE: ${path} ---\n\`\`\`\n${content}\n\`\`\``);
@@ -897,12 +910,9 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
             console.warn("Failed to build file context for AI:", e);
         }
     }
-    // --- END OF FIX ---
 
-    // NEW: Get component context and augment the system prompt
     const componentContext = getComponentContextForAI();
     const augmentedSystemPrompt = systemPrompt + componentContext;
-    // Prepend the new file context to the user's actual prompt.
     const augmentedUserPrompt = fileContext + userPrompt;
 
     logToConsole('Sending request to AI model...', 'info');
@@ -925,7 +935,6 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
     }
 
     const model = geminiModelSelect.value;
-    // Use the streaming endpoint if a callback is provided
     const useStreaming = typeof streamCallback === 'function';
     const endpoint = useStreaming 
         ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}`
@@ -944,7 +953,7 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         generationConfig: {}
     };
 
-    if (forJson && !useStreaming) { // Streaming with JSON response type is not standard
+    if (forJson && !useStreaming) {
         requestBody.generationConfig.responseMimeType = "application/json";
     }
 
@@ -969,11 +978,10 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
             let fullResponseText = '';
             let buffer = '';
 
-            // This function processes a complete or partial chunk of streamed data
             const processChunk = (chunk) => {
                 if (chunk.trim().startsWith('"text":')) {
                     try {
-                        const jsonChunk = `{${chunk}}`; // Make it valid JSON
+                        const jsonChunk = `{${chunk}}`;
                         const parsed = JSON.parse(jsonChunk);
                         const textChunk = parsed.text;
                         fullResponseText += textChunk;
@@ -987,14 +995,12 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) {
-                    // Process any remaining data in the buffer when the stream is finished
                     processChunk(buffer);
                     break;
                 }
 
                 buffer += decoder.decode(value, { stream: true });
                 
-                // Process buffer line by line, as streaming responses are chunked
                 let boundary = buffer.indexOf('\n');
                 while (boundary !== -1) {
                     const line = buffer.substring(0, boundary).trim();
@@ -1009,15 +1015,10 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
             return fullResponseText;
         }
 
-        // --- START OF FIX ---
-        // Non-streaming path
         const data = await response.json();
         console.info('--- Gemini Response Received ---');
-        // NEW: Log the full raw response for easier debugging of strange API returns.
         logDetailed('Raw Gemini Response', JSON.stringify(data, null, 2));
 
-        // FIX: Add robust checking for API blocks and other non-standard responses.
-        // The API can return a 200 OK but with a block reason instead of content.
         if (!data.candidates || data.candidates.length === 0) {
             if (data.promptFeedback && data.promptFeedback.blockReason) {
                 const reason = data.promptFeedback.blockReason;
@@ -1029,15 +1030,12 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
                 }
                 throw new Error(`Gemini API request was blocked due to safety settings. Reason: ${reason}. Details: ${details}`);
             }
-             // If there are no candidates and no block reason, the response is invalid.
              throw new Error('Invalid response from Gemini API: The response contained no valid candidates.');
         }
 
         const candidate = data.candidates[0];
 
-        // Also check for a block reason on the candidate itself.
         if (candidate.finishReason && candidate.finishReason !== "STOP") {
-            // "SAFETY" is a common finish reason when content is blocked.
             throw new Error(`Gemini API stopped generating text prematurely. Reason: ${candidate.finishReason}`);
         }
 
@@ -1049,16 +1047,12 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         
         logToConsole('Successfully received response from Gemini.', 'info');
         
-        // On successful call, maybe repopulate the full code view if it's active
         if (document.getElementById('code').classList.contains('active')) {
             showFullCode();
         }
         return content;
-        // --- END OF FIX ---
     } catch(e) {
         console.error("Error calling Gemini AI:", e);
-        // The AI might return a valid JSON but with an error message inside.
-        // Let's try to parse it to provide more context.
         try {
             const errorJson = JSON.parse(e.message);
             if(errorJson.error && errorJson.error.message) {
@@ -1167,26 +1161,17 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     try {
         let jsonResponse = rawResponse.trim();
         
-        // --- START OF FIX ---
-        // The AI can sometimes return conversational text or markdown around the JSON.
-        // This logic is more robust at extracting just the JSON array.
-
-        // 1. Try to find a markdown-fenced JSON block first.
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
         if (jsonMatch && jsonMatch[2]) {
             jsonResponse = jsonMatch[2].trim();
         }
 
-        // 2. If no fence is found, or if the result is still not valid,
-        // find the first '[' and last ']' to isolate the array. This handles
-        // cases where the AI adds text before or after the JSON.
         const startIndex = jsonResponse.indexOf('[');
         const endIndex = jsonResponse.lastIndexOf(']');
 
         if (startIndex !== -1 && endIndex > startIndex) {
             jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
         }
-        // --- END OF FIX ---
 
         const childrenArray = JSON.parse(jsonResponse);
         if (!Array.isArray(childrenArray)) {
@@ -1528,6 +1513,7 @@ async function processCodeAndRefreshUI(fullCode) {
     const buttonsToDisable = [updateTreeFromCodeButton, uploadHtmlButton];
     const originalButtonTexts = new Map();
     buttonsToDisable.forEach(b => {
+        if (!b) return;
         originalButtonTexts.set(b, b.innerHTML);
         b.disabled = true;
         b.innerHTML = 'Processing... <div class="loading-spinner"></div>';
@@ -1550,6 +1536,7 @@ async function processCodeAndRefreshUI(fullCode) {
         alert(`An error occurred during processing: ${error.message}. Check the console for details.`);
     } finally {
         buttonsToDisable.forEach(b => {
+            if (!b) return;
             b.disabled = false;
             b.innerHTML = originalButtonTexts.get(b);
         });
@@ -1982,10 +1969,6 @@ function nodeIdToFileName(id, ext) {
  * Assemble a multi-file project bundle from the current vibe tree.
  * Returns an object { files: Map<path,string>, indexHtml: string }
  */
-/**
- * Assemble a multi-file project bundle from the current vibe tree.
- * Returns an object { files: Map<path,string>, indexHtml: string }
- */
 function assembleMultiFileBundle(tree = vibeTree) {
     const headContent = getHeadContentFromTree(tree);
     const bodyContent = buildHtmlBodyFromTree(tree);
@@ -2009,18 +1992,15 @@ ${bodyContent}
 </body>
 </html>`;
 
-    // Build files map, starting with the freshly generated content
     const files = new Map();
     files.set('index.html', indexHtml);
     files.set('project.json', JSON.stringify(tree, null, 2));
 
-    // Add CSS files
     cssNodes.forEach(n => {
         const path = `assets/css/${nodeIdToFileName(n.id, 'css')}`;
         files.set(path, (n.code || '').trim() + '\n');
     });
 
-    // Add JS files (wrap in IIFE to mirror preview execution environment)
     jsNodes.forEach(n => {
         const path = `assets/js/${nodeIdToFileName(n.id, 'js')}`;
         const code = (n.code || '').trim();
@@ -2028,15 +2008,9 @@ ${bodyContent}
         files.set(path, wrapped);
     });
 
-    // --- START OF FIX ---
-    // Now, include other project assets from the database, but ONLY if they
-    // haven't already been generated from the vibeTree above. This prevents
-    // overwriting new changes with old, stored files.
     try {
         const allDbAssetPaths = db.listFiles(currentProjectId);
         allDbAssetPaths.forEach(p => {
-            // If the file path is NOT in our map of freshly generated files,
-            // then it's an asset (like an image) that we should include.
             if (!files.has(p)) {
                 files.set(p, db.readFileForExport(currentProjectId, p));
             }
@@ -2044,7 +2018,6 @@ ${bodyContent}
     } catch (e) {
         console.warn('Failed adding assets to ZIP:', e);
     }
-    // --- END OF FIX ---
 
     return { files, indexHtml };
 }
@@ -2072,29 +2045,19 @@ async function handleDownloadProjectZip() {
         if (!window.JSZip) {
             throw new Error('JSZip library failed to load.');
         }
-
-        // 1. Get all the individual project files (index.html, CSS, JS, assets).
         const { files } = assembleMultiFileBundle(vibeTree);
         const zip = new JSZip();
 
-        // 2. Add all the individual files to the zip archive.
         for (const [path, content] of files.entries()) {
             zip.file(path, content);
         }
 
-        // --- START OF MODIFICATION ---
-        // 3. Generate the single, self-contained HTML file content.
         const bundledHtmlContent = generateFullCodeString(vibeTree);
-
-        // 4. Add this content as a new file named "bundle.html" to the zip.
         zip.file("bundle.html", bundledHtmlContent);
-        // --- END OF MODIFICATION ---
 
-        // 5. Generate the final ZIP blob and trigger the download.
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         const fnameBase = currentProjectId || 'vibe-project';
         triggerBlobDownload(zipBlob, `${fnameBase}.zip`);
-        
         logToConsole(`Project "${fnameBase}" packaged with a bundled HTML file and downloaded as ZIP.`, 'info');
     } catch (e) {
         console.error('ZIP download failed:', e);
@@ -2102,6 +2065,7 @@ async function handleDownloadProjectZip() {
         alert(`Failed to build ZIP: ${e.message}`);
     }
 }
+
 /**
  * Applies the current vibeTree to the preview iframe with an advanced inspector.
  */
@@ -2443,6 +2407,61 @@ You must respond ONLY with a single, valid JSON object with the following schema
 - The response must be a single, valid JSON object and nothing else.`;
 }
 
+// NEW: System prompt for the iterative planning phase
+function getIterativePlannerSystemPrompt() {
+    return `You are a senior project manager AI. Your task is to break down a user's high-level website goal into a clear, numbered, step-by-step plan. Each step should be a single, concrete, and testable task that a developer can implement.
+
+**RULES:**
+- Analyze the user's request carefully.
+- Create a logical sequence of steps, from setting up the basic structure to adding details and functionality.
+- Respond ONLY with a single, valid JSON object with the following schema. Do not add any other text or markdown.
+{
+  "plan": [
+    "Step 1: A description of the first concrete task.",
+    "Step 2: A description of the next task.",
+    "..."
+  ]
+}`;
+}
+
+// NEW: System prompt for executing a single iterative step
+function getIterativeExecutorSystemPrompt() {
+    return `You are an expert AI developer agent executing a single step of a larger plan. Your task is to generate the necessary actions to implement ONLY the current step.
+
+You will receive the overall goal, the full plan, the current step to execute, and the website's current structure (Vibe Tree).
+
+**OUTPUT:**
+You must respond ONLY with a single, valid JSON object with the following schema. Do not add any other text or markdown.
+{
+  "plan": "A concise, human-readable summary of the changes you are making for THIS STEP ONLY.",
+  "actions": [
+    {
+      "actionType": "update",
+      "nodeId": "the-id-of-the-node-to-change",
+      "newDescription": "An updated description for this node.",
+      "newCode": "The complete, updated code for this component."
+    },
+    {
+      "actionType": "create",
+      "parentId": "the-id-of-the-container-node-for-the-new-component",
+      "newNode": {
+         "id": "new-unique-kebab-case-id",
+         "type": "html" | "css" | "javascript" | "js-function",
+         "description": "A concise description of the new component.",
+         "code": "The full code for the new component.",
+         "selector": "#some-existing-element",
+         "position": "beforeend" | "afterend"
+      }
+    }
+  ]
+}
+
+**RULES:**
+- Focus ONLY on the current step. Do not implement future steps.
+- Analyze the entire vibe tree to understand the context before making changes.
+- The response must be a single, valid JSON object.`;
+}
+
 /**
  * Initiates an AI-powered fix for a given error message.
  * @param {string} errorMessage - The full text of the error, including stack trace.
@@ -2459,8 +2478,8 @@ async function handleFixError(errorMessage, fixButton) {
     
     // Use the agent's UI elements for visual feedback
     agentPromptInput.value = `Fix this error:\n${errorMessage}`;
-    runAgentButton.disabled = true;
-    runAgentButton.innerHTML = 'Agent is fixing... <div class="loading-spinner"></div>';
+    runAgentSingleTaskButton.disabled = true;
+    runAgentSingleTaskButton.innerHTML = 'Agent is fixing... <div class="loading-spinner"></div>';
     agentOutput.innerHTML = ''; // Clear previous logs
     agentConversationHistory = []; // Clear history for a new task
     logToAgent(`<strong>New Task:</strong> Fix a runtime error.`, 'plan');
@@ -2498,8 +2517,8 @@ ${fullTreeString}
         logToAgent(`The AI fix failed: ${error.message}. Check the main console for more details.`, 'error');
         alert(`The AI Agent encountered an error while trying to fix the issue: ${error.message}`);
     } finally {
-        runAgentButton.disabled = !geminiApiKey; // Reset to its normal state based on API key presence
-        runAgentButton.innerHTML = 'Run Agent';
+        runAgentSingleTaskButton.disabled = !(geminiApiKey || nscaleApiKey); // Reset to its normal state
+        runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = ''; // Clear the prompt
     }
 }
@@ -2561,8 +2580,8 @@ async function handleRunAgent() {
     const userPrompt = agentPromptInput.value.trim();
     if (!userPrompt) return;
 
-    runAgentButton.disabled = true;
-    runAgentButton.innerHTML = 'Agent is thinking... <div class="loading-spinner"></div>';
+    runAgentSingleTaskButton.disabled = true;
+    runAgentSingleTaskButton.innerHTML = 'Agent is thinking... <div class="loading-spinner"></div>';
     logToAgent(`<strong>You:</strong> ${userPrompt}`, 'user');
 
     const fullTreeString = JSON.stringify(vibeTree, null, 2);
@@ -2587,10 +2606,211 @@ async function handleRunAgent() {
         alert(`The AI Agent encountered an error: ${error.message}`);
         agentConversationHistory.pop();
     } finally {
-        runAgentButton.disabled = !(geminiApiKey || nscaleApiKey);
-        runAgentButton.innerHTML = 'Run Agent';
+        runAgentSingleTaskButton.disabled = !(geminiApiKey || nscaleApiKey);
+        runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = '';
     }
+}
+
+// --- NEW: Iterative Agent Mode Logic ---
+
+/**
+ * Toggles the visibility of UI elements based on the iterative session state.
+ */
+function updateIterativeUI() {
+    const isActive = iterativeSessionState.isActive;
+    
+    iterativeSessionUI.classList.toggle('hidden', !isActive);
+    runAgentSingleTaskButton.style.display = isActive ? 'none' : 'inline-block';
+    startIterativeSessionButton.style.display = isActive ? 'none' : 'inline-block';
+    
+    agentPromptInput.disabled = isActive;
+    agentPromptInput.placeholder = isActive 
+        ? "Review the preview. Provide feedback here if you select 'Request Changes'." 
+        : "Describe the overall goal for your website...";
+
+    if (isActive) {
+        iterativePlanDisplay.innerHTML = '<ol>' + iterativeSessionState.plan.map((step, index) => 
+            `<li class="${index === iterativeSessionState.currentStepIndex ? 'active-step' : ''}">${step}</li>`
+        ).join('') + '</ol>';
+    } else {
+        iterativePlanDisplay.innerHTML = '';
+    }
+}
+
+/**
+ * Starts a new iterative development session.
+ */
+async function handleStartIterativeSession() {
+    const goal = agentPromptInput.value.trim();
+    if (!goal) {
+        alert("Please describe your overall goal before starting a session.");
+        return;
+    }
+
+    iterativeSessionState = {
+        isActive: true,
+        overallGoal: goal,
+        plan: [],
+        currentStepIndex: 0,
+        history: [{ role: 'user', content: `Overall Goal: ${goal}` }]
+    };
+
+    agentOutput.innerHTML = '';
+    logToAgent(`<strong>Starting Iterative Session.</strong> Goal: ${goal}`, 'plan');
+    logToAgent('Generating a step-by-step plan...', 'info');
+    updateIterativeUI();
+
+    try {
+        const systemPrompt = getIterativePlannerSystemPrompt();
+        const userPrompt = `My website goal is: "${goal}"`;
+        
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const responseJson = JSON.parse(rawResponse);
+        
+        if (!responseJson.plan || !Array.isArray(responseJson.plan)) {
+            throw new Error("AI did not return a valid plan array.");
+        }
+
+        iterativeSessionState.plan = responseJson.plan;
+        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+        
+        logToAgent('<strong>Project Plan Generated:</strong>', 'plan');
+        updateIterativeUI();
+
+        await executeNextIterativeStep();
+
+    } catch (error) {
+        console.error("Failed to start iterative session:", error);
+        logToAgent(`Error during planning phase: ${error.message}`, 'error');
+        handleEndIterativeSession();
+    }
+}
+
+/**
+ * Executes the current step in the iterative plan.
+ */
+async function executeNextIterativeStep() {
+    if (iterativeSessionState.currentStepIndex >= iterativeSessionState.plan.length) {
+        logToAgent('<strong>Project Complete!</strong> All steps have been executed.', 'plan');
+        handleEndIterativeSession();
+        return;
+    }
+
+    iterativeControls.classList.add('hidden');
+    agentPromptInput.disabled = true;
+    agentPromptInput.value = '';
+
+    const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
+    logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}:</strong> ${currentStepDescription}`, 'action');
+    updateIterativeUI();
+
+    try {
+        const systemPrompt = getIterativeExecutorSystemPrompt();
+        const fullTreeString = JSON.stringify(vibeTree, null, 2);
+        const userPrompt = `
+            Overall Goal: "${iterativeSessionState.overallGoal}"
+            Full Plan:
+            ${iterativeSessionState.plan.map((s, i) => `${i+1}. ${s}`).join('\n')}
+            Current Step to Execute: "${currentStepDescription}"
+            Current Vibe Tree:
+            \`\`\`json
+            ${fullTreeString}
+            \`\`\`
+        `;
+
+        iterativeSessionState.history.push({ role: 'user', content: userPrompt });
+
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const agentDecision = JSON.parse(rawResponse);
+
+        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+        
+        executeAgentPlan(agentDecision, logToAgent);
+        
+        logToAgent('Step complete. Please review the preview and provide feedback or continue.', 'info');
+        switchToTab('preview');
+        
+        iterativeControls.classList.remove('hidden');
+        agentPromptInput.disabled = false;
+
+    } catch (error) {
+        console.error(`Error executing step ${iterativeSessionState.currentStepIndex + 1}:`, error);
+        logToAgent(`Failed to execute step: ${error.message}`, 'error');
+        iterativeControls.classList.remove('hidden');
+    }
+}
+
+/**
+ * Handles the user accepting the changes and moving to the next step.
+ */
+function handleAcceptAndContinue() {
+    iterativeSessionState.currentStepIndex++;
+    executeNextIterativeStep();
+}
+
+/**
+ * Handles the user requesting a modification to the last step.
+ */
+async function handleRequestChanges() {
+    const changeRequest = agentPromptInput.value.trim();
+    if (!changeRequest) {
+        alert("Please describe the changes you want in the text box.");
+        return;
+    }
+
+    logToAgent(`<strong>User Feedback:</strong> ${changeRequest}`, 'user');
+    logToAgent('Applying requested changes...', 'info');
+    
+    iterativeControls.classList.add('hidden');
+    agentPromptInput.disabled = true;
+
+    try {
+        const systemPrompt = getIterativeExecutorSystemPrompt();
+        const fullTreeString = JSON.stringify(vibeTree, null, 2);
+        const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
+
+        const userPrompt = `
+            Overall Goal: "${iterativeSessionState.overallGoal}"
+            Current Step: "${currentStepDescription}"
+            Your previous attempt to implement this step was not quite right. Please apply the following correction:
+            **User Feedback:** "${changeRequest}"
+            Generate a new set of actions to update the website according to this feedback.
+            Current Vibe Tree:
+            \`\`\`json
+            ${fullTreeString}
+            \`\`\`
+        `;
+        
+        iterativeSessionState.history.push({ role: 'user', content: userPrompt });
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const agentDecision = JSON.parse(rawResponse);
+        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+
+        executeAgentPlan(agentDecision, logToAgent);
+
+        logToAgent('Changes applied. Please review again.', 'info');
+        switchToTab('preview');
+        
+    } catch (error) {
+        console.error("Failed to apply changes:", error);
+        logToAgent(`Error applying changes: ${error.message}`, 'error');
+    } finally {
+        iterativeControls.classList.remove('hidden');
+        agentPromptInput.disabled = false;
+        agentPromptInput.value = '';
+    }
+}
+
+/**
+ * Resets the state and UI, ending the iterative session.
+ */
+function handleEndIterativeSession() {
+    logToAgent('Iterative session ended.', 'info');
+    iterativeSessionState = { isActive: false, overallGoal: '', plan: [], currentStepIndex: -1, history: [] };
+    updateIterativeUI();
+    iterativeControls.classList.add('hidden');
+    agentPromptInput.value = '';
 }
 
 
@@ -2627,17 +2847,13 @@ function logToChat(message, type = 'model') {
  * @param {HTMLElement} parentElement The element containing the AI's response.
  */
 function processChatCodeBlocks(parentElement) {
-    // First, convert markdown ``` blocks to <pre><code> HTML structure.
     let htmlContent = parentElement.innerHTML;
-    // The regex captures the language fence string (e.g., "html:index.html") and the code.
     htmlContent = htmlContent.replace(/```(\S*)\n([\s\S]*?)```/g, (match, lang, code) => {
         const sanitizedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // The entire language fence string becomes a class, prefixed with "language-".
         return `<pre><code class="language-${lang}">${sanitizedCode}</code></pre>`;
     });
     parentElement.innerHTML = htmlContent;
 
-    // Now, process each generated <pre> block to add action buttons.
     const pres = parentElement.querySelectorAll('pre');
     pres.forEach(pre => {
         const codeEl = pre.querySelector('code');
@@ -2645,7 +2861,6 @@ function processChatCodeBlocks(parentElement) {
 
         const codeContent = codeEl.textContent || '';
 
-        // Create a wrapper for the <pre> tag and its action buttons.
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-code-block-wrapper';
         pre.parentNode.insertBefore(wrapper, pre);
@@ -2655,46 +2870,24 @@ function processChatCodeBlocks(parentElement) {
         actionsContainer.className = 'chat-code-actions';
         wrapper.appendChild(actionsContainer);
 
-        // --- START OF FIX ---
-        // The original code was failing because `codeEl.className` can contain multiple
-        // space-separated classes (e.g., from a syntax highlighter), which broke the regex.
-        // The corrected logic iterates through each class on the element to find the one
-        // that specifies the file path.
-
         let targetFilePath = null;
-        // This regex looks for a class name that starts with "language-", followed by a type,
-        // a colon, and then captures the file path.
         const filePathRegex = /^language-(?:[a-z0-9_-]+):(.+)$/i;
 
-        // Iterate through all classes on the <code> element.
         for (const cls of codeEl.classList) {
             const match = cls.match(filePathRegex);
-            // If a class matches the pattern "language-sometype:some/path.html"
-            if (match && match[1]) {
-                // We've found our target file path.
-                targetFilePath = match[1];
-                break; // Stop searching once we've found it.
+            if (match && match) {
+                targetFilePath = match;
+                break;
             }
         }
-        // --- END OF FIX ---
 
-
-        // If we successfully extracted a file path from the classes...
         if (targetFilePath) {
-            // Create the "Insert into file" button.
             const insertButton = document.createElement('button');
             insertButton.className = 'insert-code-button';
             insertButton.textContent = `Insert into ${targetFilePath}`;
-
-            // --- START OF FIX ---
-            // The click listener now passes the button element itself to the handler
-            // so that its state (e.g., text, disabled) can be managed during processing.
             insertButton.addEventListener('click', (e) => handleInsertCodeIntoFile(targetFilePath, codeContent, e.currentTarget));
-            // --- END OF FIX ---
             actionsContainer.appendChild(insertButton);
-
         } else {
-            // Fallback: If no file path was specified, show the "Use Agent" button.
             const agentButton = document.createElement('button');
             agentButton.className = 'use-agent-button';
             agentButton.textContent = 'Use Agent to Insert Snippet';
@@ -2702,7 +2895,6 @@ function processChatCodeBlocks(parentElement) {
             actionsContainer.appendChild(agentButton);
         }
 
-        // Always add a "Copy" button.
         const copyButton = document.createElement('button');
         copyButton.className = 'copy-code-button';
         copyButton.textContent = 'Copy';
@@ -2752,14 +2944,11 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
         return;
     }
     
-    // --- START OF FIX ---
-    // Add UI feedback for the button during processing.
     const originalText = buttonElement ? buttonElement.textContent : '';
     if (buttonElement) {
         buttonElement.disabled = true;
         buttonElement.innerHTML = 'Processing... <div class="loading-spinner"></div>';
     }
-    // --- END OF FIX ---
 
     console.info('Attempting to save file from chat insert', { projectId: currentProjectId, filePath: cleanPath });
 
@@ -2772,13 +2961,10 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
         logToConsole(`Failed to save file and refresh: ${e.message}`, 'error');
         alert(`Error saving file: ${e.message}`);
     } finally {
-        // --- START OF FIX ---
-        // Restore the button to its original state.
         if (buttonElement) {
             buttonElement.disabled = false;
             buttonElement.textContent = originalText;
         }
-        // --- END OF FIX ---
     }
 }
 
@@ -2795,7 +2981,6 @@ async function buildCombinedHtmlFromDb(projectId) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(indexText, 'text/html');
 
-    // Inline stylesheets
     const linkNodes = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
     for (const link of linkNodes) {
         const href = link.getAttribute('href').trim();
@@ -2809,7 +2994,6 @@ async function buildCombinedHtmlFromDb(projectId) {
         }
     }
 
-    // Inline scripts
     const scriptNodes = Array.from(doc.querySelectorAll('script[src]'));
     for (const script of scriptNodes) {
         const src = script.getAttribute('src').trim();
@@ -2836,19 +3020,11 @@ async function rebuildAndRefreshFromFiles() {
     logToConsole("File changed. Rebuilding Vibe Tree from source files...", "info");
     
     try {
-        // 1. Build a single HTML string by inlining all CSS and JS from the DB.
         const combinedHtml = await buildCombinedHtmlFromDb(currentProjectId);
-        
-        // 2. Decompose this combined HTML back into a Vibe Tree structure.
         recordHistory('Rebuild tree from file change');
         const newVibeTree = await decomposeCodeIntoVibeTree(combinedHtml);
-
-        // 3. Update the global Vibe Tree in memory.
         vibeTree = newVibeTree;
-
-        // 4. Refresh all UI components, which will now use the updated Vibe Tree.
         refreshAllUI();
-        
         logToConsole("Vibe Tree rebuilt and UI refreshed successfully.", "info");
     } catch (error) {
         console.error("Failed to rebuild Vibe Tree from files:", error);
@@ -2881,19 +3057,12 @@ async function handleSendChatMessage() {
     const userPrompt = chatPromptInput.value.trim();
     if (!userPrompt) return;
 
-    // --- START OF FIX ---
-    // Replaced the old, simple system prompt with a more detailed one.
-    // This new prompt instructs the AI to act as a pair programmer, to use the provided
-    // file context, and to return the *entire* modified file, which is critical
-    // for our file-saving and UI-refreshing logic.
     const systemPrompt = chatSystemPromptInput.value.trim() || `You are an expert pair programmer. The user will provide you with the full content of their project files and a request to change them.
 1.  Analyze the user's request and the provided file context.
 2.  Identify which file(s) need to be modified.
 3.  When you provide code, you MUST return the **complete, updated content** of the file. Do not provide snippets, diffs, or partial code.
 4.  Enclose the full file content in a markdown code block, and use a language fence that includes the file path. For example: \`\`\`html:index.html ... complete file content ... \`\`\``;
-    // --- END OF FIX ---
 
-    // Disable input while processing
     sendChatButton.disabled = true;
     chatPromptInput.disabled = true;
     sendChatButton.innerHTML = '<div class="loading-spinner"></div>';
@@ -2902,9 +3071,8 @@ async function handleSendChatMessage() {
     logToChat(userPrompt, 'user');
     chatConversationHistory.push({ role: 'user', content: userPrompt });
     
-    // Create the AI message container for streaming
     const aiMessageElement = logToChat('...', 'model');
-    aiMessageElement.innerHTML = ''; // Clear placeholder
+    aiMessageElement.innerHTML = '';
     
     try {
         const streamCallback = (chunk) => {
@@ -2915,17 +3083,15 @@ async function handleSendChatMessage() {
 
         const fullResponse = await callAI(systemPrompt, userPrompt, false, streamCallback);
         
-        // Once streaming is done, process the full response for code blocks and formatting
-        aiMessageElement.textContent = fullResponse; // Replace streamed content with final clean content
-        processChatCodeBlocks(aiMessageElement); // This will convert ``` to <pre> and add buttons
+        aiMessageElement.textContent = fullResponse;
+        processChatCodeBlocks(aiMessageElement);
         chatConversationHistory.push({ role: 'model', content: fullResponse });
 
     } catch (error) {
         console.error("Chat AI failed:", error);
         aiMessageElement.textContent = `The AI failed to respond: ${error.message}`;
-        aiMessageElement.classList.add('log-type-error'); // Style as an error
+        aiMessageElement.classList.add('log-type-error');
     } finally {
-        // Re-enable input
         sendChatButton.disabled = false;
         chatPromptInput.disabled = false;
         sendChatButton.innerHTML = 'Send';
@@ -2983,7 +3149,6 @@ async function handleCreateNode() {
 
     const newNode = { id: newNodeId, type: newNodeType, description: newDescription, code: '' };
     
-    // Handle insertion logic
     let inserted = false;
     if (targetId && position) {
         const targetIndex = parentNode.children.findIndex(c => c.id === targetId);
@@ -2998,7 +3163,7 @@ async function handleCreateNode() {
     }
     
     if (!inserted) {
-        parentNode.children.push(newNode); // Default to adding at the end
+        parentNode.children.push(newNode);
     }
     
     recalculateSelectors(parentNode);
@@ -3197,7 +3362,7 @@ function recalculateSelectors(parentNode) {
         child.position = (index === 0) ? 'beforeend' : 'afterend';
         
         const idMatch = child.code.match(/id="([^"]+)"/);
-        if (idMatch) {
+        if (idMatch && idMatch) {
             lastHtmlSiblingId = idMatch;
         } else {
             console.warn(`Node ${child.id} lacks an 'id' attribute, which may break layout.`);
@@ -3598,7 +3763,6 @@ projectListContainer.addEventListener('click', (event) => {
 function openComponentModal(componentId = null, componentData = null) {
     componentModalError.textContent = '';
     
-    // Case 1: Pre-fill from provided data (e.g., AI extraction)
     if (componentData) {
         componentModalTitle.textContent = 'Save New Component';
         componentIdInput.value = componentData.id || '';
@@ -3609,8 +3773,6 @@ function openComponentModal(componentId = null, componentData = null) {
         componentCssInput.value = componentData.css || '';
         componentJsInput.value = componentData.javascript || '';
         deleteComponentButton.style.display = 'none';
-        
-    // Case 2: Edit an existing component from the library
     } else if (componentId) {
         const component = db.getComponent(componentId);
         if (!component) {
@@ -3627,8 +3789,6 @@ function openComponentModal(componentId = null, componentData = null) {
         componentJsInput.value = component.javascript || '';
         deleteComponentButton.style.display = 'inline-block';
         deleteComponentButton.dataset.id = component.id;
-        
-    // Case 3: Create a new, blank component
     } else {
         componentModalTitle.textContent = 'Add New Component';
         componentIdInput.value = '';
@@ -3641,14 +3801,10 @@ function openComponentModal(componentId = null, componentData = null) {
         deleteComponentButton.style.display = 'none';
     }
 
-    // Always clear AI prompt field when opening
     if(componentAiPromptInput) componentAiPromptInput.value = '';
 
     contextComponentModal.style.display = 'block';
-    // Focus based on the context
-    if (componentData) {
-        componentNameInput.focus();
-    } else if (componentId) {
+    if (componentData || componentId) {
         componentNameInput.focus();
     } else {
         componentAiPromptInput.focus();
@@ -3672,7 +3828,6 @@ async function handleAiGenerateComponent() {
         return;
     }
 
-    // UI feedback
     const originalText = generateComponentButton.innerHTML;
     generateComponentButton.disabled = true;
     generateComponentButton.innerHTML = 'Generating... <div class="loading-spinner"></div>';
@@ -3700,12 +3855,10 @@ async function handleAiGenerateComponent() {
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
         const aiComponent = JSON.parse(rawResponse);
 
-        // Validate the response
         if (!aiComponent.id || !aiComponent.name || !aiComponent.html) {
             throw new Error("AI response is missing required fields (id, name, html).");
         }
 
-        // Populate the form fields
         componentIdInput.value = aiComponent.id || '';
         componentNameInput.value = aiComponent.name || '';
         componentDescriptionInput.value = aiComponent.description || '';
@@ -3714,7 +3867,7 @@ async function handleAiGenerateComponent() {
         componentJsInput.value = aiComponent.javascript || '';
         
         logToConsole(`AI successfully generated component '${aiComponent.name}'. Please review and save.`, 'info');
-        componentAiPromptInput.value = ''; // Clear the prompt
+        componentAiPromptInput.value = '';
 
     } catch (error) {
         console.error("AI Component Generation Failed:", error);
@@ -3722,7 +3875,6 @@ async function handleAiGenerateComponent() {
         componentModalError.textContent = errorMessage;
         logToConsole(errorMessage, 'error');
     } finally {
-        // Restore button
         generateComponentButton.disabled = false;
         generateComponentButton.innerHTML = 'Generate Component';
     }
@@ -3761,7 +3913,6 @@ function handleSaveComponent() {
     logToConsole(`Component '${name}' saved.`, 'info');
     closeComponentModal();
     renderComponentList();
-    // Select the newly saved/edited component
     selectComponentForPreview(id);
 }
 
@@ -3815,7 +3966,6 @@ function renderComponentList() {
 function selectComponentForPreview(componentId) {
     if (!contextComponentViewer) return;
 
-    // Highlight the selected item in the list
     contextComponentList.querySelectorAll('.component-list-item').forEach(el => {
         el.classList.toggle('selected', el.dataset.id === componentId);
     });
@@ -3915,10 +4065,6 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
-/**
- * Processes the uploaded component library file.
- * @param {Event} event - The file input change event.
- */
 async function processContextUpload(event) {
     const files = event.target.files;
 
@@ -3927,11 +4073,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    // --- START OF FIX ---
-    // The 'files' variable is a FileList. We need to get the first File object from it.
-    // The original code incorrectly passed the entire FileList object to the reader.
-    const file = files[0];
-    // --- END OF FIX ---
+    const file = files;
 
     logToConsole(`Context library file selected: ${file.name}`, 'info');
 
@@ -3942,7 +4084,6 @@ async function processContextUpload(event) {
             const text = e.target.result;
             const newLibrary = JSON.parse(text);
 
-            // Basic validation
             if (typeof newLibrary !== 'object' || newLibrary === null || Array.isArray(newLibrary)) {
                 throw new Error("Invalid format. The file must contain a JSON object.");
             }
@@ -3955,7 +4096,6 @@ async function processContextUpload(event) {
                 return;
             }
 
-            // More validation - check if values are component-like
             for (const key in newLibrary) {
                 const comp = newLibrary[key];
                 if (typeof comp !== 'object' || !comp.id || !comp.name) {
@@ -3969,7 +4109,6 @@ async function processContextUpload(event) {
             db.saveComponentLibrary(newLibrary);
             logToConsole(`Successfully imported ${componentCount} components.`, 'info');
             
-            // Refresh UI
             renderComponentList();
             if (contextComponentViewer) {
                 contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
@@ -3980,7 +4119,6 @@ async function processContextUpload(event) {
             logToConsole(`Failed to import library: ${error.message}`, 'error');
             alert(`Error importing library: ${error.message}`);
         } finally {
-            // Reset the input so the user can upload the same file again if they need to
             contextUploadInput.value = '';
         }
     };
@@ -3990,13 +4128,11 @@ async function processContextUpload(event) {
         alert("An error occurred while reading the file.");
     };
 
-    // The reader now correctly receives a single File object.
     reader.readAsText(file);
 }
 
 /**
  * Generic handler to extract a node as a component and open the save modal.
- * Can be called from the Vibe Editor or the Edit Node modal.
  * @param {string} nodeId - The ID of the node to extract.
  * @param {HTMLElement|null} buttonElement - The button that was clicked, for UI feedback.
  */
@@ -4062,7 +4198,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         console.error("Save as component failed:", e);
         const errorMessage = `AI analysis failed: ${e.message}`;
         logToConsole(errorMessage, 'error');
-        if (buttonElement) { // Also show error in the modal if it's open
+        if (buttonElement) {
             const errorEl = buttonElement.closest('.modal-content')?.querySelector('.modal-error');
             if (errorEl) errorEl.textContent = errorMessage;
         }
@@ -4394,7 +4530,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (undoButton) undoButton.addEventListener('click', doUndo);
         if (redoButton) redoButton.addEventListener('click', doRedo);
         if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-        if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', handleFileUpload);
+        if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
+        if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
         if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
         if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
         if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
@@ -4414,7 +4551,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') handleAiEditorSearch();
         });
-        if (runAgentButton) runAgentButton.addEventListener('click', handleRunAgent);
+        
+        // AGENT AND ITERATIVE MODE LISTENERS
+        if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
+        if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
+        if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
+        if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
+        if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
+        
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
 
@@ -4428,7 +4572,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // NEW: Context tab event listeners
         if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
         if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
         if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
@@ -4466,7 +4609,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeApiSettings();
     initializeMermaid();
     populateProjectList();
-    renderComponentList(); // NEW: Initialize component list
+    renderComponentList();
     resetHistory();
 });
 
@@ -4482,7 +4625,7 @@ function resetToStartPage() {
     generateProjectButton.disabled = !(geminiApiKey || nscaleApiKey);
     newProjectContainer.style.display = 'block';
     editorContainer.innerHTML = '';
-    previewContainer.contentWindow.document.body.innerHTML = '';
+    previewContainer.srcdoc = '';
     agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
     chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
     flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
