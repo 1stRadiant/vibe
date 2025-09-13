@@ -2065,31 +2065,43 @@ function triggerBlobDownload(blob, filename) {
 }
 
 /**
- * Handle "Download Project" click. This now downloads a single, self-contained HTML file.
+ * Handle "Download Project ZIP" click.
  */
 async function handleDownloadProjectZip() {
     try {
-        // Generate the complete HTML string with inlined CSS and JS.
-        const fullHtmlContent = generateFullCodeString(vibeTree);
+        if (!window.JSZip) {
+            throw new Error('JSZip library failed to load.');
+        }
 
-        // Create a Blob from the HTML content.
-        const htmlBlob = new Blob([fullHtmlContent], { type: 'text/html;charset=utf-8' });
+        // 1. Get all the individual project files (index.html, CSS, JS, assets).
+        const { files } = assembleMultiFileBundle(vibeTree);
+        const zip = new JSZip();
 
-        // Determine a suitable filename.
+        // 2. Add all the individual files to the zip archive.
+        for (const [path, content] of files.entries()) {
+            zip.file(path, content);
+        }
+
+        // --- START OF MODIFICATION ---
+        // 3. Generate the single, self-contained HTML file content.
+        const bundledHtmlContent = generateFullCodeString(vibeTree);
+
+        // 4. Add this content as a new file named "bundle.html" to the zip.
+        zip.file("bundle.html", bundledHtmlContent);
+        // --- END OF MODIFICATION ---
+
+        // 5. Generate the final ZIP blob and trigger the download.
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
         const fnameBase = currentProjectId || 'vibe-project';
-        const filename = `${fnameBase}.html`;
-
-        // Use the existing helper to trigger the browser download.
-        triggerBlobDownload(htmlBlob, filename);
-
-        logToConsole(`Project "${fnameBase}" packaged and downloaded as a single HTML file.`, 'info');
+        triggerBlobDownload(zipBlob, `${fnameBase}.zip`);
+        
+        logToConsole(`Project "${fnameBase}" packaged with a bundled HTML file and downloaded as ZIP.`, 'info');
     } catch (e) {
-        console.error('Project download failed:', e);
-        logToConsole(`Project download failed: ${e.message}`, 'error');
-        alert(`Failed to build project file: ${e.message}`);
+        console.error('ZIP download failed:', e);
+        logToConsole(`ZIP download failed: ${e.message}`, 'error');
+        alert(`Failed to build ZIP: ${e.message}`);
     }
 }
-
 /**
  * Applies the current vibeTree to the preview iframe with an advanced inspector.
  */
