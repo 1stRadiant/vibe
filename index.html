@@ -35,7 +35,7 @@
     <!-- The main layout that is always visible -->
     <div class="main-layout">
         <div class="tabs">
-            <button class="tab-button active" data-tab="start">Start</button> <!-- New "Start" tab, active by default -->
+            <button class="tab-button active" data-tab="start">Start</button>
             <button class="tab-button" data-tab="preview">Live Preview</button>
             <button class="tab-button" data-tab="editor">Vibe Editor</button>
             <button class="tab-button" data-tab="agent">Agent</button>
@@ -304,11 +304,19 @@
             </div>
             <div id="gemini-settings-container">
                  <h3>Gemini Model</h3>
+                 <!-- START OF FIX -->
                  <select id="gemini-model-select">
                     <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
                     <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
                     <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
+                    <optgroup label="Advanced & Experimental Models">
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    </optgroup>
                  </select>
+                 <!-- END OF FIX -->
                 <div id="gemini-api-key-container" class="api-key-container">
                     <h3>Gemini API Key</h3>
                     <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
