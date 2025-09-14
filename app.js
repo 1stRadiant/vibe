@@ -353,7 +353,8 @@ let chatConversationHistory = [];
 
 // NEW: State for iterative agent sessions
 let iterativeSessionState = {
-    isActive: false,
+    // status can be 'idle', 'planning', 'reviewing', 'executing', 'paused', 'complete'
+    status: 'idle',
     overallGoal: '',
     plan: [],
     currentStepIndex: -1,
@@ -2618,28 +2619,89 @@ async function handleRunAgent() {
  * Toggles the visibility of UI elements based on the iterative session state.
  */
 function updateIterativeUI() {
-    const isActive = iterativeSessionState.isActive;
-    
+    const status = iterativeSessionState.status;
+    const isActive = status !== 'idle';
+
     iterativeSessionUI.classList.toggle('hidden', !isActive);
     runAgentSingleTaskButton.style.display = isActive ? 'none' : 'inline-block';
     startIterativeSessionButton.style.display = isActive ? 'none' : 'inline-block';
-    
+
     agentPromptInput.disabled = isActive;
-    agentPromptInput.placeholder = isActive 
-        ? "Review the preview. Provide feedback here if you select 'Request Changes'." 
+    agentPromptInput.placeholder = isActive
+        ? "Session active. Agent is working or awaiting input."
         : "Describe the overall goal for your website...";
 
-    if (isActive) {
-        iterativePlanDisplay.innerHTML = '<ol>' + iterativeSessionState.plan.map((step, index) => 
-            `<li class="${index === iterativeSessionState.currentStepIndex ? 'active-step' : ''}">${step}</li>`
-        ).join('') + '</ol>';
-    } else {
-        iterativePlanDisplay.innerHTML = '';
+    // Hide all controls initially, then show based on status
+    iterativeControls.classList.add('hidden');
+    acceptContinueButton.style.display = 'none';
+    requestChangesButton.style.display = 'none';
+    endSessionButton.style.display = 'none';
+    iterativePlanDisplay.innerHTML = ''; // Clear previous state
+
+    switch (status) {
+        case 'planning':
+            agentPromptInput.placeholder = "Agent is generating a plan...";
+            break;
+
+        case 'reviewing':
+            iterativeControls.classList.remove('hidden');
+            acceptContinueButton.style.display = 'inline-block';
+            acceptContinueButton.textContent = 'Start Execution';
+            endSessionButton.style.display = 'inline-block';
+            endSessionButton.textContent = 'Cancel';
+
+            // Make plan editable
+            const planTextArea = document.createElement('textarea');
+            planTextArea.id = 'editable-plan-textarea';
+            planTextArea.rows = iterativeSessionState.plan.length + 2;
+            planTextArea.value = iterativeSessionState.plan.map((step, index) => `${index + 1}. ${step}`).join('\n');
+            iterativePlanDisplay.appendChild(document.createElement('h4')).textContent = 'Review and Edit Plan:';
+            iterativePlanDisplay.appendChild(planTextArea);
+            break;
+
+        case 'executing':
+            iterativeControls.classList.remove('hidden');
+            requestChangesButton.style.display = 'inline-block';
+            requestChangesButton.textContent = 'Pause';
+            endSessionButton.style.display = 'inline-block';
+            endSessionButton.textContent = 'End Session';
+
+            // Show read-only plan with progress
+            const planList = document.createElement('ol');
+            planList.innerHTML = iterativeSessionState.plan.map((step, index) =>
+                `<li class="${index === iterativeSessionState.currentStepIndex ? 'active-step' : (index < iterativeSessionState.currentStepIndex ? 'completed-step' : '')}">${step}</li>`
+            ).join('');
+            iterativePlanDisplay.appendChild(planList);
+            break;
+
+        case 'paused':
+            iterativeControls.classList.remove('hidden');
+            acceptContinueButton.style.display = 'inline-block';
+            acceptContinueButton.textContent = 'Resume';
+            endSessionButton.style.display = 'inline-block';
+            endSessionButton.textContent = 'End Session';
+            // Show read-only plan with progress
+            const pausedPlanList = document.createElement('ol');
+            pausedPlanList.innerHTML = iterativeSessionState.plan.map((step, index) =>
+                `<li class="${index === iterativeSessionState.currentStepIndex ? 'active-step' : (index < iterativeSessionState.currentStepIndex ? 'completed-step' : '')}">${step}</li>`
+            ).join('');
+            iterativePlanDisplay.appendChild(pausedPlanList);
+            break;
+
+        case 'complete':
+            iterativeControls.classList.remove('hidden');
+            endSessionButton.style.display = 'inline-block';
+            endSessionButton.textContent = 'Finish';
+            const completedPlanList = document.createElement('ol');
+            completedPlanList.innerHTML = iterativeSessionState.plan.map(step => `<li class="completed-step">${step}</li>`).join('');
+            iterativePlanDisplay.appendChild(completedPlanList);
+            break;
     }
 }
 
+
 /**
- * Starts a new iterative development session.
+ * Starts a new iterative development session by generating a plan for the user to review.
  */
 async function handleStartIterativeSession() {
     const goal = agentPromptInput.value.trim();
@@ -2649,7 +2711,7 @@ async function handleStartIterativeSession() {
     }
 
     iterativeSessionState = {
-        isActive: true,
+        status: 'planning',
         overallGoal: goal,
         plan: [],
         currentStepIndex: 0,
@@ -2664,21 +2726,20 @@ async function handleStartIterativeSession() {
     try {
         const systemPrompt = getIterativePlannerSystemPrompt();
         const userPrompt = `My website goal is: "${goal}"`;
-        
+
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
         const responseJson = JSON.parse(rawResponse);
-        
+
         if (!responseJson.plan || !Array.isArray(responseJson.plan)) {
             throw new Error("AI did not return a valid plan array.");
         }
 
         iterativeSessionState.plan = responseJson.plan;
         iterativeSessionState.history.push({ role: 'model', content: rawResponse });
-        
-        logToAgent('<strong>Project Plan Generated:</strong>', 'plan');
-        updateIterativeUI();
 
-        await executeNextIterativeStep();
+        logToAgent('<strong>Project Plan Generated.</strong> Please review and edit the plan below, then click "Start Execution".', 'plan');
+        iterativeSessionState.status = 'reviewing';
+        updateIterativeUI();
 
     } catch (error) {
         console.error("Failed to start iterative session:", error);
@@ -2688,22 +2749,25 @@ async function handleStartIterativeSession() {
 }
 
 /**
- * Executes the current step in the iterative plan.
+ * Executes the current step in the iterative plan and automatically proceeds to the next.
  */
 async function executeNextIterativeStep() {
-    if (iterativeSessionState.currentStepIndex >= iterativeSessionState.plan.length) {
-        logToAgent('<strong>Project Complete!</strong> All steps have been executed.', 'plan');
-        handleEndIterativeSession();
+    // Stop if the session is no longer in the 'executing' state.
+    if (iterativeSessionState.status !== 'executing') {
+        logToAgent('Execution paused or ended.', 'info');
         return;
     }
 
-    iterativeControls.classList.add('hidden');
-    agentPromptInput.disabled = true;
-    agentPromptInput.value = '';
+    if (iterativeSessionState.currentStepIndex >= iterativeSessionState.plan.length) {
+        logToAgent('<strong>Project Complete!</strong> All steps have been executed.', 'plan');
+        iterativeSessionState.status = 'complete';
+        updateIterativeUI();
+        return;
+    }
 
+    updateIterativeUI(); // Refresh UI to highlight the current step
     const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
     logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}:</strong> ${currentStepDescription}`, 'action');
-    updateIterativeUI();
 
     try {
         const systemPrompt = getIterativeExecutorSystemPrompt();
@@ -2725,80 +2789,75 @@ async function executeNextIterativeStep() {
         const agentDecision = JSON.parse(rawResponse);
 
         iterativeSessionState.history.push({ role: 'model', content: rawResponse });
-        
+
         executeAgentPlan(agentDecision, logToAgent);
-        
-        logToAgent('Step complete. Please review the preview and provide feedback or continue.', 'info');
+
+        logToAgent(`Step ${iterativeSessionState.currentStepIndex + 1} complete.`, 'info');
         switchToTab('preview');
-        
-        iterativeControls.classList.remove('hidden');
-        agentPromptInput.disabled = false;
+
+        // Automatically proceed to the next step
+        iterativeSessionState.currentStepIndex++;
+        // Add a short delay to allow UI to update and be readable
+        setTimeout(executeNextIterativeStep, 1500);
 
     } catch (error) {
         console.error(`Error executing step ${iterativeSessionState.currentStepIndex + 1}:`, error);
-        logToAgent(`Failed to execute step: ${error.message}`, 'error');
-        iterativeControls.classList.remove('hidden');
+        logToAgent(`Failed to execute step: ${error.message}. Execution has been paused. You can try to fix the issue or edit the plan and resume.`, 'error');
+        iterativeSessionState.status = 'paused';
+        updateIterativeUI();
     }
 }
 
 /**
- * Handles the user accepting the changes and moving to the next step.
+ * Handles the primary positive action in an iterative session, which changes
+ * based on the current state (e.g., 'Start Execution', 'Resume').
  */
 function handleAcceptAndContinue() {
-    iterativeSessionState.currentStepIndex++;
-    executeNextIterativeStep();
+    const status = iterativeSessionState.status;
+
+    if (status === 'reviewing') {
+        // This is now the "Start Execution" action
+        const planTextArea = document.getElementById('editable-plan-textarea');
+        if (!planTextArea) {
+            console.error("Could not find editable plan textarea.");
+            logToAgent("Internal error: Could not find plan to execute.", 'error');
+            return;
+        }
+
+        // Parse the edited plan from the textarea.
+        const editedPlanText = planTextArea.value.trim();
+        const editedPlan = editedPlanText.split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(line => line);
+
+        if (editedPlan.length === 0) {
+            alert("The plan is empty. Please define at least one step.");
+            return;
+        }
+
+        iterativeSessionState.plan = editedPlan;
+        iterativeSessionState.status = 'executing';
+        iterativeSessionState.currentStepIndex = 0; // Start from the beginning
+
+        logToAgent('<strong>Execution Started.</strong> Agent will now work through the plan automatically.', 'plan');
+        executeNextIterativeStep(); // Kick off the execution loop
+    } else if (status === 'paused') {
+        // This is the "Resume" action
+        iterativeSessionState.status = 'executing';
+        logToAgent('Resuming execution...', 'info');
+        executeNextIterativeStep(); // Continue the loop
+    }
 }
 
 /**
- * Handles the user requesting a modification to the last step.
+ * Handles the secondary action in an iterative session, which is now 'Pause'.
+ * The old 'request changes' functionality is replaced by direct plan editing
+ * and the ability to pause and intervene manually.
  */
-async function handleRequestChanges() {
-    const changeRequest = agentPromptInput.value.trim();
-    if (!changeRequest) {
-        alert("Please describe the changes you want in the text box.");
-        return;
-    }
-
-    logToAgent(`<strong>User Feedback:</strong> ${changeRequest}`, 'user');
-    logToAgent('Applying requested changes...', 'info');
-    
-    iterativeControls.classList.add('hidden');
-    agentPromptInput.disabled = true;
-
-    try {
-        const systemPrompt = getIterativeExecutorSystemPrompt();
-        const fullTreeString = JSON.stringify(vibeTree, null, 2);
-        const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
-
-        const userPrompt = `
-            Overall Goal: "${iterativeSessionState.overallGoal}"
-            Current Step: "${currentStepDescription}"
-            Your previous attempt to implement this step was not quite right. Please apply the following correction:
-            **User Feedback:** "${changeRequest}"
-            Generate a new set of actions to update the website according to this feedback.
-            Current Vibe Tree:
-            \`\`\`json
-            ${fullTreeString}
-            \`\`\`
-        `;
-        
-        iterativeSessionState.history.push({ role: 'user', content: userPrompt });
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
-        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
-
-        executeAgentPlan(agentDecision, logToAgent);
-
-        logToAgent('Changes applied. Please review again.', 'info');
-        switchToTab('preview');
-        
-    } catch (error) {
-        console.error("Failed to apply changes:", error);
-        logToAgent(`Error applying changes: ${error.message}`, 'error');
-    } finally {
-        iterativeControls.classList.remove('hidden');
-        agentPromptInput.disabled = false;
-        agentPromptInput.value = '';
+function handleRequestChanges() {
+    // This button's only role now is to pause execution.
+    if (iterativeSessionState.status === 'executing') {
+        iterativeSessionState.status = 'paused';
+        logToAgent('Execution paused by user.', 'info');
+        updateIterativeUI();
     }
 }
 
@@ -2807,9 +2866,14 @@ async function handleRequestChanges() {
  */
 function handleEndIterativeSession() {
     logToAgent('Iterative session ended.', 'info');
-    iterativeSessionState = { isActive: false, overallGoal: '', plan: [], currentStepIndex: -1, history: [] };
+    iterativeSessionState = {
+        status: 'idle',
+        overallGoal: '',
+        plan: [],
+        currentStepIndex: -1,
+        history: []
+    };
     updateIterativeUI();
-    iterativeControls.classList.add('hidden');
     agentPromptInput.value = '';
 }
 
@@ -4066,15 +4130,13 @@ function handleUploadContextTrigger() {
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
-    const files = event.target.files;
+    const file = event.target.files;
 
-    if (!files || files.length === 0) {
+    if (!file) {
         logToConsole("No file selected for context upload.", "info");
         return;
     }
-
-    const file = files;
-
+    
     logToConsole(`Context library file selected: ${file.name}`, 'info');
 
     const reader = new FileReader();
@@ -4836,7 +4898,7 @@ async function handleAiImproveDescription() {
         
         let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
         const fenced = improved.match(/```[\s\S]*?```/);
-        if (fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
+        if (fenced && fenced) improved = fenced.replace(/```[a-z]*\s*|\s*```/gi, '').trim();
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
