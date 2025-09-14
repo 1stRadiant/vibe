@@ -103,6 +103,16 @@ body {
     border-left: 3px solid #61afef;
 }
 
+/* START OF FIX: Make project list scrollable */
+#project-list {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 10px; /* Space for scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #4b5263 #282c34;
+}
+/* END OF FIX */
+
 .project-id-text {
     font-family: 'Roboto Mono', monospace;
     font-size: 1.1em;
@@ -1013,6 +1023,7 @@ button.update-button:disabled {
     padding: 15px;
     margin-bottom: 20px;
     border-left: 4px solid #c678dd; /* Purple for Agent */
+    flex-shrink: 0;
 }
 
 #agent-prompt-input {
@@ -1042,13 +1053,16 @@ button.update-button:disabled {
     background-color: #d18ce8;
 }
 
+/* START OF FIX: Make Agent Log scrollable */
 .agent-output-container {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     background-color: #21252b;
     border-radius: 4px;
+    min-height: 0; /* Important for flex-grow in a flex column */
 }
+/* END OF FIX */
 
 .agent-output-container h3 {
     font-family: 'Roboto Mono', monospace;
@@ -1060,6 +1074,7 @@ button.update-button:disabled {
     border-top-left-radius: 4px;
     border-top-right-radius: 4px;
     color: #abb2bf;
+    flex-shrink: 0;
 }
 
 #agent-output {
@@ -1108,6 +1123,73 @@ button.update-button:disabled {
     color: #5c6370;
     font-style: italic;
 }
+
+/* START OF FIX: Iterative Mode UI Styles */
+#iterative-session-ui {
+    background-color: #21252b;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: -10px; /* Overlap the controls slightly */
+    margin-bottom: 20px;
+}
+#iterative-session-ui h4 {
+    margin-top: 0;
+    font-family: 'Roboto Mono', monospace;
+    color: #98c379;
+}
+#iterative-plan-display ol {
+    padding-left: 20px;
+    margin: 10px 0;
+    list-style-type: decimal;
+}
+#iterative-plan-display li {
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #abb2bf;
+}
+#iterative-plan-display li.active-step {
+    background-color: #3a3f4b;
+    color: #e5c07b;
+    font-weight: bold;
+}
+#iterative-plan-display li.completed-step {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+#editable-plan-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 150px;
+    background-color: #282c34;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.95em;
+    resize: vertical;
+}
+#iterative-controls {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #444;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+#iterative-controls p {
+    margin: 0;
+    color: #5c6370;
+    font-style: italic;
+    font-size: 0.9em;
+}
+#iterative-controls button {
+    margin-left: auto;
+}
+/* END OF FIX */
 
 /* Chat Tab Styles */
 .chat-container {
@@ -1803,4 +1885,21 @@ body.is-dragging-vibe .drag-handle {
     background-color: #4a5058;
     opacity: 0.7;
     cursor: not-allowed;
+}
+
+/* START OF FIX: Make component list scrollable */
+.context-list-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+#context-component-list {
+    flex-grow: 1;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px;
+    background: #21252b;
+    margin-bottom: 15px;
 }
