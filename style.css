@@ -103,7 +103,6 @@ body {
     border-left: 3px solid #61afef;
 }
 
-/* START OF FIX: Make project list scrollable */
 #project-list {
     max-height: 250px;
     overflow-y: auto;
@@ -111,7 +110,6 @@ body {
     scrollbar-width: thin;
     scrollbar-color: #4b5263 #282c34;
 }
-/* END OF FIX */
 
 .project-id-text {
     font-family: 'Roboto Mono', monospace;
@@ -426,6 +424,7 @@ button.delete-project-button:hover {
     align-items: center;
     gap: 8px;
     flex-shrink: 0; /* Prevent tabs from shrinking */
+    position: relative; /* For loading spinner */
 }
 
 .tab-button:hover {
@@ -458,6 +457,20 @@ button.delete-project-button:hover {
     /* Move button down slightly to cover the parent's bottom border, creating a seamless connection */
     margin-bottom: -1px; 
 }
+
+/* START OF FIX: Agent Tab Loading Spinner */
+.tab-button.loading::after {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #61afef; /* Match active tab color */
+    animation: spin 1s ease-in-out infinite;
+    margin-left: 8px;
+}
+/* END OF FIX */
 
 .tab-content-area {
     flex-grow: 1;
@@ -1011,6 +1024,7 @@ button.update-button:disabled {
     display: none;
 }
 
+/* START OF FIX: Agent Container Layout Adjustments */
 .agent-container {
     display: flex;
     flex-direction: column;
@@ -1025,6 +1039,7 @@ button.update-button:disabled {
     border-left: 4px solid #c678dd; /* Purple for Agent */
     flex-shrink: 0;
 }
+/* END OF FIX */
 
 #agent-prompt-input {
     width: 100%;
@@ -1130,8 +1145,9 @@ button.update-button:disabled {
     border: 1px solid #444;
     border-radius: 6px;
     padding: 15px;
-    margin-top: -10px; /* Overlap the controls slightly */
+    margin-top: 20px; /* Give space from controls above */
     margin-bottom: 20px;
+    flex-shrink: 0;
 }
 #iterative-session-ui h4 {
     margin-top: 0;
@@ -1887,7 +1903,6 @@ body.is-dragging-vibe .drag-handle {
     cursor: not-allowed;
 }
 
-/* START OF FIX: Make component list scrollable */
 .context-list-panel {
     display: flex;
     flex-direction: column;
