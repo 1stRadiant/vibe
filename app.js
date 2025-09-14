@@ -110,6 +110,7 @@ const agentPromptInput = document.getElementById('agent-prompt-input');
 const runAgentSingleTaskButton = document.getElementById('run-agent-single-task-button'); // Renamed
 const startIterativeSessionButton = document.getElementById('start-iterative-session-button'); // New
 const agentOutput = document.getElementById('agent-output');
+const agentTabButton = document.getElementById('agent-tab-button');
 
 // New Iterative Session elements
 const iterativeSessionUI = document.getElementById('iterative-session-ui');
@@ -2343,6 +2344,15 @@ function addEventListeners() {
 
 // --- Agent Logic ---
 
+// START OF FIX: Helper functions for agent tab spinner
+function showAgentSpinner() {
+    if (agentTabButton) agentTabButton.classList.add('loading');
+}
+function hideAgentSpinner() {
+    if (agentTabButton) agentTabButton.classList.remove('loading');
+}
+// END OF FIX
+
 function logToAgent(message, type = 'info') {
     const placeholder = agentOutput.querySelector('.agent-message-placeholder');
     if (placeholder) {
@@ -2471,6 +2481,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
 async function handleFixError(errorMessage, fixButton) {
     fixButton.disabled = true;
     fixButton.innerHTML = 'Fixing... <div class="loading-spinner"></div>';
+    showAgentSpinner();
 
     logToConsole(`Attempting to fix error: "${errorMessage.split('\n')[0]}..."`, 'info');
 
@@ -2521,6 +2532,7 @@ ${fullTreeString}
         runAgentSingleTaskButton.disabled = !(geminiApiKey || nscaleApiKey); // Reset to its normal state
         runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = ''; // Clear the prompt
+        hideAgentSpinner();
     }
 }
 
@@ -2584,6 +2596,7 @@ async function handleRunAgent() {
     runAgentSingleTaskButton.disabled = true;
     runAgentSingleTaskButton.innerHTML = 'Agent is thinking... <div class="loading-spinner"></div>';
     logToAgent(`<strong>You:</strong> ${userPrompt}`, 'user');
+    showAgentSpinner();
 
     const fullTreeString = JSON.stringify(vibeTree, null, 2);
     const systemPrompt = getAgentSystemPrompt();
@@ -2610,6 +2623,7 @@ async function handleRunAgent() {
         runAgentSingleTaskButton.disabled = !(geminiApiKey || nscaleApiKey);
         runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = '';
+        hideAgentSpinner();
     }
 }
 
@@ -2722,6 +2736,7 @@ async function handleStartIterativeSession() {
     logToAgent(`<strong>Starting Iterative Session.</strong> Goal: ${goal}`, 'plan');
     logToAgent('Generating a step-by-step plan...', 'info');
     updateIterativeUI();
+    showAgentSpinner();
 
     try {
         const systemPrompt = getIterativePlannerSystemPrompt();
@@ -2745,6 +2760,8 @@ async function handleStartIterativeSession() {
         console.error("Failed to start iterative session:", error);
         logToAgent(`Error during planning phase: ${error.message}`, 'error');
         handleEndIterativeSession();
+    } finally {
+        hideAgentSpinner();
     }
 }
 
@@ -2755,6 +2772,7 @@ async function executeNextIterativeStep() {
     // Stop if the session is no longer in the 'executing' state.
     if (iterativeSessionState.status !== 'executing') {
         logToAgent('Execution paused or ended.', 'info');
+        hideAgentSpinner();
         return;
     }
 
@@ -2762,9 +2780,11 @@ async function executeNextIterativeStep() {
         logToAgent('<strong>Project Complete!</strong> All steps have been executed.', 'plan');
         iterativeSessionState.status = 'complete';
         updateIterativeUI();
+        hideAgentSpinner();
         return;
     }
 
+    showAgentSpinner();
     updateIterativeUI(); // Refresh UI to highlight the current step
     const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
     logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}:</strong> ${currentStepDescription}`, 'action');
@@ -2805,6 +2825,7 @@ async function executeNextIterativeStep() {
         logToAgent(`Failed to execute step: ${error.message}. Execution has been paused. You can try to fix the issue or edit the plan and resume.`, 'error');
         iterativeSessionState.status = 'paused';
         updateIterativeUI();
+        hideAgentSpinner();
     }
 }
 
@@ -2858,6 +2879,7 @@ function handleRequestChanges() {
         iterativeSessionState.status = 'paused';
         logToAgent('Execution paused by user.', 'info');
         updateIterativeUI();
+        hideAgentSpinner();
     }
 }
 
@@ -2875,6 +2897,7 @@ function handleEndIterativeSession() {
     };
     updateIterativeUI();
     agentPromptInput.value = '';
+    hideAgentSpinner();
 }
 
 
