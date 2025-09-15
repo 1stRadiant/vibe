@@ -110,7 +110,7 @@ const agentPromptInput = document.getElementById('agent-prompt-input');
 const runAgentSingleTaskButton = document.getElementById('run-agent-single-task-button'); // Renamed
 const startIterativeSessionButton = document.getElementById('start-iterative-session-button'); // New
 const agentOutput = document.getElementById('agent-output');
-const agentTabButton = document.getElementById('agent-tab-button');
+const agentTabButton = document.querySelector('.tab-button[data-tab="agent"]'); // More specific selector
 
 // New Iterative Session elements
 const iterativeSessionUI = document.getElementById('iterative-session-ui');
@@ -144,6 +144,12 @@ const filesCopyButton = document.getElementById('files-copy-button');
 const filesPasteButton = document.getElementById('files-paste-button');
 const filesRenameButton = document.getElementById('files-rename-button');
 const filesDeleteButton = document.getElementById('files-delete-button');
+
+// START OF FIX: Global Agent Loader elements
+const globalAgentLoader = document.getElementById('global-agent-loader');
+const globalAgentStatusText = document.getElementById('global-agent-status-text');
+const globalAgentProgressText = document.getElementById('global-agent-progress-text');
+// END OF FIX
 
 // NEW: Context Tab elements
 const contextComponentList = document.getElementById('context-component-list');
@@ -204,6 +210,43 @@ const saveEditNodeButton = document.getElementById('save-edit-node-button');
 const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
 const saveAsComponentButton = document.getElementById('save-as-component-button');
+
+// START OF FIX: Global Agent Loader functions
+/**
+ * Shows and updates the global agent status loader.
+ * @param {string} status - The main status message (e.g., "Agent is working...").
+ * @param {string} [progress=''] - Optional progress text (e.g., "Step 1/5").
+ */
+function showGlobalAgentLoader(status, progress = '') {
+    if (!globalAgentLoader) return;
+    globalAgentStatusText.textContent = status;
+    globalAgentProgressText.textContent = progress;
+    globalAgentLoader.classList.add('visible');
+}
+
+/**
+ * Updates the text of an already visible global agent loader.
+ * @param {string} status - The new main status message.
+ * @param {string} [progress=''] - The new progress text.
+ */
+function updateGlobalAgentLoader(status, progress = '') {
+    if (!globalAgentLoader || !globalAgentLoader.classList.contains('visible')) {
+        // If it's not visible, just show it with the new text
+        showGlobalAgentLoader(status, progress);
+        return;
+    }
+    globalAgentStatusText.textContent = status;
+    globalAgentProgressText.textContent = progress;
+}
+
+/**
+ * Hides the global agent status loader.
+ */
+function hideGlobalAgentLoader() {
+    if (!globalAgentLoader) return;
+    globalAgentLoader.classList.remove('visible');
+}
+// END OF FIX
 
 // --- On-page Console Logging ---
 const consoleOutput = document.getElementById('console-output');
@@ -2482,6 +2525,7 @@ async function handleFixError(errorMessage, fixButton) {
     fixButton.disabled = true;
     fixButton.innerHTML = 'Fixing... <div class="loading-spinner"></div>';
     showAgentSpinner();
+    showGlobalAgentLoader('Fixing runtime error...');
 
     logToConsole(`Attempting to fix error: "${errorMessage.split('\n')[0]}..."`, 'info');
 
@@ -2533,6 +2577,7 @@ ${fullTreeString}
         runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = ''; // Clear the prompt
         hideAgentSpinner();
+        hideGlobalAgentLoader();
     }
 }
 
@@ -2597,6 +2642,7 @@ async function handleRunAgent() {
     runAgentSingleTaskButton.innerHTML = 'Agent is thinking... <div class="loading-spinner"></div>';
     logToAgent(`<strong>You:</strong> ${userPrompt}`, 'user');
     showAgentSpinner();
+    showGlobalAgentLoader('Executing single task...');
 
     const fullTreeString = JSON.stringify(vibeTree, null, 2);
     const systemPrompt = getAgentSystemPrompt();
@@ -2624,6 +2670,7 @@ async function handleRunAgent() {
         runAgentSingleTaskButton.innerHTML = 'Execute as Single Task';
         agentPromptInput.value = '';
         hideAgentSpinner();
+        hideGlobalAgentLoader();
     }
 }
 
@@ -2737,6 +2784,7 @@ async function handleStartIterativeSession() {
     logToAgent('Generating a step-by-step plan...', 'info');
     updateIterativeUI();
     showAgentSpinner();
+    showGlobalAgentLoader('Agent is creating a plan...');
 
     try {
         const systemPrompt = getIterativePlannerSystemPrompt();
@@ -2754,6 +2802,7 @@ async function handleStartIterativeSession() {
 
         logToAgent('<strong>Project Plan Generated.</strong> Please review and edit the plan below, then click "Start Execution".', 'plan');
         iterativeSessionState.status = 'reviewing';
+        updateGlobalAgentLoader('Plan generated', 'Please review and start.');
         updateIterativeUI();
 
     } catch (error) {
@@ -2779,6 +2828,7 @@ async function executeNextIterativeStep() {
     if (iterativeSessionState.currentStepIndex >= iterativeSessionState.plan.length) {
         logToAgent('<strong>Project Complete!</strong> All steps have been executed.', 'plan');
         iterativeSessionState.status = 'complete';
+        updateGlobalAgentLoader('Project Complete!', 'All steps executed.');
         updateIterativeUI();
         hideAgentSpinner();
         return;
@@ -2788,6 +2838,7 @@ async function executeNextIterativeStep() {
     updateIterativeUI(); // Refresh UI to highlight the current step
     const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
     logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}:</strong> ${currentStepDescription}`, 'action');
+    updateGlobalAgentLoader('Executing plan...', `Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
 
     try {
         const systemPrompt = getIterativeExecutorSystemPrompt();
@@ -2824,6 +2875,7 @@ async function executeNextIterativeStep() {
         console.error(`Error executing step ${iterativeSessionState.currentStepIndex + 1}:`, error);
         logToAgent(`Failed to execute step: ${error.message}. Execution has been paused. You can try to fix the issue or edit the plan and resume.`, 'error');
         iterativeSessionState.status = 'paused';
+        updateGlobalAgentLoader('Execution paused on error', `At Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
         updateIterativeUI();
         hideAgentSpinner();
     }
@@ -2859,11 +2911,13 @@ function handleAcceptAndContinue() {
         iterativeSessionState.currentStepIndex = 0; // Start from the beginning
 
         logToAgent('<strong>Execution Started.</strong> Agent will now work through the plan automatically.', 'plan');
+        updateGlobalAgentLoader('Starting execution...', `Step 1/${editedPlan.length}`);
         executeNextIterativeStep(); // Kick off the execution loop
     } else if (status === 'paused') {
         // This is the "Resume" action
         iterativeSessionState.status = 'executing';
         logToAgent('Resuming execution...', 'info');
+        updateGlobalAgentLoader('Resuming execution...', `Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
         executeNextIterativeStep(); // Continue the loop
     }
 }
@@ -2878,6 +2932,7 @@ function handleRequestChanges() {
     if (iterativeSessionState.status === 'executing') {
         iterativeSessionState.status = 'paused';
         logToAgent('Execution paused by user.', 'info');
+        updateGlobalAgentLoader('Execution paused by user', `At Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
         updateIterativeUI();
         hideAgentSpinner();
     }
@@ -2898,6 +2953,7 @@ function handleEndIterativeSession() {
     updateIterativeUI();
     agentPromptInput.value = '';
     hideAgentSpinner();
+    hideGlobalAgentLoader();
 }
 
 
@@ -3368,7 +3424,7 @@ function deleteNode(nodeId) {
         return;
     }
     
-    if (confirm(`Are you sure you want to delete the element "${nodeId}"?`)) {
+    if (confirm(`Are you sure you want to permanently delete the element "${nodeId}"?`)) {
         recordHistory(`Delete node ${nodeId}`);
         const { node, parent } = result;
         const index = parent.children.indexOf(node);
@@ -4770,12 +4826,14 @@ function buildBasicMermaidFromTree(tree) {
         const safeId = (node.id || 'node').replace(/[^a-zA-Z0-9_]/g, '_');
         const label = `${node.id}\\n(${node.type})`;
         graph += `  ${safeId}["${label}"]\n`;
-        if (parentId) graph += `  ${parentId} --> ${safeId}\n`;
+        if (parentId) {
+            graph += `  ${parentId} --> ${safeId}\n`;
+        }
         if (Array.isArray(node.children)) {
             node.children.forEach(child => addNode(child, safeId));
         }
     };
-    addNode(tree);
+    addNode(vibeTree); // Start from the root
     return graph;
 }
 
