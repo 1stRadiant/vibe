@@ -7,21 +7,35 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <!-- JSZip for ZIP import (global JSZip) -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <!-- START OF FIX: Removed inline style block -->
+    <!-- END OF FIX -->
 </head>
 <body>
 
+    <!-- The main layout that is always visible -->
     <div class="main-layout">
         <div class="tabs">
-            <button class="tab-button active" data-tab-id="start">Start</button>
-            <!-- Project tabs will be dynamically inserted here -->
+            <button class="tab-button active" data-tab="start">Start</button>
+            <button class="tab-button" data-tab="preview">Live Preview</button>
+            <button class="tab-button" data-tab="editor">Vibe Editor</button>
+            <button class="tab-button" data-tab="agent">Agent</button>
+            <button class="tab-button" data-tab="chat">Chat</button>
+            <button class="tab-button" data-tab="flowchart">Flowchart</button>
+            <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
+            <button class="tab-button" data-tab="files">Files</button>
+            <button class="tab-button" data-tab="context">Context</button>
+            <button class="tab-button" data-tab="code">Full Code</button>
+
             <div class="tabs-spacer"></div>
             <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
             <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
+            <button id="new-project-button" title="New Project">+</button>
         </div>
 
         <div class="tab-content-area">
-            <div id="start-content" class="tab-content active">
+            <div id="start" class="tab-content active">
                 <div class="start-page-content">
                     <div class="start-header">
                         <h1>Vibe Coding System</h1>
@@ -39,23 +53,8 @@
                          <p>Enter a unique ID and a description to generate a new website.</p>
                          <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
                          <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                         <div class="button-row">
-                            <button id="generate-project-button">Generate Instantly</button>
-                            <button id="start-guided-generation-button">Start Guided Generation</button>
-                         </div>
+                         <button id="generate-project-button">Generate & Save Project</button>
                     </div>
-
-                    <!-- START OF FIX: Iterative UI moved to start page -->
-                    <div id="start-page-iterative-ui" class="hidden">
-                        <h4>Project Plan:</h4>
-                        <p>The AI has generated a plan. You can edit the steps below before starting the build process.</p>
-                        <div id="start-page-iterative-plan-display"></div>
-                        <div id="start-page-iterative-controls" class="hidden">
-                            <button id="execute-plan-button" class="action-button">Looks Good, Build Project</button>
-                            <button id="cancel-plan-button" class="action-button danger">Cancel</button>
-                        </div>
-                    </div>
-                     <!-- END OF FIX -->
 
                     <div id="start-page-generation-output" style="display: none;">
                         <div id="generation-status-container">
@@ -68,185 +67,189 @@
                     </div>
                 </div>
             </div>
-            <!-- Project tab contents will be dynamically inserted here -->
-        </div>
-    </div>
-    
-    <!-- START OF FIX: Template for a full project tab's UI -->
-    <template id="project-tab-template">
-        <div class="project-tab-content tab-content">
-            <div class="project-main-grid">
-                <div class="project-preview-area">
-                    <div class="preview-container">
-                        <div class="preview-header">
-                            <h2>Live Website Preview</h2>
-                            <button class="toggle-inspect-button action-button" title="Click to select elements in the preview">Enable Inspect</button>
-                        </div>
-                        <iframe class="website-preview" title="Live Website Preview"></iframe>
+
+            <div id="preview" class="tab-content">
+                <div class="preview-container">
+                    <div class="preview-header">
+                        <h2>Live Website Preview</h2>
+                        <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
                     </div>
+                    <iframe id="website-preview" title="Live Website Preview"></iframe>
                 </div>
-                <div class="project-sidebar">
-                    <div class="sidebar-tabs">
-                        <button class="sidebar-tab-button active" data-sidebar-tab="editor">Vibe Editor</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="agent">Agent</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="chat">Chat</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="files">Files</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="code">Full Code</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="flowchart">Flowchart</button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="console">Console<span class="console-error-indicator"></span></button>
-                        <button class="sidebar-tab-button" data-sidebar-tab="context">Context</button>
+            </div>
+
+            <div id="editor" class="tab-content">
+                 <div class="editor-container">
+                    <div class="editor-header">
+                        <div class="editor-header-left">
+                            <h2>Vibe Editor</h2>
+                            <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
+                        </div>
+                        <div class="editor-header-right">
+                             <div id="ai-editor-search-container">
+                                <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                <button id="ai-editor-search-button" class="action-button">Search</button>
+                            </div>
+                            <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                        </div>
                     </div>
-                    <div class="sidebar-content-area">
-                        
-                        <div class="sidebar-content active" data-sidebar-tab-content="editor">
-                            <div class="editor-container">
-                                <div class="editor-header">
-                                    <div class="editor-header-left">
-                                        <h2>Vibe Editor</h2>
-                                    </div>
-                                    <div class="editor-header-right">
-                                         <div class="ai-editor-search-container">
-                                            <input type="text" class="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
-                                            <button class="ai-editor-search-button action-button">Search</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="vibe-editor"></div>
-                            </div>
-                        </div>
+                    <div id="vibe-editor"></div>
+                </div>
+            </div>
 
-                        <div class="sidebar-content" data-sidebar-tab-content="agent">
-                           <div class="agent-container">
-                                <h2>AI Agent</h2>
-                                <p>Describe a task. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
-                                <div class="agent-controls">
-                                    <textarea class="agent-prompt-input" rows="4" placeholder="e.g., 'Change the color scheme to dark mode'"></textarea>
-                                    <div class="agent-buttons-container">
-                                        <button class="run-agent-single-task-button action-button">Execute as Single Task</button>
-                                        <button class="start-iterative-session-button action-button">Start Iterative Session</button>
-                                    </div>
-                                </div>
-                                <div class="iterative-session-ui hidden">
-                                    <h4>Project Plan:</h4>
-                                    <div class="iterative-plan-display"></div>
-                                    <div class="iterative-controls hidden">
-                                        <p>Review changes in the preview, then provide feedback or continue.</p>
-                                        <button class="accept-continue-button action-button">Looks Good, Continue</button>
-                                        <button class="request-changes-button action-button">Request Changes</button>
-                                        <button class="end-session-button">End Session</button>
-                                    </div>
-                                </div>
-                                <div class="agent-output-container">
-                                    <h3>Agent Log</h3>
-                                    <div class="agent-output">
-                                        <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
-                                    </div>
-                                </div>
-                            </div>
+            <div id="agent" class="tab-content">
+                <div class="agent-container">
+                    <h2>AI Agent</h2>
+                    <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
+                    
+                    <div id="agent-controls">
+                        <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
+                        <div id="agent-buttons-container">
+                            <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
+                            <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
                         </div>
-
-                         <div class="sidebar-content" data-sidebar-tab-content="chat">
-                            <div class="chat-container">
-                                <div class="system-prompt-container">
-                                    <label>System Prompt (Optional)</label>
-                                    <textarea class="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
-                                </div>
-                                <div class="chat-output-container">
-                                    <h3>Chat</h3>
-                                    <div class="chat-output">
-                                        <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
-                                    </div>
-                                </div>
-                                <div class="chat-controls">
-                                    <textarea class="chat-prompt-input" placeholder="Ask the AI anything..."></textarea>
-                                    <button class="send-chat-button action-button">Send</button>
-                                </div>
-                            </div>
+                    </div>
+            
+                    <div id="iterative-session-ui" class="hidden">
+                        <h4>Project Plan:</h4>
+                        <div id="iterative-plan-display"></div>
+                        <div id="iterative-controls" class="hidden">
+                            <p>Review the changes in the preview. Then, provide feedback or continue.</p>
+                            <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
+                            <button id="request-changes-button" class="action-button">Request Changes</button>
+                            <button id="end-session-button">End Session</button>
                         </div>
-
-                        <div class="sidebar-content" data-sidebar-tab-content="files">
-                            <div class="files-container">
-                                <h2>Project Files & Assets</h2>
-                                <div class="files-toolbar">
-                                    <input type="file" class="files-upload-input" multiple style="display: none;">
-                                    <button class="files-upload-button action-button">Upload</button>
-                                    <button class="files-new-folder-button action-button">New Folder</button>
-                                    <button class="files-new-file-button action-button">New File</button>
-                                    <button class="files-delete-button action-button danger">Delete</button>
-                                </div>
-                                <div class="assets-hint">
-                                    <strong>Hint:</strong> You can reference uploaded assets in your prompts and code.
-                                </div>
-                                <div class="files-browser">
-                                    <div class="files-tree"></div>
-                                    <div class="files-preview">
-                                        <div class="files-preview-placeholder">Select a file to preview it here.</div>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+            
+                    <div id="agent-output-container">
+                        <h3>Agent Log</h3>
+                        <div id="agent-output">
+                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
                         </div>
-
-                         <div class="sidebar-content" data-sidebar-tab-content="code">
-                            <div class="full-code-container">
-                                <h3>Full Website Code</h3>
-                                <div class="search-container">
-                                    <input type="text" class="search-input" placeholder="Find in code...">
-                                    <span class="search-results-count"></span>
-                                </div>
-                                <textarea class="full-code-editor"></textarea>
-                                <button class="update-tree-from-code-button action-button">Process Code and Update Nodes</button>
-                            </div>
-                        </div>
-
-                         <div class="sidebar-content" data-sidebar-tab-content="flowchart">
-                            <div class="flowchart-container">
-                                <h2>Website Flowchart</h2>
-                                <div class="flowchart-controls">
-                                    <button class="generate-flowchart-button action-button">Generate Flowchart</button>
-                                </div>
-                                <div class="flowchart-output">
-                                    <div class="flowchart-placeholder">Click "Generate" to create a diagram.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="sidebar-content" data-sidebar-tab-content="console">
-                             <div class="console-container">
-                                <h3>Console</h3>
-                                <div class="console-output"></div>
-                            </div>
-                        </div>
-
-                        <div class="sidebar-content" data-sidebar-tab-content="context">
-                            <div class="context-container">
-                                <h2>Component Context Library</h2>
-                                <p>Manage reusable components. The AI will use this library as context.</p>
-                                <div class="context-browser">
-                                    <div class="context-list-panel">
-                                        <h3>Components</h3>
-                                        <div class="context-component-list"></div>
-                                        <button class="add-new-component-button action-button">Add New Component</button>
-                                        <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
-                                            <input type="file" class="context-upload-input" accept=".json,application/json" style="display: none;">
-                                            <button class="upload-context-button action-button">Upload Library</button>
-                                            <button class="download-context-button action-button">Download Library</button>
-                                        </div>
-                                    </div>
-                                    <div class="context-component-viewer">
-                                        <div class="files-preview-placeholder">Select a component to view it here.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
                     </div>
                 </div>
             </div>
-        </div>
-    </template>
-    <!-- END OF FIX -->
 
-    <!-- Modals (shared across all tabs) -->
+            <div id="chat" class="tab-content">
+                <div class="chat-container">
+                    <div class="system-prompt-container">
+                        <label for="chat-system-prompt-input">System Prompt (Optional)</label>
+                        <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
+                    </div>
+                    <div class="chat-output-container">
+                        <h3>Chat</h3>
+                        <div id="chat-output">
+                            <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
+                        </div>
+                    </div>
+                    <div class="chat-controls">
+                        <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
+                        <button id="send-chat-button" class="action-button">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flowchart" class="tab-content">
+                <div class="flowchart-container">
+                    <h2>Website Functionality Flowchart</h2>
+                    <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
+                    <div class="flowchart-controls">
+                        <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
+                    </div>
+                    <div id="flowchart-output">
+                        <div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website's logic.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="console" class="tab-content">
+                <div id="console-container">
+                    <h3>Console</h3>
+                    <div id="console-output"></div>
+                </div>
+            </div>
+
+            <div id="files" class="tab-content">
+                <div class="files-container">
+                    <h2>Project Files & Assets</h2>
+                    <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
+                    <div class="files-toolbar">
+                        <input type="file" id="files-upload-input" multiple style="display: none;">
+                        <button id="files-upload-button" class="action-button">Upload</button>
+                        <button id="files-new-folder-button" class="action-button">New Folder</button>
+                        <button id="files-new-file-button" class="action-button">New File</button>
+                        <button id="files-download-button" class="action-button">Download</button>
+                        <button id="files-copy-button" class="action-button">Copy</button>
+                        <button id="files-paste-button" class="action-button">Paste</button>
+                        <button id="files-rename-button" class="action-button">Rename</button>
+                        <button id="files-delete-button" class="action-button danger">Delete</button>
+                    </div>
+                    <div class="assets-hint">
+                        <strong>Hint:</strong> You can reference these assets in your prompts and code. The AI receives a list of available assets. Use paths exactly as shown below.
+                    </div>
+                    <div class="files-browser">
+                        <div class="files-tree" id="files-tree"></div>
+                        <div class="files-preview" id="files-preview">
+                            <div class="files-preview-placeholder">Select a file to preview it here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="context" class="tab-content">
+                <div class="context-container">
+                    <h2>Component Context Library</h2>
+                    <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
+                    <div class="context-browser">
+                        <div class="context-list-panel">
+                            <h3>Components</h3>
+                            <div id="context-component-list"></div>
+                            <button id="add-new-component-button" class="action-button">Add New Component</button>
+                            <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
+                                <input type="file" id="context-upload-input" accept=".json,application/json" style="display: none;">
+                                <button id="upload-context-button" class="action-button" title="Import a component library from a .json file">Upload Library</button>
+                                <button id="download-context-button" class="action-button" title="Export the current component library to a .json file">Download Library</button>
+                            </div>
+                        </div>
+                        <div id="context-component-viewer" class="context-viewer-panel">
+                            <div class="files-preview-placeholder">Select a component to view it here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="code" class="tab-content">
+                <div class="full-code-container">
+                    <h3>Full Website Code</h3>
+                    <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
+                    <div class="file-upload-container">
+                        <p>Or, upload an HTML file to start a new project:</p>
+                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
+                        <button id="upload-html-button" class="action-button">Upload & Process File</button>
+                    </div>
+                    <div class="file-upload-container">
+                        <p>Upload a ZIP of a multi-file website (HTML, CSS, JS, images). We'll inline CSS/JS and re-link assets automatically.</p>
+                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
+                        <button id="upload-zip-button" class="action-button">Upload ZIP & Import Project</button>
+                    </div>
+                    <div class="file-upload-container">
+                        <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
+                        <button id="download-zip-button" class="action-button">Download Project ZIP</button>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" id="search-input" placeholder="Find in code...">
+                        <button id="find-prev-button" class="action-button">&lt; Prev</button>
+                        <button id="find-next-button" class="action-button">Next &gt;</button>
+                        <span id="search-results-count"></span>
+                    </div>
+                    <textarea id="full-code-editor"></textarea>
+                    <button id="update-tree-from-code-button" class="action-button">Process Code and Update Nodes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
     <div id="add-node-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -287,6 +290,12 @@
                     <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
                     <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
                     <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
+                    <optgroup label="Advanced & Experimental Models">
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    </optgroup>
                  </select>
                 <div id="gemini-api-key-container" class="api-key-container">
                     <h3>Gemini API Key</h3>
@@ -363,6 +372,7 @@
         </div>
     </div>
 
+    <!-- START OF FIX: Global Agent Status Loader -->
     <div id="global-agent-loader">
         <div class="loading-spinner"></div>
         <div class="loader-text">
@@ -370,6 +380,7 @@
             <p id="global-agent-progress-text"></p>
         </div>
     </div>
+    <!-- END OF FIX -->
 
     <script type="module" src="app.js"></script>
 </body>
