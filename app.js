@@ -68,6 +68,8 @@ const newProjectIdInput = document.getElementById('new-project-id-input');
 const projectListContainer = document.getElementById('project-list');
 const noProjectsMessage = document.getElementById('no-projects-message');
 const newProjectContainer = document.getElementById('new-project-container');
+const startIterativeBuildButton = document.getElementById('start-iterative-build-button');
+
 
 // Full code display (now in a tab)
 const fullCodeEditor = document.getElementById('full-code-editor');
@@ -578,6 +580,7 @@ function updateFeatureAvailability() {
     uploadHtmlButton.disabled = !keyIsAvailable;
     generateFlowchartButton.disabled = !keyIsAvailable;
     generateProjectButton.disabled = !keyIsAvailable;
+    startIterativeBuildButton.disabled = !keyIsAvailable;
     aiEditorSearchButton.disabled = !keyIsAvailable; // NEW: Control AI editor search availability
     // The "Fix with AI" buttons are generated dynamically, so we can't disable them here.
     // Instead, we check for the key when the button is created.
@@ -4702,6 +4705,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
         if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+        if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
 
         if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
         if (chatPromptInput) {
@@ -4943,6 +4947,54 @@ async function handleGenerateProject() {
         newProjectContainer.style.display = 'block';
     }
 }
+
+/**
+ * Starts a new project and immediately enters an iterative build session.
+ */
+async function handleStartIterativeProjectBuild() {
+    try {
+        const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+        if (!keyIsAvailable) {
+            alert(`Please add your API Key in Settings to generate a project.`);
+            return;
+        }
+
+        const prompt = (projectPromptInput.value || '').trim();
+        if (!prompt) {
+            alert('Please enter a description for your new project.');
+            return;
+        }
+
+        let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+        if (!desiredId) desiredId = `project-${Date.now()}`;
+
+        const existing = db.listProjects();
+        let projectId = desiredId;
+        let suffix = 2;
+        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
+
+        // Initialize a new, empty project
+        currentProjectId = projectId;
+        vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
+        vibeTree.description = prompt; // Set the overall goal
+        db.saveProject(currentProjectId, vibeTree);
+        populateProjectList();
+        resetHistory();
+        refreshAllUI(); // Refresh UI to show the empty project state
+
+        logToConsole(`New project '${currentProjectId}' created for iterative session.`, 'info');
+
+        // Switch to agent tab and kick off the iterative process
+        switchToTab('agent');
+        agentPromptInput.value = prompt; // Pre-fill the goal
+        handleStartIterativeSession(); // Start the planning phase
+
+    } catch (e) {
+        console.error('Iterative project build failed:', e);
+        alert(`Failed to start iterative build: ${e.message}`);
+    }
+}
+
 
 // NEW: Use AI to generate a more detailed description for the selected component.
 async function handleAiImproveDescription() {
