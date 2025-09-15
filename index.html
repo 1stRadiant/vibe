@@ -17,10 +17,10 @@
     <!-- The main layout that is always visible -->
     <div class="main-layout">
         <div class="tabs">
-            <button class="tab-button active" data-tab="start">Start</button>
+            <button class="tab-button active" data-tab="agent">Agent</button>
+            <button class="tab-button" data-tab="projects">Projects</button>
             <button class="tab-button" data-tab="preview">Live Preview</button>
             <button class="tab-button" data-tab="editor">Vibe Editor</button>
-            <button class="tab-button" data-tab="agent">Agent</button>
             <button class="tab-button" data-tab="chat">Chat</button>
             <button class="tab-button" data-tab="flowchart">Flowchart</button>
             <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
@@ -35,7 +35,40 @@
         </div>
 
         <div class="tab-content-area">
-            <div id="start" class="tab-content active">
+            <div id="agent" class="tab-content active">
+                <div class="agent-container">
+                    <h2>AI Agent</h2>
+                    <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
+                    
+                    <div id="agent-controls">
+                        <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
+                        <div id="agent-buttons-container">
+                            <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
+                            <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
+                        </div>
+                    </div>
+            
+                    <div id="iterative-session-ui" class="hidden">
+                        <h4>Project Plan:</h4>
+                        <div id="iterative-plan-display"></div>
+                        <div id="iterative-controls" class="hidden">
+                            <p>Review the changes in the preview. Then, provide feedback or continue.</p>
+                            <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
+                            <button id="request-changes-button" class="action-button">Request Changes</button>
+                            <button id="end-session-button">End Session</button>
+                        </div>
+                    </div>
+            
+                    <div id="agent-output-container">
+                        <h3>Agent Log</h3>
+                        <div id="agent-output">
+                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="projects" class="tab-content">
                 <div class="start-page-content">
                     <div class="start-header">
                         <h1>Vibe Coding System</h1>
@@ -94,39 +127,6 @@
                         </div>
                     </div>
                     <div id="vibe-editor"></div>
-                </div>
-            </div>
-
-            <div id="agent" class="tab-content">
-                <div class="agent-container">
-                    <h2>AI Agent</h2>
-                    <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
-                    
-                    <div id="agent-controls">
-                        <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
-                        <div id="agent-buttons-container">
-                            <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
-                            <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
-                        </div>
-                    </div>
-            
-                    <div id="iterative-session-ui" class="hidden">
-                        <h4>Project Plan:</h4>
-                        <div id="iterative-plan-display"></div>
-                        <div id="iterative-controls" class="hidden">
-                            <p>Review the changes in the preview. Then, provide feedback or continue.</p>
-                            <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
-                            <button id="request-changes-button" class="action-button">Request Changes</button>
-                            <button id="end-session-button">End Session</button>
-                        </div>
-                    </div>
-            
-                    <div id="agent-output-container">
-                        <h3>Agent Log</h3>
-                        <div id="agent-output">
-                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
