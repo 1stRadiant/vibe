@@ -31,12 +31,8 @@ body {
 }
 
 
-/* Start Page Styles: Remove display toggling and center the content block */
-#start {
-    /* No display properties needed, handled by .tab-content */
-}
-
-#start .start-page-content {
+/* Projects Page Styles: Remove display toggling and center the content block */
+#projects .start-page-content {
     margin: 40px auto; /* Center the content block with some top margin */
     max-width: 700px;
     background-color: #282c34;
