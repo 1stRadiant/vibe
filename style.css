@@ -1918,3 +1918,57 @@ body.is-dragging-vibe .drag-handle {
     background: #21252b;
     margin-bottom: 15px;
 }
+
+/* START OF FIX: Global Agent Loader Styles */
+#global-agent-loader {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #21252b;
+    border: 1px solid #444;
+    border-left: 4px solid #c678dd; /* Purple like agent tab */
+    border-radius: 8px;
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 2000;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    pointer-events: none; /* Don't block clicks when hidden */
+}
+
+#global-agent-loader.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto; /* Allow interaction when visible */
+}
+
+#global-agent-loader .loading-spinner {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+    border-top-color: #c678dd;
+    margin: 0; /* Override default margins */
+    flex-shrink: 0;
+}
+
+#global-agent-loader .loader-text p {
+    margin: 0;
+    line-height: 1.4;
+}
+
+#global-agent-status-text {
+    font-weight: bold;
+    color: #abb2bf;
+}
+
+#global-agent-progress-text {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.9em;
+    color: #5c6370;
+    min-height: 1.2em; /* Prevent layout shift when text appears */
+}
+/* END OF FIX */
