@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vibe Coding System — Bundle</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+
+<!-- JSZip CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+  :root{
+    --dark-bg-primary: #1a1a2e;
+    --dark-bg-secondary: #162447;
+    --dark-bg-tertiary: #1f4068;
+    --glow-accent-primary: #7ff1ff;
+    --glow-accent-secondary: #4169e1;
+    --text-primary: #f0f0f0;
+    --text-secondary: #abb2bf;
+    --destructive-red: #dc3545;
+    --glass-opacity: 0.12;
+    --panel-radius: 12px;
+  }
+
+  html,body{height:100%;margin:0;background:var(--dark-bg-primary);font-family:'Rajdhani',sans-serif;color:var(--text-primary);overflow:hidden;}
+  /* Particle canvas */
+  #particles-canvas{position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,var(--dark-bg-primary),var(--dark-bg-secondary));}
+
+  /* Split view */
+  .app-split{display:flex;height:100vh;gap:16px;padding:18px;box-sizing:border-box;}
+  #vibe-editor{width:42%;min-width:340px;background:rgba(255,255,255,var(--glass-opacity));backdrop-filter:blur(10px);border:1px solid rgba(127,241,255,0.08);border-radius:var(--panel-radius);padding:14px;box-shadow:0 8px 40px rgba(0,0,0,0.6);overflow:auto}
+  #website-preview-container{flex:1;min-width:360px;background:rgba(255,255,255,var(--glass-opacity));backdrop-filter:blur(10px);border:1px solid rgba(65,105,225,0.06);border-radius:var(--panel-radius);display:flex;flex-direction:column;overflow:hidden;padding:8px}
+  #website-preview{flex:1;border-radius:8px;border:1px solid rgba(127,241,255,0.06);background:#fff}
+
+  h1,h2{font-family:'Orbitron',sans-serif;margin:6px 0 12px 0;color:var(--glow-accent-primary);text-shadow:0 0 8px rgba(127,241,255,0.14);}
+  .subtitle{color:var(--text-secondary);font-size:13px;margin-bottom:10px}
+
+  /* Vibe Tree list */
+  .vibe-node{padding:10px;border-radius:8px;margin-bottom:8px;border:1px solid rgba(127,241,255,0.05);display:flex;flex-direction:column;gap:8px}
+  .node-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .node-id{font-weight:600;color:var(--glow-accent-primary)}
+  .node-type{font-size:12px;color:var(--text-secondary);padding:6px 8px;border-radius:6px;border:1px solid rgba(65,105,225,0.06)}
+  .node-desc{color:var(--text-secondary);font-size:13px}
+  .node-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{
+    padding:6px 10px;border-radius:8px;border:1px solid rgba(127,241,255,0.12);background:transparent;color:var(--glow-accent-primary);
+    cursor:pointer;font-weight:600;font-size:13px;text-shadow:0 0 6px rgba(127,241,255,0.06);
+    transition:all 200ms;backdrop-filter:blur(6px)
+  }
+  .btn:hover{box-shadow:0 6px 18px rgba(127,241,255,0.06);transform:translateY(-2px);background:linear-gradient(90deg, rgba(127,241,255,0.03), rgba(65,105,225,0.02))}
+  .btn-danger{color:var(--destructive-red);border-color:rgba(220,53,69,0.12)}
+  .small{padding:4px 8px;font-size:12px;border-radius:6px}
+
+  /* OS menu */
+  #os-menu-container{position:fixed;right:26px;bottom:26px;width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:60;cursor:grab}
+  #os-menu{
+    width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(180deg, rgba(127,241,255,0.06), rgba(65,105,225,0.04));
+    border:1px solid rgba(127,241,255,0.18);box-shadow:0 12px 30px rgba(0,0,0,0.6),0 0 18px rgba(127,241,255,0.04);
+    transition:transform 240ms;
+  }
+  #os-menu.open{transform:scale(1.04)rotate(-6deg)}
+  .radial-btn{
+    width:48px;height:48px;border-radius:50%;position:absolute;right:26px;bottom:26px;display:flex;align-items:center;justify-content:center;
+    opacity:0;transform:translate(0,0) scale(0.6);transition:all 320ms cubic-bezier(.2,.9,.2,1);pointer-events:none;
+    border:1px solid rgba(127,241,255,0.06);backdrop-filter:blur(8px);
+    background:linear-gradient(180deg, rgba(127,241,255,0.02), rgba(65,105,225,0.02));
+  }
+  .radial-btn.show{opacity:1;pointer-events:auto;scale:1}
+  .radial-label{position:absolute;right:90px;bottom:26px;color:var(--text-secondary);font-size:12px;transform:translateY(0);opacity:0;transition:all 240ms}
+  .radial-btn svg{width:18px;height:18px;filter:drop-shadow(0 0 8px rgba(127,241,255,0.06))}
+
+  /* console */
+  #console-container{position:fixed;left:18px;right:18px;bottom:18px;height:150px;background:rgba(0,0,0,0.28);border-radius:10px;padding:10px;border:1px solid rgba(127,241,255,0.04);display:flex;flex-direction:column;gap:8px;z-index:40}
+  #console-logs{flex:1;overflow:auto;color:var(--text-secondary);font-size:13px;font-family:monospace;padding:6px}
+  #console-controls{display:flex;gap:8px;align-items:center}
+  .resizer{height:6px;cursor:ns-resize;background:linear-gradient(90deg, rgba(127,241,255,0.04), rgba(65,105,225,0.02));border-radius:4px}
+
+  /* modals */
+  .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);min-width:520px;max-width:90%;max-height:80%;overflow:auto;background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);border-radius:12px;padding:16px;border:1px solid rgba(127,241,255,0.06);z-index:80;display:none}
+  .modal.show{display:block}
+  .modal-header{display:flex;justify-content:space-between;align-items:center}
+  .close-x{background:transparent;border:0;color:var(--text-secondary);font-weight:800;cursor:pointer}
+  input[type="text"], textarea {width:100%;padding:8px;border-radius:8px;border:1px solid rgba(127,241,255,0.04);background:transparent;color:var(--text-primary)}
+  .modal-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+
+  /* loader */
+  #global-agent-loader{position:fixed;left:18px;top:18px;background:linear-gradient(180deg, rgba(127,241,255,0.06), rgba(65,105,225,0.03));padding:8px;border-radius:999px;border:1px solid rgba(127,241,255,0.06);display:flex;gap:8px;align-items:center;z-index:90;box-shadow:0 8px 20px rgba(0,0,0,0.6);visibility:hidden;opacity:0}
+  #global-agent-loader.show{visibility:visible;opacity:1}
+  .spinner{width:18px;height:18px;border-radius:50%;border:3px solid rgba(127,241,255,0.12);border-top-color:var(--glow-accent-primary);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* tiny helpers */
+  .muted{color:var(--text-secondary);font-size:12px}
+  .highlight{background:linear-gradient(90deg, rgba(127,241,255,0.06), rgba(65,105,225,0.03));padding:6px;border-radius:6px}
+  .selected-node{outline:2px solid rgba(127,241,255,0.18);box-shadow:0 8px 26px rgba(65,105,225,0.06)}
+  /* responsive */
+  @media (max-width:900px){
+    .app-split{flex-direction:column}
+    #vibe-editor{width:auto;height:40vh}
+    #website-preview-container{height:55vh}
+  }
+</style>
+</head>
+<body>
+<canvas id="particles-canvas"></canvas>
+
+<div class="app-split">
+  <div id="vibe-editor" aria-label="Vibe Editor">
+    <h1>Vibe Coding System</h1>
+    <div class="subtitle">Edit the website via the Vibe Tree — interact with AI agents to sculpt your site.</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn" id="btn-new-project">+ New Project</button>
+      <button class="btn" id="btn-open-project">Open Project</button>
+      <button class="btn" id="btn-save-project">Save Project</button>
+      <button class="btn" id="btn-export">Export ZIP</button>
+      <button class="btn" id="btn-import">Import ZIP</button>
+      <button class="btn" id="btn-ai-agent">AI Agent</button>
+    </div>
+
+    <div id="vibe-tree-root"></div>
+  </div>
+
+  <div id="website-preview-container">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="display:flex;flex-direction:column;flex:1">
+        <div style="display:flex;align-items:center;gap:10px">
+          <strong class="muted">Live Preview</strong>
+          <span class="muted">| Auto-compiled from Vibe Tree</span>
+        </div>
+        <div class="muted" style="font-size:12px">Inspector: <label class="muted"><input type="checkbox" id="inspector-toggle"> Enable</label></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" id="btn-undo">Undo</button>
+        <button class="btn small" id="btn-redo">Redo</button>
+        <button class="btn small" id="btn-ai-chat">AI Chat</button>
+        <button class="btn small" id="btn-components">Components</button>
+      </div>
+    </div>
+
+    <iframe id="website-preview" sandbox="allow-scripts allow-forms allow-modals" srcdoc=""></iframe>
+  </div>
+</div>
+
+<!-- Console -->
+<div id="console-container">
+  <div id="console-controls">
+    <div class="muted">Console</div>
+    <div style="flex:1"></div>
+    <button class="btn small" id="btn-fix-ai">Fix with AI</button>
+    <button class="btn small" id="btn-clear-console">Clear</button>
+  </div>
+  <div id="console-logs"></div>
+  <div class="resizer" id="console-resize" style="margin-top:6px;border-radius:4px;"></div>
+</div>
+
+<!-- OS Menu -->
+<div id="os-menu-container" title="Command Center">
+  <div id="os-menu" title="Open">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 0 8px rgba(127,241,255,0.06))">
+      <circle cx="12" cy="12" r="9" stroke="rgba(127,241,255,0.28)" stroke-width="1.2" fill="none"/>
+      <path d="M8 12h8M12 8v8" stroke="rgba(127,241,255,0.9)" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- radial buttons (positioned with inline styles when shown) -->
+  <div class="radial-btn" data-action="ai-agent" id="radial-ai" title="AI Agent">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="ai-chat" id="radial-chat" title="AI Chat">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="components" id="radial-comp" title="Components">
+    <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.4"/><rect x="14" y="3" width="7" height="7" stroke="currentColor" stroke-width="1.4"/><rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="1.4"/><rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="1.4"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="inspector" id="radial-inspector" title="Inspector">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.4"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="undo" id="radial-undo" title="Undo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20a9 9 0 0 0-11-11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="redo" id="radial-redo" title="Redo">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 14l5-5-5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20a9 9 0 0 0 11-11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <div class="radial-btn" data-action="export" id="radial-export" title="Export">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5 10l7-7 7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="15" width="18" height="6" rx="2" stroke="currentColor" stroke-width="1.4"/></svg>
+  </div>
+
+</div>
+
+<!-- Modals -->
+
+<!-- Project Manager -->
+<div class="modal" id="modal-projects" role="dialog" aria-modal="true">
+  <div class="modal-header">
+    <div>
+      <h2 style="margin:0">Project Manager</h2>
+      <div class="muted">Create, open, import, or delete projects</div>
+    </div>
+    <div><button class="close-x" data-close="modal-projects">✕</button></div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:8px;">
+    <input id="project-name" placeholder="New project name..." />
+    <button class="btn" id="create-project-btn">Create</button>
+    <input type="file" id="import-zip-file" accept=".zip" style="display:none" />
+    <button class="btn" id="import-zip-btn">Import ZIP</button>
+  </div>
+
+  <div class="modal-list" id="projects-list" style="margin-top:12px"></div>
+</div>
+
+<!-- AI Agent Modal -->
+<div class="modal" id="modal-ai-agent">
+  <div class="modal-header">
+    <div>
+      <h2 style="margin:0">AI Agent</h2>
+      <div class="muted">Set a high-level goal and run the iterative agent</div>
+    </div>
+    <div><button class="close-x" data-close="modal-ai-agent">✕</button></div>
+  </div>
+
+  <div style="margin-top:12px">
+    <textarea id="ai-goal" rows="3" placeholder="Make the homepage a sleek landing with hero, CTA, and dark theme..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" id="ai-generate-plan">Generate Plan</button>
+      <button class="btn" id="ai-execute-plan">Execute Plan</button>
+      <button class="btn" id="ai-pause">Pause</button>
+      <button class="btn" id="ai-stop">Stop</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="muted">AI Execution Plan</div>
+      <ol id="ai-plan-list" style="margin-top:8px;color:var(--text-secondary)"></ol>
+    </div>
+  </div>
+</div>
+
+<!-- AI Chat Modal -->
+<div class="modal" id="modal-ai-chat">
+  <div class="modal-header">
+    <div>
+      <h2 style="margin:0">AI Chat</h2>
+      <div class="muted">Direct chat with the AI assistant (mock)</div>
+    </div>
+    <div><button class="close-x" data-close="modal-ai-chat">✕</button></div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+    <div id="chat-log" style="height:320px;overflow:auto;background:rgba(0,0,0,0.08);padding:8px;border-radius:8px;font-family:monospace;color:var(--text-secondary)"></div>
+    <textarea id="chat-input" rows="3" placeholder="Ask the AI to generate code, explain, or fix things..."></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="chat-send">Send</button>
+      <button class="btn" id="chat-insert-code">Insert Code Block</button>
+    </div>
+  </div>
+</div>
+
+<!-- Component Library Modal -->
+<div class="modal" id="modal-components">
+  <div class="modal-header">
+    <div>
+      <h2 style="margin:0">Component Library</h2>
+      <div class="muted">Save and reuse components generated by AI</div>
+    </div>
+    <div><button class="close-x" data-close="modal-components">✕</button></div>
+  </div>
+
+  <div style="margin-top:12px">
+    <div style="display:flex;gap:8px">
+      <input id="component-name" placeholder="Component name..." />
+      <button class="btn" id="generate-component">Generate with AI</button>
+    </div>
+    <div id="components-list" class="modal-list" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- Global Loader -->
+<div id="global-agent-loader">
+  <div class="spinner" aria-hidden="true"></div>
+  <div class="muted" id="loader-text">AI Agent Running...</div>
+</div>
+
+<script>
+(function(){
+  /********************
+   * Utilities
+   ********************/
+  function uid(prefix='id'){
+    return prefix+'-'+Math.random().toString(36).slice(2,9);
+  }
+
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  function el(sel, parent=document){ return parent.querySelector(sel); }
+  function els(sel, parent=document){ return Array.from(parent.querySelectorAll(sel)); }
+  function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /********************
+   * State & Defaults
+   ********************/
+  const state = {
+    projects: {}, // loaded via DB
+    currentProject: null,
+    vibeTree: [], // array of nodes
+    inspectorActive: false,
+    selectedNodeId: null,
+    historyManager: null,
+    database: null,
+    componentLibrary: null,
+    aiService: null,
+    agentRunning: false,
+    agentPaused: false
+  };
+
+  /********************
+   * DataBase — localStorage wrapper
+   ********************/
+  class DataBase{
+    constructor(ns='vibe'){
+      this.ns = ns;
+      this.key = ns+'::projects';
+      this._load();
+    }
+    _load(){
+      const raw = localStorage.getItem(this.key);
+      this.projects = raw ? JSON.parse(raw) : {};
+    }
+    _save(){ localStorage.setItem(this.key, JSON.stringify(this.projects)); }
+    saveProject(projectData){
+      if(!projectData.id) projectData.id = uid('proj');
+      projectData.updatedAt = Date.now();
+      this.projects[projectData.id] = projectData;
+      this._save();
+      return projectData.id;
+    }
+    loadProject(projectId){
+      return this.projects[projectId] ? JSON.parse(JSON.stringify(this.projects[projectId])) : null;
+    }
+    deleteProject(projectId){
+      delete this.projects[projectId];
+      this._save();
+    }
+    listProjects(){
+      return Object.values(this.projects).sort((a,b)=>b.updatedAt - a.updatedAt);
+    }
+  }
+
+  /********************
+   * HistoryManager
+   ********************/
+  class HistoryManager{
+    constructor(onChange){
+      this.stack = [];
+      this.index = -1;
+      this.onChange = onChange || function(){};
+      this.max = 80;
+    }
+    addSnapshot(vibeTree){
+      const snap = JSON.stringify(vibeTree);
+      // drop forward
+      if(this.index < this.stack.length -1){
+        this.stack = this.stack.slice(0, this.index+1);
+      }
+      this.stack.push(snap);
+      if(this.stack.length > this.max) this.stack.shift();
+      this.index = this.stack.length -1;
+    }
+    canUndo(){ return this.index > 0; }
+    canRedo(){ return this.index < this.stack.length -1; }
+    undo(){
+      if(!this.canUndo()) return null;
+      this.index--;
+      const data = JSON.parse(this.stack[this.index]);
+      this.onChange(data);
+      return data;
+    }
+    redo(){
+      if(!this.canRedo()) return null;
+      this.index++;
+      const data = JSON.parse(this.stack[this.index]);
+      this.onChange(data);
+      return data;
+    }
+    reset(vibeTree){
+      this.stack = [JSON.stringify(vibeTree)];
+      this.index = 0;
+    }
+  }
+
+  /********************
+   * ComponentLibrary
+   ********************/
+  class ComponentLibrary{
+    constructor(ns='vibe'){
+      this.key = ns + '::components';
+      this._load();
+    }
+    _load(){ this.components = JSON.parse(localStorage.getItem(this.key) || '{}'); }
+    _save(){ localStorage.setItem(this.key, JSON.stringify(this.components)); }
+    addComponent(componentData){
+      if(!componentData.id) componentData.id = uid('cmp');
+      this.components[componentData.id] = componentData;
+      this._save();
+    }
+    deleteComponent(id){ delete this.components[id]; this._save(); }
+    getComponents(){ return Object.values(this.components); }
+  }
+
+  /********************
+   * Mocked AIService
+   ********************/
+  class AIService{
+    constructor(){
+      this.latencyMin = 400;
+      this.latencyMax = 1400;
+    }
+    async callAI(systemPrompt, userPrompt, context){
+      // simulate network latency
+      const delay = this.latencyMin + Math.random()*(this.latencyMax-this.latencyMin);
+      return new Promise((resolve)=>{
+        setTimeout(()=>{
+          // Very rough simple parsing heuristics to create actions
+          const lower = (userPrompt||'').toLowerCase();
+          let response = { plan: "No plan", actions: [] };
+
+          if(lower.includes('create') && lower.includes('hero')){
+            // create a hero node with html, css
+            const id = uid('hero');
+            response.plan = "Create hero section and styles";
+            response.actions.push({
+              actionType:'create',
+              node:{
+                id: id,
+                type: 'html',
+                description: 'Hero section with headline and CTA',
+                code: `<section data-vibe-id="${id}" class="hero"><h1>Welcome to Vibe</h1><p>Build with vibes not files.</p><a href="#" class="cta">Get Started</a></section>`,
+                children: []
+              }
+            });
+            response.actions.push({
+              actionType:'create',
+              node:{
+                id: id+'-css',
+                type: 'css',
+                description:'Hero styles',
+                code: `.hero{padding:80px 20px;text-align:center;background:linear-gradient(180deg,#091022,#10213a);color:var(--text-primary)} .hero .cta{display:inline-block;margin-top:14px;padding:10px 18px;border-radius:8px;border:1px solid rgba(127,241,255,0.12)}`
+              }
+            });
+          } else if(lower.includes('add nav') || lower.includes('navigation') || lower.includes('nav')){
+            const id = uid('nav');
+            response.plan = "Add a top navigation bar";
+            response.actions.push({
+              actionType:'create',
+              node:{
+                id:id,
+                type:'html',
+                description:'Top navigation',
+                code:`<nav data-vibe-id="${id}" class="topnav"><div class="logo">Vibe</div><div class="links"><a href="#">Home</a><a href="#">Docs</a><a href="#">Contact</a></div></nav>`
+              }
+            });
+            response.actions.push({
+              actionType:'create',
+              node:{
+                id:id+'-css',
+                type:'css',
+                description:'Top nav styles',
+                code: `.topnav{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,0.02)} .topnav .logo{font-weight:700}`
+              }
+            });
+          } else if(lower.includes('fix') || lower.includes('error') || lower.includes('bug')){
+            response.plan = "Attempt to patch runtime issues by editing JS nodes";
+            // naive patch: find any js-function nodes in context and wrap with try/catch
+            const jsNodes = (context && context.vibeTree) ? context.vibeTree.filter(n=>n.type && n.type.startsWith('js')) : [];
+            if(jsNodes.length){
+              jsNodes.forEach(n=>{
+                response.actions.push({
+                  actionType:'update',
+                  nodeId:n.id,
+                  newCode: `try{ ${n.code} }catch(e){ console.error("AI patched error in ${n.id}:",e); }`
+                });
+              });
+            } else {
+              // suggest adding a window.onerror handler
+              response.actions.push({
+                actionType:'create',
+                node:{
+                  id: uid('js'),
+                  type:'js',
+                  description:'Global error handler (AI added)',
+                  code: `window.addEventListener('error',function(e){console.error("Runtime error captured:",e.message)});`
+                }
+              });
+            }
+          } else if(lower.includes('generate component') || lower.includes('component')){
+            const cid = uid('cmp');
+            response.plan = "Generate a reusable component";
+            response.actions.push({
+              actionType:'create',
+              node:{
+                id:cid,
+                type:'component',
+                description: 'AI-generated component skeleton',
+                code: JSON.stringify({
+                  html:`<div data-vibe-id="${cid}" class="card"><h3>Component</h3><p>Reusable piece</p></div>`,
+                  css: `.card{padding:12px;border-radius:10px;background:linear-gradient(180deg,#0b1220,#10213a);}`,
+                  js: ''
+                })
+              }
+            });
+          } else if(lower.trim().length===0){
+            response.plan = "Provide suggestions for the project.";
+            response.actions.push({actionType:'noop', message:'Provide a short plan: add nav, hero, footer, and styles.'});
+          } else {
+            // Generic: return a short plan with an update to body css
+            response.plan = "Suggest dark theme polish";
+            response.actions.push({
+              actionType:'update',
+              nodeId: (context && context.vibeTree && context.vibeTree.find(n=>n.type==='css')) ? context.vibeTree.find(n=>n.type==='css').id : null,
+              newCode: `:root{--text-primary:#f0f0f0;--bg:linear-gradient(180deg,#0a0f1a,#061025)} body{background:var(--bg);color:var(--text-primary)}`
+            });
+          }
+
+          // Wrap into JSON string to resemble an AI returning JSON
+          resolve(JSON.stringify(response));
+        }, delay);
+      });
+    }
+  }
+
+  /********************
+   * Particles Background
+   ********************/
+  (function particlesInit(){
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let w, h, particles = [], ratio = window.devicePixelRatio || 1;
+
+    function resize(){
+      w = canvas.width = Math.floor(window.innerWidth * ratio);
+      h = canvas.height = Math.floor(window.innerHeight * ratio);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.scale(ratio, ratio);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function createParticles(n){
+      particles = [];
+      for(let i=0;i<n;i++){
+        particles.push({
+          x: Math.random()*window.innerWidth,
+          y: Math.random()*window.innerHeight,
+          vx: (Math.random()-0.5)*0.3,
+          vy: (Math.random()-0.5)*0.3,
+          r: Math.random()*2 + 0.6
+        });
+      }
+    }
+    createParticles(80);
+
+    function step(){
+      ctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+      // draw lines
+      for(let i=0;i<particles.length;i++){
+        for(let j=i+1;j<particles.length;j++){
+          const a=particles[i], b=particles[j];
+          const dx=a.x-b.x, dy=a.y-b.y;
+          const d2 = dx*dx+dy*dy;
+          if(d2<9000){
+            const alpha = 0.08*(1 - d2/9000);
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(127,241,255,${alpha})`;
+            ctx.moveTo(a.x,a.y);
+            ctx.lineTo(b.x,b.y);
+            ctx.stroke();
+          }
+        }
+      }
+      // draw particles
+      particles.forEach(p=>{
+        p.x += p.vx; p.y += p.vy;
+        if(p.x<0) p.x = window.innerWidth;
+        if(p.x>window.innerWidth) p.x = 0;
+        if(p.y<0) p.y = window.innerHeight;
+        if(p.y>window.innerHeight) p.y = 0;
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(127,241,255,0.06)';
+        ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fill();
+      });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
+
+  /********************
+   * Rendering Vibe Tree and Preview
+   ********************/
+  function renderVibeTree(nodes, parentEl){
+    parentEl.innerHTML = '';
+    if(!Array.isArray(nodes)) nodes = [];
+    nodes.forEach(node=>{
+      const nodeEl = document.createElement('div');
+      nodeEl.className = 'vibe-node';
+      nodeEl.dataset.id = node.id;
+      if(state.selectedNodeId === node.id) nodeEl.classList.add('selected-node');
+
+      const meta = document.createElement('div'); meta.className='node-meta';
+      const left = document.createElement('div');
+      left.innerHTML = `<div class="node-id">${escapeHtml(node.id)}</div><div class="node-desc">${escapeHtml(node.description||'')}</div>`;
+      const right = document.createElement('div');
+      right.innerHTML = `<div class="node-type">${escapeHtml(node.type||'')}</div>`;
+      meta.append(left,right);
+
+      const codePreview = document.createElement('pre');
+      codePreview.style.background='rgba(0,0,0,0.06)';
+      codePreview.style.padding='8px';
+      codePreview.style.borderRadius='8px';
+      codePreview.style.overflowX='auto';
+      codePreview.style.fontFamily='monospace';
+      codePreview.style.fontSize='12px';
+      codePreview.textContent = (node.code||'').slice(0,500) + ((node.code||'').length>500 ? '\n...':'');
+      const actions = document.createElement('div'); actions.className='node-actions';
+      const btnUpdate = document.createElement('button'); btnUpdate.className='btn small'; btnUpdate.textContent='⚡ Update Vibe';
+      btnUpdate.onclick = ()=> openUpdateNodeModal(node);
+      const btnSaveComp = document.createElement('button'); btnSaveComp.className='btn small'; btnSaveComp.textContent='💾 Save as Component';
+      btnSaveComp.onclick = ()=> { state.componentLibrary.addComponent({id:uid('cmp'),name:node.id, data:node}); refreshComponentsList(); alert('Saved component'); };
+      const btnDelete = document.createElement('button'); btnDelete.className='btn small btn-danger'; btnDelete.textContent='🗑 Delete';
+      btnDelete.onclick = ()=> { if(confirm('Delete node '+node.id+'?')) { deleteNode(node.id); } };
+      const btnSelect = document.createElement('button'); btnSelect.className='btn small'; btnSelect.textContent='🔍 Inspect';
+      btnSelect.onclick = ()=> { state.selectedNodeId = node.id; renderAll(); highlightInIframe(node.id); };
+
+      actions.append(btnUpdate, btnSaveComp, btnSelect, btnDelete);
+
+      nodeEl.appendChild(meta);
+      nodeEl.appendChild(codePreview);
+      nodeEl.appendChild(actions);
+
+      // children
+      if(node.children && node.children.length){
+        const childList = document.createElement('div');
+        childList.style.marginLeft='12px';
+        renderVibeTree(node.children, childList);
+        nodeEl.appendChild(childList);
+      }
+      parentEl.appendChild(nodeEl);
+    });
+  }
+
+  function deleteNode(nodeId){
+    function recurse(arr){
+      for(let i=arr.length-1;i>=0;i--){
+        if(arr[i].id===nodeId){ arr.splice(i,1); return true; }
+        if(arr[i].children && recurse(arr[i].children)) return true;
+      }
+      return false;
+    }
+    const removed = recurse(state.vibeTree);
+    if(removed){
+      state.historyManager.addSnapshot(state.vibeTree);
+      renderAll();
+      updatePreview();
+    }
+  }
+
+  function openUpdateNodeModal(node){
+    // quick inline editing prompt
+    const newCode = prompt('Edit code for '+node.id, node.code || '');
+    if(newCode !== null){
+      // update node in place
+      function recurse(arr){
+        for(const n of arr){
+          if(n.id===node.id){
+            n.code = newCode;
+            return true;
+          }
+          if(n.children && recurse(n.children)) return true;
+        }
+        return false;
+      }
+      recurse(state.vibeTree);
+      state.historyManager.addSnapshot(state.vibeTree);
+      renderAll();
+      updatePreview();
+    }
+  }
+
+  function collectByType(vibeTree){
+    const htmls=[], csses=[], jss=[];
+    function walk(node){
+      if(!node) return;
+      if(node.type && node.code){
+        const t = node.type.toLowerCase();
+        if(t==='html' || t==='head' || t==='container' || t==='component') htmls.push(node.code);
+        else if(t==='css' || t==='style') csses.push(node.code);
+        else if(t.startsWith('js') || t==='script' || t==='js-function') jss.push(node.code);
+      }
+      if(node.children && node.children.length) node.children.forEach(walk);
+    }
+    vibeTree.forEach(walk);
+    return {htmls,csses,jss};
+  }
+
+  function sanitizeSrcdoc(s){ return s; }
+
+  function updatePreview(vibeTree, isInspectorActive){
+    vibeTree = vibeTree || state.vibeTree || [];
+    isInspectorActive = typeof isInspectorActive === 'boolean' ? isInspectorActive : state.inspectorActive;
+    const parts = collectByType(vibeTree);
+    const htmlPart = parts.htmls.join('\n');
+    const cssPart = parts.csses.join('\n');
+    const jsPart = parts.jss.join('\n');
+
+    // Inject window.onerror to post messages to parent
+    const onErrorScript = `
+      window.onerror = function(message, source, lineno, colno, error){
+        try{ parent.postMessage({type:'runtime-error',message:message,source:source,lineno:lineno,colno:colno,stack:error && error.stack}, '*'); }catch(e){}
+      };
+      window.addEventListener('unhandledrejection', function(ev){ try{ parent.postMessage({type:'runtime-unhandledrejection',reason:ev.reason}, '*'); }catch(e){} });
+    `;
+
+    // Inspector script: add data-vibe-id attributes to nodes where possible and handle click/mouseover
+    const inspectorScript = isInspectorActive ? `
+      (function(){
+        function walkAddId(){
+          // look for elements that already have data-vibe-id in html strings - otherwise guess by classes
+          document.querySelectorAll('[data-vibe-id]').forEach(el=>{
+            el.addEventListener('mouseover', function(e){ e.stopPropagation(); this.style.outline='2px solid rgba(127,241,255,0.26)'; });
+            el.addEventListener('mouseout', function(e){ e.stopPropagation(); this.style.outline=''; });
+            el.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); parent.postMessage({type:'vibe-inspector-click',vibeNodeId:this.getAttribute('data-vibe-id')}, '*'); });
+          });
+        }
+        document.addEventListener('DOMContentLoaded', walkAddId);
+        setTimeout(walkAddId,800);
+      })();
+    ` : '';
+
+    const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        :root{
+          --text-primary: #f0f0f0;
+        }
+        body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#070915;color:var(--text-primary);min-height:100vh}
+        ${cssPart}
+      </style>
+      </head><body>
+      ${htmlPart}
+      <script>
+        ${onErrorScript}
+        ${inspectorScript}
+        try{
+          ${jsPart}
+        }catch(e){
+          console.error("Error in injected JS:",e);
+          parent.postMessage({type:'runtime-error',message:e.message,stack:e.stack},'*');
+        }
+      </script>
+      </body></html>`;
+
+    const iframe = el('#website-preview');
+    iframe.srcdoc = sanitizeSrcdoc(doc);
+  }
+
+  /********************
+   * Project Management UI & functions
+   ********************/
+  function renderProjectsList(){
+    const list = el('#projects-list');
+    list.innerHTML = '';
+    const projects = state.database.listProjects();
+    if(projects.length === 0){
+      list.innerHTML = `<div class="muted">No projects yet — create one.</div>`;
+      return;
+    }
+    projects.forEach(p=>{
+      const item = document.createElement('div');
+      item.className = 'highlight';
+      item.style.display='flex';item.style.justifyContent='space-between';item.style.alignItems='center';
+      item.innerHTML = `<div><strong style="color:var(--glow-accent-primary)">${escapeHtml(p.name)}</strong><div class="muted" style="font-size:12px">Updated ${new Date(p.updatedAt).toLocaleString()}</div></div>`;
+      const btns = document.createElement('div');
+      const open = document.createElement('button'); open.className='btn small'; open.textContent='Open'; open.onclick = ()=> { loadProject(p.id); hideModal('modal-projects'); };
+      const del = document.createElement('button'); del.className='btn small btn-danger'; del.textContent='Delete'; del.onclick = ()=> { if(confirm('Delete project "'+p.name+'"?')){ state.database.deleteProject(p.id); renderProjectsList(); } };
+      btns.append(open,del);
+      item.appendChild(btns);
+      list.appendChild(item);
+    });
+  }
+
+  function newProject(name){
+    const proj = { id: uid('proj'), name: name||'Vibe Project', vibeTree: [
+      { id:'head-meta', type:'head', description:'Meta & base styles', code: `<meta name="viewport" content="width=device-width,initial-scale=1">` },
+      { id:'base-css', type:'css', description:'Base theme', code: `:root{--text-primary:#f0f0f0} body{font-family:system-ui,Arial;background:#071021;color:var(--text-primary);margin:0}` },
+      { id:'main-js', type:'js', description:'App scaffolding', code: `/* placeholder script */ console.log('Vibe project initialized');` }
+    ], createdAt:Date.now(), updatedAt:Date.now() };
+    state.database.saveProject(proj);
+    return proj.id;
+  }
+
+  function loadProject(projectId){
+    const proj = state.database.loadProject(projectId);
+    if(!proj) return alert('Could not load project');
+    state.currentProject = proj;
+    state.vibeTree = proj.vibeTree || [];
+    state.historyManager.reset(state.vibeTree);
+    renderAll();
+    updatePreview();
+  }
+
+  function saveCurrentProject(){
+    if(!state.currentProject){
+      alert('No current project — create one first.');
+      return;
+    }
+    state.currentProject.vibeTree = state.vibeTree;
+    state.currentProject.updatedAt = Date.now();
+    state.database.saveProject(state.currentProject);
+    renderProjectsList();
+    alert('Project saved.');
+  }
+
+  /********************
+   * Import/Export via JSZip
+   ********************/
+  async function exportProjectZip(){
+    const zip = new JSZip();
+    // compile vibeTree into files
+    const parts = collectByType(state.vibeTree);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"></head><body>${parts.htmls.join('\n')}<script src="script.js"></script></body></html>`;
+    const css = parts.csses.join('\n');
+    const js = parts.jss.join('\n');
+    zip.file('index.html', html);
+    zip.file('style.css', css);
+    zip.file('script.js', js);
+    const content = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(content);
+    a.download = (state.currentProject ? state.currentProject.name.replace(/\s+/g,'_') : 'vibe_project') + '.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function importProjectZip(file){
+    if(!file) return;
+    const zip = await JSZip.loadAsync(file);
+    // read index.html if present
+    const indexFile = zip.file('index.html') || zip.file('index.htm');
+    let newVibeTree = [];
+    if(indexFile){
+      const html = await indexFile.async('string');
+      // Very naive extraction: everything in <style> tags or linked CSS we won't deeply parse.
+      // We'll create a single html node with the body content and create css and js nodes from style/script tags if found (simple regex).
+      const bodyMatch = html.match(/<body[^>]*>((.|[\r\n])*)<\/body>/i);
+      const bodyContent = bodyMatch ? bodyMatch[1] : html;
+      const cssMatches = html.match(/<style[^>]*>((.|[\r\n])*)<\/style>/ig) || [];
+      const css = cssMatches.map(m=>m.replace(/<style[^>]*>/i,'').replace(/<\/style>/i,'')).join('\n');
+      const jsMatches = html.match(/<script[^>]*>((.|[\r\n])*)<\/script>/ig) || [];
+      const js = jsMatches.map(m=>m.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'')).join('\n');
+
+      newVibeTree.push({id:uid('html'),type:'html',description:'Imported page body',code:bodyContent,children:[]});
+      if(css.trim()) newVibeTree.push({id:uid('css'),type:'css',description:'Imported styles',code:css,children:[]});
+      if(js.trim()) newVibeTree.push({id:uid('js'),type:'js',description:'Imported scripts',code:js,children:[]});
+    } else {
+      // try to import style.css/script.js
+      const cssFile = zip.file('style.css');
+      const jsFile = zip.file('script.js');
+      if(cssFile) newVibeTree.push({id:uid('css'),type:'css',description:'Imported style.css',code:await cssFile.async('string')});
+      if(jsFile) newVibeTree.push({id:uid('js'),type:'js',description:'Imported script.js',code:await jsFile.async('string')});
+      // index.html absent: create placeholder html node
+      newVibeTree.push({id:uid('html'),type:'html',description:'Imported placeholders',code:'<div>Imported project</div>'});
+    }
+    // create a new project from imported content
+    const projectId = uid('proj');
+    const proj = { id: projectId, name: file.name.replace(/\.[^/.]+$/,''), vibeTree:newVibeTree, createdAt:Date.now(), updatedAt:Date.now() };
+    state.database.saveProject(proj);
+    renderProjectsList();
+    alert('Imported project saved. Open it from Project Manager.');
+  }
+
+  /********************
+   * Inspector — highlight nodes in Vibe Tree when iframe posts messages
+   ********************/
+  window.addEventListener('message', (ev)=>{
+    try{
+      const msg = ev.data || {};
+      if(msg && msg.type === 'runtime-error'){
+        appendConsole('[error] '+(msg.message||'Unknown error') + (msg.stack ? '\\n'+msg.stack.split('\\n').slice(0,3).join('\\n') : ''), 'error');
+      } else if(msg && msg.type === 'runtime-unhandledrejection'){
+        appendConsole('[unhandled rejection] '+JSON.stringify(msg.reason), 'error');
+      } else if(msg && msg.type === 'vibe-inspector-click'){
+        // highlight node in editor
+        state.selectedNodeId = msg.vibeNodeId;
+        renderAll();
+        appendConsole('[inspector] Clicked node: '+msg.vibeNodeId, 'info');
+      }
+    }catch(e){}
+  });
+
+  function highlightInIframe(nodeId){
+    // attempt to post a message to iframe to highlight
+    const iframe = el('#website-preview');
+    iframe.contentWindow && iframe.contentWindow.postMessage({type:'highlight',vibeNodeId:nodeId},'*');
+  }
+
+  /********************
+   * Console
+   ********************/
+  function appendConsole(text, level='log'){
+    const log = el('#console-logs');
+    const time = new Date().toLocaleTimeString();
+    const line = document.createElement('div');
+    line.style.whiteSpace='pre-wrap';
+    if(level==='error') line.style.color = 'var(--destructive-red)';
+    else line.style.color = 'var(--text-secondary)';
+    line.textContent = `[${time}] ${text}`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  /********************
+   * AI Iterative Agent & Chat
+   ********************/
+  async function generatePlan(){
+    const goal = el('#ai-goal').value || '';
+    showLoader(true,'Generating plan...');
+    try{
+      const raw = await state.aiService.callAI('system: you are a web dev assistant', 'plan: '+goal, {vibeTree:state.vibeTree});
+      const parsed = JSON.parse(raw);
+      // show plan
+      const ol = el('#ai-plan-list');
+      ol.innerHTML = '';
+      if(parsed.plan) ol.innerHTML += '<li style="color:var(--glow-accent-primary)">'+escapeHtml(parsed.plan)+'</li>';
+      (parsed.actions||[]).forEach((a,i)=>{ const li=document.createElement('li'); li.textContent = (a.message || a.actionType + ' ' + (a.node && a.node.id) || a.nodeId || a.actionType); ol.appendChild(li); });
+      showLoader(false);
+    }catch(e){ showLoader(false); appendConsole('AI plan error: '+e.message,'error'); alert('AI plan failed'); }
+  }
+
+  async function executePlan(){
+    const goal = el('#ai-goal').value || '';
+    if(!goal) return alert('Set a goal first.');
+    showLoader(true,'Agent executing...');
+    state.agentRunning = true;
+    state.agentPaused = false;
+    // first ask for plan
+    try{
+      const rawPlan = await state.aiService.callAI('system: agent','plan: '+goal, {vibeTree:state.vibeTree});
+      const parsedPlan = JSON.parse(rawPlan);
+      const steps = parsedPlan.actions || [];
+      // For each step, call AI again to get modifications (simulate iterative behaviour)
+      for(let i=0;i<steps.length && state.agentRunning;i++){
+        if(state.agentPaused){ appendConsole('Agent paused'); break; }
+        const step = steps[i];
+        appendConsole('Agent step: '+(step.actionType || 'noop'));
+        // If step contains a node with code, apply directly otherwise ask AI for modifications
+        if(step.actionType === 'create' && step.node){
+          state.vibeTree.push(step.node);
+          appendConsole('Created node '+step.node.id);
+        } else if(step.actionType === 'update' && step.nodeId){
+          // find node and update
+          const found = findNodeById(step.nodeId, state.vibeTree);
+          if(found){ found.code = step.newCode || found.code; appendConsole('Updated node '+step.nodeId); }
+        } else if(step.actionType === 'delete' && step.nodeId){
+          deleteNode(step.nodeId);
+          appendConsole('Deleted node '+step.nodeId);
+        } else if(step.actionType === 'noop'){
+          appendConsole('AI NOOP: '+(step.message||''));
+        } else {
+          // ask AI to expand this step into actions
+          try{
+            const raw = await state.aiService.callAI('system: expand', 'execute step '+JSON.stringify(step), {vibeTree:state.vibeTree});
+            const parsed = JSON.parse(raw);
+            (parsed.actions||[]).forEach(a=>{
+              applyAIAction(a);
+            });
+          }catch(e){
+            appendConsole('Error expanding step: '+e.message,'error');
+          }
+        }
+        state.historyManager.addSnapshot(state.vibeTree);
+        renderAll();
+        updatePreview();
+        // small pause
+        await new Promise(r=>setTimeout(r,350));
+      }
+    }catch(e){ appendConsole('Agent execution failed: '+e.message,'error'); }
+    state.agentRunning=false;
+    showLoader(false);
+  }
+
+  function applyAIAction(a){
+    if(!a) return;
+    if(a.actionType==='create' && a.node){
+      state.vibeTree.push(a.node);
+    } else if(a.actionType==='update' && a.nodeId){
+      const n = findNodeById(a.nodeId, state.vibeTree);
+      if(n) n.code = a.newCode || n.code;
+    } else if(a.actionType==='delete' && a.nodeId){
+      deleteNode(a.nodeId);
+    }
+  }
+
+  function findNodeById(id, arr){
+    if(!arr) return null;
+    for(const n of arr){
+      if(n.id === id) return n;
+      if(n.children){
+        const res = findNodeById(id, n.children);
+        if(res) return res;
+      }
+    }
+    return null;
+  }
+
+  // AI Chat
+  async function chatSend(){
+    const text = el('#chat-input').value;
+    if(!text) return;
+    const log = el('#chat-log');
+    const userDiv = document.createElement('div'); userDiv.style.color='var(--glow-accent-primary)'; userDiv.textContent = 'You: '+text;
+    log.appendChild(userDiv);
+    el('#chat-input').value='';
+    try{
+      const raw = await state.aiService.callAI('assistant','chat: '+text,{vibeTree:state.vibeTree});
+      const parsed = JSON.parse(raw);
+      const assistantText = parsed.plan || (parsed.message || '...'); // fallback
+      const aiDiv = document.createElement('div'); aiDiv.style.color='var(--text-secondary)'; aiDiv.innerHTML = 'AI: '+escapeHtml(assistantText);
+      log.appendChild(aiDiv);
+
+      // if AI returned actions with code blocks, create "Insert Code" buttons (we parse parsed.actions)
+      if(parsed.actions && parsed.actions.length){
+        parsed.actions.forEach(a=>{
+          if(a.node && a.node.code){
+            const btn = document.createElement('button'); btn.className='btn small'; btn.textContent='Insert Code into Vibe';
+            btn.onclick = ()=>{
+              state.vibeTree.push(a.node);
+              state.historyManager.addSnapshot(state.vibeTree);
+              renderAll();
+              updatePreview();
+              alert('Inserted node: '+a.node.id);
+            };
+            log.appendChild(btn);
+          }
+        });
+      }
+    }catch(e){ appendConsole('Chat error: '+e.message,'error'); }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  /********************
+   * Component Library UI
+   ********************/
+  function refreshComponentsList(){
+    const list = el('#components-list');
+    list.innerHTML = '';
+    const comps = state.componentLibrary.getComponents();
+    if(comps.length===0) { list.innerHTML = '<div class="muted">No components yet.</div>'; return; }
+    comps.forEach(c=>{
+      const item = document.createElement('div');
+      item.style.display='flex';item.style.justifyContent='space-between';item.style.alignItems='center';
+      item.innerHTML = `<div><strong style="color:var(--glow-accent-primary)">${escapeHtml(c.name||c.id)}</strong><div class="muted" style="font-size:12px">${escapeHtml(c.data && c.data.description || '')}</div></div>`;
+      const btns = document.createElement('div');
+      const insert = document.createElement('button'); insert.className='btn small'; insert.textContent='Insert'; insert.onclick = ()=>{ state.vibeTree.push(JSON.parse(JSON.stringify(c.data))); state.historyManager.addSnapshot(state.vibeTree); renderAll(); updatePreview(); };
+      const del = document.createElement('button'); del.className='btn small btn-danger'; del.textContent='Delete'; del.onclick = ()=>{ if(confirm('Delete component?')){ state.componentLibrary.deleteComponent(c.id); refreshComponentsList(); } };
+      btns.append(insert,del); item.appendChild(btns);
+      list.appendChild(item);
+    });
+  }
+
+  /********************
+   * UI wiring
+   ********************/
+  function bindUI(){
+    // modals open/close
+    el('#btn-open-project').onclick = ()=> showModal('modal-projects');
+    el('#btn-new-project').onclick = ()=> { const name = prompt('Project name?','New Vibe Project'); if(name){ const id = newProject(name); renderProjectsList(); loadProject(id); hideModal('modal-projects'); } };
+    el('#create-project-btn').onclick = ()=> { const name = el('#project-name').value || prompt('Project name?'); if(name){ const id = newProject(name); renderProjectsList(); loadProject(id); hideModal('modal-projects'); } };
+    els('.close-x').forEach(b=>b.onclick = ()=> hideModal(b.dataset.close));
+
+    el('#btn-save-project').onclick = saveCurrentProject;
+    el('#btn-export').onclick = exportProjectZip;
+    el('#btn-import').onclick = ()=> el('#import-zip-file').click();
+    el('#import-zip-file').addEventListener('change', (e)=> { const f = e.target.files[0]; if(f) importProjectZip(f); e.target.value=''; });
+
+    el('#btn-ai-agent').onclick = ()=> showModal('modal-ai-agent');
+    el('#ai-generate-plan').onclick = generatePlan;
+    el('#ai-execute-plan').onclick = executePlan;
+    el('#ai-pause').onclick = ()=> { state.agentPaused = !state.agentPaused; appendConsole('Agent '+(state.agentPaused?'paused':'resumed')); };
+    el('#ai-stop').onclick = ()=> { state.agentRunning = false; state.agentPaused=false; showLoader(false); appendConsole('Agent stopped'); };
+
+    el('#btn-ai-chat').onclick = ()=> showModal('modal-ai-chat');
+    el('#chat-send').onclick = chatSend;
+    el('#chat-insert-code').onclick = ()=> { // quick demo: insert a sample js node
+      const id = uid('js');
+      state.vibeTree.push({id, type:'js', description:'Inserted from chat', code: `console.log('Inserted code from chat: ${id}');`});
+      state.historyManager.addSnapshot(state.vibeTree); renderAll(); updatePreview(); hideModal('modal-ai-chat');
+    };
+
+    el('#btn-components').onclick = ()=> { refreshComponentsList(); showModal('modal-components'); };
+    el('#generate-component').onclick = async ()=>{
+      const name = el('#component-name').value || prompt('Component name?','New Component');
+      if(!name) return;
+      showLoader(true,'Generating component...');
+      try{
+        const raw = await state.aiService.callAI('system: gen component','generate component: '+name,{vibeTree:state.vibeTree});
+        const parsed = JSON.parse(raw);
+        // parsed.actions[0].node contains the component skeleton in our mock; saved as JSON string
+        const node = (parsed.actions && parsed.actions[0] && parsed.actions[0].node) ? parsed.actions[0].node : null;
+        if(node){
+          state.componentLibrary.addComponent({id:uid('cmp'),name, data:node});
+          refreshComponentsList();
+          alert('Component generated and saved.');
+        } else {
+          alert('AI did not return a component.');
+        }
+      }catch(e){ alert('Generation failed'); }
+      showLoader(false);
+    };
+
+    el('#btn-clear-console').onclick = ()=> el('#console-logs').innerHTML='';
+
+    el('#btn-undo').onclick = ()=> { state.historyManager.undo(); renderAll(); updatePreview(); };
+    el('#btn-redo').onclick = ()=> { state.historyManager.redo(); renderAll(); updatePreview(); };
+
+    el('#btn-fix-ai').onclick = async ()=>{
+      // gather last console error text and send to AI
+      const logs = el('#console-logs').innerText || '';
+      if(!logs) return alert('No logs to fix.');
+      showLoader(true,'Asking AI to fix...');
+      try{
+        const raw = await state.aiService.callAI('system: fix errors','fix: '+logs,{vibeTree:state.vibeTree});
+        const parsed = JSON.parse(raw);
+        (parsed.actions||[]).forEach(a=> applyAIAction(a));
+        state.historyManager.addSnapshot(state.vibeTree);
+        renderAll(); updatePreview();
+        appendConsole('AI attempted to fix errors.');
+      }catch(e){ appendConsole('AI fix error: '+e.message,'error'); }
+      showLoader(false);
+    };
+
+    // console resizer
+    const resizer = el('#console-resize');
+    let dragging=false, startY=0, startH=0;
+    resizer.addEventListener('pointerdown', (e)=>{ dragging=true; startY=e.clientY; startH = parseInt(getComputedStyle(el('#console-container')).height); document.body.style.userSelect='none'; });
+    window.addEventListener('pointerup', ()=>{ dragging=false; document.body.style.userSelect='auto'; });
+    window.addEventListener('pointermove', (e)=>{ if(!dragging) return; const dy = startY - e.clientY; const newH = clamp(startH + dy, 80, window.innerHeight-120); el('#console-container').style.height = newH+'px'; });
+
+    // inspector toggle
+    el('#inspector-toggle').addEventListener('change', (e)=>{ state.inspectorActive = e.target.checked; updatePreview(); });
+
+    // radial OS menu behavior
+    const osMenu = el('#os-menu');
+    const container = el('#os-menu-container');
+    let open = false;
+    container.addEventListener('pointerdown', (e)=>{ container.setPointerCapture(e.pointerId); container.dataset.dragging='true'; container.startX = e.clientX; container.startY = e.clientY; container.origRight = parseInt(getComputedStyle(container).right) || 26; container.origBottom = parseInt(getComputedStyle(container).bottom) || 26; });
+    container.addEventListener('pointermove', (e)=>{ if(container.dataset.dragging){ const dx = container.startX - e.clientX; const dy = container.startY - e.clientY; container.style.right = (container.origRight + dx)+'px'; container.style.bottom = (container.origBottom + dy)+'px'; }});
+    container.addEventListener('pointerup', (e)=>{ container.releasePointerCapture(e.pointerId); container.dataset.dragging=''; });
+    osMenu.addEventListener('click', ()=>{
+      open = !open;
+      osMenu.classList.toggle('open', open);
+      const btns = els('.radial-btn');
+      if(open){
+        // fan out
+        const angleStep = Math.PI / (btns.length+1);
+        const radius = 110;
+        btns.forEach((b,i)=>{
+          const ang = angleStep*(i+1);
+          const x = Math.cos(ang)*radius;
+          const y = Math.sin(ang)*radius;
+          b.style.transform = `translate(${-x}px,${-y}px) scale(1)`;
+          b.classList.add('show');
+          // set label
+        });
+      } else {
+        btns.forEach(b=>{ b.classList.remove('show'); b.style.transform = ''; });
+      }
+    });
+    // radial actions
+    els('.radial-btn').forEach(b=>{
+      b.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const a = b.dataset.action;
+        if(a==='ai-agent') showModal('modal-ai-agent');
+        if(a==='ai-chat') showModal('modal-ai-chat');
+        if(a==='components') { refreshComponentsList(); showModal('modal-components'); }
+        if(a==='inspector'){ el('#inspector-toggle').checked = !el('#inspector-toggle').checked; state.inspectorActive = el('#inspector-toggle').checked; updatePreview(); }
+        if(a==='undo') { state.historyManager.undo(); renderAll(); updatePreview(); }
+        if(a==='redo') { state.historyManager.redo(); renderAll(); updatePreview(); }
+        if(a==='export') exportProjectZip();
+      });
+    });
+
+    // project manager render
+    renderProjectsList();
+  }
+
+  function showModal(id){ el('#'+id).classList.add('show'); }
+  function hideModal(id){ el('#'+id).classList.remove('show'); }
+
+  function showLoader(yes, text){
+    const loader = el('#global-agent-loader');
+    if(yes){ loader.classList.add('show'); el('#loader-text').textContent = text || 'AI Running...'; }
+    else loader.classList.remove('show');
+  }
+
+  function renderAll(){
+    renderVibeTree(state.vibeTree, el('#vibe-tree-root'));
+    refreshComponentsList();
+  }
+
+  /********************
+   * Initialization
+   ********************/
+  document.addEventListener('DOMContentLoaded', ()=>{
+    // instantiate services
+    state.database = new DataBase('vibesys');
+    state.componentLibrary = new ComponentLibrary('vibesys');
+    state.aiService = new AIService();
+    state.historyManager = new HistoryManager((vibe)=>{ state.vibeTree = vibe; renderAll(); updatePreview(); });
+    // Load last project if exists otherwise show project manager
+    const projects = state.database.listProjects();
+    if(projects.length>0){
+      loadProject(projects[0].id);
+    } else {
+      // create starter project and open modal
+      const id = newProject('Starter Vibe');
+      renderProjectsList();
+      loadProject(id);
+      showModal('modal-projects');
+    }
+
+    bindUI();
+    renderAll();
+    updatePreview();
+
+    appendConsole('Vibe system initialized.');
+  });
+
+  // expose some API for console debugging (optional)
+  window.VIBE = {
+    state,
+    saveCurrentProject,
+    updatePreview,
+    renderAll,
+    exportProjectZip
+  };
+
+})();
+</script>
+</body>
+</html>
