@@ -358,6 +358,1004 @@
                 <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
             </button>
             <button class="os-menu-button" title="Settings" data-modal-id="settings-modal">
+                <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+            </button>
+        </div>
+    </div>
+    
+    <!-- PANELS (repurposed tabs) -->
+    <div id="start" class="content-panel">
+        <div class="panel-content">
+            <span class="close-button" data-panel-id="start">&times;</span>
+            <!-- Content from original #start tab -->
+            <div class="start-page-content" style="background:transparent; border:none; box-shadow:none; padding:0;">
+                <div class="start-header">
+                    <h1>Vibe Coding System</h1>
+                </div>
+                <div id="new-project-container">
+                     <h2>Create a New Project</h2>
+                     <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                     <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                     <div id="agent-buttons-container" style="display:flex; gap: 10px; margin-top: 10px;">
+                        <button id="generate-project-button">Generate Project</button>
+                        <button id="start-iterative-build-button">Start Iterative Build</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="preview" class="content-panel">
+        <div class="panel-content">
+            <span class="close-button" data-panel-id="preview">&times;</span>
+            <div class="preview-container">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2>Live Website Preview</h2>
+                    <button id="toggle-inspect-button">Enable Inspect</button>
+                </div>
+                <iframe id="website-preview" title="Live Website Preview"></iframe>
+            </div>
+        </div>
+    </div>
+    
+    <div id="agent" class="content-panel">
+        <div class="panel-content">
+            <span class="close-button" data-panel-id="agent">&times;</span>
+            <div class="agent-container">
+                <h2>AI Agent</h2>
+                <div id="agent-controls">
+                    <textarea id="agent-prompt-input" rows="3" placeholder="Describe the overall goal for your website..."></textarea>
+                    <div style="display:flex; gap: 10px; margin-top: 10px;">
+                        <button id="run-agent-single-task-button">Execute as Single Task</button>
+                        <button id="start-iterative-session-button">Start Iterative Session</button>
+                    </div>
+                </div>
+                <div id="agent-output-container" style="display:flex; flex-direction:column; flex-grow:1;">
+                    <h3>Agent Log</h3>
+                    <div id="agent-output"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="chat" class="content-panel">
+        <div class="panel-content">
+            <span class="close-button" data-panel-id="chat">&times;</span>
+            <div class="chat-container">
+                <h2>Chat</h2>
+                <div id="chat-output"></div>
+                <div class="chat-controls" style="display:flex; gap:10px;">
+                    <textarea id="chat-prompt-input" placeholder="Ask the AI..."></textarea>
+                    <button id="send-chat-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="files" class="content-panel">
+        <div class="panel-content">
+            <span class="close-button" data-panel-id="files">&times;</span>
+            <div class="files-container">
+                <h2>Project Files & Assets</h2>
+                <div class="files-toolbar" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                    <input type="file" id="files-upload-input" multiple style="display: none;">
+                    <button id="files-upload-button">Upload</button>
+                    <button id="files-new-folder-button">New Folder</button>
+                    <button id="files-rename-button">Rename</button>
+                    <button id="files-delete-button" class="danger">Delete</button>
+                </div>
+                <div class="files-browser">
+                    <div class="files-tree" id="files-tree"></div>
+                    <div class="files-preview" id="files-preview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS (use original structure, will be styled by new CSS) -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="settings-modal">&times;</span>
+            <h2>API Settings</h2>
+            <div class="ai-provider-container">
+                <h3>AI Provider</h3>
+                <select id="ai-provider-select">
+                    <option value="gemini">Google Gemini</option>
+                    <!-- <option value="nscale">nscale</option> -->
+                </select>
+            </div>
+            <div id="gemini-settings-container">
+                <div class="api-key-container">
+                    <h3>Gemini API Key</h3>
+                    <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
+                    <button id="save-api-key-button">Save Key</button>
+                    <div id="api-key-status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="edit-node-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" data-modal-id="edit-node-modal">&times;</span>
+            <h2>Edit Component</h2>
+            <label>Node ID</label>
+            <input type="text" id="edit-node-id" readonly>
+            <label for="edit-node-description">Description</label>
+            <textarea id="edit-node-description" rows="3"></textarea>
+            <label for="edit-node-code">Code</label>
+            <textarea id="edit-node-code" rows="8"></textarea>
+            <div class="button-row" style="display:flex; gap:10px; margin-top:15px;">
+                <button id="save-edit-node-button" class="action-button">Save & Update Vibe</button>
+            </div>
+        </div>
+    </div>
+
+<script type="module">
+// --- START OF COMBINED AND FIXED JAVASCRIPT LOGIC ---
+
+// In-memory implementation of DataBase class using localStorage
+class DataBase {
+    constructor() {
+        this.prefix = '_vibe_project_';
+        this.filesPrefix = '_vibe_files_';
+    }
+    // --- Project Management ---
+    listProjects() {
+        return Object.keys(localStorage)
+            .filter(key => key.startsWith(this.prefix))
+            .map(key => key.substring(this.prefix.length));
+    }
+    saveProject(projectId, vibeTree) {
+        if (!projectId) return;
+        try {
+            localStorage.setItem(this.prefix + projectId, JSON.stringify(vibeTree));
+        } catch (e) {
+            console.error("Failed to save project:", e);
+        }
+    }
+    loadProject(projectId) {
+        if (!projectId) return null;
+        try {
+            const data = localStorage.getItem(this.prefix + projectId);
+            return data ? JSON.parse(data) : null;
+        } catch (e) {
+            console.error("Failed to load project:", e);
+            return null;
+        }
+    }
+    deleteProject(projectId) {
+        if (!projectId) return;
+        localStorage.removeItem(this.prefix + projectId);
+        // Also delete associated files
+        this.listFiles(projectId).forEach(path => this.deleteFile(projectId, path));
+    }
+
+    // --- File Management ---
+    _getFilePath(projectId, path) {
+        return `${this.filesPrefix}${projectId}_${path}`;
+    }
+
+    listFiles(projectId) {
+        if (!projectId) return [];
+        const projectFilePrefix = `${this.filesPrefix}${projectId}_`;
+        return Object.keys(localStorage)
+            .filter(key => key.startsWith(projectFilePrefix))
+            .map(key => key.substring(projectFilePrefix.length));
+    }
+
+    saveTextFile(projectId, path, content) {
+        if (!projectId || !path) return;
+        localStorage.setItem(this._getFilePath(projectId, path), content);
+    }
+
+    readTextFile(projectId, path) {
+        if (!projectId || !path) return null;
+        return localStorage.getItem(this._getFilePath(projectId, path));
+    }
+
+    deleteFile(projectId, path) {
+        if (!projectId || !path) return;
+        localStorage.removeItem(this._getFilePath(projectId, path));
+    }
+
+    renameFile(projectId, oldPath, newPath) {
+        if (!projectId || !oldPath || !newPath) return;
+        const content = this.readTextFile(projectId, oldPath);
+        if (content !== null) {
+            this.saveTextFile(projectId, newPath, content);
+            this.deleteFile(projectId, oldPath);
+        }
+    }
+}
+
+const db = new DataBase();
+window.db = db; // Make db globally accessible for debugging
+
+// --- DOM ELEMENT REFERENCES ---
+const previewContainer = document.getElementById('website-preview');
+const editorContainer = document.getElementById('vibe-editor');
+const toggleInspectButton = document.getElementById('toggle-inspect-button');
+const projectPromptInput = document.getElementById('project-prompt-input');
+const generateProjectButton = document.getElementById('generate-project-button');
+const newProjectIdInput = document.getElementById('new-project-id-input');
+const projectListContainer = document.getElementById('project-list');
+const noProjectsMessage = document.getElementById('no-projects-message');
+const startIterativeBuildButton = document.getElementById('start-iterative-build-button');
+const agentPromptInput = document.getElementById('agent-prompt-input');
+const runAgentSingleTaskButton = document.getElementById('run-agent-single-task-button');
+const startIterativeSessionButton = document.getElementById('start-iterative-session-button');
+const agentOutput = document.getElementById('agent-output');
+const chatOutput = document.getElementById('chat-output');
+const chatPromptInput = document.getElementById('chat-prompt-input');
+const sendChatButton = document.getElementById('send-chat-button');
+const filesTreeEl = document.getElementById('files-tree');
+const filesPreviewEl = document.getElementById('files-preview');
+const filesUploadInput = document.getElementById('files-upload-input');
+const filesUploadButton = document.getElementById('files-upload-button');
+const filesNewFolderButton = document.getElementById('files-new-folder-button');
+const filesRenameButton = document.getElementById('files-rename-button');
+const filesDeleteButton = document.getElementById('files-delete-button');
+const settingsModal = document.getElementById('settings-modal');
+const aiProviderSelect = document.getElementById('ai-provider-select');
+const geminiSettingsContainer = document.getElementById('gemini-settings-container');
+const apiKeyInput = document.getElementById('api-key-input');
+const saveApiKeyButton = document.getElementById('save-api-key-button');
+const apiKeyStatus = document.getElementById('api-key-status');
+const editNodeModal = document.getElementById('edit-node-modal');
+const editNodeIdInput = document.getElementById('edit-node-id');
+const editNodeDescriptionInput = document.getElementById('edit-node-description');
+const editNodeCodeInput = document.getElementById('edit-node-code');
+const saveEditNodeButton = document.getElementById('save-edit-node-button');
+
+
+// --- CORE APPLICATION STATE & LOGIC ---
+let currentProjectId = null;
+let geminiApiKey = '';
+let vibeTree = {
+  id: "whole-page",
+  description: "A new, empty website.",
+  type: "container",
+  children: []
+};
+const initialVibeTree = JSON.parse(JSON.stringify(vibeTree));
+
+function logToConsole(message, type = 'log') {
+    const consoleFunc = console[type] || console.log;
+    consoleFunc(`[VCS] ${message}`);
+}
+
+function findNodeById(id, node = vibeTree) {
+    if (node.id === id) return node;
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findNodeById(id, child);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+// --- API & AI CALLING LOGIC ---
+async function callAI(systemPrompt, userPrompt) {
+    if (!geminiApiKey) {
+        throw new Error("Gemini API key is not set. Please add it in Settings.");
+    }
+    const model = 'gemini-1.5-flash-latest';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+    logToConsole('Calling AI...');
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { responseMimeType: "application/json" }
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API Error: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+        throw new Error("Invalid response from Gemini API.");
+    }
+    
+    logToConsole('AI response received.');
+    return data.candidates[0].content.parts[0].text;
+}
+
+async function generateCompleteSubtree(parentNode) {
+    logToConsole(`Generating subtree for "${parentNode.id}"...`);
+    const systemPrompt = `You are an expert system that designs a website component hierarchy. Your output MUST be a single, valid JSON array of "vibe node" objects.
+    Each node must have: id (kebab-case), type ("html", "css", "js-function", "head"), description, and code. HTML nodes can have a 'children' array.
+    The first HTML node in an array should have selector: "#${parentNode.id}" and position: "beforeend". Subsequent HTML siblings must chain off the previous sibling's ID with position: "afterend".`;
+    const userPrompt = `Generate child components for this container:\n{ "id": "${parentNode.id}", "description": "${parentNode.description}" }`;
+    
+    const rawResponse = await callAI(systemPrompt, userPrompt);
+    try {
+        let jsonResponse = rawResponse.trim().match(/```(json)?\s*([\s\S]*?)\s*```/)?.[2] || rawResponse;
+        return JSON.parse(jsonResponse);
+    } catch (e) {
+        console.error("Failed to parse subtree JSON:", rawResponse);
+        throw new Error("AI returned invalid JSON for the component structure.");
+    }
+}
+
+// --- UI RENDERING & EVENT HANDLING ---
+
+function renderEditor(node) {
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'vibe-node';
+    nodeEl.dataset.nodeId = node.id;
+    // Removed style.marginLeft for root-level alignment
+
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+
+    nodeEl.innerHTML = `
+        <div class="vibe-node-header" title="Click to edit node details">
+            <span class="id">${node.id}</span>
+            <span class="type">${node.type}</span>
+        </div>
+        <div class="vibe-node-content">
+             <p>${node.description}</p>
+        </div>
+    `;
+
+    if (hasChildren) {
+        const childrenEl = document.createElement('div');
+        childrenEl.className = 'children';
+        node.children.forEach(child => childrenEl.appendChild(renderEditor(child)));
+        nodeEl.appendChild(childrenEl);
+    }
+    
+    nodeEl.querySelector('.vibe-node-header').addEventListener('click', (e) => {
+        // Prevent clicks on buttons inside the header from triggering this
+        if(e.target.tagName === 'BUTTON') return;
+        openEditNodeModal(node.id)
+    });
+
+    return nodeEl;
+}
+
+function generateFullCodeString(tree = vibeTree) {
+    let cssContent = '', jsContent = '', htmlContent = '', headContent = '<title>Website</title>';
+    
+    function traverse(node) {
+        switch (node.type) {
+            case 'head': headContent = node.code || headContent; break;
+            case 'css': cssContent += (node.code || '') + '\n'; break;
+            case 'javascript': case 'js-function': jsContent += (node.code || '') + '\n'; break;
+        }
+        if (node.children) node.children.forEach(traverse);
+    }
+    traverse(tree);
+    
+    function buildHtmlRecursive(nodes) {
+        let currentHtml = '';
+        if (!nodes) return '';
+        const htmlNodes = nodes.filter(n => n.type === 'html');
+        htmlNodes.forEach(node => {
+            let finalCode = node.code || '';
+            if (node.children && node.children.length > 0) {
+                 const innerHtml = buildHtmlRecursive(node.children);
+                 const wrapper = document.createElement('div');
+                 wrapper.innerHTML = finalCode;
+                 if(wrapper.firstElementChild) {
+                     wrapper.firstElementChild.innerHTML = innerHtml;
+                     currentHtml += wrapper.innerHTML;
+                 } else {
+                    currentHtml += finalCode; // Fallback for code without a single root element
+                 }
+            } else {
+                 currentHtml += finalCode;
+            }
+        });
+        return currentHtml;
+    }
+
+    htmlContent = buildHtmlRecursive(tree.children);
+    
+    return `<!DOCTYPE html><html lang="en"><head>${headContent}<style>${cssContent}</style></head><body>${htmlContent}<script>${jsContent}<\/script></body></html>`;
+}
+
+function applyVibes() {
+    const fullHtml = generateFullCodeString(vibeTree);
+    if(previewContainer) {
+        previewContainer.srcdoc = fullHtml;
+    }
+    logToConsole("Preview updated.");
+}
+
+function refreshAllUI() {
+    editorContainer.innerHTML = '';
+    const editorRoot = renderEditor(vibeTree);
+    editorRoot.style.marginLeft = '0'; // Ensure root is not indented
+    editorContainer.appendChild(editorRoot);
+    
+    applyVibes();
+    autoSaveProject();
+}
+
+function populateProjectList() {
+    const projects = db.listProjects();
+    projectListContainer.innerHTML = '';
+    noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
+    projects.forEach(projectId => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '8px 5px';
+        item.style.borderBottom = '1px solid var(--dark-bg-tertiary)';
+        item.innerHTML = `<span>${projectId}</span><div><button class="load-project" data-id="${projectId}" style="padding: 5px 10px; margin-right: 5px;">Load</button><button class="delete-project danger" data-id="${projectId}" style="padding: 5px 10px;">Del</button></div>`;
+        projectListContainer.appendChild(item);
+    });
+}
+
+function autoSaveProject() {
+    if (currentProjectId) {
+        db.saveProject(currentProjectId, vibeTree);
+        logToConsole(`Project '${currentProjectId}' auto-saved.`);
+    }
+}
+
+// --- EVENT HANDLERS ---
+async function handleGenerateProject() {
+    const prompt = projectPromptInput.value.trim();
+    if (!prompt) { alert('Please enter a project description.'); return; }
+    
+    let projectId = newProjectIdInput.value.trim() || `project-${Date.now()}`;
+    if(db.loadProject(projectId)) {
+        if(!confirm(`Project "${projectId}" already exists. Overwrite?`)) return;
+    }
+    
+    logToConsole(`Generating new project "${projectId}"...`);
+    currentProjectId = projectId;
+    vibeTree = { id: 'whole-page', type: 'container', description: prompt, children: [] };
+    
+    try {
+        const generateButton = document.getElementById('generate-project-button');
+        generateButton.disabled = true;
+        generateButton.innerHTML = 'Generating... <span class="loading-spinner"></span>';
+
+        vibeTree.children = await generateCompleteSubtree(vibeTree);
+        refreshAllUI();
+        populateProjectList();
+        document.getElementById('start')?.style.display = 'none'; // Close start panel
+        
+        generateButton.disabled = false;
+        generateButton.textContent = 'Generate Project';
+    } catch(e) {
+        alert(`Failed to generate project: ${e.message}`);
+    }
+}
+
+function handleLoadProject(projectId) {
+    const projectData = db.loadProject(projectId);
+    if (projectData) {
+        currentProjectId = projectId;
+        vibeTree = projectData;
+        refreshAllUI();
+        logToConsole(`Project '${projectId}' loaded.`);
+        document.querySelector('.sidebar')?.classList.remove('open');
+    }
+}
+
+function handleDeleteProject(projectId) {
+    if (confirm(`Delete project "${projectId}"? This is permanent.`)) {
+        db.deleteProject(projectId);
+        if (currentProjectId === projectId) {
+            currentProjectId = null;
+            vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
+            refreshAllUI();
+        }
+        populateProjectList();
+    }
+}
+
+function handleSaveEditedNode() {
+    const nodeId = editNodeIdInput.value;
+    const node = findNodeById(nodeId);
+    if (!node) return;
+    
+    node.description = editNodeDescriptionInput.value;
+    node.code = editNodeCodeInput.value;
+    
+    refreshAllUI();
+    document.getElementById('edit-node-modal').style.display = 'none';
+}
+
+function openEditNodeModal(nodeId) {
+    const node = findNodeById(nodeId);
+    if (!node) return;
+    
+    editNodeIdInput.value = node.id;
+    editNodeDescriptionInput.value = node.description || '';
+    editNodeCodeInput.value = node.code || '';
+    
+    editNodeModal.style.display = 'block';
+}
+
+// --- INITIALIZATION & UI GLUE ---
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Particle Canvas Animation ---
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particlesArray;
+
+    function initParticleCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const particleCount = Math.floor((canvas.width * canvas.height) / 15000);
+        particlesArray = [];
+        for (let i = 0; i < particleCount; i++) {
+            particlesArray.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                directionX: (Math.random() * 0.4) - 0.2,
+                directionY: (Math.random() * 0.4) - 0.2,
+                size: Math.random() * 1.5 + 0.5
+            });
+        }
+    }
+
+    function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < particlesArray.length; i++) {
+            let p = particlesArray[i];
+            p.x += p.directionX;
+            p.y += p.directionY;
+            if (p.x > canvas.width || p.x < 0) p.directionX = -p.directionX;
+            if (p.y > canvas.height || p.y < 0) p.directionY = -p.directionY;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(65, 105, 225, 0.5)';
+            ctx.fill();
+        }
+        requestAnimationFrame(animateParticles);
+    }
+    
+    window.addEventListener('resize', initParticleCanvas);
+    initParticleCanvas();
+    animateParticles();
+
+    // --- Sidebar, OS Menu, and Dragging Logic ---
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarToggle = document.querySelector('.sidebar-toggle');
+    sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+
+    const osMenu = document.getElementById('os-menu-container');
+    osMenu.querySelector('.os-menu-main-button').addEventListener('click', () => osMenu.classList.toggle('open'));
+    
+    let isDragging = false, draggedElement = null, dragOffsetX = 0, dragOffsetY = 0;
+
+    function startDrag(e, element) {
+        if (e.target.closest('button, input, textarea, select')) return;
+        isDragging = true;
+        draggedElement = element;
+        draggedElement.classList.add('dragging');
+        const rect = draggedElement.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', endDrag, { once: true });
+    }
+
+    function onDrag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        draggedElement.style.left = `${e.clientX - dragOffsetX}px`;
+        draggedElement.style.top = `${e.clientY - dragOffsetY}px`;
+    }
+
+    function endDrag() {
+        if (draggedElement) draggedElement.classList.remove('dragging');
+        isDragging = false;
+        draggedElement = null;
+        document.removeEventListener('mousemove', onDrag);
+    }
+    
+    osMenu.addEventListener('mousedown', (e) => startDrag(e, osMenu));
+
+    // --- Panel & Modal Management (Glue Code) ---
+    function openPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if(panel) panel.style.display = 'block';
+    }
+    function closePanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if(panel) panel.style.display = 'none';
+    }
+    function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if(modal) modal.style.display = 'block';
+    }
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if(modal) modal.style.display = 'none';
+    }
+
+    osMenu.querySelectorAll('[data-panel-id]').forEach(btn => {
+        btn.addEventListener('click', () => openPanel(btn.dataset.panelId));
+    });
+    osMenu.querySelectorAll('[data-modal-id]').forEach(btn => {
+        btn.addEventListener('click', () => openModal(btn.dataset.modalId));
+    });
+    document.querySelectorAll('.close-button').forEach(btn => {
+        const panelId = btn.dataset.panelId;
+        const modalId = btn.dataset.modalId;
+        if (panelId) {
+            btn.addEventListener('click', () => closePanel(panelId));
+        }
+        if (modalId) {
+            btn.addEventListener('click', () => closeModal(modalId));
+        }
+    });
+
+    // --- Application Logic Event Listeners ---
+    // API Settings
+    geminiApiKey = localStorage.getItem('geminiApiKey') || '';
+    if (apiKeyInput) apiKeyInput.value = geminiApiKey;
+    if (saveApiKeyButton) {
+        saveApiKeyButton.addEventListener('click', () => {
+            geminiApiKey = apiKeyInput.value.trim();
+            localStorage.setItem('geminiApiKey', geminiApiKey);
+            apiKeyStatus.textContent = 'API Key Saved!';
+            setTimeout(() => apiKeyStatus.textContent = '', 2000);
+        });
+    }
+
+    // Project Management
+    if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+    projectListContainer.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.classList.contains('load-project')) {
+            handleLoadProject(target.dataset.id);
+        } else if (target.classList.contains('delete-project')) {
+            handleDeleteProject(target.dataset.id);
+        }
+    });
+    
+    // Edit Modal
+    if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
+
+    // Initial Render
+    populateProjectList();
+    refreshAllUI();
+    logToConsole("Vibe Coding System Initialized.");
+});
+
+</script>
+</body>
+</html>            overflow: hidden;
+            font-size: 16px;
+        }
+        
+        /* --- CORE FUTURISTIC UI --- */
+
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .main-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #node-container {
+             position: relative;
+             width: 100%;
+             height: 100%;
+             padding: 20px;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(22, 36, 71, 0.9);
+            backdrop-filter: blur(12px);
+            border-right: 2px solid var(--glow-accent-secondary);
+            transform: translateX(-100%);
+            transition: transform 0.4s ease-in-out;
+            z-index: 1100;
+            padding: 20px;
+        }
+        .sidebar.open {
+            transform: translateX(0);
+        }
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: var(--dark-bg-tertiary);
+            color: var(--glow-accent-primary);
+            border: 1px solid var(--glow-accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 1101;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px var(--glow-accent-primary);
+            transition: all 0.3s;
+        }
+        .sidebar-toggle:hover {
+            box-shadow: 0 0 20px var(--glow-accent-primary), 0 0 5px var(--glow-accent-primary) inset;
+        }
+        
+        /* --- OS MENU --- */
+
+        #os-menu-container {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            cursor: grab;
+            z-index: 1200;
+        }
+        #os-menu-container.dragging { cursor: grabbing; }
+        .os-menu-main-button { width: 100%; height: 100%; position: relative; }
+        .os-menu-logo { width: 100%; height: 100%; }
+        .os-menu-logo .glow { animation: pulseGlow 3s infinite ease-in-out; }
+        .os-menu-logo .dashed-circle { animation: rotateDashed 20s linear infinite; transform-origin: center; }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 5px var(--glow-accent-primary)); }
+            50% { filter: drop-shadow(0 0 15px var(--glow-accent-primary)); }
+        }
+        @keyframes rotateDashed { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .os-menu-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--dark-bg-tertiary);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--glow-accent-primary);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s;
+            cursor: pointer;
+        }
+        #os-menu-container.open .os-menu-button { opacity: 1; }
+        #os-menu-container.open .os-menu-button:nth-of-type(1) { transform: translate(-50%, -50%) translateY(-110px); } /* Start */
+        #os-menu-container.open .os-menu-button:nth-of-type(2) { transform: translate(-50%, -50%) translate(-85px, -75px); } /* Preview */
+        #os-menu-container.open .os-menu-button:nth-of-type(3) { transform: translate(-50%, -50%) translate(-110px, 0px); } /* Agent */
+        #os-menu-container.open .os-menu-button:nth-of-type(4) { transform: translate(-50%, -50%) translate(-85px, 75px); } /* Chat */
+        #os-menu-container.open .os-menu-button:nth-of-type(5) { transform: translate(-50%, -50%) translateY(110px); } /* Files */
+        #os-menu-container.open .os-menu-button:nth-of-type(6) { transform: translate(-50%, -50%) translate(0, 110px); } /* Settings */
+        .os-menu-button:hover { box-shadow: 0 0 15px var(--glow-accent-primary); color: white; }
+        .os-menu-button svg { width: 24px; height: 24px; fill: currentColor; }
+
+        /* --- STYLING FOR VIBE-EDITOR NODES --- */
+        
+        .vibe-node {
+            position: relative;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(65, 105, 225, 0.5), 0 0 20px rgba(65, 105, 225, 0.3);
+            color: var(--text-primary);
+            padding: 10px;
+            transition: box-shadow 0.3s, border-color 0.3s;
+            margin-bottom: 10px;
+        }
+        .vibe-node .drag-handle { cursor: grab; opacity: 0.5; margin-right: 8px; font-size: 18px; line-height: 1; user-select: none; }
+        .vibe-node .drag-handle:hover { opacity: 1; }
+        .vibe-node.dragging { opacity: 0.5; background: #3c414d; cursor: grabbing; }
+        .vibe-node .children { margin-top: 10px; padding-left: 20px; border-left: 2px solid var(--glow-accent-secondary); }
+        .vibe-node-header { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .vibe-node-header .id { font-weight: bold; color: var(--glow-accent-primary); font-size: 1.1em; }
+        .vibe-node-header .type { background-color: var(--glow-accent-secondary); color: var(--dark-bg-primary); padding: 3px 8px; border-radius: 4px; font-size: 0.8em; }
+        .vibe-node.collapsed > .vibe-node-content, .vibe-node.collapsed > .children { display: none; }
+
+        /* --- MODALS & CONTENT PANELS --- */
+
+        .modal, .content-panel {
+            display: none; 
+            position: fixed; 
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content, .panel-content {
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            margin: 5vh auto;
+            padding: 25px;
+            border: 1px solid var(--glow-accent-secondary);
+            width: 90%;
+            height: 90vh;
+            max-width: 1600px;
+            border-radius: 8px;
+            box-shadow: 0 0 25px var(--glow-accent-secondary);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-content { max-width: 600px; height: auto; } /* Smaller modals */
+        
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+            z-index: 1;
+        }
+        .close-button:hover { color: var(--glow-accent-primary); }
+        
+        /* --- GENERAL UI ELEMENTS --- */
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-primary);
+            color: var(--glow-accent-primary);
+            text-shadow: 0 0 8px var(--glow-accent-primary);
+            border-bottom: 1px solid rgba(65, 105, 225, 0.5);
+            padding-bottom: 10px;
+        }
+        
+        p, label { color: var(--text-secondary); }
+
+        input, textarea, select {
+            background-color: var(--dark-bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--dark-bg-tertiary);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: var(--font-secondary);
+            width: 100%;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--glow-accent-secondary);
+            box-shadow: 0 0 8px var(--glow-accent-secondary);
+        }
+
+        button, .action-button {
+            padding: 10px 18px;
+            background-color: transparent;
+            color: var(--glow-accent-primary);
+            border: 1px solid var(--glow-accent-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: var(--font-secondary);
+            transition: all 0.2s;
+            text-shadow: 0 0 5px var(--glow-accent-primary);
+        }
+        button:hover:not(:disabled) {
+            background-color: var(--glow-accent-primary);
+            color: var(--dark-bg-primary);
+            box-shadow: 0 0 15px var(--glow-accent-primary);
+            text-shadow: none;
+        }
+        button:disabled {
+            border-color: #5c6370;
+            color: #5c6370;
+            cursor: not-allowed;
+            text-shadow: none;
+        }
+        button.danger { border-color: var(--destructive-red); color: var(--destructive-red); }
+        button.danger:hover:not(:disabled) { background-color: var(--destructive-red); color: var(--text-primary); }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            border: 2px solid rgba(127, 241, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--glow-accent-primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Specific container styles for flex layouts */
+        .agent-container, .chat-container, .files-container, .full-code-container, .flowchart-container, .preview-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 15px;
+        }
+        #agent-output, #chat-output, #console-output, #files-tree, #files-preview, #full-code-editor {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: var(--dark-bg-secondary);
+            border: 1px solid var(--dark-bg-tertiary);
+            padding: 10px;
+        }
+        #website-preview {
+            flex-grow: 1;
+            border: 1px solid var(--glow-accent-secondary);
+            background-color: white;
+        }
+        .files-browser {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px;
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PARTICLE BACKGROUND -->
+    <canvas id="particles-canvas"></canvas>
+
+    <!-- SIDEBAR (repurposed for projects/topics) -->
+    <div class="sidebar">
+        <h2 style="font-family: var(--font-primary); color: var(--glow-accent-primary); text-align: center;">Projects</h2>
+        <div id="project-list"></div>
+        <p id="no-projects-message" style="display: none; text-align: center; color: var(--text-secondary);">No saved projects.</p>
+    </div>
+    <button class="sidebar-toggle">&#x2261;</button>
+
+    <!-- MAIN NODE CONTAINER (replaces the old Vibe Editor tab) -->
+    <div class="main-container">
+        <div id="node-container">
+            <div id="vibe-editor">
+                 <!-- app.js will render the Vibe Tree here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- OS MENU FOR NAVIGATION -->
+    <div id="os-menu-container">
+        <div class="os-menu-main-button">
+            <svg class="os-menu-logo" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="48" stroke="var(--glow-accent-secondary)" stroke-width="1" fill="none" class="glow"/>
+                <circle cx="50" cy="50" r="40" stroke="var(--glow-accent-secondary)" stroke-width="2" stroke-dasharray="10 5" fill="none" class="dashed-circle"/>
+                <text x="50" y="55" font-family="Orbitron" font-size="14" fill="var(--glow-accent-primary)" text-anchor="middle">VIBE</text>
+            </svg>
+            <!-- Buttons are mapped to open modals/panels -->
+            <button class="os-menu-button" title="Start/New Project" data-panel-id="start">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Live Preview" data-panel-id="preview">
+                <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </button>
+            <button class="os-menu-button" title="AI Agent" data-panel-id="agent">
+                 <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-5 13.5a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm5 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm5 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Chat" data-panel-id="chat">
+                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Files" data-panel-id="files">
+                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Settings" data-modal-id="settings-modal">
                 <svg viewBox="0 0 24 24"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
             </button>
         </div>
