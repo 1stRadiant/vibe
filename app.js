@@ -258,6 +258,7 @@ function logToConsole(message, type = 'log') {
 
     const msgEl = document.createElement('div');
     msgEl.className = `console-message log-type-${type}`;
+    const timestamp = `[${new Date().toLocaleTimeString()}] `;
 
     if (type === 'error') {
         consoleErrorIndicator.classList.add('active');
@@ -266,23 +267,19 @@ function logToConsole(message, type = 'log') {
         if (message instanceof Error) {
             errorMessageText = `${message.name || 'Error'}: ${message.message}\n${message.stack || ''}`;
         } else if (typeof message === 'object' && message !== null) {
-             try {
+            try {
                 errorMessageText = JSON.stringify(message, Object.getOwnPropertyNames(message), 2);
-             } catch(e) {
+            } catch (e) {
                 errorMessageText = String(message);
-             }
+            }
         } else {
             errorMessageText = String(message);
         }
-
-        const timestamp = `[${new Date().toLocaleTimeString()}] `;
         
-        // Create the main error message element
         const pre = document.createElement('pre');
         pre.textContent = `${timestamp}${errorMessageText}`;
         msgEl.appendChild(pre);
         
-        // Create the "Fix with AI" button if an API key is present
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
         if (keyIsAvailable) {
             const fixButton = document.createElement('button');
@@ -292,42 +289,21 @@ function logToConsole(message, type = 'log') {
             msgEl.appendChild(fixButton);
         }
 
-    } else { // Handle other log types as before
-        let displayMessage;
-        // Special handling for Error objects to get more details like stack trace
-        if (message instanceof Error) {
-            displayMessage = `${message.name || 'Error'}: ${message.message}\n${message.stack || ''}`;
-        } else if (typeof message === 'object' && message !== null) {
-            try {
-                // Attempt to pretty-print objects. The 'replacer' handles cases where an object might have lost its properties.
-                const replacer = (key, value) => {
-                     if (typeof value === 'object' && value !== null) {
-                        if (Object.keys(value).length === 0) {
-                            if (value.toString() !== '[object Object]') {
-                                return value.toString();
-                            }
-                        }
-                    }
-                    return value;
-                };
-                displayMessage = JSON.stringify(message, replacer, 2);
-                if (displayMessage === '{}') {
-                    displayMessage = '[Object (no properties)] ' + message.toString();
-                }
-            } catch (e) {
-                displayMessage = "[Unserializable object]";
-            }
-        } else {
-            displayMessage = String(message);
-        }
-
-        const timestamp = `[${new Date().toLocaleTimeString()}] `;
-        msgEl.innerHTML = `<pre>${timestamp}${displayMessage}</pre>`;
+    } else if (type === 'table') {
+        // For tables, the message is pre-formatted HTML
+        const timeNode = document.createTextNode(timestamp);
+        msgEl.appendChild(timeNode);
+        msgEl.innerHTML += message; // Append HTML table
+    } else {
+        const pre = document.createElement('pre');
+        pre.textContent = `${timestamp}${message}`;
+        msgEl.appendChild(pre);
     }
     
     consoleOutput.appendChild(msgEl);
-    consoleOutput.scrollTop = consoleOutput.scrollHeight; // Auto-scroll
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
 }
+
 
 /**
  * Logs a detailed, collapsible message to the on-page console, ideal for large data like AI prompts.
@@ -361,30 +337,88 @@ function logDetailed(title, content) {
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
 }
 
-// Override console methods to also log to our on-page console
+// START OF FIX: Comprehensive Console Overhaul
+/**
+ * Formats any JavaScript variable into a readable string for the console.
+ * Handles circular references in objects.
+ * @param {*} arg - The variable to format.
+ * @returns {string} A string representation of the variable.
+ */
+function formatForConsole(arg) {
+    if (typeof arg === 'string') return arg;
+    if (typeof arg === 'number' || typeof arg === 'boolean' || arg === null || arg === undefined) return String(arg);
+    if (typeof arg === 'symbol') return arg.toString();
+    if (typeof arg === 'function') {
+        const funcStr = arg.toString();
+        return funcStr.length > 100 ? funcStr.substring(0, 90) + '... }' : funcStr;
+    }
+    try {
+        const cache = new Set();
+        return JSON.stringify(arg, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                if (cache.has(value)) return '[Circular]';
+                cache.add(value);
+            }
+            if (typeof value === 'function') return `[Function: ${value.name || 'anonymous'}]`;
+            return value;
+        }, 2);
+    } catch (e) {
+        return '[Unserializable Object]';
+    }
+}
+
+/**
+ * Creates an HTML table string from an array of objects.
+ * @param {Array<Object>} data - The data to tabulate.
+ * @returns {string} An HTML table string.
+ */
+function createHtmlTable(data) {
+    if (!data || typeof data !== 'object') return formatForConsole(data);
+    const isArrayOfObjects = Array.isArray(data) && data.every(item => typeof item === 'object' && item !== null);
+    if (!isArrayOfObjects || data.length === 0) return formatForConsole(data);
+
+    const headers = Object.keys(data[0]);
+    let table = '<table><thead><tr><th>(index)</th>';
+    headers.forEach(h => table += `<th>${h}</th>`);
+    table += '</tr></thead><tbody>';
+
+    data.forEach((row, index) => {
+        table += `<tr><td>${index}</td>`;
+        headers.forEach(header => {
+            const cellContent = String(row[header]).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            table += `<td>${cellContent}</td>`;
+        });
+        table += '</tr>';
+    });
+
+    table += '</tbody></table>';
+    return table;
+}
+
 const originalConsole = { ...console };
-console.log = function(...args) {
-    originalConsole.log(...args);
-    logToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' '), 'log');
-};
+const consoleMethods = ['log', 'warn', 'info', 'debug', 'table'];
+
+consoleMethods.forEach(method => {
+    console[method] = function(...args) {
+        if (originalConsole[method]) originalConsole[method](...args);
+        
+        if (method === 'table' && args.length > 0) {
+            logToConsole(createHtmlTable(args[0]), 'table');
+        } else {
+            const formattedMessage = args.map(formatForConsole).join(' ');
+            logToConsole(formattedMessage, method);
+        }
+    };
+});
+
+// Keep special handling for error to preserve the error object itself
 console.error = function(...args) {
     originalConsole.error(...args);
-    // Log each argument separately to handle complex objects like Error instances better
-    args.forEach(arg => {
-        logToConsole(arg, 'error');
-    });
+    args.forEach(arg => logToConsole(arg, 'error'));
 };
-console.warn = function(...args) {
-    originalConsole.warn(...args);
-    logToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' '), 'warn');
-};
-console.info = function(...args) {
-    originalConsole.info(...args);
-    logToConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' '), 'info');
-};
+// END OF FIX
 
 window.addEventListener('error', function (e) {
-    // This catches errors from the dynamically added scripts in the main window
     console.error(e.error || e.message);
 });
 
@@ -397,7 +431,7 @@ window.addEventListener('unhandledrejection', function(event) {
 let currentProjectId = null;
 let agentConversationHistory = [];
 let chatConversationHistory = [];
-let iframeErrors = []; // START OF FIX: Track errors from the preview iframe
+let iframeErrors = [];
 
 // NEW: State for iterative agent sessions
 let iterativeSessionState = {
@@ -1593,14 +1627,10 @@ async function processCodeAndRefreshUI(fullCode) {
     }
 }
 
-// START OF FIX: Ensure handleUpdateTreeFromCode function is defined.
-// This function was reported as missing, causing a ReferenceError.
-// It is defined here to be accessible by the event listener in bindEventListeners.
 async function handleUpdateTreeFromCode() {
     const fullCode = fullCodeEditor.value;
     await processCodeAndRefreshUI(fullCode);
 }
-// END OF FIX
 
 async function handleFileUpload() {
     const file = htmlFileInput.files[0];
@@ -2125,180 +2155,47 @@ async function handleDownloadProjectZip() {
  */
 function applyVibes() {
     try {
-        // START OF FIX: Clear any tracked errors from the previous preview state
         iframeErrors = [];
-        // END OF FIX
         const doc = previewContainer.contentWindow.document;
         let html = generateFullCodeString();
 
-        const inspectorScriptText = `
+        // START OF FIX: This single script handles inspector, console, and error logging
+        const commsScriptText = `
+<script>
 (function(){
+    // --- Part 1: Inspector Logic ---
     let inspectEnabled = false;
     let hoverEl = null;
+    const inspectorStyles = \`.__vibe-inspect-highlight-hover{outline:2px solid #e5c07b !important;outline-offset:2px !important;box-shadow:0 0 8px rgba(229,192,123,.8) !important;cursor:pointer}.__vibe-inspect-highlight-clicked{outline:3px solid #61afef !important;outline-offset:2px !important;box-shadow:0 0 12px rgba(97,175,239,.9) !important;transition:all .5s ease-out !important}\`;
+    function getNodeId(el){const c=el.closest('[data-vibe-node-id]');return c?{nodeId:c.dataset.vibeNodeId,element:c}:null}
+    function ensureStyles(){if(document.getElementById('vibe-inspector-styles'))return;const s=document.createElement('style');s.id='vibe-inspector-styles';s.textContent=inspectorStyles;document.head.appendChild(s)}
+    document.addEventListener('mouseover',e=>{if(!inspectEnabled)return;const t=getNodeId(e.target);if(t){if(hoverEl&&hoverEl!==t.element)hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=t.element;hoverEl.classList.add('__vibe-inspect-highlight-hover')}else if(hoverEl){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}});
+    document.addEventListener('mouseout',e=>{if(hoverEl&&!hoverEl.contains(e.relatedTarget)){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}});
+    document.addEventListener('click',e=>{if(!inspectEnabled)return;const t=getNodeId(e.target);if(t){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'vibe-node-click',nodeId:t.nodeId},'*');if(hoverEl)hoverEl.classList.remove('__vibe-inspect-highlight-hover');const el=t.element;el.classList.add('__vibe-inspect-highlight-clicked');setTimeout(()=>el.classList.remove('__vibe-inspect-highlight-clicked'),500)}},true);
 
-    const inspectorStyles = \`
-        .__vibe-inspect-highlight-hover {
-            outline: 2px solid #e5c07b !important;
-            outline-offset: 2px !important;
-            box-shadow: 0 0 8px rgba(229, 192, 123, 0.8) !important;
-            cursor: pointer;
-        }
-        .__vibe-inspect-highlight-clicked {
-            outline: 3px solid #61afef !important;
-            outline-offset: 2px !important;
-            box-shadow: 0 0 12px rgba(97, 175, 239, 0.9) !important;
-            transition: all 0.5s ease-out !important;
-        }
-    \`;
+    // --- Part 2: Console and Error Proxy Logic ---
+    function formatForPost(arg){if(arg instanceof Error)return{__isError:true,message:arg.message,stack:arg.stack,name:arg.name};try{JSON.stringify(arg);return arg}catch(e){return String(arg)}}
+    function reportError(err){window.parent.postMessage({type:'iframe-error',payload:formatForPost(err)},'*')}
+    window.addEventListener('error',e=>reportError(e.error||e.message));
+    window.addEventListener('unhandledrejection',e=>reportError(e.reason));
+    const oConsole={...window.console};
+    ['log','warn','error','info','debug','table'].forEach(level=>{window.console[level]=(...args)=>{if(oConsole[level])oConsole[level](...args);try{window.parent.postMessage({type:'iframe-console',level,payload:args.map(formatForPost)},'*')}catch(e){oConsole.error('Vibe console proxy error:',e)}}});
 
-    function getNodeIdForElement(el) {
-        const closest = el.closest('[data-vibe-node-id]');
-        if (closest) {
-            return {
-                nodeId: closest.dataset.vibeNodeId,
-                element: closest
-            };
-        }
-        return null;
-    }
-    
-    function ensureInspectorStyles() {
-        if (document.getElementById('vibe-inspector-styles')) return;
-        const styleSheet = document.createElement('style');
-        styleSheet.id = 'vibe-inspector-styles';
-        styleSheet.textContent = inspectorStyles;
-        document.head.appendChild(styleSheet);
-    }
-
-    function handleMouseOver(e) {
-        if (!inspectEnabled) return;
-        const targetInfo = getNodeIdForElement(e.target);
-        
-        if (targetInfo) {
-            if (hoverEl && hoverEl !== targetInfo.element) {
-                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-            }
-            hoverEl = targetInfo.element;
-            hoverEl.classList.add('__vibe-inspect-highlight-hover');
-        } else {
-             if (hoverEl) {
-                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-                hoverEl = null;
-            }
-        }
-    }
-    
-    function handleMouseOut(e) {
-        if (hoverEl && !hoverEl.contains(e.relatedTarget)) {
-            hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-            hoverEl = null;
-        }
-    }
-
-    function handleClick(e) {
-        if (!inspectEnabled) return;
-        
-        const targetInfo = getNodeIdForElement(e.target);
-
-        if (targetInfo) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            window.parent.postMessage({ type: 'vibe-node-click', nodeId: targetInfo.nodeId }, '*');
-
-            if (hoverEl) {
-                hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-            }
-            const el = targetInfo.element;
-            el.classList.add('__vibe-inspect-highlight-clicked');
-            setTimeout(() => {
-                el.classList.remove('__vibe-inspect-highlight-clicked');
-            }, 500);
-        }
-    }
-
-    function enableInspect() {
-        if (inspectEnabled) return;
-        inspectEnabled = true;
-        ensureInspectorStyles();
-        document.addEventListener('mouseover', handleMouseOver);
-        document.addEventListener('mouseout', handleMouseOut);
-        document.addEventListener('click', handleClick, true);
-    }
-
-    function disableInspect() {
-        if (!inspectEnabled) return;
-        inspectEnabled = false;
-        document.removeEventListener('mouseover', handleMouseOver);
-        document.removeEventListener('mouseout', handleMouseOut);
-        document.removeEventListener('click', handleClick, true);
-        if (hoverEl) hoverEl.classList.remove('__vibe-inspect-highlight-hover');
-        hoverEl = null;
-    }
-    
-    window.addEventListener('message', function(event) {
-        if (event.data.type === 'toggle-inspect') { 
-            if (event.data.enabled) enableInspect(); else disableInspect(); 
-        }
-    });
-})();`;
-
-        // START OF FIX: Dedicated script to capture all iframe errors and report them
-        const errorListenerScriptText = `
-(function() {
-    function reportError(error) {
-        let message = 'An unknown error occurred.';
-        let stack = '';
-
-        if (error instanceof Error) {
-            message = error.message;
-            stack = error.stack;
-        } else if (typeof error === 'object' && error !== null && error.message) {
-            message = error.message;
-            stack = error.stack || (error.filename ? \`\${error.filename}:\${error.lineno}:\${error.colno}\` : '');
-        } else {
-            try {
-                message = JSON.stringify(error);
-            } catch {
-                message = String(error);
-            }
-        }
-        
-        window.parent.postMessage({
-            type: 'iframe-error',
-            payload: { message, stack }
-        }, '*');
-    }
-
-    window.addEventListener('error', event => {
-        reportError(event.error || event.message);
-    });
-
-    window.addEventListener('unhandledrejection', event => {
-        reportError(event.reason);
-    });
-
-    const originalIframeError = console.error;
-    console.error = function(...args) {
-        originalIframeError.apply(console, args);
-        args.forEach(arg => reportError(arg));
-    };
-})();`;
+    // --- Part 3: Message listener for toggling inspect ---
+    window.addEventListener('message',e=>{if(e.data.type==='toggle-inspect'){inspectEnabled=e.data.enabled;if(inspectEnabled)ensureStyles();else if(hoverEl){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}}});
+})();
+<\/script>`;
         // END OF FIX
+        
+        if (html.includes('</body>')) {
+            html = html.replace('</body>', `${commsScriptText}\n</body>`);
+        } else {
+            html += commsScriptText;
+        }
 
         doc.open();
         doc.write(html);
         doc.close();
-        
-        // START OF FIX: Inject both the inspector and the error listener scripts
-        const inspectorScript = doc.createElement('script');
-        inspectorScript.textContent = inspectorScriptText;
-        doc.body.appendChild(inspectorScript);
-        
-        const errorListenerScript = doc.createElement('script');
-        errorListenerScript.textContent = errorListenerScriptText;
-        doc.head.insertBefore(errorListenerScript, doc.head.firstChild); // Inject into head to run ASAP
-        // END OF FIX
 
         (async () => {
             const assetMap = await buildAssetUrlMap();
@@ -3721,9 +3618,7 @@ window.addEventListener('message', (event) => {
     const data = event.data || {};
     switch (data.type) {
         case 'vibe-node-click':
-            if (data.nodeId) {
-                openEditNodeModal(data.nodeId);
-            }
+            if (data.nodeId) openEditNodeModal(data.nodeId);
             break;
         case 'vibe-node-delete':
             if (data.nodeId) deleteNode(data.nodeId);
@@ -3738,14 +3633,30 @@ window.addEventListener('message', (event) => {
                 handleAddNodeFromInspect(data.targetNodeId, data.position);
             }
             break;
-        // START OF FIX: Handle errors reported from the preview iframe
+        // START OF FIX: Handle all console logs and errors from the iframe
         case 'iframe-error':
             if (data.payload) {
-                const { message, stack } = data.payload;
+                const { message, stack, name } = data.payload;
                 const error = new Error(message);
-                error.stack = stack;
-                iframeErrors.push(error); // For agent testing
-                logToConsole(error, 'error'); // For user visibility
+                if (stack) error.stack = stack;
+                if (name) error.name = name;
+                iframeErrors.push(error);
+                console.error(error); // Log it through our overridden console.error
+            }
+            break;
+        case 'iframe-console':
+            if (data.payload && Array.isArray(data.payload)) {
+                const level = data.level || 'log';
+                const reconstructedArgs = data.payload.map(arg => {
+                    if (arg && arg.__isError) {
+                        const err = new Error(arg.message);
+                        err.stack = arg.stack;
+                        err.name = arg.name;
+                        return err;
+                    }
+                    return arg;
+                });
+                console[level](...reconstructedArgs);
             }
             break;
         // END OF FIX
