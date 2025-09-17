@@ -1593,6 +1593,15 @@ async function processCodeAndRefreshUI(fullCode) {
     }
 }
 
+// START OF FIX: Ensure handleUpdateTreeFromCode function is defined.
+// This function was reported as missing, causing a ReferenceError.
+// It is defined here to be accessible by the event listener in bindEventListeners.
+async function handleUpdateTreeFromCode() {
+    const fullCode = fullCodeEditor.value;
+    await processCodeAndRefreshUI(fullCode);
+}
+// END OF FIX
+
 async function handleFileUpload() {
     const file = htmlFileInput.files[0];
     if (!file) {
