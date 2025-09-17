@@ -386,10 +386,81 @@ function handleConsoleCommand(level, args) {
     }
 }
 
+// START OF FIX: This block proxies the main window's console to the on-page display.
 const originalConsole = { ...console };
-console.log = (...args) => originalConsole.log(...args); // Keep native logging
-// ... repeat for other methods, we are now handling logging via message passing.
 
+const MAX_DEPTH = 5;
+/**
+ * Serializes an argument from the main window for the on-page console.
+ * This is a copy of the function used inside the iframe to ensure compatibility.
+ * @param {*} arg The argument to serialize.
+ * @param {number} depth The current recursion depth.
+ * @param {WeakSet} seen A set of seen objects to prevent circular references.
+ * @returns {object} A serialized representation of the argument.
+ */
+function serializeArg(arg, depth = 0, seen = new WeakSet()) {
+    if (arg === undefined) return { type: 'undefined', value: 'undefined', preview: 'undefined' };
+    if (arg === null) return { type: 'null', value: 'null', preview: 'null' };
+    const type = typeof arg;
+    if (['string', 'number', 'boolean', 'symbol', 'bigint'].includes(type)) {
+        return { type, value: arg.toString(), preview: arg.toString() };
+    }
+    if (type === 'function') {
+        const signature = arg.toString().match(/^(async\s+)?function\s*\*?\s*([a-zA-Z0-9_$]+)?\s*\([^)]*\)/)?.[0] || 'function()';
+        return { type: 'function', value: signature, preview: 'ƒ' };
+    }
+    if (seen.has(arg)) {
+        return { type: 'string', value: '[Circular]', preview: '[Circular]' };
+    }
+    if (arg instanceof HTMLElement) {
+        return { type: 'dom', tagName: arg.tagName, id: arg.id, classes: [...arg.classList], preview: '<...>' };
+    }
+    if (arg instanceof Error) {
+        const value = { name: arg.name, message: arg.message };
+        if (arg.stack) value.stack = arg.stack;
+        const serializedValue = serializeArg(value, depth + 1, seen);
+        return { type: 'object', value: serializedValue.value, preview: '{Error}' };
+    }
+    if (depth > MAX_DEPTH) {
+        return { type: 'string', value: Array.isArray(arg) ? '[Array]' : '[Object]', preview: '...' };
+    }
+    seen.add(arg);
+    if (Array.isArray(arg)) {
+        return { type: 'array', value: arg.map(item => serializeArg(item, depth + 1, seen)), preview: '[]' };
+    }
+    if (type === 'object') {
+        const obj = {};
+        for (const key in arg) {
+            if (Object.prototype.hasOwnProperty.call(arg, key)) {
+                obj[key] = serializeArg(arg[key], depth + 1, seen);
+            }
+        }
+        return { type: 'object', value: obj, preview: '{}' };
+    }
+    return { type: 'string', value: String(arg), preview: String(arg) };
+}
+
+
+// Override the main window's console methods
+Object.keys(originalConsole).forEach(level => {
+    if (typeof originalConsole[level] === 'function') {
+        console[level] = (...args) => {
+            // 1. Call the original native method so logs still appear in the browser's devtools
+            originalConsole[level](...args);
+            
+            // 2. Serialize arguments and send them to our on-page console
+            try {
+                const serializedArgs = args.map(arg => serializeArg(arg));
+                handleConsoleCommand(level, serializedArgs);
+            } catch (e) {
+                // If our proxy fails, log the failure to the real console.
+                originalConsole.error('Vibe console proxy failed:', e);
+            }
+        };
+    }
+});
+
+// These global error handlers will now automatically use our proxied `console.error`
 window.addEventListener('error', e => console.error(e.error || e.message));
 window.addEventListener('unhandledrejection', e => console.error('Unhandled promise rejection:', e.reason));
 // END OF FIX
@@ -954,8 +1025,11 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     const augmentedSystemPrompt = systemPrompt + componentContext;
     const augmentedUserPrompt = fileContext + userPrompt;
 
-    logDetailed('System Prompt Sent to AI', augmentedSystemPrompt);
-    logDetailed('User Prompt Sent to AI', augmentedUserPrompt);
+    // Use originalConsole to avoid feedback loops if our console proxy has issues
+    originalConsole.log('--- AI Call Details ---');
+    originalConsole.log('System Prompt:', augmentedSystemPrompt);
+    originalConsole.log('User Prompt:', augmentedUserPrompt);
+
 
     if (currentAIProvider === 'nscale') {
         if (streamCallback) {
@@ -1048,13 +1122,14 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
                 }
             }
             
-            logDetailed('Full Raw Gemini Response (Streamed)', fullResponseText);
+            originalConsole.log('Full Raw Gemini Response (Streamed)', fullResponseText);
             return fullResponseText;
         }
 
         const data = await response.json();
         console.log('--- Gemini Response Received ---');
-        logDetailed('Raw Gemini Response', JSON.stringify(data, null, 2));
+        originalConsole.log('Raw Gemini Response', JSON.stringify(data, null, 2));
+
 
         if (!data.candidates || data.candidates.length === 0) {
             if (data.promptFeedback && data.promptFeedback.blockReason) {
@@ -1255,7 +1330,8 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         }
 
         let content = data.choices[0].message.content;
-        logDetailed('Raw nscale Response', content);
+        originalConsole.log('Raw nscale Response', content);
+
         
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
