@@ -283,7 +283,8 @@ function logToConsole(message, type = 'log') {
         msgEl.appendChild(pre);
         
         // Create the "Fix with AI" button if an API key is present
-        if (geminiApiKey) {
+        const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+        if (keyIsAvailable) {
             const fixButton = document.createElement('button');
             fixButton.textContent = 'Fix with AI';
             fixButton.className = 'fix-error-button action-button';
@@ -383,7 +384,7 @@ console.info = function(...args) {
 };
 
 window.addEventListener('error', function (e) {
-    // This catches errors from the dynamically added scripts
+    // This catches errors from the dynamically added scripts in the main window
     console.error(e.error || e.message);
 });
 
@@ -396,6 +397,7 @@ window.addEventListener('unhandledrejection', function(event) {
 let currentProjectId = null;
 let agentConversationHistory = [];
 let chatConversationHistory = [];
+let iframeErrors = []; // START OF FIX: Track errors from the preview iframe
 
 // NEW: State for iterative agent sessions
 let iterativeSessionState = {
@@ -1591,11 +1593,6 @@ async function processCodeAndRefreshUI(fullCode) {
     }
 }
 
-async function handleUpdateTreeFromCode() {
-    const fullCode = fullCodeEditor.value;
-    await processCodeAndRefreshUI(fullCode);
-}
-
 async function handleFileUpload() {
     const file = htmlFileInput.files[0];
     if (!file) {
@@ -2119,11 +2116,13 @@ async function handleDownloadProjectZip() {
  */
 function applyVibes() {
     try {
+        // START OF FIX: Clear any tracked errors from the previous preview state
+        iframeErrors = [];
+        // END OF FIX
         const doc = previewContainer.contentWindow.document;
         let html = generateFullCodeString();
 
-        const inspectorScript = `
-<script>
+        const inspectorScriptText = `
 (function(){
     let inspectEnabled = false;
     let hoverEl = null;
@@ -2233,18 +2232,64 @@ function applyVibes() {
             if (event.data.enabled) enableInspect(); else disableInspect(); 
         }
     });
-})();
-<\/script>`;
+})();`;
 
-        if (html.includes('</body>')) {
-            html = html.replace('</body>', `${inspectorScript}\n</body>`);
+        // START OF FIX: Dedicated script to capture all iframe errors and report them
+        const errorListenerScriptText = `
+(function() {
+    function reportError(error) {
+        let message = 'An unknown error occurred.';
+        let stack = '';
+
+        if (error instanceof Error) {
+            message = error.message;
+            stack = error.stack;
+        } else if (typeof error === 'object' && error !== null && error.message) {
+            message = error.message;
+            stack = error.stack || (error.filename ? \`\${error.filename}:\${error.lineno}:\${error.colno}\` : '');
         } else {
-            html += inspectorScript;
+            try {
+                message = JSON.stringify(error);
+            } catch {
+                message = String(error);
+            }
         }
+        
+        window.parent.postMessage({
+            type: 'iframe-error',
+            payload: { message, stack }
+        }, '*');
+    }
+
+    window.addEventListener('error', event => {
+        reportError(event.error || event.message);
+    });
+
+    window.addEventListener('unhandledrejection', event => {
+        reportError(event.reason);
+    });
+
+    const originalIframeError = console.error;
+    console.error = function(...args) {
+        originalIframeError.apply(console, args);
+        args.forEach(arg => reportError(arg));
+    };
+})();`;
+        // END OF FIX
 
         doc.open();
         doc.write(html);
         doc.close();
+        
+        // START OF FIX: Inject both the inspector and the error listener scripts
+        const inspectorScript = doc.createElement('script');
+        inspectorScript.textContent = inspectorScriptText;
+        doc.body.appendChild(inspectorScript);
+        
+        const errorListenerScript = doc.createElement('script');
+        errorListenerScript.textContent = errorListenerScriptText;
+        doc.head.insertBefore(errorListenerScript, doc.head.firstChild); // Inject into head to run ASAP
+        // END OF FIX
 
         (async () => {
             const assetMap = await buildAssetUrlMap();
@@ -2518,6 +2563,33 @@ You must respond ONLY with a single, valid JSON object with the following schema
 - Analyze the entire vibe tree to understand the context before making changes.
 - The response must be a single, valid JSON object.`;
 }
+
+// START OF FIX: New system prompt for the self-correction phase
+function getSelfCorrectionSystemPrompt() {
+    return `You are an expert AI developer agent specializing in debugging. Your previous attempt to implement a step resulted in a runtime error. Your task is to analyze the error, the original goal, and the current code to generate a fix.
+
+**INPUT:**
+1.  **Original Goal:** The description of the task you were trying to complete.
+2.  **Error Details:** The error message and stack trace that occurred.
+3.  **Full Vibe Tree:** The current state of the code that is causing the error.
+
+**TASK:**
+Generate a new set of actions to fix the error while still achieving the original goal. You may need to update existing code or create new helper components.
+
+**OUTPUT:**
+You must respond ONLY with a single, valid JSON object with the action schema.
+{
+  "plan": "A concise summary of the fix. Explain what caused the error and how your new actions will resolve it.",
+  "actions": [
+    {
+      "actionType": "update",
+      "nodeId": "the-id-of-the-node-to-change",
+      "newCode": "The complete, corrected code for this component."
+    }
+  ]
+}`;
+}
+// END OF FIX
 
 /**
  * Initiates an AI-powered fix for a given error message.
@@ -2817,14 +2889,69 @@ async function handleStartIterativeSession() {
     }
 }
 
+
+// START OF FIX: New functions for iterative testing and self-correction
+
 /**
- * Executes the current step in the iterative plan and automatically proceeds to the next.
+ * Waits for a short period and checks if any JS errors were reported from the iframe.
+ * @returns {Promise<void>} Resolves if no errors, rejects with the first error found.
+ */
+function testCurrentStep() {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (iframeErrors.length > 0) {
+                const errorDetails = iframeErrors.map(e => `${e.message}${e.stack ? `\n${e.stack}`:''}`).join('\n---\n');
+                reject(new Error(errorDetails));
+            } else {
+                resolve();
+            }
+        }, 2000); // Wait 2 seconds for any errors to occur and be reported
+    });
+}
+
+/**
+ * Asks the AI to generate a fix for a failed step.
+ * @param {string} failedStepDescription - The original goal of the step.
+ * @param {Error} error - The error that occurred.
+ * @returns {Promise<object>} A promise that resolves to the AI's new action plan.
+ */
+async function handleSelfCorrection(failedStepDescription, error) {
+    logToAgent('Asking AI for a fix...', 'info');
+
+    const systemPrompt = getSelfCorrectionSystemPrompt();
+    const fullTreeString = JSON.stringify(vibeTree, null, 2);
+    const userPrompt = `The attempt to implement the following step failed.
+
+**Original Goal:**
+"${failedStepDescription}"
+
+**Error Details:**
+\`\`\`
+${error.message}
+${error.stack || ''}
+\`\`\`
+
+**Full Vibe Tree (current code with error):**
+\`\`\`json
+${fullTreeString}
+\`\`\`
+
+Please analyze the code and the error, and provide a new set of actions to fix the problem.`;
+
+    const rawResponse = await callAI(systemPrompt, userPrompt, true);
+    return JSON.parse(rawResponse);
+}
+// END OF FIX
+
+/**
+ * Executes the current step in the iterative plan, tests for errors,
+ * and attempts to self-correct upon failure before proceeding.
  */
 async function executeNextIterativeStep() {
-    // Stop if the session is no longer in the 'executing' state.
     if (iterativeSessionState.status !== 'executing') {
         logToAgent('Execution paused or ended.', 'info');
         hideAgentSpinner();
+        hideGlobalAgentLoader();
         return;
     }
 
@@ -2838,51 +2965,74 @@ async function executeNextIterativeStep() {
     }
 
     showAgentSpinner();
-    updateIterativeUI(); // Refresh UI to highlight the current step
+    updateIterativeUI();
     const currentStepDescription = iterativeSessionState.plan[iterativeSessionState.currentStepIndex];
-    logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}:</strong> ${currentStepDescription}`, 'action');
-    updateGlobalAgentLoader('Executing plan...', `Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
+    const progressText = `Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`;
+    updateGlobalAgentLoader('Executing plan...', progressText);
 
-    try {
-        const systemPrompt = getIterativeExecutorSystemPrompt();
-        const fullTreeString = JSON.stringify(vibeTree, null, 2);
-        const userPrompt = `
-            Overall Goal: "${iterativeSessionState.overallGoal}"
-            Full Plan:
-            ${iterativeSessionState.plan.map((s, i) => `${i+1}. ${s}`).join('\n')}
-            Current Step to Execute: "${currentStepDescription}"
-            Current Vibe Tree:
-            \`\`\`json
-            ${fullTreeString}
-            \`\`\`
-        `;
+    const MAX_RETRIES = 1;
+    let lastError = null;
 
-        iterativeSessionState.history.push({ role: 'user', content: userPrompt });
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            if (attempt === 0) {
+                // First attempt: normal execution
+                logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}:</strong> ${currentStepDescription}`, 'action');
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
+                const systemPrompt = getIterativeExecutorSystemPrompt();
+                const fullTreeString = JSON.stringify(vibeTree, null, 2);
+                const userPrompt = `
+                    Overall Goal: "${iterativeSessionState.overallGoal}"
+                    Full Plan:
+                    ${iterativeSessionState.plan.map((s, i) => `${i+1}. ${s}`).join('\n')}
+                    Current Step to Execute: "${currentStepDescription}"
+                    Current Vibe Tree:
+                    \`\`\`json
+                    ${fullTreeString}
+                    \`\`\`
+                `;
+                iterativeSessionState.history.push({ role: 'user', content: userPrompt });
 
-        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+                const rawResponse = await callAI(systemPrompt, userPrompt, true);
+                const agentDecision = JSON.parse(rawResponse);
 
-        executeAgentPlan(agentDecision, logToAgent);
+                iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+                executeAgentPlan(agentDecision, logToAgent);
 
-        logToAgent(`Step ${iterativeSessionState.currentStepIndex + 1} complete.`, 'info');
-        switchToTab('preview');
+            } else {
+                // Subsequent attempts: self-correction
+                logToAgent(`<strong>Attempt ${attempt + 1}:</strong> Applying AI-generated fix for the previous error.`, 'action');
+                const fixDecision = await handleSelfCorrection(currentStepDescription, lastError);
+                executeAgentPlan(fixDecision, logToAgent);
+            }
 
-        // Automatically proceed to the next step
-        iterativeSessionState.currentStepIndex++;
-        // Add a short delay to allow UI to update and be readable
-        setTimeout(executeNextIterativeStep, 1500);
+            logToAgent('Testing implementation for errors...', 'info');
+            await testCurrentStep();
 
-    } catch (error) {
-        console.error(`Error executing step ${iterativeSessionState.currentStepIndex + 1}:`, error);
-        logToAgent(`Failed to execute step: ${error.message}. Execution has been paused. You can try to fix the issue or edit the plan and resume.`, 'error');
-        iterativeSessionState.status = 'paused';
-        updateGlobalAgentLoader('Execution paused on error', `At Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`);
-        updateIterativeUI();
-        hideAgentSpinner();
+            // If test passes, we're done with this step
+            logToAgent(`Step ${iterativeSessionState.currentStepIndex + 1} completed and tested successfully.`, 'info');
+            switchToTab('preview');
+            iterativeSessionState.currentStepIndex++;
+            setTimeout(executeNextIterativeStep, 1500);
+            return; // Exit the loop and the function for this step
+
+        } catch (error) {
+            lastError = error;
+            console.error(`Error during step ${iterativeSessionState.currentStepIndex + 1}, attempt ${attempt + 1}:`, error);
+            logToAgent(`Attempt ${attempt + 1} failed the test with an error: <pre>${error.message}</pre>`, 'error');
+
+            if (attempt >= MAX_RETRIES) {
+                logToAgent('Maximum self-correction retries reached. Pausing session for your review.', 'error');
+                iterativeSessionState.status = 'paused';
+                updateGlobalAgentLoader('Execution paused on error', progressText);
+                updateIterativeUI();
+                hideAgentSpinner();
+                return; // Exit loop and function
+            }
+        }
     }
 }
+
 
 /**
  * Handles the primary positive action in an iterative session, which changes
@@ -2913,7 +3063,7 @@ function handleAcceptAndContinue() {
         iterativeSessionState.status = 'executing';
         iterativeSessionState.currentStepIndex = 0; // Start from the beginning
 
-        logToAgent('<strong>Execution Started.</strong> Agent will now work through the plan automatically.', 'plan');
+        logToAgent('<strong>Execution Started.</strong> Agent will now work through the plan, testing each step.', 'plan');
         updateGlobalAgentLoader('Starting execution...', `Step 1/${editedPlan.length}`);
         executeNextIterativeStep(); // Kick off the execution loop
     } else if (status === 'paused') {
@@ -3579,6 +3729,17 @@ window.addEventListener('message', (event) => {
                 handleAddNodeFromInspect(data.targetNodeId, data.position);
             }
             break;
+        // START OF FIX: Handle errors reported from the preview iframe
+        case 'iframe-error':
+            if (data.payload) {
+                const { message, stack } = data.payload;
+                const error = new Error(message);
+                error.stack = stack;
+                iframeErrors.push(error); // For agent testing
+                logToConsole(error, 'error'); // For user visibility
+            }
+            break;
+        // END OF FIX
     }
 });
 
@@ -4767,15 +4928,16 @@ function resetToStartPage() {
     projectPromptInput.value = '';
     newProjectIdInput.value = '';
     startPageGenerationOutput.style.display = 'none';
-    generateProjectButton.disabled = !(geminiApiKey || nscaleApiKey);
-    newProjectContainer.style.display = 'block';
-    editorContainer.innerHTML = '';
-    previewContainer.srcdoc = '';
-    agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
-    chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
-    flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
-    consoleOutput.innerHTML = '';
-    fullCodeEditor.value = '';
+    const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if(generateProjectButton) generateProjectButton.disabled = !keyIsAvailable;
+    if(newProjectContainer) newProjectContainer.style.display = 'block';
+    if(editorContainer) editorContainer.innerHTML = '';
+    if(previewContainer) previewContainer.srcdoc = '';
+    if(agentOutput) agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
+    if(chatOutput) chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
+    if(flowchartOutput) flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
+    if(consoleOutput) consoleOutput.innerHTML = '';
+    if(fullCodeEditor) fullCodeEditor.value = '';
     populateProjectList();
     logToConsole("Ready for new project.", "info");
 }
