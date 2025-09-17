@@ -252,181 +252,147 @@ function hideGlobalAgentLoader() {
 
 // --- On-page Console Logging ---
 const consoleOutput = document.getElementById('console-output');
-
-function logToConsole(message, type = 'log') {
-    if (!consoleOutput) return;
-
-    const msgEl = document.createElement('div');
-    msgEl.className = `console-message log-type-${type}`;
-    const timestamp = `[${new Date().toLocaleTimeString()}] `;
-
-    if (type === 'error') {
-        consoleErrorIndicator.classList.add('active');
-
-        let errorMessageText;
-        if (message instanceof Error) {
-            errorMessageText = `${message.name || 'Error'}: ${message.message}\n${message.stack || ''}`;
-        } else if (typeof message === 'object' && message !== null) {
-            try {
-                errorMessageText = JSON.stringify(message, Object.getOwnPropertyNames(message), 2);
-            } catch (e) {
-                errorMessageText = String(message);
-            }
-        } else {
-            errorMessageText = String(message);
-        }
-        
-        const pre = document.createElement('pre');
-        pre.textContent = `${timestamp}${errorMessageText}`;
-        msgEl.appendChild(pre);
-        
-        const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
-        if (keyIsAvailable) {
-            const fixButton = document.createElement('button');
-            fixButton.textContent = 'Fix with AI';
-            fixButton.className = 'fix-error-button action-button';
-            fixButton.onclick = () => handleFixError(errorMessageText, fixButton);
-            msgEl.appendChild(fixButton);
-        }
-
-    } else if (type === 'table') {
-        // For tables, the message is pre-formatted HTML
-        const timeNode = document.createTextNode(timestamp);
-        msgEl.appendChild(timeNode);
-        msgEl.innerHTML += message; // Append HTML table
-    } else {
-        const pre = document.createElement('pre');
-        pre.textContent = `${timestamp}${message}`;
-        msgEl.appendChild(pre);
-    }
-    
-    consoleOutput.appendChild(msgEl);
-    consoleOutput.scrollTop = consoleOutput.scrollHeight;
-}
-
+let currentLogGroup = consoleOutput; // For console.group support
 
 /**
- * Logs a detailed, collapsible message to the on-page console, ideal for large data like AI prompts.
- * @param {string} title - The summary text for the collapsible section.
- * @param {string} content - The detailed content to show inside.
+ * Creates an interactive, styled HTML element from a serialized log argument.
+ * @param {object} arg - The serialized argument from the iframe proxy.
+ * @returns {Node} A DOM node representing the argument.
  */
-function logDetailed(title, content) {
-    if (!consoleOutput) return;
+function createLogElement(arg) {
+    if (arg === null) return createStyledSpan('null', 'console-null');
+    if (arg === undefined) return createStyledSpan('undefined', 'console-undefined');
 
-    const msgEl = document.createElement('div');
-    msgEl.className = `console-message log-type-info`;
+    const el = document.createElement('span');
+    switch (arg.type) {
+        case 'string':
+            el.className = 'console-string';
+            el.textContent = `"${arg.value}"`;
+            break;
+        case 'number':
+        case 'boolean':
+        case 'symbol':
+            el.className = `console-${arg.type}`;
+            el.textContent = arg.value;
+            break;
+        case 'function':
+            el.className = 'console-function';
+            el.textContent = `ƒ ${arg.value}`;
+            break;
+        case 'dom':
+            el.className = 'console-dom';
+            el.textContent = `<${arg.tagName.toLowerCase()}${arg.id ? '#' + arg.id : ''}${arg.classes ? '.' + arg.classes.join('.') : ''}>`;
+            break;
+        case 'array':
+        case 'object':
+            return createCollapsible(arg);
+        default:
+            el.textContent = String(arg); // Fallback
+    }
+    return el;
+}
 
-    const timestamp = `[${new Date().toLocaleTimeString()}] `;
-    const detail = document.createElement('details');
-    detail.className = 'console-ai-log';
-    
+function createStyledSpan(text, className) {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    return span;
+}
+
+function createCollapsible(data) {
+    const details = document.createElement('details');
+    details.className = 'console-collapsible';
     const summary = document.createElement('summary');
-    summary.textContent = ` ${title}`; // Add space for alignment
     
-    const pre = document.createElement('pre');
-    pre.textContent = content; // Using textContent is safer and pre preserves formatting
+    let preview;
+    if (data.type === 'array') {
+        preview = `Array(${data.value.length}) [${data.value.slice(0, 5).map(v => v.preview).join(', ')}${data.value.length > 5 ? ', ...' : ''}]`;
+    } else {
+        preview = `{${Object.entries(data.value).slice(0, 3).map(([k, v]) => `${k}: ${v.preview}`).join(', ')}${Object.keys(data.value).length > 3 ? ', ...' : ''}}`;
+    }
+    summary.textContent = preview;
+    details.appendChild(summary);
 
-    detail.appendChild(summary);
-    detail.appendChild(pre);
-
-    const timestampNode = document.createTextNode(timestamp);
-    msgEl.appendChild(timestampNode);
-    msgEl.appendChild(detail);
-
-    consoleOutput.appendChild(msgEl);
-    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    const content = document.createElement('div');
+    content.className = 'console-collapsible-content';
+    
+    for (const [key, value] of Object.entries(data.value)) {
+        const row = document.createElement('div');
+        row.className = 'console-kv-pair';
+        const keyEl = createStyledSpan(`${key}: `, 'console-key');
+        const valueEl = createLogElement(value);
+        row.appendChild(keyEl);
+        row.appendChild(valueEl);
+        content.appendChild(row);
+    }
+    
+    details.appendChild(content);
+    return details;
 }
 
-// START OF FIX: Comprehensive Console Overhaul
-/**
- * Formats any JavaScript variable into a readable string for the console.
- * Handles circular references in objects.
- * @param {*} arg - The variable to format.
- * @returns {string} A string representation of the variable.
- */
-function formatForConsole(arg) {
-    if (typeof arg === 'string') return arg;
-    if (typeof arg === 'number' || typeof arg === 'boolean' || arg === null || arg === undefined) return String(arg);
-    if (typeof arg === 'symbol') return arg.toString();
-    if (typeof arg === 'function') {
-        const funcStr = arg.toString();
-        return funcStr.length > 100 ? funcStr.substring(0, 90) + '... }' : funcStr;
-    }
-    try {
-        const cache = new Set();
-        return JSON.stringify(arg, (key, value) => {
-            if (typeof value === 'object' && value !== null) {
-                if (cache.has(value)) return '[Circular]';
-                cache.add(value);
-            }
-            if (typeof value === 'function') return `[Function: ${value.name || 'anonymous'}]`;
-            return value;
-        }, 2);
-    } catch (e) {
-        return '[Unserializable Object]';
-    }
-}
+function renderConsoleMessage(level, args) {
+    if (!consoleOutput) return;
 
-/**
- * Creates an HTML table string from an array of objects.
- * @param {Array<Object>} data - The data to tabulate.
- * @returns {string} An HTML table string.
- */
-function createHtmlTable(data) {
-    if (!data || typeof data !== 'object') return formatForConsole(data);
-    const isArrayOfObjects = Array.isArray(data) && data.every(item => typeof item === 'object' && item !== null);
-    if (!isArrayOfObjects || data.length === 0) return formatForConsole(data);
+    const msgEl = document.createElement('div');
+    msgEl.className = `console-message log-type-${level}`;
+    const timestamp = `[${new Date().toLocaleTimeString()}] `;
+    msgEl.appendChild(document.createTextNode(timestamp));
 
-    const headers = Object.keys(data[0]);
-    let table = '<table><thead><tr><th>(index)</th>';
-    headers.forEach(h => table += `<th>${h}</th>`);
-    table += '</tr></thead><tbody>';
-
-    data.forEach((row, index) => {
-        table += `<tr><td>${index}</td>`;
-        headers.forEach(header => {
-            const cellContent = String(row[header]).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            table += `<td>${cellContent}</td>`;
-        });
-        table += '</tr>';
+    args.forEach(arg => {
+        msgEl.appendChild(createLogElement(arg));
+        msgEl.appendChild(document.createTextNode(' ')); // Add space between args
     });
 
-    table += '</tbody></table>';
-    return table;
+    currentLogGroup.appendChild(msgEl);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function handleConsoleCommand(level, args) {
+    switch (level) {
+        case 'group':
+        case 'groupCollapsed':
+            const group = document.createElement('div');
+            group.className = 'console-group';
+            const details = document.createElement('details');
+            details.open = (level === 'group');
+            const summary = document.createElement('summary');
+            const label = args.length > 0 ? args.map(arg => arg.value || '').join(' ') : 'Console group';
+            summary.textContent = label;
+            details.appendChild(summary);
+            const content = document.createElement('div');
+            content.className = 'console-group-content';
+            details.appendChild(content);
+            group.appendChild(details);
+            currentLogGroup.appendChild(group);
+            currentLogGroup = content;
+            break;
+        case 'groupEnd':
+            if (currentLogGroup.parentElement && currentLogGroup.parentElement.closest('.console-group')) {
+                currentLogGroup = currentLogGroup.parentElement.closest('.console-group').parentElement;
+            } else {
+                currentLogGroup = consoleOutput;
+            }
+            break;
+        case 'clear':
+            consoleOutput.innerHTML = '';
+            currentLogGroup = consoleOutput;
+            break;
+        case 'error':
+            consoleErrorIndicator.classList.add('active');
+            renderConsoleMessage(level, args);
+            break;
+        default:
+            renderConsoleMessage(level, args);
+    }
 }
 
 const originalConsole = { ...console };
-const consoleMethods = ['log', 'warn', 'info', 'debug', 'table'];
+console.log = (...args) => originalConsole.log(...args); // Keep native logging
+// ... repeat for other methods, we are now handling logging via message passing.
 
-consoleMethods.forEach(method => {
-    console[method] = function(...args) {
-        if (originalConsole[method]) originalConsole[method](...args);
-        
-        if (method === 'table' && args.length > 0) {
-            logToConsole(createHtmlTable(args[0]), 'table');
-        } else {
-            const formattedMessage = args.map(formatForConsole).join(' ');
-            logToConsole(formattedMessage, method);
-        }
-    };
-});
-
-// Keep special handling for error to preserve the error object itself
-console.error = function(...args) {
-    originalConsole.error(...args);
-    args.forEach(arg => logToConsole(arg, 'error'));
-};
+window.addEventListener('error', e => console.error(e.error || e.message));
+window.addEventListener('unhandledrejection', e => console.error('Unhandled promise rejection:', e.reason));
 // END OF FIX
-
-window.addEventListener('error', function (e) {
-    console.error(e.error || e.message);
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled promise rejection:', event.reason);
-});
-
-// --- End On-page Console Logging ---
 
 let currentProjectId = null;
 let agentConversationHistory = [];
@@ -435,7 +401,6 @@ let iframeErrors = [];
 
 // NEW: State for iterative agent sessions
 let iterativeSessionState = {
-    // status can be 'idle', 'planning', 'reviewing', 'executing', 'paused', 'complete'
     status: 'idle',
     overallGoal: '',
     plan: [],
@@ -502,7 +467,7 @@ function recordHistory(label = '') {
     // Update last snapshot
     historyState.lastSnapshotSerialized = current;
     updateUndoRedoUI();
-    if (label) console.info(`History recorded: ${label}`);
+    if (label) originalConsole.info(`History recorded: ${label}`);
 }
 
 /**
@@ -634,15 +599,14 @@ function initializeApiSettings() {
     updateApiKeyVisibility();
     updateFeatureAvailability();
     
-    console.info(`AI Provider set to: ${currentAIProvider}`);
-    console.info(`Gemini model set to: ${geminiModelSelect.value}`);
+    console.log(`AI Provider set to: ${currentAIProvider}`);
+    console.log(`Gemini model set to: ${geminiModelSelect.value}`);
 }
 
 function handleProviderChange() {
     currentAIProvider = aiProviderSelect.value;
     localStorage.setItem('aiProvider', currentAIProvider);
-    console.info(`Switched AI Provider to: ${currentAIProvider}`);
-    logToConsole(`AI Provider switched to: ${currentAIProvider}`, 'info');
+    console.log(`Switched AI Provider to: ${currentAIProvider}`);
     updateApiKeyVisibility();
     updateFeatureAvailability();
 }
@@ -652,7 +616,7 @@ function saveGeminiApiKey() {
     if (key) {
         localStorage.setItem('geminiApiKey', key);
         geminiApiKey = key;
-        console.info('Gemini API Key saved!');
+        console.log('Gemini API Key saved!');
     } else {
         localStorage.removeItem('geminiApiKey');
         geminiApiKey = '';
@@ -668,7 +632,7 @@ function saveNscaleApiKey() {
     if (key) {
         localStorage.setItem('nscaleApiKey', key);
         nscaleApiKey = key;
-        console.info('nscale API Key saved!');
+        console.log('nscale API Key saved!');
     } else {
         localStorage.removeItem('nscaleApiKey');
         nscaleApiKey = '';
@@ -791,7 +755,7 @@ async function handleSaveCode(event) {
     recordHistory(`Save code for ${nodeId}`);
 
     node.code = newCode;
-    logToConsole(`Code for node '${nodeId}' was manually saved.`, 'info');
+    console.log(`Code for node '${nodeId}' was manually saved.`);
     
     const originalText = button.textContent;
     button.textContent = 'Saved!';
@@ -827,7 +791,6 @@ async function handleUpdate(event) {
     button.disabled = true;
     button.innerHTML = 'Updating... <div class="loading-spinner"></div>';
     console.log(`Updating node: ${nodeId}`);
-    logToConsole(`Updating node '${nodeId}' with new description...`, 'info');
     
     node.description = newDescription;
 
@@ -855,23 +818,18 @@ ${fullTreeString}
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
             const agentDecision = JSON.parse(rawResponse);
-
-            // Log the plan to the main console for visibility
-            const consoleLogger = (message, type) => {
+            
+            executeAgentPlan(agentDecision, (message, type) => {
                 const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
                 const logFunc = console[type] || console.log;
                 logFunc(`[UpdateEngine] ${cleanMessage}`);
-            };
-            
-            executeAgentPlan(agentDecision, consoleLogger);
+            });
         }
         
-        // NEW: Automatically switch to the preview tab after a successful update.
         switchToTab('preview');
 
     } catch (error) {
         console.error("Failed to update vibes:", error);
-        logToConsole(`An error occurred during the update: ${error.message}. Check the console for details.`, 'error');
         alert(`An error occurred during the update: ${error.message}. Check the console for details.`);
     } finally {
         button.disabled = false;
@@ -880,7 +838,7 @@ ${fullTreeString}
 }
 
 function refreshAllUI() {
-    logToConsole('Refreshing entire UI: Vibe Editor, Website Preview, and Full Code.', 'info');
+    console.log('Refreshing entire UI: Vibe Editor, Website Preview, and Full Code.');
 
     // Preserve the expanded/collapsed state of the editor nodes
     const expandedNodeStates = new Map(); // nodeId -> { content: boolean, children: boolean }
@@ -929,12 +887,9 @@ function refreshAllUI() {
     if (document.getElementById('code').classList.contains('active')) {
         showFullCode();
     }
-
-    // NEW: keep the Files tab in sync with the currently loaded project
-    // This ensures the file system reflects the active project's files immediately.
+    
     renderFileTree();
-
-    updateUndoRedoUI(); // NEW: reflect availability after any UI refresh
+    updateUndoRedoUI();
     autoSaveProject();
 }
 
@@ -971,7 +926,7 @@ function getComponentContextForAI() {
 }
 
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
-    console.info('--- Calling AI ---');
+    console.log('--- Calling AI ---');
     
     let fileContext = '';
     if (currentProjectId) {
@@ -999,7 +954,6 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     const augmentedSystemPrompt = systemPrompt + componentContext;
     const augmentedUserPrompt = fileContext + userPrompt;
 
-    logToConsole('Sending request to AI model...', 'info');
     logDetailed('System Prompt Sent to AI', augmentedSystemPrompt);
     logDetailed('User Prompt Sent to AI', augmentedUserPrompt);
 
@@ -1094,13 +1048,12 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
                 }
             }
             
-            logToConsole('Successfully received streaming response from Gemini.', 'info');
             logDetailed('Full Raw Gemini Response (Streamed)', fullResponseText);
             return fullResponseText;
         }
 
         const data = await response.json();
-        console.info('--- Gemini Response Received ---');
+        console.log('--- Gemini Response Received ---');
         logDetailed('Raw Gemini Response', JSON.stringify(data, null, 2));
 
         if (!data.candidates || data.candidates.length === 0) {
@@ -1129,8 +1082,6 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
 
         const content = candidate.content.parts[0].text;
         
-        logToConsole('Successfully received response from Gemini.', 'info');
-        
         if (document.getElementById('code').classList.contains('active')) {
             showFullCode();
         }
@@ -1145,7 +1096,6 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         } catch (parseError) {
              // Not a JSON error, re-throw original.
         }
-        logToConsole(`Gemini AI communication failed: ${e.message}`, 'error');
         throw new Error(`Gemini AI communication failed: ${e.message}`);
     }
 }
@@ -1159,7 +1109,6 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
  */
 async function generateCompleteSubtree(parentNode, streamCallback = null) {
     console.log(`Generating subtree for parent: ${parentNode.id}`);
-    logToConsole(`Generating components for "${parentNode.id}"...`, 'info');
 
     const systemPrompt = `You are an expert system that designs a complete website component hierarchy based on a high-level description. Your task is to generate a valid JSON array of "vibe nodes" that represent the children of a given container.
 
@@ -1262,7 +1211,6 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
             throw new Error("AI did not return a valid JSON array.");
         }
         console.log("Successfully parsed generated subtree from AI.");
-        logToConsole(`Successfully generated ${childrenArray.length} new components.`, 'info');
         
         return childrenArray;
     } catch (e) {
@@ -1300,14 +1248,13 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         }
 
         const data = await response.json();
-        console.info('--- nscale Response Received ---');
+        console.log('--- nscale Response Received ---');
 
         if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
         let content = data.choices[0].message.content;
-        logToConsole('Successfully received response from nscale.', 'info');
         logDetailed('Raw nscale Response', content);
         
         if (forJson) {
@@ -1321,7 +1268,6 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
 
     } catch (e) {
         console.error("Error calling nscale AI:", e);
-        logToConsole(`nscale AI communication failed: ${e.message}`, 'error');
         throw new Error(`nscale AI communication failed: ${e.message}`);
     }
 }
@@ -1332,7 +1278,7 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
  * @returns {object} A vibeTree object.
  */
 function parseHtmlToVibeTree(fullCode) {
-    logToConsole("Parsing HTML to Vibe Tree using client-side logic.", 'info');
+    console.log("Parsing HTML to Vibe Tree using client-side logic.");
     const parser = new DOMParser();
     const doc = parser.parseFromString(fullCode, 'text/html');
 
@@ -1568,13 +1514,11 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
         if (!parsed) {
             console.warn("AI did not return valid JSON. Falling back to client-side HTML parser.");
-            logToConsole('AI returned invalid JSON; using client-side HTML parser instead.', 'warn');
             return parseHtmlToVibeTree(fullCode);
         }
 
         if (!parsed.id || parsed.type !== 'container' || !Array.isArray(parsed.children)) {
             console.warn("AI JSON missing required root container fields. Falling back to client-side parser.");
-            logToConsole('AI JSON missing required fields; using client-side parser instead.', 'warn');
             return parseHtmlToVibeTree(fullCode);
         }
 
@@ -1582,7 +1526,6 @@ async function decomposeCodeIntoVibeTree(fullCode) {
         return parsed;
     } catch (e) {
         console.warn("Failed to parse vibe tree JSON from AI, using client-side parser.", e);
-        logToConsole(`AI JSON parse failed (${e.message}); using client-side parser.`, 'warn');
         return parseHtmlToVibeTree(fullCode);
     }
 }
@@ -1590,7 +1533,6 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 async function processCodeAndRefreshUI(fullCode) {
     if (!fullCode.trim()) {
         alert("The code is empty. There is nothing to process.");
-        logToConsole("Processing aborted: code is empty.", 'warn');
         return;
     }
 
@@ -1603,20 +1545,18 @@ async function processCodeAndRefreshUI(fullCode) {
         b.innerHTML = 'Processing... <div class="loading-spinner"></div>';
     });
 
-    logToConsole(`Processing full code to update vibe tree.`, 'info');
     
     try {
         recordHistory('Process full code (replace tree)');
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode);
         vibeTree = newVibeTree;
         refreshAllUI();
-        logToConsole("Update from code complete. UI refreshed.", 'info');
+        console.log("Update from code complete. UI refreshed.");
         switchToTab('preview');
         historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         autoSaveProject();
     } catch (error) {
         console.error("Failed to update vibes from full code:", error);
-        logToConsole(`Failed to process code: ${error.message}`, 'error');
         alert(`An error occurred during processing: ${error.message}. Check the console for details.`);
     } finally {
         buttonsToDisable.forEach(b => {
@@ -1638,9 +1578,9 @@ async function handleFileUpload() {
         alert("Please select an HTML file to upload.");
         return;
     }
-    logToConsole(`File selected: ${file.name} (${file.type})`, 'info');
+    console.log(`File selected: ${file.name} (${file.type})`);
     if (!file.type.includes('html')) {
-        logToConsole(`Warning: Selected file is not text/html. Proceeding anyway.`, 'warn');
+        console.warn(`Warning: Selected file is not text/html. Proceeding anyway.`);
     }
 
     const baseId = file.name.replace(/\.(html|htm)$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
@@ -1651,7 +1591,7 @@ async function handleFileUpload() {
         projectId = `${baseId}-${suffix++}`;
     }
     currentProjectId = projectId;
-    logToConsole(`New project ID assigned from file: ${currentProjectId}`, 'info');
+    console.log(`New project ID assigned from file: ${currentProjectId}`);
 
     const reader = new FileReader();
     
@@ -1660,7 +1600,7 @@ async function handleFileUpload() {
         fullCodeEditor.value = fileContent;
         await processCodeAndRefreshUI(fileContent);
         autoSaveProject();
-        logToConsole(`HTML project '${currentProjectId}' imported and processed.`, 'info');
+        console.log(`HTML project '${currentProjectId}' imported and processed.`);
     };
 
     reader.onerror = (error) => {
@@ -1825,7 +1765,7 @@ async function handleZipUpload() {
         alert("Please select a ZIP file to upload.");
         return;
     }
-    logToConsole(`ZIP selected: ${file.name}`, 'info');
+    console.log(`ZIP selected: ${file.name}`);
 
     const originalText = uploadZipButton.innerHTML;
     uploadZipButton.disabled = true;
@@ -1839,7 +1779,7 @@ async function handleZipUpload() {
         if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
         htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
         const indexPath = htmlCandidates[0];
-        logToConsole(`Using entry point: ${indexPath}`, 'info');
+        console.log(`Using entry point: ${indexPath}`);
 
         const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
         fullCodeEditor.value = combinedHtml;
@@ -1853,7 +1793,7 @@ async function handleZipUpload() {
         }
         currentProjectId = projectId;
 
-        logToConsole('Decomposing ZIP website into Vibe Tree...', 'info');
+        console.log('Decomposing ZIP website into Vibe Tree...');
         const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
 
         vibeTree = newTree;
@@ -1862,11 +1802,10 @@ async function handleZipUpload() {
         resetHistory();
         refreshAllUI();
         switchToTab('preview');
-        logToConsole(`ZIP project '${currentProjectId}' imported successfully.`, 'info');
+        console.log(`ZIP project '${currentProjectId}' imported successfully.`);
 
     } catch (e) {
         console.error('ZIP import failed:', e);
-        logToConsole(`ZIP import failed: ${e.message}`, 'error');
         alert(`Failed to import ZIP: ${e.message}`);
     } finally {
         uploadZipButton.disabled = false;
@@ -2142,10 +2081,9 @@ async function handleDownloadProjectZip() {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         const fnameBase = currentProjectId || 'vibe-project';
         triggerBlobDownload(zipBlob, `${fnameBase}.zip`);
-        logToConsole(`Project "${fnameBase}" packaged with a bundled HTML file and downloaded as ZIP.`, 'info');
+        console.log(`Project "${fnameBase}" packaged with a bundled HTML file and downloaded as ZIP.`);
     } catch (e) {
         console.error('ZIP download failed:', e);
-        logToConsole(`ZIP download failed: ${e.message}`, 'error');
         alert(`Failed to build ZIP: ${e.message}`);
     }
 }
@@ -2174,12 +2112,85 @@ function applyVibes() {
     document.addEventListener('click',e=>{if(!inspectEnabled)return;const t=getNodeId(e.target);if(t){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'vibe-node-click',nodeId:t.nodeId},'*');if(hoverEl)hoverEl.classList.remove('__vibe-inspect-highlight-hover');const el=t.element;el.classList.add('__vibe-inspect-highlight-clicked');setTimeout(()=>el.classList.remove('__vibe-inspect-highlight-clicked'),500)}},true);
 
     // --- Part 2: Console and Error Proxy Logic ---
-    function formatForPost(arg){if(arg instanceof Error)return{__isError:true,message:arg.message,stack:arg.stack,name:arg.name};try{JSON.stringify(arg);return arg}catch(e){return String(arg)}}
-    function reportError(err){window.parent.postMessage({type:'iframe-error',payload:formatForPost(err)},'*')}
-    window.addEventListener('error',e=>reportError(e.error||e.message));
-    window.addEventListener('unhandledrejection',e=>reportError(e.reason));
-    const oConsole={...window.console};
-    ['log','warn','error','info','debug','table'].forEach(level=>{window.console[level]=(...args)=>{if(oConsole[level])oConsole[level](...args);try{window.parent.postMessage({type:'iframe-console',level,payload:args.map(formatForPost)},'*')}catch(e){oConsole.error('Vibe console proxy error:',e)}}});
+    const MAX_DEPTH = 5;
+    function serializeArg(arg, depth = 0, seen = new WeakSet()) {
+        if (arg === undefined) return { type: 'undefined', value: 'undefined' };
+        if (arg === null) return { type: 'null', value: 'null' };
+        const type = typeof arg;
+        if (['string', 'number', 'boolean', 'symbol', 'bigint'].includes(type)) {
+            return { type, value: arg.toString(), preview: arg.toString() };
+        }
+        if (type === 'function') {
+            const signature = arg.toString().match(/^(async\\s+)?function\\s*\\*?\\s*([a-zA-Z0-9_$]+)?\\s*\\([^)]*\\)/)?.[0] || 'function()';
+            return { type: 'function', value: signature, preview: 'ƒ' };
+        }
+        if (seen.has(arg)) {
+            return { type: 'string', value: '[Circular]', preview: '[Circular]' };
+        }
+        if (arg instanceof HTMLElement) {
+            return { type: 'dom', tagName: arg.tagName, id: arg.id, classes: [...arg.classList], preview: '<...>' };
+        }
+        if (depth > MAX_DEPTH) {
+             return { type: 'string', value: Array.isArray(arg) ? '[Array]' : '[Object]', preview: '...' };
+        }
+        seen.add(arg);
+        if (Array.isArray(arg)) {
+            return { type: 'array', value: arg.map(item => serializeArg(item, depth + 1, seen)), preview: '[]' };
+        }
+        if (type === 'object') {
+            const obj = {};
+            for (const key in arg) {
+                if (Object.prototype.hasOwnProperty.call(arg, key)) {
+                    obj[key] = serializeArg(arg[key], depth + 1, seen);
+                }
+            }
+            return { type: 'object', value: obj, preview: '{}' };
+        }
+        return { type: 'string', value: String(arg), preview: String(arg) };
+    }
+
+    function reportError(err){
+        const serialized = { message: err.message, stack: err.stack, name: err.name, __isError: true };
+        window.parent.postMessage({type:'iframe-error',payload:serialized},'*');
+    }
+    window.addEventListener('error', e => reportError(e.error || e.message));
+    window.addEventListener('unhandledrejection', e => reportError(e.reason));
+
+    const oConsole = {...window.console};
+    const counts = {};
+    const timers = {};
+    Object.keys(oConsole).forEach(level => {
+        window.console[level] = (...args) => {
+            oConsole[level](...args); // keep native behavior
+            let payload = args;
+            if (level === 'count') {
+                const label = args[0] || 'default';
+                counts[label] = (counts[label] || 0) + 1;
+                payload = [\`\${label}: \${counts[label]}\`];
+            } else if (level === 'countReset') {
+                const label = args[0] || 'default';
+                counts[label] = 0;
+                payload = [\`\${label}: 0\`];
+            } else if (level === 'time') {
+                timers[args[0] || 'default'] = performance.now();
+                return; // Do not log
+            } else if (level === 'timeEnd') {
+                const label = args[0] || 'default';
+                const startTime = timers[label];
+                if (startTime) {
+                    payload = [\`\${label}: \${performance.now() - startTime} ms\`];
+                    delete timers[label];
+                } else {
+                    payload = [\`Timer '\${label}' does not exist\`];
+                    level = 'warn';
+                }
+            } else if (level === 'assert') {
+                if (args[0]) return;
+                payload = ['Assertion failed:', ...args.slice(1)];
+            }
+            try { window.parent.postMessage({ type: 'iframe-console', level, payload: payload.map(p => serializeArg(p)) }, '*') } catch(e) { oConsole.error('Vibe proxy error', e) }
+        }
+    });
 
     // --- Part 3: Message listener for toggling inspect ---
     window.addEventListener('message',e=>{if(e.data.type==='toggle-inspect'){inspectEnabled=e.data.enabled;if(inspectEnabled)ensureStyles();else if(hoverEl){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}}});
@@ -2203,7 +2214,6 @@ function applyVibes() {
         })();
     } catch (e) {
         console.error('applyVibes failed:', e);
-        logToConsole(`applyVibes failed: ${e.message}`, 'error');
     }
 }
 
@@ -2211,7 +2221,7 @@ function applyVibes() {
 function showFullCode() {
     const fullCode = generateFullCodeString();
     fullCodeEditor.value = fullCode; // Use value for textarea
-    logToConsole('Displaying full website code.', 'info');
+    console.log('Displaying full website code.');
 }
 
 function hideFullCode() {
@@ -2508,7 +2518,7 @@ async function handleFixError(errorMessage, fixButton) {
     showAgentSpinner();
     showGlobalAgentLoader('Fixing runtime error...');
 
-    logToConsole(`Attempting to fix error: "${errorMessage.split('\n')[0]}..."`, 'info');
+    console.log(`Attempting to fix error: "${errorMessage.split('\n')[0]}..."`);
 
     // Switch to the Agent tab to show progress
     switchToTab('agent');
@@ -2569,7 +2579,7 @@ ${fullTreeString}
  */
 function executeAgentPlan(agentDecision, agentLogger) {
     if (!agentDecision.plan || !Array.isArray(agentDecision.actions)) {
-        logToConsole("AI returned a malformed plan object. Check AI logs for details.", 'error');
+        console.error("AI returned a malformed plan object. Check AI logs for details.");
         throw new Error("AI returned a malformed plan object. Check console for details.");
     }
 
@@ -3156,11 +3166,10 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
 
     try {
         await db.saveTextFile(currentProjectId, cleanPath, codeContent);
-        logToConsole(`File '${cleanPath}' was updated from Chat. Rebuilding project...`, 'info');
+        console.log(`File '${cleanPath}' was updated from Chat. Rebuilding project...`);
         await rebuildAndRefreshFromFiles();
     } catch (e) {
         console.error(`Failed to insert code and refresh for ${cleanPath}:`, e);
-        logToConsole(`Failed to save file and refresh: ${e.message}`, 'error');
         alert(`Error saving file: ${e.message}`);
     } finally {
         if (buttonElement) {
@@ -3219,7 +3228,7 @@ async function buildCombinedHtmlFromDb(projectId) {
  * and refreshing the entire application UI to reflect the changes.
  */
 async function rebuildAndRefreshFromFiles() {
-    logToConsole("File changed. Rebuilding Vibe Tree from source files...", "info");
+    console.log("File changed. Rebuilding Vibe Tree from source files...");
     
     try {
         const combinedHtml = await buildCombinedHtmlFromDb(currentProjectId);
@@ -3227,10 +3236,9 @@ async function rebuildAndRefreshFromFiles() {
         const newVibeTree = await decomposeCodeIntoVibeTree(combinedHtml);
         vibeTree = newVibeTree;
         refreshAllUI();
-        logToConsole("Vibe Tree rebuilt and UI refreshed successfully.", "info");
+        console.log("Vibe Tree rebuilt and UI refreshed successfully.");
     } catch (error) {
         console.error("Failed to rebuild Vibe Tree from files:", error);
-        logToConsole(`Error rebuilding from files: ${error.message}`, 'error');
         alert(`An error occurred while synchronizing file changes: ${error.message}`);
     }
 }
@@ -3442,7 +3450,7 @@ function handleSaveEditedNode() {
                 refreshAllUI();
             }
             closeEditNodeModal();
-            logToConsole(`Node '${nodeId}' updated from Element Editor.`, 'info');
+            console.log(`Node '${nodeId}' updated from Element Editor.`);
             autoSaveProject();
         } catch (e) {
             editNodeError.textContent = e.message || 'Failed to update node.';
@@ -3479,7 +3487,7 @@ function findNodeAndParentById(id, node = vibeTree, parent = null) {
 function deleteNode(nodeId) {
     const result = findNodeAndParentById(nodeId);
     if (!result || !result.parent) {
-        logToConsole(`Cannot delete node '${nodeId}': not found or is root.`, 'error');
+        console.error(`Cannot delete node '${nodeId}': not found or is root.`);
         return;
     }
     
@@ -3490,7 +3498,7 @@ function deleteNode(nodeId) {
         if (index > -1) {
             parent.children.splice(index, 1);
             recalculateSelectors(parent);
-            logToConsole(`Node '${nodeId}' deleted.`, 'info');
+            console.log(`Node '${nodeId}' deleted.`);
             refreshAllUI();
         }
     }
@@ -3501,7 +3509,7 @@ function moveNode(sourceNodeId, targetNodeId, position) {
     const targetResult = findNodeAndParentById(targetNodeId);
 
     if (!sourceResult || !targetResult) {
-        logToConsole('Move failed: source or target node not found.', 'error');
+        console.error('Move failed: source or target node not found.');
         return;
     }
 
@@ -3512,7 +3520,7 @@ function moveNode(sourceNodeId, targetNodeId, position) {
     let current = targetParent;
     while(current) {
         if (current.id === sourceNodeId) {
-            logToConsole('Move failed: cannot move a parent node into one of its children.', 'error');
+            console.error('Move failed: cannot move a parent node into one of its children.');
             return;
         }
         const result = findNodeAndParentById(current.id);
@@ -3526,7 +3534,7 @@ function moveNode(sourceNodeId, targetNodeId, position) {
     if (sourceIndex > -1) {
         sourceParent.children.splice(sourceIndex, 1);
     } else {
-        logToConsole('Move failed: source node not found in its parent.', 'error');
+        console.error('Move failed: source node not found in its parent.');
         return;
     }
 
@@ -3549,7 +3557,7 @@ function moveNode(sourceNodeId, targetNodeId, position) {
         recalculateSelectors(sourceParent);
     }
 
-    logToConsole(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`, 'info');
+    console.log(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`);
     refreshAllUI();
 }
 
@@ -3582,7 +3590,7 @@ function recalculateSelectors(parentNode) {
 function handleAddNodeFromInspect(targetNodeId, position) {
     const targetResult = findNodeAndParentById(targetNodeId);
     if (!targetResult) {
-        logToConsole(`Cannot add node: target '${targetNodeId}' not found.`, 'error');
+        console.error(`Cannot add node: target '${targetNodeId}' not found.`);
         return;
     }
 
@@ -3633,7 +3641,6 @@ window.addEventListener('message', (event) => {
                 handleAddNodeFromInspect(data.targetNodeId, data.position);
             }
             break;
-        // START OF FIX: Handle all console logs and errors from the iframe
         case 'iframe-error':
             if (data.payload) {
                 const { message, stack, name } = data.payload;
@@ -3641,25 +3648,14 @@ window.addEventListener('message', (event) => {
                 if (stack) error.stack = stack;
                 if (name) error.name = name;
                 iframeErrors.push(error);
-                console.error(error); // Log it through our overridden console.error
+                console.error(error);
             }
             break;
         case 'iframe-console':
             if (data.payload && Array.isArray(data.payload)) {
-                const level = data.level || 'log';
-                const reconstructedArgs = data.payload.map(arg => {
-                    if (arg && arg.__isError) {
-                        const err = new Error(arg.message);
-                        err.stack = arg.stack;
-                        err.name = arg.name;
-                        return err;
-                    }
-                    return arg;
-                });
-                console[level](...reconstructedArgs);
+                handleConsoleCommand(data.level, data.payload);
             }
             break;
-        // END OF FIX
     }
 });
 
@@ -3756,7 +3752,7 @@ async function handleAiEditorSearch() {
     aiEditorSearchButton.disabled = true;
     aiEditorSearchButton.innerHTML = 'Searching... <div class="loading-spinner"></div>';
     
-    logToConsole(`Performing AI editor search for: "${query}"`, 'info');
+    console.log(`Performing AI editor search for: "${query}"`);
 
     try {
         const systemPrompt = `You are an intelligent search engine for a JSON-based component tree called a "Vibe Tree". Your task is to find the most relevant nodes based on a user's natural language query. Analyze the entire tree, including node IDs, descriptions, and code snippets.
@@ -3775,7 +3771,7 @@ async function handleAiEditorSearch() {
             throw new Error("AI did not return a valid array of node IDs.");
         }
         
-        logToConsole(`AI search found ${resultIds.length} relevant nodes.`, 'info');
+        console.log(`AI search found ${resultIds.length} relevant nodes.`);
         
         if (resultIds.length > 0) {
             highlightSearchResults(resultIds);
@@ -3785,7 +3781,6 @@ async function handleAiEditorSearch() {
         
     } catch (error) {
         console.error("AI Editor Search failed:", error);
-        logToConsole(`AI search failed: ${error.message}`, 'error');
         alert(`An error occurred during the AI search: ${error.message}`);
     } finally {
         aiEditorSearchButton.disabled = false;
@@ -3924,7 +3919,6 @@ function handleLoadProject(event) {
         currentProjectId = projectId;
         vibeTree = projectData;
         console.log(`Project '${projectId}' loaded.`);
-        logToConsole(`Project '${projectId}' loaded successfully.`, 'info');
         
         refreshAllUI();
         resetHistory();
@@ -3965,7 +3959,7 @@ function autoSaveProject() {
     }
 
     renderFileTree();
-    logToConsole(`Project '${currentProjectId}' auto-saved.`, 'info');
+    console.log(`Project '${currentProjectId}' auto-saved.`);
 }
 
 // Add event listeners for project management buttons
@@ -4077,7 +4071,7 @@ async function handleAiGenerateComponent() {
 
         const userPrompt = `Generate a component based on the following request: "${prompt}"`;
         
-        logToConsole(`Generating component with AI from prompt: "${prompt}"`, 'info');
+        console.log(`Generating component with AI from prompt: "${prompt}"`);
         
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
         const aiComponent = JSON.parse(rawResponse);
@@ -4093,14 +4087,13 @@ async function handleAiGenerateComponent() {
         componentCssInput.value = aiComponent.css || '';
         componentJsInput.value = aiComponent.javascript || '';
         
-        logToConsole(`AI successfully generated component '${aiComponent.name}'. Please review and save.`, 'info');
+        console.log(`AI successfully generated component '${aiComponent.name}'. Please review and save.`);
         componentAiPromptInput.value = '';
 
     } catch (error) {
         console.error("AI Component Generation Failed:", error);
         const errorMessage = `AI generation failed: ${error.message}. Please check the console for details.`;
         componentModalError.textContent = errorMessage;
-        logToConsole(errorMessage, 'error');
     } finally {
         generateComponentButton.disabled = false;
         generateComponentButton.innerHTML = 'Generate Component';
@@ -4137,7 +4130,7 @@ function handleSaveComponent() {
     };
 
     db.saveComponent(component);
-    logToConsole(`Component '${name}' saved.`, 'info');
+    console.log(`Component '${name}' saved.`);
     closeComponentModal();
     renderComponentList();
     selectComponentForPreview(id);
@@ -4150,7 +4143,7 @@ function handleDeleteComponentFromModal() {
     const componentId = deleteComponentButton.dataset.id;
     if (componentId && confirm(`Are you sure you want to delete the component "${componentId}"?`)) {
         db.deleteComponent(componentId);
-        logToConsole(`Component '${componentId}' deleted.`, 'info');
+        console.log(`Component '${componentId}' deleted.`);
         closeComponentModal();
         renderComponentList();
         contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
@@ -4273,10 +4266,9 @@ function handleDownloadContext() {
         const libraryJson = JSON.stringify(library, null, 2);
         const blob = new Blob([libraryJson], { type: 'application/json' });
         triggerBlobDownload(blob, 'vibe-component-library.json');
-        logToConsole('Component library downloaded successfully.', 'info');
+        console.log('Component library downloaded successfully.');
     } catch (e) {
         console.error("Failed to download component library:", e);
-        logToConsole(`Failed to download library: ${e.message}`, 'error');
         alert(`An error occurred while preparing the download: ${e.message}`);
     }
 }
@@ -4296,11 +4288,11 @@ async function processContextUpload(event) {
     const file = event.target.files;
 
     if (!file) {
-        logToConsole("No file selected for context upload.", "info");
+        console.log("No file selected for context upload.");
         return;
     }
     
-    logToConsole(`Context library file selected: ${file.name}`, 'info');
+    console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
 
@@ -4317,22 +4309,22 @@ async function processContextUpload(event) {
             const currentCount = db.listComponents().length;
 
             if (!confirm(`This will replace your current library of ${currentCount} components with the new library of ${componentCount} components. Are you sure you want to continue?`)) {
-                logToConsole("Context library import cancelled by user.", "info");
+                console.log("Context library import cancelled by user.");
                 return;
             }
 
             for (const key in newLibrary) {
                 const comp = newLibrary[key];
                 if (typeof comp !== 'object' || !comp.id || !comp.name) {
-                     logToConsole(`Warning: Imported component with key '${key}' is missing 'id' or 'name'. Importing anyway.`, 'warn');
+                     console.warn(`Warning: Imported component with key '${key}' is missing 'id' or 'name'. Importing anyway.`);
                 }
                 if (key !== comp.id) {
-                     logToConsole(`Warning: Component key '${key}' does not match component.id '${comp.id}'. The library will still be saved.`, 'warn');
+                     console.warn(`Warning: Component key '${key}' does not match component.id '${comp.id}'. The library will still be saved.`);
                 }
             }
 
             db.saveComponentLibrary(newLibrary);
-            logToConsole(`Successfully imported ${componentCount} components.`, 'info');
+            console.log(`Successfully imported ${componentCount} components.`);
             
             renderComponentList();
             if (contextComponentViewer) {
@@ -4341,7 +4333,6 @@ async function processContextUpload(event) {
 
         } catch (error) {
             console.error("Failed to upload/process context library:", error);
-            logToConsole(`Failed to import library: ${error.message}`, 'error');
             alert(`Error importing library: ${error.message}`);
         } finally {
             contextUploadInput.value = '';
@@ -4366,7 +4357,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
 
     const node = findNodeById(nodeId);
     if (!node) {
-        logToConsole(`Node not found, cannot save as component: ${nodeId}`, 'error');
+        console.error(`Node not found, cannot save as component: ${nodeId}`);
         return;
     }
 
@@ -4377,7 +4368,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         buttonElement.innerHTML = 'Analyzing...';
     }
     
-    logToConsole(`AI is analyzing node '${nodeId}' to create a component...`, 'info');
+    console.log(`AI is analyzing node '${nodeId}' to create a component...`);
 
     try {
         const systemPrompt = `You are an expert component extractor. Your task is to analyze a website's full structure (a "vibe tree") and extract a specific node, along with all its dependencies, into a self-contained, reusable component.
@@ -4413,7 +4404,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
             throw new Error("AI failed to return a valid component structure with id and name.");
         }
         
-        logToConsole(`AI analysis complete. Please review and save the new component.`, 'info');
+        console.log(`AI analysis complete. Please review and save the new component.`);
         
         closeEditNodeModal();
         switchToTab('context');
@@ -4422,7 +4413,6 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
     } catch (e) {
         console.error("Save as component failed:", e);
         const errorMessage = `AI analysis failed: ${e.message}`;
-        logToConsole(errorMessage, 'error');
         if (buttonElement) {
             const errorEl = buttonElement.closest('.modal-content')?.querySelector('.modal-error');
             if (errorEl) errorEl.textContent = errorMessage;
@@ -4556,7 +4546,7 @@ async function renderFilePreview(path) {
             </div>
         `;
 
-        const copyBtnHandler = () => navigator.clipboard.writeText(path).then(() => logToConsole(`Asset path copied: ${path}`, 'info'));
+        const copyBtnHandler = () => navigator.clipboard.writeText(path).then(() => console.log(`Asset path copied: ${path}`));
 
         if (meta.isBinary) {
             const blob = await db.getFileBlob(currentProjectId, path);
@@ -4595,7 +4585,7 @@ async function renderFilePreview(path) {
             saveBtn.textContent = 'Save';
             saveBtn.addEventListener('click', async () => {
                 await db.saveTextFile(currentProjectId, path, ta.value);
-                logToConsole(`Saved file: ${path}`, 'info');
+                console.log(`Saved file: ${path}`);
                 autoSaveProject();
             });
             saveRow.appendChild(saveBtn);
@@ -4627,10 +4617,9 @@ async function handleFilesUpload() {
             } else {
                 await db.saveBinaryFile(currentProjectId, path, new Uint8Array(await f.arrayBuffer()), f.type || guessMimeType(f.name));
             }
-            logToConsole(`Uploaded: ${path}`, 'info');
+            console.log(`Uploaded: ${path}`);
         } catch (e) {
             console.error('Upload error:', e);
-            logToConsole(`Upload failed for ${f.name}: ${e.message}`, 'error');
         }
     }
     renderFileTree();
@@ -4675,7 +4664,7 @@ function handleFilesCopy() {
     const meta = db.getFileMeta(currentProjectId, filesState.selectedPath);
     if (!meta) return;
     filesState.clipboard = { path: filesState.selectedPath, meta };
-    logToConsole(`Copied file to clipboard: ${filesState.selectedPath}`, 'info');
+    console.log(`Copied file to clipboard: ${filesState.selectedPath}`);
 }
 
 async function handleFilesPaste() {
@@ -4705,7 +4694,7 @@ async function handleFilesPaste() {
         renderFileTree();
         selectFile(dest);
         autoSaveProject();
-        logToConsole(`Pasted file as: ${dest}`, 'info');
+        console.log(`Pasted file as: ${dest}`);
     } catch (e) {
         console.error('Paste failed:', e);
         alert(`Paste failed: ${e.message}`);
@@ -4722,7 +4711,7 @@ async function handleFilesRename() {
         renderFileTree();
         selectFile(newPath);
         autoSaveProject();
-        logToConsole(`Renamed: ${path} -> ${newPath}`, 'info');
+        console.log(`Renamed: ${path} -> ${newPath}`);
     } catch (e) {
         console.error('Rename failed:', e);
         alert(`Rename failed: ${e.message}`);
@@ -4739,7 +4728,7 @@ async function handleFilesDelete() {
         renderFileTree();
         if (filesPreviewEl) filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file.</div>';
         autoSaveProject();
-        logToConsole(`Deleted: ${path}`, 'info');
+        console.log(`Deleted: ${path}`);
     } catch (e) {
         console.error('Delete failed:', e);
         alert(`Delete failed: ${e.message}`);
@@ -4859,7 +4848,7 @@ function resetToStartPage() {
     if(consoleOutput) consoleOutput.innerHTML = '';
     if(fullCodeEditor) fullCodeEditor.value = '';
     populateProjectList();
-    logToConsole("Ready for new project.", "info");
+    console.log("Ready for new project.");
 }
 
 /* --- Missing helpers (safe stubs) --- */
@@ -4894,7 +4883,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
             const agentDecision = JSON.parse(rawResponse);
-            executeAgentPlan(agentDecision, (msg, t = 'info') => logToConsole(`[ModalUpdate] ${msg}`, t));
+            executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
         }
         switchToTab('preview');
     } finally {
@@ -4962,10 +4951,9 @@ async function handleGenerateFlowchart() {
         const mermaidText = extractMermaidFromText(aiText);
         if (!mermaidText) throw new Error('AI did not return a valid Mermaid graph.');
         await renderMermaidInto(flowchartOutput, mermaidText);
-        logToConsole('AI-generated flowchart rendered.', 'info');
+        console.log('AI-generated flowchart rendered.');
     } catch (e) {
         console.warn('AI flowchart failed, falling back to basic graph:', e);
-        logToConsole(`AI flowchart failed (${e.message}). Falling back to basic graph.`, 'warn');
         try {
             await renderMermaidInto(flowchartOutput, buildBasicMermaidFromTree(vibeTree));
         } catch (fallbackError) {
@@ -5021,7 +5009,7 @@ async function handleGenerateProject() {
 
         refreshAllUI();
         switchToTab('preview');
-        logToConsole(`New project '${currentProjectId}' created.`, 'info');
+        console.log(`New project '${currentProjectId}' created.`);
     } catch (e) {
         console.error('Project generation failed:', e);
         generationStatusText.textContent = 'Generation failed.';
@@ -5064,7 +5052,7 @@ async function handleStartIterativeProjectBuild() {
         resetHistory();
         refreshAllUI(); // Refresh UI to show the empty project state
 
-        logToConsole(`New project '${currentProjectId}' created for iterative session.`, 'info');
+        console.log(`New project '${currentProjectId}' created for iterative session.`);
 
         // Switch to agent tab and kick off the iterative process
         switchToTab('agent');
@@ -5117,7 +5105,7 @@ async function handleAiImproveDescription() {
 
         if (improved) {
             editNodeDescriptionInput.value = improved;
-            logToConsole(`AI generated a richer description for "${node.id}".`, 'info');
+            console.log(`AI generated a richer description for "${node.id}".`);
         } else {
             editNodeError.textContent = 'AI returned an empty response.';
         }
