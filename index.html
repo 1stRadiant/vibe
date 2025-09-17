@@ -3,38 +3,391 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibe Coding System - Futuristic Interface</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+    <title>Vibe Coding System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- JSZip for ZIP import (global JSZip) -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <!-- START OF FIX: Removed inline style block -->
+    <!-- END OF FIX -->
+</head>
+<body>
 
-    <style>
-        :root {
-            --dark-bg-primary: #1a1a2e;
-            --dark-bg-secondary: #162447;
-            --dark-bg-tertiary: #1f4068;
-            --glass-bg: rgba(31, 64, 104, 0.85);
-            --glow-accent-primary: #7ff1ff;
-            --glow-accent-secondary: #4169e1;
-            --text-primary: #f0f0f0;
-            --text-secondary: #abb2bf;
-            --destructive-red: #dc3545;
-            --font-primary: 'Orbitron', sans-serif;
-            --font-secondary: 'Rajdhani', sans-serif;
-        }
+    <!-- The main layout that is always visible -->
+    <div class="main-layout">
+        <div class="tabs">
+            <button class="tab-button active" data-tab="start">Start</button>
+            <button class="tab-button" data-tab="preview">Live Preview</button>
+            <button class="tab-button" data-tab="editor">Vibe Editor</button>
+            <button class="tab-button" data-tab="agent">Agent</button>
+            <button class="tab-button" data-tab="chat">Chat</button>
+            <button class="tab-button" data-tab="flowchart">Flowchart</button>
+            <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
+            <button class="tab-button" data-tab="files">Files</button>
+            <button class="tab-button" data-tab="context">Context</button>
+            <button class="tab-button" data-tab="code">Full Code</button>
 
-        *, *::before, *::after {
-            box-sizing: border-box;
-        }
+            <div class="tabs-spacer"></div>
+            <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
+            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
+            <button id="new-project-button" title="New Project">+</button>
+        </div>
 
-        body {
-            margin: 0;
-            background-color: var(--dark-bg-primary);
-            color: var(--text-primary);
-            font-family: var(--font-secondary);
-            overflow: hidden;
+        <div class="tab-content-area">
+            <div id="start" class="tab-content active">
+                <div class="start-page-content">
+                    <div class="start-header">
+                        <h1>Vibe Coding System</h1>
+                        <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+                    </div>
+
+                    <div id="existing-projects-container">
+                        <h2>Your Projects</h2>
+                        <div id="project-list"></div>
+                        <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                    </div>
+
+                    <div id="new-project-container">
+                         <h2>Create a New Project</h2>
+                         <p>Enter a unique ID and a description, then choose how to build your site.</p>
+                         <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                         <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                         <div id="agent-buttons-container">
+                            <button id="generate-project-button">Generate Project (Single Task)</button>
+                            <button id="start-iterative-build-button" class="action-button">Start Iterative Build</button>
+                        </div>
+                    </div>
+
+                    <div id="start-page-generation-output" style="display: none;">
+                        <div id="generation-status-container">
+                            <h3 id="generation-status-text">Generating your project...</h3>
+                            <div class="loading-spinner"></div>
+                        </div>
+                        <div id="live-code-container">
+                            <pre><code id="live-code-output" class="language-html"></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="preview" class="tab-content">
+                <div class="preview-container">
+                    <div class="preview-header">
+                        <h2>Live Website Preview</h2>
+                        <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                    </div>
+                    <iframe id="website-preview" title="Live Website Preview"></iframe>
+                </div>
+            </div>
+
+            <div id="editor" class="tab-content">
+                 <div class="editor-container">
+                    <div class="editor-header">
+                        <div class="editor-header-left">
+                            <h2>Vibe Editor</h2>
+                            <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
+                        </div>
+                        <div class="editor-header-right">
+                             <div id="ai-editor-search-container">
+                                <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                <button id="ai-editor-search-button" class="action-button">Search</button>
+                            </div>
+                            <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                        </div>
+                    </div>
+                    <div id="vibe-editor"></div>
+                </div>
+            </div>
+
+            <div id="agent" class="tab-content">
+                <div class="agent-container">
+                    <h2>AI Agent</h2>
+                    <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
+                    
+                    <div id="agent-controls">
+                        <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
+                        <div id="agent-buttons-container">
+                            <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
+                            <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
+                        </div>
+                    </div>
+            
+                    <div id="iterative-session-ui" class="hidden">
+                        <h4>Project Plan:</h4>
+                        <div id="iterative-plan-display"></div>
+                        <div id="iterative-controls" class="hidden">
+                            <p>Review the changes in the preview. Then, provide feedback or continue.</p>
+                            <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
+                            <button id="request-changes-button" class="action-button">Request Changes</button>
+                            <button id="end-session-button">End Session</button>
+                        </div>
+                    </div>
+            
+                    <div id="agent-output-container">
+                        <h3>Agent Log</h3>
+                        <div id="agent-output">
+                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chat" class="tab-content">
+                <div class="chat-container">
+                    <div class="system-prompt-container">
+                        <label for="chat-system-prompt-input">System Prompt (Optional)</label>
+                        <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
+                    </div>
+                    <div class="chat-output-container">
+                        <h3>Chat</h3>
+                        <div id="chat-output">
+                            <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
+                        </div>
+                    </div>
+                    <div class="chat-controls">
+                        <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
+                        <button id="send-chat-button" class="action-button">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="flowchart" class="tab-content">
+                <div class="flowchart-container">
+                    <h2>Website Functionality Flowchart</h2>
+                    <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
+                    <div class="flowchart-controls">
+                        <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
+                    </div>
+                    <div id="flowchart-output">
+                        <div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website's logic.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="console" class="tab-content">
+                <div id="console-container">
+                    <h3>Console</h3>
+                    <div id="console-output"></div>
+                </div>
+            </div>
+
+            <div id="files" class="tab-content">
+                <div class="files-container">
+                    <h2>Project Files & Assets</h2>
+                    <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
+                    <div class="files-toolbar">
+                        <input type="file" id="files-upload-input" multiple style="display: none;">
+                        <button id="files-upload-button" class="action-button">Upload</button>
+                        <button id="files-new-folder-button" class="action-button">New Folder</button>
+                        <button id="files-new-file-button" class="action-button">New File</button>
+                        <button id="files-download-button" class="action-button">Download</button>
+                        <button id="files-copy-button" class="action-button">Copy</button>
+                        <button id="files-paste-button" class="action-button">Paste</button>
+                        <button id="files-rename-button" class="action-button">Rename</button>
+                        <button id="files-delete-button" class="action-button danger">Delete</button>
+                    </div>
+                    <div class="assets-hint">
+                        <strong>Hint:</strong> You can reference these assets in your prompts and code. The AI receives a list of available assets. Use paths exactly as shown below.
+                    </div>
+                    <div class="files-browser">
+                        <div class="files-tree" id="files-tree"></div>
+                        <div class="files-preview" id="files-preview">
+                            <div class="files-preview-placeholder">Select a file to preview it here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="context" class="tab-content">
+                <div class="context-container">
+                    <h2>Component Context Library</h2>
+                    <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
+                    <div class="context-browser">
+                        <div class="context-list-panel">
+                            <h3>Components</h3>
+                            <div id="context-component-list"></div>
+                            <button id="add-new-component-button" class="action-button">Add New Component</button>
+                            <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
+                                <input type="file" id="context-upload-input" accept=".json,application/json" style="display: none;">
+                                <button id="upload-context-button" class="action-button" title="Import a component library from a .json file">Upload Library</button>
+                                <button id="download-context-button" class="action-button" title="Export the current component library to a .json file">Download Library</button>
+                            </div>
+                        </div>
+                        <div id="context-component-viewer" class="context-viewer-panel">
+                            <div class="files-preview-placeholder">Select a component to view it here.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="code" class="tab-content">
+                <div class="full-code-container">
+                    <h3>Full Website Code</h3>
+                    <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
+                    <div class="file-upload-container">
+                        <p>Or, upload an HTML file to start a new project:</p>
+                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
+                        <button id="upload-html-button" class="action-button">Upload & Process File</button>
+                    </div>
+                    <div class="file-upload-container">
+                        <p>Upload a ZIP of a multi-file website (HTML, CSS, JS, images). We'll inline CSS/JS and re-link assets automatically.</p>
+                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
+                        <button id="upload-zip-button" class="action-button">Upload ZIP & Import Project</button>
+                    </div>
+                    <div class="file-upload-container">
+                        <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
+                        <button id="download-zip-button" class="action-button">Download Project ZIP</button>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" id="search-input" placeholder="Find in code...">
+                        <button id="find-prev-button" class="action-button">&lt; Prev</button>
+                        <button id="find-next-button" class="action-button">Next &gt;</button>
+                        <span id="search-results-count"></span>
+                    </div>
+                    <textarea id="full-code-editor"></textarea>
+                    <button id="update-tree-from-code-button" class="action-button">Process Code and Update Nodes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-node-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Add New Child Node</h2>
+            <p>Define the new component to add to the selected container.</p>
+            <input type="hidden" id="add-node-parent-id">
+            <input type="hidden" id="add-node-target-id">
+            <input type="hidden" id="add-node-position">
+            <label for="new-node-id">New Node ID (kebab-case):</label>
+            <input type="text" id="new-node-id" placeholder="e.g., my-new-button">
+            <label for="new-node-description">Description:</label>
+            <textarea id="new-node-description" rows="2" placeholder="A concise description..."></textarea>
+            <label for="new-node-type">Node Type:</label>
+            <select id="new-node-type">
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="javascript">JavaScript</option>
+            </select>
+            <button id="create-node-button" class="action-button">Create Node</button>
+            <div id="add-node-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-settings-modal-button">&times;</span>
+            <h2>API Settings</h2>
+            <div class="ai-provider-container">
+                <h3>AI Provider</h3>
+                <select id="ai-provider-select">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="nscale">nscale</option>
+                </select>
+            </div>
+            <div id="gemini-settings-container">
+                 <h3>Gemini Model</h3>
+                 <select id="gemini-model-select">
+                    <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
+                    <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
+                    <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
+                    <optgroup label="Advanced & Experimental Models">
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    </optgroup>
+                 </select>
+                <div id="gemini-api-key-container" class="api-key-container">
+                    <h3>Gemini API Key</h3>
+                    <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
+                    <button id="save-api-key-button">Save Key</button>
+                    <div id="api-key-status"></div>
+                </div>
+            </div>
+            <div id="nscale-api-key-container" class="api-key-container" style="display: none;">
+                <h3>nscale API Key</h3>
+                <input type="password" id="nscale-api-key-input" placeholder="Enter your nscale API Key here...">
+                <button id="save-nscale-api-key-button">Save Key</button>
+                <div id="nscale-api-key-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-node-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-edit-node-modal-button">&times;</span>
+            <h2>Edit Component</h2>
+            <label>Node ID</label>
+            <input type="text" id="edit-node-id" readonly>
+            <label>Type</label>
+            <input type="text" id="edit-node-type" readonly>
+            <label for="edit-node-description">Description</label>
+            <textarea id="edit-node-description" rows="3"></textarea>
+            <button id="ai-improve-description-button" class="action-button" style="margin-top: 10px;">AI: Improve Description</button>
+            <label for="edit-node-code">Code</label>
+            <textarea id="edit-node-code" rows="10"></textarea>
+            <div class="button-row">
+                <button id="save-edit-node-button" class="action-button">Save & Update Vibe</button>
+                <button id="save-as-component-button" class="action-button">Save as Component</button>
+            </div>
+            <div id="edit-node-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <div id="context-component-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-context-modal-button">&times;</span>
+            <h2 id="component-modal-title">Add New Component</h2>
+            <div class="component-ai-generator">
+                <label for="component-ai-prompt-input">Generate with AI:</label>
+                <textarea id="component-ai-prompt-input" rows="3" placeholder="e.g., 'a responsive card with an image...'"></textarea>
+                <button id="generate-component-button" class="action-button">Generate Component</button>
+            </div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #4b5263;">
+            <label for="component-id-input">Component ID (unique, kebab-case):</label>
+            <input type="text" id="component-id-input" placeholder="e.g., responsive-navbar">
+            <label for="component-name-input">Display Name:</label>
+            <input type="text" id="component-name-input" placeholder="e.g., Responsive Navbar">
+            <label for="component-description-input">Description:</label>
+            <textarea id="component-description-input" rows="2"></textarea>
+            <div class="component-modal-code-fields">
+                <div>
+                    <label for="component-html-input">HTML Snippet:</label>
+                    <textarea id="component-html-input" rows="6"></textarea>
+                </div>
+                <div>
+                    <label for="component-css-input">CSS Snippet:</label>
+                    <textarea id="component-css-input" rows="6"></textarea>
+                </div>
+                <div>
+                    <label for="component-js-input">JavaScript Snippet:</label>
+                    <textarea id="component-js-input" rows="6"></textarea>
+                </div>
+            </div>
+            <div class="button-row">
+                <button id="save-component-button" class="action-button">Save Component</button>
+                <button id="delete-component-button" class="action-button danger" style="display: none;">Delete</button>
+            </div>
+            <div id="component-modal-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <!-- START OF FIX: Global Agent Status Loader -->
+    <div id="global-agent-loader">
+        <div class="loading-spinner"></div>
+        <div class="loader-text">
+            <p id="global-agent-status-text">Agent is working...</p>
+            <p id="global-agent-progress-text"></p>
+        </div>
+    </div>
+    <!-- END OF FIX -->
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>            overflow: hidden;
             font-size: 16px;
         }
         
