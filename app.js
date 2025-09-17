@@ -2274,11 +2274,15 @@ function applyVibes() {
 <\/script>`;
         // END OF FIX
         
-        if (html.includes('</body>')) {
-            html = html.replace('</body>', `${commsScriptText}\n</body>`);
+        // START OF FIX: Inject the communications script into the <head> to ensure it runs before any body content.
+        // This is crucial for catching all errors, including syntax errors in the main script.
+        if (html.includes('</head>')) {
+            html = html.replace('</head>', `${commsScriptText}\n</head>`);
         } else {
-            html += commsScriptText;
+            // Fallback for cases where there's no head tag for some reason
+            html = commsScriptText + html;
         }
+        // END OF FIX
 
         doc.open();
         doc.write(html);
@@ -3286,7 +3290,7 @@ async function buildCombinedHtmlFromDb(projectId) {
         const src = script.getAttribute('src').trim();
         try {
             const jsCode = await db.readTextFile(projectId, src);
-            const inlineScript = doc.createElement('script');
+            const inlineScript = document.createElement('script');
             inlineScript.textContent = jsCode;
             if (script.type) inlineScript.type = script.type;
             script.replaceWith(inlineScript);
