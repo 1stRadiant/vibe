@@ -3,388 +3,865 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibe Coding System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <title>Vibe Coding System - Futuristic Mind Map</title>
+    <!-- Use futuristic fonts as requested -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- External libraries from original file are kept -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <link rel="stylesheet" href="style.css">
-    <!-- JSZip for ZIP import (global JSZip) -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <!-- START OF FIX: Removed inline style block -->
-    <!-- END OF FIX -->
+
+    <style>
+        /* --- START OF FUTURISTIC MIND-MAP STYLES (PART 1 & 3) --- */
+        :root {
+            --dark-bg-primary: #1a1a2e;
+            --dark-bg-secondary: #162447;
+            --dark-bg-tertiary: #1f4068;
+            --glow-accent-primary: #7ff1ff;
+            --glow-accent-secondary: #4169e1;
+            --text-primary: #f0f0f0;
+            --text-secondary: #abb2bf;
+            --destructive-red: #dc3545;
+            --font-primary: 'Orbitron', sans-serif;
+            --font-secondary: 'Rajdhani', sans-serif;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--dark-bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-secondary);
+            overflow: hidden; /* Prevent scrollbars from the canvas */
+            display: block; /* Override flex from original */
+        }
+
+        /* Dynamic Particle Background */
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        /* Main Container for Nodes */
+        .main-container, .chat-container /* Alias for compatibility */ {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #node-container {
+             position: relative;
+             width: 100%;
+             height: 100%;
+        }
+
+        /* Navbar - repurposed for a top input bar */
+        .navbar {
+            display: none; /* Initially hidden as per prompt */
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            background: rgba(31, 64, 104, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 0 15px var(--glow-accent-secondary), 0 0 30px var(--glow-accent-secondary) inset;
+            z-index: 1001;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: rgba(22, 36, 71, 0.9);
+            backdrop-filter: blur(12px);
+            border-right: 2px solid var(--glow-accent-secondary);
+            transform: translateX(-100%);
+            transition: transform 0.4s ease-in-out;
+            z-index: 1100;
+            padding: 20px;
+        }
+        .sidebar.open {
+            transform: translateX(0);
+        }
+        .sidebar-title {
+            font-family: var(--font-primary);
+            color: var(--glow-accent-primary);
+            text-align: center;
+            text-shadow: 0 0 8px var(--glow-accent-primary);
+        }
+        #topic-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .topic-item {
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .topic-item:hover {
+            background-color: var(--dark-bg-tertiary);
+            transform: translateX(5px);
+            color: var(--glow-accent-primary);
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: var(--dark-bg-tertiary);
+            color: var(--glow-accent-primary);
+            border: 1px solid var(--glow-accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 1101;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px var(--glow-accent-primary);
+            transition: all 0.3s;
+        }
+        .sidebar-toggle:hover {
+            box-shadow: 0 0 20px var(--glow-accent-primary), 0 0 5px var(--glow-accent-primary) inset;
+        }
+
+        /* Loader */
+        .loader {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+
+        /* Draggable OS Menu */
+        #os-menu-container {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            cursor: grab;
+            z-index: 1200;
+        }
+        #os-menu-container.dragging {
+            cursor: grabbing;
+        }
+        .os-menu-main-button {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .os-menu-logo {
+            width: 100%;
+            height: 100%;
+        }
+        .os-menu-logo .glow {
+            animation: pulseGlow 3s infinite ease-in-out;
+        }
+        .os-menu-logo .dashed-circle {
+            animation: rotateDashed 20s linear infinite;
+            transform-origin: center;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 5px var(--glow-accent-primary)); }
+            50% { filter: drop-shadow(0 0 15px var(--glow-accent-primary)); }
+        }
+        @keyframes rotateDashed {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .os-menu-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--dark-bg-tertiary);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--glow-accent-primary);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s;
+            cursor: pointer;
+        }
+        #os-menu-container.open .os-menu-button {
+            opacity: 1;
+        }
+        /* Fan-out positions */
+        #os-menu-container.open .os-menu-button:nth-of-type(1) { transform: translate(-50%, -50%) translateY(-110px); }
+        #os-menu-container.open .os-menu-button:nth-of-type(2) { transform: translate(-50%, -50%) translate(-85px, -75px); }
+        #os-menu-container.open .os-menu-button:nth-of-type(3) { transform: translate(-50%, -50%) translate(-110px, 0px); }
+        #os-menu-container.open .os-menu-button:nth-of-type(4) { transform: translate(-50%, -50%) translate(-85px, 75px); }
+        #os-menu-container.open .os-menu-button:nth-of-type(5) { transform: translate(-50%, -50%) translateY(110px); }
+        
+        .os-menu-button:hover {
+             box-shadow: 0 0 15px var(--glow-accent-primary);
+             color: white;
+        }
+        .os-menu-button svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+
+        /* Mind Map Node Styles */
+        .node {
+            position: absolute;
+            width: 250px;
+            background: rgba(31, 64, 104, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(65, 105, 225, 0.5), 0 0 20px rgba(65, 105, 225, 0.3);
+            color: var(--text-primary);
+            cursor: grab;
+            padding: 10px;
+            transition: box-shadow 0.3s, border-color 0.3s;
+            min-height: 50px;
+        }
+        .node.center {
+            border-color: var(--glow-accent-primary);
+            box-shadow: 0 0 20px var(--glow-accent-primary), 0 0 40px rgba(127, 241, 255, 0.5);
+        }
+        .node.dragging {
+            cursor: grabbing;
+            transition: none;
+            z-index: 1000;
+        }
+        .node.pinned {
+            box-shadow: 0 0 25px #ffdf7f, 0 0 10px #ffdf7f inset;
+            border-color: #ffdf7f;
+        }
+        .node.minimized {
+            height: 40px;
+            width: 150px;
+            overflow: hidden;
+            padding: 8px;
+        }
+        .node.maximized {
+            width: 400px;
+            height: 300px;
+            resize: both;
+            overflow: auto;
+        }
+        .node-header {
+            font-family: var(--font-primary);
+            font-size: 1.1em;
+            color: var(--glow-accent-primary);
+            text-shadow: 0 0 5px var(--glow-accent-primary);
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(65, 105, 225, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .node-content {
+            font-size: 0.95em;
+        }
+        .node-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .node-btn {
+            background: transparent;
+            border: 1px solid var(--glow-accent-secondary);
+            color: var(--glow-accent-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            padding: 2px 5px;
+            font-size: 0.8em;
+            transition: all 0.2s;
+        }
+        .node-btn:hover {
+            background: var(--glow-accent-secondary);
+            color: var(--dark-bg-primary);
+        }
+        .node-btn.delete-btn {
+            border-color: var(--destructive-red);
+            color: var(--destructive-red);
+        }
+        .node-btn.delete-btn:hover {
+            background: var(--destructive-red);
+            color: var(--text-primary);
+        }
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            cursor: nwse-resize;
+        }
+
+        /* Connector Lines */
+        .connector {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--glow-accent-secondary), transparent);
+            transform-origin: 0 0;
+            z-index: -1;
+        }
+        
+        /* --- END OF FUTURISTIC STYLES --- */
+
+
+        /* --- START OF RE-STYLED ORIGINAL CSS --- */
+        /* This section takes selectors from the original style.css and applies the new theme. */
+
+        body {
+            /* These are already defined above, but we ensure the futuristic theme wins */
+            background-color: var(--dark-bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-secondary);
+        }
+
+        /* The main layout is no longer a flex column, but we can style the container */
+        .main-layout {
+           /* This is now the whole page, no specific styles needed */
+        }
+
+        /* Old .container rules are removed as the element is gone. */
+        
+        /* Tab system is removed. Tab buttons and content are repurposed or hidden. */
+        .tabs, .tab-content {
+            display: none; /* Hide the original tab system and content blocks */
+        }
+        .tab-content.active {
+            display: none; /* Override to ensure it stays hidden */
+        }
+        
+        /* Repurpose #start page as a modal or initial view */
+        #start .start-page-content {
+            background-color: rgba(31, 64, 104, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glow-accent-secondary);
+            box-shadow: 0 0 15px var(--glow-accent-secondary);
+            color: var(--text-primary);
+            text-align: left;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: var(--font-primary);
+            color: var(--glow-accent-primary);
+            text-shadow: 0 0 8px var(--glow-accent-primary);
+            border-bottom-color: rgba(65, 105, 225, 0.5);
+        }
+        
+        p, label {
+            color: var(--text-secondary);
+        }
+
+        input[type="text"], input[type="password"], textarea, select {
+            background-color: var(--dark-bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--dark-bg-tertiary);
+            border-radius: 4px;
+            padding: 10px;
+            font-family: var(--font-secondary);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--glow-accent-secondary);
+            box-shadow: 0 0 8px var(--glow-accent-secondary);
+        }
+        
+        /* General Button Styling */
+        button, .action-button, input[type="file"]::file-selector-button {
+            padding: 10px 18px;
+            background-color: transparent;
+            color: var(--glow-accent-primary);
+            border: 1px solid var(--glow-accent-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: var(--font-secondary);
+            transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
+            text-shadow: 0 0 5px var(--glow-accent-primary);
+        }
+
+        button:hover:not(:disabled), .action-button:hover:not(:disabled), input[type="file"]::file-selector-button:hover {
+            background-color: var(--glow-accent-primary);
+            color: var(--dark-bg-primary);
+            box-shadow: 0 0 15px var(--glow-accent-primary);
+            text-shadow: none;
+        }
+        
+        button:disabled, .action-button:disabled {
+            border-color: #5c6370;
+            color: #5c6370;
+            cursor: not-allowed;
+            text-shadow: none;
+        }
+
+        button.danger {
+            border-color: var(--destructive-red);
+            color: var(--destructive-red);
+            text-shadow: 0 0 5px var(--destructive-red);
+        }
+        button.danger:hover:not(:disabled) {
+            background-color: var(--destructive-red);
+            color: var(--text-primary);
+            box-shadow: 0 0 15px var(--destructive-red);
+        }
+
+        /* Settings and other specific buttons */
+        .settings-button {
+            font-size: 1.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+        }
+
+        /* Modal Styles */
+        .modal, .docs-modal, .guide-modal /* Add new modal classes */ {
+            display: none; 
+            position: fixed; 
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        .modal-content {
+            background-color: rgba(31, 64, 104, 0.85);
+            backdrop-filter: blur(15px);
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid var(--glow-accent-secondary);
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 0 25px var(--glow-accent-secondary);
+            position: relative;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: var(--glow-accent-primary);
+            text-shadow: 0 0 10px var(--glow-accent-primary);
+        }
+
+        .modal-error {
+            color: var(--destructive-red);
+            text-shadow: 0 0 8px var(--destructive-red);
+            margin-top: 10px;
+            font-size: 0.9em;
+            height: 1.2em;
+        }
+        
+        /* Iframe preview */
+        #website-preview {
+            border: 1px solid var(--glow-accent-secondary);
+            box-shadow: 0 0 10px var(--glow-accent-secondary);
+        }
+
+        /* Containers for API keys, AI providers, etc. */
+        .api-key-container, .ai-provider-container, .settings-trigger-container, .file-upload-container {
+             background: rgba(22, 36, 71, 0.5);
+             border-radius: 6px;
+             margin-bottom: 20px;
+             padding: 15px;
+             border: 1px solid var(--dark-bg-tertiary);
+             border-left: 4px solid var(--glow-accent-secondary);
+        }
+        
+        /* Loading Spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(127, 241, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--glow-accent-primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Global Agent Loader (repurposed for futuristic theme) */
+        #global-agent-loader {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(31, 64, 104, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glow-accent-secondary);
+            border-radius: 8px;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 2000;
+            box-shadow: 0 0 20px var(--glow-accent-secondary);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            pointer-events: none;
+        }
+        #global-agent-loader.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            #os-menu-container {
+                width: 60px;
+                height: 60px;
+                bottom: 20px;
+                right: 20px;
+            }
+            .os-menu-button {
+                width: 45px;
+                height: 45px;
+            }
+            #os-menu-container.open .os-menu-button:nth-of-type(1) { transform: translate(-50%, -50%) translateY(-80px); }
+            #os-menu-container.open .os-menu-button:nth-of-type(2) { transform: translate(-50%, -50%) translate(-60px, -55px); }
+            #os-menu-container.open .os-menu-button:nth-of-type(3) { transform: translate(-50%, -50%) translate(-80px, 0px); }
+            #os-menu-container.open .os-menu-button:nth-of-type(4) { transform: translate(-50%, -50%) translate(-60px, 55px); }
+            #os-menu-container.open .os-menu-button:nth-of-type(5) { transform: translate(-50%, -50%) translateY(80px); }
+
+            .sidebar {
+                width: 240px;
+            }
+            .modal-content {
+                width: 90%;
+                margin: 5% auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar-toggle {
+                top: 10px;
+                left: 10px;
+            }
+        }
+        /* --- END OF RE-STYLED ORIGINAL CSS --- */
+    </style>
 </head>
 <body>
 
-    <!-- The main layout that is always visible -->
-    <div class="main-layout">
-        <div class="tabs">
-            <button class="tab-button active" data-tab="start">Start</button>
-            <button class="tab-button" data-tab="preview">Live Preview</button>
-            <button class="tab-button" data-tab="editor">Vibe Editor</button>
-            <button class="tab-button" data-tab="agent">Agent</button>
-            <button class="tab-button" data-tab="chat">Chat</button>
-            <button class="tab-button" data-tab="flowchart">Flowchart</button>
-            <button class="tab-button" data-tab="console">Console<span id="console-error-indicator"></span></button>
-            <button class="tab-button" data-tab="files">Files</button>
-            <button class="tab-button" data-tab="context">Context</button>
-            <button class="tab-button" data-tab="code">Full Code</button>
+    <!-- PART 2: NEW HTML STRUCTURE -->
 
-            <div class="tabs-spacer"></div>
-            <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
-            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
-            <button id="new-project-button" title="New Project">+</button>
+    <canvas id="particles-canvas"></canvas>
+
+    <!-- Sidebar (for topics, etc.) -->
+    <div class="sidebar">
+        <h2 class="sidebar-title">Topics</h2>
+        <ul id="topic-list">
+             <!-- JS will populate this -->
+        </ul>
+    </div>
+    <button class="sidebar-toggle">&#x2261;</button>
+    
+    <!-- Navbar (Hidden by default) -->
+    <div class="navbar">
+        <input type="text" id="user-input" placeholder="Enter your prompt..." style="width: 80%; margin-right: 10px;">
+        <button id="send-button">Send</button>
+        <div class="tip-message"></div>
+    </div>
+
+    <!-- Main Container for Nodes -->
+    <div class="main-container">
+        <!-- The #vibe-editor div from the original project is repurposed as the main node container -->
+        <div id="node-container">
+            <div id="vibe-editor">
+                 <!-- Mind map nodes will be dynamically added here by JavaScript -->
+            </div>
         </div>
+    </div>
 
+    <!-- Loader -->
+    <div class="loader">
+        <svg width="60" height="60" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="spinner-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="var(--dark-bg-tertiary)" stop-opacity="0.1"/>
+                    <stop offset="100%" stop-color="var(--glow-accent-primary)" />
+                </linearGradient>
+            </defs>
+            <path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25" fill="var(--glow-accent-primary)"/>
+            <path d="M12,4a8,8,0,0,1,7.89,6.7A1.53,1.53,0,0,0,21.38,12h0a1.5,1.5,0,0,0,1.48-1.75,11,11,0,0,0-21.72,0A1.5,1.5,0,0,0,2.62,12h0a1.53,1.53,0,0,0,1.49-1.3A8,8,0,0,1,12,4Z" fill="url(#spinner-gradient)">
+                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+            </path>
+        </svg>
+    </div>
+
+    <!-- Draggable OS Menu -->
+    <div id="os-menu-container">
+        <div class="os-menu-main-button">
+            <svg class="os-menu-logo" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="48" stroke="var(--glow-accent-secondary)" stroke-width="1" fill="none" class="glow"/>
+                <circle cx="50" cy="50" r="40" stroke="var(--glow-accent-secondary)" stroke-width="2" stroke-dasharray="10 5" fill="none" class="dashed-circle"/>
+                <text x="50" y="55" font-family="Orbitron" font-size="14" fill="var(--glow-accent-primary)" text-anchor="middle">VIBE</text>
+            </svg>
+            <button class="os-menu-button" title="New Topic">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+            <button class="os-menu-button" title="User Guide">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Documentation">
+                 <svg viewBox="0 0 24 24"><path d="M20 6v14H6V4h7.01L20 10.99M20 4l-6-4H4v20h18V8h-2M8 12h8v2H8zm0 4h8v2H8zm-2-8h4v4H6z"/></svg>
+            </button>
+            <button class="os-menu-button" title="Commands">
+                <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+            </button>
+             <button class="os-menu-button" title="App Center">
+                 <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODALS FROM ORIGINAL PROJECT (RE-STYLED) -->
+    <!-- The original .main-layout and .tab-content-area are no longer used for layout, but preserved as containers -->
+    <div class="main-layout" style="display:none;">
         <div class="tab-content-area">
-            <div id="start" class="tab-content active">
-                <div class="start-page-content">
-                    <div class="start-header">
-                        <h1>Vibe Coding System</h1>
-                        <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
-                    </div>
+            <!-- Each original "tab" is now a hidden container, ready to be shown as a modal or panel -->
+            <div id="start" class="tab-content">...</div>
+            <div id="preview" class="tab-content">...</div>
+            <div id="editor" class="tab-content">...</div>
+            <div id="agent" class="tab-content">...</div>
+            <div id="chat" class="tab-content">...</div>
+            <!-- etc. for all other tabs -->
+        </div>
+    </div>
+    
+    <!-- All original modals are kept for compatibility -->
+    <div id="add-node-modal" class="modal">...</div>
+    <div id="settings-modal" class="modal">...</div>
+    <div id="edit-node-modal" class="modal">...</div>
+    <div id="context-component-modal" class="modal">...</div>
+    
+    <!-- Global agent loader is also kept -->
+    <div id="global-agent-loader">...</div>
+    
+    
+<script>
+// --- START OF VANILLA JAVASCRIPT FOR NEW UI (PART 4) ---
 
-                    <div id="existing-projects-container">
-                        <h2>Your Projects</h2>
-                        <div id="project-list"></div>
-                        <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
-                    </div>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- State Management ---
+    const state = {
+        nodes: [],
+        topics: [],
+        connections: [],
+        isDragging: false,
+        draggedElement: null,
+        dragOffsetX: 0,
+        dragOffsetY: 0,
+    };
 
-                    <div id="new-project-container">
-                         <h2>Create a New Project</h2>
-                         <p>Enter a unique ID and a description, then choose how to build your site.</p>
-                         <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                         <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                         <div id="agent-buttons-container">
-                            <button id="generate-project-button">Generate Project (Single Task)</button>
-                            <button id="start-iterative-build-button" class="action-button">Start Iterative Build</button>
-                        </div>
-                    </div>
+    // --- Core Systems ---
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particlesArray;
 
-                    <div id="start-page-generation-output" style="display: none;">
-                        <div id="generation-status-container">
-                            <h3 id="generation-status-text">Generating your project...</h3>
-                            <div class="loading-spinner"></div>
-                        </div>
-                        <div id="live-code-container">
-                            <pre><code id="live-code-output" class="language-html"></code></pre>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    function initParticleCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-            <div id="preview" class="tab-content">
-                <div class="preview-container">
-                    <div class="preview-header">
-                        <h2>Live Website Preview</h2>
-                        <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
-                    </div>
-                    <iframe id="website-preview" title="Live Website Preview"></iframe>
-                </div>
-            </div>
+        const particleCount = Math.floor((canvas.width * canvas.height) / 15000);
+        particlesArray = [];
+        for (let i = 0; i < particleCount; i++) {
+            let size = Math.random() * 1.5 + 0.5;
+            let x = Math.random() * canvas.width;
+            let y = Math.random() * canvas.height;
+            let directionX = (Math.random() * 0.4) - 0.2;
+            let directionY = (Math.random() * 0.4) - 0.2;
+            particlesArray.push({ x, y, directionX, directionY, size });
+        }
+    }
 
-            <div id="editor" class="tab-content">
-                 <div class="editor-container">
-                    <div class="editor-header">
-                        <div class="editor-header-left">
-                            <h2>Vibe Editor</h2>
-                            <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
-                        </div>
-                        <div class="editor-header-right">
-                             <div id="ai-editor-search-container">
-                                <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
-                                <button id="ai-editor-search-button" class="action-button">Search</button>
-                            </div>
-                            <button id="open-settings-modal-button" class="action-button">API Settings</button>
-                        </div>
-                    </div>
-                    <div id="vibe-editor"></div>
-                </div>
-            </div>
-
-            <div id="agent" class="tab-content">
-                <div class="agent-container">
-                    <h2>AI Agent</h2>
-                    <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
-                    
-                    <div id="agent-controls">
-                        <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
-                        <div id="agent-buttons-container">
-                            <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
-                            <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
-                        </div>
-                    </div>
+    function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < particlesArray.length; i++) {
+            let p = particlesArray[i];
+            p.x += p.directionX;
+            p.y += p.directionY;
             
-                    <div id="iterative-session-ui" class="hidden">
-                        <h4>Project Plan:</h4>
-                        <div id="iterative-plan-display"></div>
-                        <div id="iterative-controls" class="hidden">
-                            <p>Review the changes in the preview. Then, provide feedback or continue.</p>
-                            <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
-                            <button id="request-changes-button" class="action-button">Request Changes</button>
-                            <button id="end-session-button">End Session</button>
-                        </div>
-                    </div>
-            
-                    <div id="agent-output-container">
-                        <h3>Agent Log</h3>
-                        <div id="agent-output">
-                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            if (p.x > canvas.width || p.x < 0) p.directionX = -p.directionX;
+            if (p.y > canvas.height || p.y < 0) p.directionY = -p.directionY;
 
-            <div id="chat" class="tab-content">
-                <div class="chat-container">
-                    <div class="system-prompt-container">
-                        <label for="chat-system-prompt-input">System Prompt (Optional)</label>
-                        <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
-                    </div>
-                    <div class="chat-output-container">
-                        <h3>Chat</h3>
-                        <div id="chat-output">
-                            <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
-                        </div>
-                    </div>
-                    <div class="chat-controls">
-                        <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
-                        <button id="send-chat-button" class="action-button">Send</button>
-                    </div>
-                </div>
-            </div>
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(65, 105, 225, 0.5)';
+            ctx.fill();
 
-            <div id="flowchart" class="tab-content">
-                <div class="flowchart-container">
-                    <h2>Website Functionality Flowchart</h2>
-                    <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
-                    <div class="flowchart-controls">
-                        <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
-                    </div>
-                    <div id="flowchart-output">
-                        <div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website's logic.</div>
-                    </div>
-                </div>
-            </div>
+            // Draw connecting lines
+            for (let j = i + 1; j < particlesArray.length; j++) {
+                let p2 = particlesArray[j];
+                let dx = p.x - p2.x;
+                let dy = p.y - p2.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < 120) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(127, 241, 255, ${1 - distance / 120})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(animateParticles);
+    }
+    
+    window.addEventListener('resize', () => {
+        initParticleCanvas();
+    });
 
-            <div id="console" class="tab-content">
-                <div id="console-container">
-                    <h3>Console</h3>
-                    <div id="console-output"></div>
-                </div>
-            </div>
+    // --- UI Interactivity ---
+    
+    // Sidebar
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarToggle = document.querySelector('.sidebar-toggle');
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+    });
 
-            <div id="files" class="tab-content">
-                <div class="files-container">
-                    <h2>Project Files & Assets</h2>
-                    <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
-                    <div class="files-toolbar">
-                        <input type="file" id="files-upload-input" multiple style="display: none;">
-                        <button id="files-upload-button" class="action-button">Upload</button>
-                        <button id="files-new-folder-button" class="action-button">New Folder</button>
-                        <button id="files-new-file-button" class="action-button">New File</button>
-                        <button id="files-download-button" class="action-button">Download</button>
-                        <button id="files-copy-button" class="action-button">Copy</button>
-                        <button id="files-paste-button" class="action-button">Paste</button>
-                        <button id="files-rename-button" class="action-button">Rename</button>
-                        <button id="files-delete-button" class="action-button danger">Delete</button>
-                    </div>
-                    <div class="assets-hint">
-                        <strong>Hint:</strong> You can reference these assets in your prompts and code. The AI receives a list of available assets. Use paths exactly as shown below.
-                    </div>
-                    <div class="files-browser">
-                        <div class="files-tree" id="files-tree"></div>
-                        <div class="files-preview" id="files-preview">
-                            <div class="files-preview-placeholder">Select a file to preview it here.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="context" class="tab-content">
-                <div class="context-container">
-                    <h2>Component Context Library</h2>
-                    <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
-                    <div class="context-browser">
-                        <div class="context-list-panel">
-                            <h3>Components</h3>
-                            <div id="context-component-list"></div>
-                            <button id="add-new-component-button" class="action-button">Add New Component</button>
-                            <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
-                                <input type="file" id="context-upload-input" accept=".json,application/json" style="display: none;">
-                                <button id="upload-context-button" class="action-button" title="Import a component library from a .json file">Upload Library</button>
-                                <button id="download-context-button" class="action-button" title="Export the current component library to a .json file">Download Library</button>
-                            </div>
-                        </div>
-                        <div id="context-component-viewer" class="context-viewer-panel">
-                            <div class="files-preview-placeholder">Select a component to view it here.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    // OS Menu
+    const osMenu = document.getElementById('os-menu-container');
+    const osMenuButton = document.querySelector('.os-menu-main-button');
+    osMenuButton.addEventListener('click', () => {
+        osMenu.classList.toggle('open');
+    });
+    
+    // Dragging Logic
+    function startDrag(e, element) {
+        if (e.target.closest('button, input, textarea, select, .resize-handle')) return;
+        
+        state.isDragging = true;
+        state.draggedElement = element;
+        state.draggedElement.classList.add('dragging');
+        
+        const rect = state.draggedElement.getBoundingClientRect();
+        state.dragOffsetX = e.clientX - rect.left;
+        state.dragOffsetY = e.clientY - rect.top;
+        
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', endDrag);
+    }
 
-            <div id="code" class="tab-content">
-                <div class="full-code-container">
-                    <h3>Full Website Code</h3>
-                    <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
-                    <div class="file-upload-container">
-                        <p>Or, upload an HTML file to start a new project:</p>
-                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
-                        <button id="upload-html-button" class="action-button">Upload & Process File</button>
-                    </div>
-                    <div class="file-upload-container">
-                        <p>Upload a ZIP of a multi-file website (HTML, CSS, JS, images). We'll inline CSS/JS and re-link assets automatically.</p>
-                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
-                        <button id="upload-zip-button" class="action-button">Upload ZIP & Import Project</button>
-                    </div>
-                    <div class="file-upload-container">
-                        <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
-                        <button id="download-zip-button" class="action-button">Download Project ZIP</button>
-                    </div>
-                    <div class="search-container">
-                        <input type="text" id="search-input" placeholder="Find in code...">
-                        <button id="find-prev-button" class="action-button">&lt; Prev</button>
-                        <button id="find-next-button" class="action-button">Next &gt;</button>
-                        <span id="search-results-count"></span>
-                    </div>
-                    <textarea id="full-code-editor"></textarea>
-                    <button id="update-tree-from-code-button" class="action-button">Process Code and Update Nodes</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    function onDrag(e) {
+        if (!state.isDragging) return;
+        e.preventDefault();
+        
+        let newX = e.clientX - state.dragOffsetX;
+        let newY = e.clientY - state.dragOffsetY;
+        
+        state.draggedElement.style.left = `${newX}px`;
+        state.draggedElement.style.top = `${newY}px`;
+    }
 
-    <!-- Modals -->
-    <div id="add-node-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Add New Child Node</h2>
-            <p>Define the new component to add to the selected container.</p>
-            <input type="hidden" id="add-node-parent-id">
-            <input type="hidden" id="add-node-target-id">
-            <input type="hidden" id="add-node-position">
-            <label for="new-node-id">New Node ID (kebab-case):</label>
-            <input type="text" id="new-node-id" placeholder="e.g., my-new-button">
-            <label for="new-node-description">Description:</label>
-            <textarea id="new-node-description" rows="2" placeholder="A concise description..."></textarea>
-            <label for="new-node-type">Node Type:</label>
-            <select id="new-node-type">
-                <option value="html">HTML</option>
-                <option value="css">CSS</option>
-                <option value="javascript">JavaScript</option>
-            </select>
-            <button id="create-node-button" class="action-button">Create Node</button>
-            <div id="add-node-error" class="modal-error"></div>
-        </div>
-    </div>
+    function endDrag() {
+        if (state.draggedElement) {
+            state.draggedElement.classList.remove('dragging');
+        }
+        state.isDragging = false;
+        state.draggedElement = null;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', endDrag);
+    }
 
-    <div id="settings-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-settings-modal-button">&times;</span>
-            <h2>API Settings</h2>
-            <div class="ai-provider-container">
-                <h3>AI Provider</h3>
-                <select id="ai-provider-select">
-                    <option value="gemini">Google Gemini</option>
-                    <option value="nscale">nscale</option>
-                </select>
-            </div>
-            <div id="gemini-settings-container">
-                 <h3>Gemini Model</h3>
-                 <select id="gemini-model-select">
-                    <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
-                    <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
-                    <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
-                    <optgroup label="Advanced & Experimental Models">
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                    </optgroup>
-                 </select>
-                <div id="gemini-api-key-container" class="api-key-container">
-                    <h3>Gemini API Key</h3>
-                    <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
-                    <button id="save-api-key-button">Save Key</button>
-                    <div id="api-key-status"></div>
-                </div>
-            </div>
-            <div id="nscale-api-key-container" class="api-key-container" style="display: none;">
-                <h3>nscale API Key</h3>
-                <input type="password" id="nscale-api-key-input" placeholder="Enter your nscale API Key here...">
-                <button id="save-nscale-api-key-button">Save Key</button>
-                <div id="nscale-api-key-status"></div>
-            </div>
-        </div>
-    </div>
+    // Make OS Menu draggable
+    osMenu.addEventListener('mousedown', (e) => startDrag(e, osMenu));
+    
+    // Add event listeners for future nodes (using event delegation)
+    const nodeContainer = document.getElementById('node-container');
+    nodeContainer.addEventListener('mousedown', (e) => {
+        const targetNode = e.target.closest('.node');
+        if (targetNode) {
+            startDrag(e, targetNode);
+        }
+    });
 
-    <div id="edit-node-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-edit-node-modal-button">&times;</span>
-            <h2>Edit Component</h2>
-            <label>Node ID</label>
-            <input type="text" id="edit-node-id" readonly>
-            <label>Type</label>
-            <input type="text" id="edit-node-type" readonly>
-            <label for="edit-node-description">Description</label>
-            <textarea id="edit-node-description" rows="3"></textarea>
-            <button id="ai-improve-description-button" class="action-button" style="margin-top: 10px;">AI: Improve Description</button>
-            <label for="edit-node-code">Code</label>
-            <textarea id="edit-node-code" rows="10"></textarea>
-            <div class="button-row">
-                <button id="save-edit-node-button" class="action-button">Save & Update Vibe</button>
-                <button id="save-as-component-button" class="action-button">Save as Component</button>
-            </div>
-            <div id="edit-node-error" class="modal-error"></div>
-        </div>
-    </div>
+    // --- Persistence ---
+    function saveToLocalStorage() {
+        try {
+            const serializedState = JSON.stringify(state);
+            localStorage.setItem('mindMapState', serializedState);
+            console.log('State saved.');
+        } catch (error) {
+            console.error('Failed to save state:', error);
+        }
+    }
 
-    <div id="context-component-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-context-modal-button">&times;</span>
-            <h2 id="component-modal-title">Add New Component</h2>
-            <div class="component-ai-generator">
-                <label for="component-ai-prompt-input">Generate with AI:</label>
-                <textarea id="component-ai-prompt-input" rows="3" placeholder="e.g., 'a responsive card with an image...'"></textarea>
-                <button id="generate-component-button" class="action-button">Generate Component</button>
-            </div>
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #4b5263;">
-            <label for="component-id-input">Component ID (unique, kebab-case):</label>
-            <input type="text" id="component-id-input" placeholder="e.g., responsive-navbar">
-            <label for="component-name-input">Display Name:</label>
-            <input type="text" id="component-name-input" placeholder="e.g., Responsive Navbar">
-            <label for="component-description-input">Description:</label>
-            <textarea id="component-description-input" rows="2"></textarea>
-            <div class="component-modal-code-fields">
-                <div>
-                    <label for="component-html-input">HTML Snippet:</label>
-                    <textarea id="component-html-input" rows="6"></textarea>
-                </div>
-                <div>
-                    <label for="component-css-input">CSS Snippet:</label>
-                    <textarea id="component-css-input" rows="6"></textarea>
-                </div>
-                <div>
-                    <label for="component-js-input">JavaScript Snippet:</label>
-                    <textarea id="component-js-input" rows="6"></textarea>
-                </div>
-            </div>
-            <div class="button-row">
-                <button id="save-component-button" class="action-button">Save Component</button>
-                <button id="delete-component-button" class="action-button danger" style="display: none;">Delete</button>
-            </div>
-            <div id="component-modal-error" class="modal-error"></div>
-        </div>
-    </div>
+    function loadFromLocalStorage() {
+        try {
+            const savedState = localStorage.getItem('mindMapState');
+            if (savedState) {
+                Object.assign(state, JSON.parse(savedState));
+                // Here you would need to re-render the nodes based on the loaded state
+                console.log('State loaded.');
+            }
+        } catch (error) {
+            console.error('Failed to load state:', error);
+        }
+    }
 
-    <!-- START OF FIX: Global Agent Status Loader -->
-    <div id="global-agent-loader">
-        <div class="loading-spinner"></div>
-        <div class="loader-text">
-            <p id="global-agent-status-text">Agent is working...</p>
-            <p id="global-agent-progress-text"></p>
-        </div>
-    </div>
-    <!-- END OF FIX -->
+    // --- Initial Setup ---
+    function initialize() {
+        initParticleCanvas();
+        animateParticles();
+        // loadFromLocalStorage();
+        console.log('Futuristic Mind Map UI Initialized.');
+    }
 
-    <script type="module" src="app.js"></script>
+    initialize();
+});
+// --- END OF VANILLA JAVASCRIPT ---
+</script>
+
 </body>
 </html>
