@@ -330,6 +330,33 @@ function createCollapsible(data) {
     return details;
 }
 
+// START OF FIX: Helper function to stringify serialized console args for the AI.
+/**
+ * Converts serialized console arguments back into a string for AI analysis.
+ * @param {Array<object>} args - The array of serialized arguments.
+ * @returns {string} A string representation of the error/log.
+ */
+function stringifySerializedArgs(args) {
+    let fullMessage = '';
+    for (const arg of args) {
+        if (arg.type === 'object' && arg.value && arg.value.message && arg.value.name) {
+            // Handle serialized Error objects
+            let errorString = `${arg.value.name.value}: ${arg.value.message.value}`;
+            if (arg.value.stack) {
+                // The stack is often the most useful part
+                errorString = arg.value.stack.value;
+            }
+            fullMessage += errorString + ' ';
+        } else if (typeof arg === 'string') {
+            fullMessage += arg + ' ';
+        } else if (arg && arg.value !== undefined) {
+            fullMessage += String(arg.value) + ' ';
+        }
+    }
+    return fullMessage.trim();
+}
+// END OF FIX
+
 function renderConsoleMessage(level, args) {
     if (!consoleOutput) return;
 
@@ -342,6 +369,22 @@ function renderConsoleMessage(level, args) {
         msgEl.appendChild(createLogElement(arg));
         msgEl.appendChild(document.createTextNode(' ')); // Add space between args
     });
+
+    // START OF FIX: Add a "Fix with AI" button to error messages.
+    if (level === 'error') {
+        const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+        if (keyIsAvailable) {
+            const fixButton = document.createElement('button');
+            fixButton.className = 'action-button fix-error-button';
+            fixButton.style.marginLeft = '10px';
+            fixButton.style.verticalAlign = 'middle';
+            fixButton.textContent = 'Fix with AI';
+            const errorMessage = stringifySerializedArgs(args);
+            fixButton.onclick = () => handleFixError(errorMessage, fixButton);
+            msgEl.appendChild(fixButton);
+        }
+    }
+    // END OF FIX
 
     currentLogGroup.appendChild(msgEl);
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
@@ -2939,9 +2982,9 @@ Please analyze the code and the error, and provide a new set of actions to fix t
 }
 // END OF FIX
 
+// START OF FIX: Reworked the iterative step execution to remove auto self-correction.
 /**
- * Executes the current step in the iterative plan, tests for errors,
- * and attempts to self-correct upon failure before proceeding.
+ * Executes the current step in the iterative plan and pauses on error.
  */
 async function executeNextIterativeStep() {
     if (iterativeSessionState.status !== 'executing') {
@@ -2966,68 +3009,50 @@ async function executeNextIterativeStep() {
     const progressText = `Step ${iterativeSessionState.currentStepIndex + 1}/${iterativeSessionState.plan.length}`;
     updateGlobalAgentLoader('Executing plan...', progressText);
 
-    const MAX_RETRIES = 1;
-    let lastError = null;
+    try {
+        logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}:</strong> ${currentStepDescription}`, 'action');
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            if (attempt === 0) {
-                // First attempt: normal execution
-                logToAgent(`<strong>Executing Step ${iterativeSessionState.currentStepIndex + 1}:</strong> ${currentStepDescription}`, 'action');
+        const systemPrompt = getIterativeExecutorSystemPrompt();
+        const fullTreeString = JSON.stringify(vibeTree, null, 2);
+        const userPrompt = `
+            Overall Goal: "${iterativeSessionState.overallGoal}"
+            Full Plan:
+            ${iterativeSessionState.plan.map((s, i) => `${i+1}. ${s}`).join('\n')}
+            Current Step to Execute: "${currentStepDescription}"
+            Current Vibe Tree:
+            \`\`\`json
+            ${fullTreeString}
+            \`\`\`
+        `;
+        iterativeSessionState.history.push({ role: 'user', content: userPrompt });
 
-                const systemPrompt = getIterativeExecutorSystemPrompt();
-                const fullTreeString = JSON.stringify(vibeTree, null, 2);
-                const userPrompt = `
-                    Overall Goal: "${iterativeSessionState.overallGoal}"
-                    Full Plan:
-                    ${iterativeSessionState.plan.map((s, i) => `${i+1}. ${s}`).join('\n')}
-                    Current Step to Execute: "${currentStepDescription}"
-                    Current Vibe Tree:
-                    \`\`\`json
-                    ${fullTreeString}
-                    \`\`\`
-                `;
-                iterativeSessionState.history.push({ role: 'user', content: userPrompt });
+        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const agentDecision = JSON.parse(rawResponse);
 
-                const rawResponse = await callAI(systemPrompt, userPrompt, true);
-                const agentDecision = JSON.parse(rawResponse);
+        iterativeSessionState.history.push({ role: 'model', content: rawResponse });
+        executeAgentPlan(agentDecision, logToAgent);
 
-                iterativeSessionState.history.push({ role: 'model', content: rawResponse });
-                executeAgentPlan(agentDecision, logToAgent);
+        logToAgent('Testing implementation for errors...', 'info');
+        await testCurrentStep();
 
-            } else {
-                // Subsequent attempts: self-correction
-                logToAgent(`<strong>Attempt ${attempt + 1}:</strong> Applying AI-generated fix for the previous error.`, 'action');
-                const fixDecision = await handleSelfCorrection(currentStepDescription, lastError);
-                executeAgentPlan(fixDecision, logToAgent);
-            }
+        // If test passes, we're done with this step
+        logToAgent(`Step ${iterativeSessionState.currentStepIndex + 1} completed and tested successfully.`, 'info');
+        switchToTab('preview');
+        iterativeSessionState.currentStepIndex++;
+        setTimeout(executeNextIterativeStep, 1500);
 
-            logToAgent('Testing implementation for errors...', 'info');
-            await testCurrentStep();
-
-            // If test passes, we're done with this step
-            logToAgent(`Step ${iterativeSessionState.currentStepIndex + 1} completed and tested successfully.`, 'info');
-            switchToTab('preview');
-            iterativeSessionState.currentStepIndex++;
-            setTimeout(executeNextIterativeStep, 1500);
-            return; // Exit the loop and the function for this step
-
-        } catch (error) {
-            lastError = error;
-            console.error(`Error during step ${iterativeSessionState.currentStepIndex + 1}, attempt ${attempt + 1}:`, error);
-            logToAgent(`Attempt ${attempt + 1} failed the test with an error: <pre>${error.message}</pre>`, 'error');
-
-            if (attempt >= MAX_RETRIES) {
-                logToAgent('Maximum self-correction retries reached. Pausing session for your review.', 'error');
-                iterativeSessionState.status = 'paused';
-                updateGlobalAgentLoader('Execution paused on error', progressText);
-                updateIterativeUI();
-                hideAgentSpinner();
-                return; // Exit loop and function
-            }
-        }
+    } catch (error) {
+        console.error(`Error during step ${iterativeSessionState.currentStepIndex + 1}:`, error);
+        logToAgent(`Execution failed with an error: <pre>${error.message}</pre>`, 'error');
+        logToAgent('Pausing session for your review. You can make manual changes, use the "Fix with AI" button in the console, or end the session.', 'error');
+        iterativeSessionState.status = 'paused';
+        updateGlobalAgentLoader('Execution paused on error', progressText);
+        updateIterativeUI();
+        hideAgentSpinner();
+        switchToTab('console'); // Switch to console to show the error
     }
 }
+// END OF FIX
 
 
 /**
@@ -4360,18 +4385,20 @@ function handleUploadContextTrigger() {
     contextUploadInput.click();
 }
 
+// START OF FIX: Correctly handle FileList and process the selected file.
 /**
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
 async function processContextUpload(event) {
-    const file = event.target.files;
+    const files = event.target.files;
 
-    if (!file) {
+    if (!files || files.length === 0) {
         console.log("No file selected for context upload.");
         return;
     }
-    
+
+    const file = files;
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4415,6 +4442,7 @@ async function processContextUpload(event) {
             console.error("Failed to upload/process context library:", error);
             alert(`Error importing library: ${error.message}`);
         } finally {
+            // Reset the input so the same file can be uploaded again
             contextUploadInput.value = '';
         }
     };
@@ -4426,6 +4454,7 @@ async function processContextUpload(event) {
 
     reader.readAsText(file);
 }
+// END OF FIX
 
 /**
  * Generic handler to extract a node as a component and open the save modal.
