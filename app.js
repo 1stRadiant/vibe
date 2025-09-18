@@ -4390,6 +4390,10 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
+/**
+ * Processes the uploaded component library file.
+ * @param {Event} event - The file input change event.
+ */
 async function processContextUpload(event) {
     const files = event.target.files;
 
@@ -4398,7 +4402,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files; // Get the first file from the FileList
+    const file = files[0]; // FIX: Get the first file from the FileList, not the whole list.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4454,7 +4458,6 @@ async function processContextUpload(event) {
 
     reader.readAsText(file);
 }
-// END OF FIX
 
 /**
  * Generic handler to extract a node as a component and open the save modal.
