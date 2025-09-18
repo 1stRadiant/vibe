@@ -4385,7 +4385,7 @@ function handleUploadContextTrigger() {
     contextUploadInput.click();
 }
 
-// START OF FIX: Correctly handle FileList and process the selected file.
+// START OF FIX: Correctly handle the FileList object to process the selected file.
 /**
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
@@ -4398,7 +4398,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files;
+    const file = files; // Get the first file from the FileList
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
