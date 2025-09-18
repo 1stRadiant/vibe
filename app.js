@@ -4923,6 +4923,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
         if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
         if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
+        
+        // START OF FIX: Add click listener to dismiss the global agent loader.
+        if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
+        // END OF FIX
 
         window.addEventListener('click', (event) => {
             if (event.target === settingsModal) settingsModal.style.display = 'none';
@@ -4932,14 +4936,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    bindEventListeners();
-    initializeApiSettings();
-    initializeMermaid();
-    populateProjectList();
-    renderComponentList();
-    resetHistory();
-});
-
 function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
