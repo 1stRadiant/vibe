@@ -931,7 +931,7 @@ ${fullTreeString}
 \`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
+            const agentDecision = safeParseJson(rawResponse);
             
             executeAgentPlan(agentDecision, (message, type) => {
                 const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
@@ -1038,6 +1038,64 @@ function getComponentContextForAI() {
 
     return contextString;
 }
+
+// START OF FIX: Helper function to safely parse JSON from AI responses
+/**
+ * Safely parses a JSON string that might be wrapped in markdown or have extra text.
+ * @param {string} rawText - The raw string from the AI.
+ * @returns {object | Array} The parsed JavaScript object or array.
+ * @throws {Error} If no valid JSON can be extracted or parsed.
+ */
+function safeParseJson(rawText) {
+    if (typeof rawText !== 'string') {
+        throw new Error("Input must be a string.");
+    }
+    
+    let jsonString = rawText.trim();
+
+    // 1. Try to find a JSON markdown block and extract its content.
+    const jsonMatch = jsonString.match(/```(json)?\s*([\s\S]*?)\s*```/i);
+    if (jsonMatch && jsonMatch[2]) {
+        jsonString = jsonMatch[2].trim();
+    }
+
+    // 2. Find the boundaries of the first top-level JSON object or array.
+    const firstBrace = jsonString.indexOf('{');
+    const firstBracket = jsonString.indexOf('[');
+    let startIndex;
+
+    if (firstBrace === -1 && firstBracket === -1) {
+        throw new Error("AI response did not contain a JSON object or array.");
+    }
+
+    if (firstBrace === -1) {
+        startIndex = firstBracket;
+    } else if (firstBracket === -1) {
+        startIndex = firstBrace;
+    } else {
+        startIndex = Math.min(firstBrace, firstBracket);
+    }
+    
+    const jsonType = jsonString[startIndex];
+    const endChar = jsonType === '{' ? '}' : ']';
+    const endIndex = jsonString.lastIndexOf(endChar);
+
+    if (endIndex === -1 || endIndex < startIndex) {
+        throw new Error(`AI response started with '${jsonType}' but did not have a matching closing '${endChar}'.`);
+    }
+
+    jsonString = jsonString.substring(startIndex, endIndex + 1);
+
+    // 3. Attempt to parse the extracted string.
+    try {
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Failed to parse cleaned JSON string:", jsonString);
+        // Re-throw with a more informative error message.
+        throw new Error(`AI returned malformed JSON that could not be cleaned. (Original error: ${e.message})`);
+    }
+}
+// END OF FIX
 
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     console.log('--- Calling AI ---');
@@ -1310,30 +1368,17 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback);
     
     try {
-        let jsonResponse = rawResponse.trim();
-        
-        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2].trim();
-        }
-
-        const startIndex = jsonResponse.indexOf('[');
-        const endIndex = jsonResponse.lastIndexOf(']');
-
-        if (startIndex !== -1 && endIndex > startIndex) {
-            jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
-        }
-
-        const childrenArray = JSON.parse(jsonResponse);
+        const childrenArray = safeParseJson(rawResponse);
         if (!Array.isArray(childrenArray)) {
-            throw new Error("AI did not return a valid JSON array.");
+            console.warn("AI returned a valid JSON object, but an array was expected.", childrenArray);
+            throw new Error("AI did not return a valid JSON array for the component structure.");
         }
         console.log("Successfully parsed generated subtree from AI.");
-        
         return childrenArray;
     } catch (e) {
         console.error("Failed to parse subtree JSON from AI:", rawResponse);
-        throw new Error(`AI returned invalid JSON for the component structure. Original response logged in console. Error: ${e.message}`);
+        // The error from safeParseJson is already informative, so we can just re-throw or wrap it.
+        throw new Error(`AI returned invalid JSON for the component structure. Error: ${e.message}`);
     }
 }
 
@@ -1613,25 +1658,10 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
     const rawResponse = await callAI(systemPrompt, userPrompt, true);
 
-    // Helper: try progressively more aggressive JSON extraction strategies
-    function tryParseVarious(text) {
-        try { return JSON.parse(text.trim()); } catch {}
-        const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence[1]) {
-            try { return JSON.parse(fence[1]); } catch {}
-        }
-        const firstBrace = text.indexOf('{');
-        const lastBrace = text.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-            try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch {}
-        }
-        return null;
-    }
-
     try {
-        const parsed = tryParseVarious(rawResponse);
+        const parsed = safeParseJson(rawResponse);
 
-        if (!parsed) {
+        if (!parsed) { // safeParseJson throws, so this check is redundant but safe
             console.warn("AI did not return valid JSON. Falling back to client-side HTML parser.");
             return parseHtmlToVibeTree(fullCode);
         }
@@ -2673,7 +2703,7 @@ ${fullTreeString}
 
     try {
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
+        const agentDecision = safeParseJson(rawResponse);
 
         logToAgent('Received fix plan from AI. Executing actions...', 'info');
         executeAgentPlan(agentDecision, logToAgent);
@@ -2770,7 +2800,7 @@ async function handleRunAgent() {
     try {
         const rawResponse = await callAI(systemPrompt, agentUserPrompt, true);
         agentConversationHistory.push({ role: 'model', content: rawResponse });
-        const agentDecision = JSON.parse(rawResponse);
+        const agentDecision = safeParseJson(rawResponse);
         executeAgentPlan(agentDecision, logToAgent);
         logToAgent('Changes applied.', 'info');
         switchToTab('preview');
@@ -2905,7 +2935,7 @@ async function handleStartIterativeSession() {
         const userPrompt = `My website goal is: "${goal}"`;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const responseJson = JSON.parse(rawResponse);
+        const responseJson = safeParseJson(rawResponse);
 
         if (!responseJson.plan || !Array.isArray(responseJson.plan)) {
             throw new Error("AI did not return a valid plan array.");
@@ -2978,7 +3008,7 @@ ${fullTreeString}
 Please analyze the code and the error, and provide a new set of actions to fix the problem.`;
 
     const rawResponse = await callAI(systemPrompt, userPrompt, true);
-    return JSON.parse(rawResponse);
+    return safeParseJson(rawResponse);
 }
 // END OF FIX
 
@@ -3027,7 +3057,7 @@ async function executeNextIterativeStep() {
         iterativeSessionState.history.push({ role: 'user', content: userPrompt });
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
+        const agentDecision = safeParseJson(rawResponse);
 
         iterativeSessionState.history.push({ role: 'model', content: rawResponse });
         executeAgentPlan(agentDecision, logToAgent);
@@ -3870,7 +3900,7 @@ async function handleAiEditorSearch() {
         const userPrompt = `Search Query: "${query}"\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const resultIds = JSON.parse(rawResponse);
+        const resultIds = safeParseJson(rawResponse);
         
         if (!Array.isArray(resultIds)) {
             throw new Error("AI did not return a valid array of node IDs.");
@@ -4179,7 +4209,7 @@ async function handleAiGenerateComponent() {
         console.log(`Generating component with AI from prompt: "${prompt}"`);
         
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const aiComponent = JSON.parse(rawResponse);
+        const aiComponent = safeParseJson(rawResponse);
 
         if (!aiComponent.id || !aiComponent.name || !aiComponent.html) {
             throw new Error("AI response is missing required fields (id, name, html).");
@@ -4402,7 +4432,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files[0]; // FIX: Get the first file from the FileList, not the whole list.
+    const file = files; // FIX: Get the first file from the FileList, not the whole list.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4510,7 +4540,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         const userPrompt = `Extract the node with ID "${nodeId}" from the following Vibe Tree into a self-contained component.\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const extractedComponent = JSON.parse(rawResponse);
+        const extractedComponent = safeParseJson(rawResponse);
 
         if (!extractedComponent.id || !extractedComponent.name) {
             throw new Error("AI failed to return a valid component structure with id and name.");
@@ -4990,7 +5020,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
             const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
+            const agentDecision = safeParseJson(rawResponse);
             executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
         }
         switchToTab('preview');
