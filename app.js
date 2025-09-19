@@ -5245,3 +5245,14 @@ function handleNodeContentToggle(event) {
     const header = event.currentTarget;
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
+
+// START OF FIX
+    // Initial setup on page load
+    initializeApiSettings();
+    initializeMermaid();
+    bindEventListeners();
+    populateProjectList(); // Load the list of projects on startup
+    resetToStartPage(); // Start on the "new project" page
+    updateUndoRedoUI();
+});
+// END OF FIX
