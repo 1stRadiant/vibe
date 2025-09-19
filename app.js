@@ -931,7 +931,7 @@ ${fullTreeString}
 \`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = safeParseJson(rawResponse);
+            const agentDecision = JSON.parse(rawResponse);
             
             executeAgentPlan(agentDecision, (message, type) => {
                 const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
@@ -1038,64 +1038,6 @@ function getComponentContextForAI() {
 
     return contextString;
 }
-
-// START OF FIX: Helper function to safely parse JSON from AI responses
-/**
- * Safely parses a JSON string that might be wrapped in markdown or have extra text.
- * @param {string} rawText - The raw string from the AI.
- * @returns {object | Array} The parsed JavaScript object or array.
- * @throws {Error} If no valid JSON can be extracted or parsed.
- */
-function safeParseJson(rawText) {
-    if (typeof rawText !== 'string') {
-        throw new Error("Input must be a string.");
-    }
-    
-    let jsonString = rawText.trim();
-
-    // 1. Try to find a JSON markdown block and extract its content.
-    const jsonMatch = jsonString.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-    if (jsonMatch && jsonMatch[2]) {
-        jsonString = jsonMatch[2].trim();
-    }
-
-    // 2. Find the boundaries of the first top-level JSON object or array.
-    const firstBrace = jsonString.indexOf('{');
-    const firstBracket = jsonString.indexOf('[');
-    let startIndex;
-
-    if (firstBrace === -1 && firstBracket === -1) {
-        throw new Error("AI response did not contain a JSON object or array.");
-    }
-
-    if (firstBrace === -1) {
-        startIndex = firstBracket;
-    } else if (firstBracket === -1) {
-        startIndex = firstBrace;
-    } else {
-        startIndex = Math.min(firstBrace, firstBracket);
-    }
-    
-    const jsonType = jsonString[startIndex];
-    const endChar = jsonType === '{' ? '}' : ']';
-    const endIndex = jsonString.lastIndexOf(endChar);
-
-    if (endIndex === -1 || endIndex < startIndex) {
-        throw new Error(`AI response started with '${jsonType}' but did not have a matching closing '${endChar}'.`);
-    }
-
-    jsonString = jsonString.substring(startIndex, endIndex + 1);
-
-    // 3. Attempt to parse the extracted string.
-    try {
-        return JSON.parse(jsonString);
-    } catch (e) {
-        console.error("Failed to parse cleaned JSON string:", jsonString);
-        // Re-throw with a more informative error message.
-        throw new Error(`AI returned malformed JSON that could not be cleaned. (Original error: ${e.message})`);
-    }
-}
-// END OF FIX
 
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     console.log('--- Calling AI ---');
@@ -1368,17 +1310,30 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback);
     
     try {
-        const childrenArray = safeParseJson(rawResponse);
+        let jsonResponse = rawResponse.trim();
+        
+        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
+        if (jsonMatch && jsonMatch[2]) {
+            jsonResponse = jsonMatch[2].trim();
+        }
+
+        const startIndex = jsonResponse.indexOf('[');
+        const endIndex = jsonResponse.lastIndexOf(']');
+
+        if (startIndex !== -1 && endIndex > startIndex) {
+            jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
+        }
+
+        const childrenArray = JSON.parse(jsonResponse);
         if (!Array.isArray(childrenArray)) {
-            console.warn("AI returned a valid JSON object, but an array was expected.", childrenArray);
-            throw new Error("AI did not return a valid JSON array for the component structure.");
+            throw new Error("AI did not return a valid JSON array.");
         }
         console.log("Successfully parsed generated subtree from AI.");
+        
         return childrenArray;
     } catch (e) {
         console.error("Failed to parse subtree JSON from AI:", rawResponse);
-        // The error from safeParseJson is already informative, so we can just re-throw or wrap it.
-        throw new Error(`AI returned invalid JSON for the component structure. Error: ${e.message}`);
+        throw new Error(`AI returned invalid JSON for the component structure. Original response logged in console. Error: ${e.message}`);
     }
 }
 
@@ -1658,10 +1613,25 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
     const rawResponse = await callAI(systemPrompt, userPrompt, true);
 
-    try {
-        const parsed = safeParseJson(rawResponse);
+    // Helper: try progressively more aggressive JSON extraction strategies
+    function tryParseVarious(text) {
+        try { return JSON.parse(text.trim()); } catch {}
+        const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (fence && fence[1]) {
+            try { return JSON.parse(fence[1]); } catch {}
+        }
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+            try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch {}
+        }
+        return null;
+    }
 
-        if (!parsed) { // safeParseJson throws, so this check is redundant but safe
+    try {
+        const parsed = tryParseVarious(rawResponse);
+
+        if (!parsed) {
             console.warn("AI did not return valid JSON. Falling back to client-side HTML parser.");
             return parseHtmlToVibeTree(fullCode);
         }
@@ -2703,7 +2673,7 @@ ${fullTreeString}
 
     try {
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = safeParseJson(rawResponse);
+        const agentDecision = JSON.parse(rawResponse);
 
         logToAgent('Received fix plan from AI. Executing actions...', 'info');
         executeAgentPlan(agentDecision, logToAgent);
@@ -2800,7 +2770,7 @@ async function handleRunAgent() {
     try {
         const rawResponse = await callAI(systemPrompt, agentUserPrompt, true);
         agentConversationHistory.push({ role: 'model', content: rawResponse });
-        const agentDecision = safeParseJson(rawResponse);
+        const agentDecision = JSON.parse(rawResponse);
         executeAgentPlan(agentDecision, logToAgent);
         logToAgent('Changes applied.', 'info');
         switchToTab('preview');
@@ -2935,7 +2905,7 @@ async function handleStartIterativeSession() {
         const userPrompt = `My website goal is: "${goal}"`;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const responseJson = safeParseJson(rawResponse);
+        const responseJson = JSON.parse(rawResponse);
 
         if (!responseJson.plan || !Array.isArray(responseJson.plan)) {
             throw new Error("AI did not return a valid plan array.");
@@ -3008,7 +2978,7 @@ ${fullTreeString}
 Please analyze the code and the error, and provide a new set of actions to fix the problem.`;
 
     const rawResponse = await callAI(systemPrompt, userPrompt, true);
-    return safeParseJson(rawResponse);
+    return JSON.parse(rawResponse);
 }
 // END OF FIX
 
@@ -3057,7 +3027,7 @@ async function executeNextIterativeStep() {
         iterativeSessionState.history.push({ role: 'user', content: userPrompt });
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = safeParseJson(rawResponse);
+        const agentDecision = JSON.parse(rawResponse);
 
         iterativeSessionState.history.push({ role: 'model', content: rawResponse });
         executeAgentPlan(agentDecision, logToAgent);
@@ -3900,7 +3870,7 @@ async function handleAiEditorSearch() {
         const userPrompt = `Search Query: "${query}"\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const resultIds = safeParseJson(rawResponse);
+        const resultIds = JSON.parse(rawResponse);
         
         if (!Array.isArray(resultIds)) {
             throw new Error("AI did not return a valid array of node IDs.");
@@ -4209,7 +4179,7 @@ async function handleAiGenerateComponent() {
         console.log(`Generating component with AI from prompt: "${prompt}"`);
         
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const aiComponent = safeParseJson(rawResponse);
+        const aiComponent = JSON.parse(rawResponse);
 
         if (!aiComponent.id || !aiComponent.name || !aiComponent.html) {
             throw new Error("AI response is missing required fields (id, name, html).");
@@ -4540,7 +4510,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         const userPrompt = `Extract the node with ID "${nodeId}" from the following Vibe Tree into a self-contained component.\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const extractedComponent = safeParseJson(rawResponse);
+        const extractedComponent = JSON.parse(rawResponse);
 
         if (!extractedComponent.id || !extractedComponent.name) {
             throw new Error("AI failed to return a valid component structure with id and name.");
@@ -4877,94 +4847,90 @@ async function handleFilesDelete() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM fully loaded. Initializing application.");
+// START OF FIX: Moved helper function definitions to global scope
+function bindEventListeners() {
+    handleTabSwitching();
+    if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
+    if (undoButton) undoButton.addEventListener('click', doUndo);
+    if (redoButton) redoButton.addEventListener('click', doRedo);
+    if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
+    if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
+    if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
+    if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
+    if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
+    if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
+    if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+    if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
+    if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
+    if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
+    if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
+    if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
+    if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
+    if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
+    if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
+    if (searchInput) searchInput.addEventListener('input', handleSearchInput());
+    if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
+    if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
+    if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
+    if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleAiEditorSearch();
+    });
     
-    function bindEventListeners() {
-        handleTabSwitching();
-        if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
-        if (undoButton) undoButton.addEventListener('click', doUndo);
-        if (redoButton) redoButton.addEventListener('click', doRedo);
-        if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-        if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
-        if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
-        if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
-        if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
-        if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-        if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
-        if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
-        if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
-        if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
-        if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
-        if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
-        if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
-        if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
-        if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
-        if (searchInput) searchInput.addEventListener('input', handleSearchInput());
-        if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
-        if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
-        if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
-        if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleAiEditorSearch();
-        });
-        
-        // AGENT AND ITERATIVE MODE LISTENERS
-        if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
-        if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
-        if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
-        if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
-        if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
-        
-        if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
-        if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
-        if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
+    // AGENT AND ITERATIVE MODE LISTENERS
+    if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
+    if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
+    if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
+    if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
+    if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
+    
+    if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
+    if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+    if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
 
-        if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
-        if (chatPromptInput) {
-            chatPromptInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSendChatMessage();
-                }
-            });
-        }
-        
-        if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
-        if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
-        if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
-        if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
-        if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
-        if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
-        if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
-        if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
-
-        const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
-        if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
-        if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
-        if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
-        if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
-        if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
-        if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
-        if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
-        if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
-        if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
-        if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-        if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
-        if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
-        if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
-        if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
-        
-        // START OF FIX: Add click listener to dismiss the global agent loader.
-        if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
-        // END OF FIX
-
-        window.addEventListener('click', (event) => {
-            if (event.target === settingsModal) settingsModal.style.display = 'none';
-            if (event.target === addNodeModal) addNodeModal.style.display = 'none';
-            if (event.target === editNodeModal) editNodeModal.style.display = 'none';
-            if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
+    if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
+    if (chatPromptInput) {
+        chatPromptInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSendChatMessage();
+            }
         });
     }
+    
+    if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
+    if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
+    if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
+    if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+    if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
+    if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
+    if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
+    if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
+
+    const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
+    if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
+    if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
+    if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
+    if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
+    if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
+    if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
+    if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
+    if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
+    if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
+    if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
+    if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
+    if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
+    
+    if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
+
+    window.addEventListener('click', (event) => {
+        if (event.target === settingsModal) settingsModal.style.display = 'none';
+        if (event.target === addNodeModal) addNodeModal.style.display = 'none';
+        if (event.target === editNodeModal) editNodeModal.style.display = 'none';
+        if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
+    });
+}
     
 function resetToStartPage() {
     console.log("Resetting to new project state.");
@@ -4989,12 +4955,9 @@ function resetToStartPage() {
     console.log("Ready for new project.");
 }
 
-/* --- Missing helpers (safe stubs) --- */
 async function buildAssetUrlMap() { return {}; }
 function injectAssetRewriterScript(doc, assetMap) {}
-/* --- End stubs --- */
 
-/* --- Allow editing descriptions from the Edit Component modal --- */
 async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
     const node = findNodeById(nodeId);
     if (!node) throw new Error(`Node not found: ${nodeId}`);
@@ -5020,7 +4983,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
             const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = safeParseJson(rawResponse);
+            const agentDecision = JSON.parse(rawResponse);
             executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
         }
         switchToTab('preview');
@@ -5032,7 +4995,6 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
     }
 }
 
-/* --- Flowchart generation (minimal) --- */
 function buildBasicMermaidFromTree(tree) {
     let graph = 'graph TD\n';
     const addNode = (node, parentId = null) => {
@@ -5103,9 +5065,6 @@ async function handleGenerateFlowchart() {
     }
 }
 
-/**
- * Create a brand new project from a high-level prompt.
- */
 async function handleGenerateProject() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5156,9 +5115,6 @@ async function handleGenerateProject() {
     }
 }
 
-/**
- * Starts a new project and immediately enters an iterative build session.
- */
 async function handleStartIterativeProjectBuild() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5203,8 +5159,6 @@ async function handleStartIterativeProjectBuild() {
     }
 }
 
-
-// NEW: Use AI to generate a more detailed description for the selected component.
 async function handleAiImproveDescription() {
     const nodeId = editNodeIdInput.value;
     const node = findNodeById(nodeId);
@@ -5276,7 +5230,8 @@ function handleNodeContentToggle(event) {
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
 
-// START OF FIX
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded. Initializing application.");
     // Initial setup on page load
     initializeApiSettings();
     initializeMermaid();
@@ -5285,4 +5240,3 @@ function handleNodeContentToggle(event) {
     resetToStartPage(); // Start on the "new project" page
     updateUndoRedoUI();
 });
-// END OF FIX
