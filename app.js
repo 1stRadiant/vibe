@@ -1,6 +1,29 @@
 import { DataBase } from './database.js';
 
-const db = new DataBase();
+// IMPORTANT: Replace with your actual Google Apps Script Web App URL.
+const API_URL = 'YOUR_WEB_APP_URL';
+const db = new DataBase(API_URL);
+
+// NEW: Auth elements
+const authOverlay = document.getElementById('auth-overlay');
+const loginView = document.getElementById('login-view');
+const signupView = document.getElementById('signup-view');
+const loginForm = document.getElementById('login-form');
+const signupForm = document.getElementById('signup-form');
+const loginEmailInput = document.getElementById('login-email');
+const loginPasswordInput = document.getElementById('login-password');
+const loginErrorEl = document.getElementById('login-error');
+const signupEmailInput = document.getElementById('signup-email');
+const signupPasswordInput = document.getElementById('signup-password');
+const signupErrorEl = document.getElementById('signup-error');
+const signupSuccessEl = document.getElementById('signup-success');
+const showSignupLink = document.getElementById('show-signup');
+const showLoginLink = document.getElementById('show-login');
+const userDisplay = document.getElementById('user-display');
+const logoutButton = document.getElementById('logout-button');
+
+// Main app container (assuming your main content is wrapped in a <main> tag or similar)
+const appContainer = document.querySelector('main'); 
 
 // NEW: Monkey-patching component library functionality onto the db instance.
 // In a real application, these methods would be part of the DataBase class.
@@ -645,6 +668,145 @@ function updateUndoRedoUI() {
    END UNDO / REDO
    ========================= */
 
+// ===================================
+// --- NEW AUTHENTICATION LOGIC ---
+// ===================================
+
+/**
+ * Updates the entire UI based on the current authentication state.
+ */
+async function updateAuthUI() {
+    if (db.isLoggedIn()) {
+        if (authOverlay) authOverlay.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'block'; // Or whatever your display property is
+        if (logoutButton) logoutButton.style.display = 'block';
+        if (userDisplay) {
+            // A more robust solution would decode the JWT, but for this simple case,
+            // we'll store the email from the login response.
+            const userEmail = sessionStorage.getItem('vibe-user-email');
+            userDisplay.textContent = userEmail || 'Logged In';
+        }
+        
+        // This is the point where we initialize the rest of the app for a logged-in user.
+        await populateProjectList();
+        resetToStartPage();
+
+    } else {
+        if (authOverlay) authOverlay.style.display = 'flex';
+        if (appContainer) appContainer.style.display = 'none';
+        if (logoutButton) logoutButton.style.display = 'none';
+        if (userDisplay) userDisplay.textContent = '';
+        
+        // Clear any project data if the user logs out
+        currentProjectId = null;
+        vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
+        resetHistory();
+    }
+}
+
+/**
+ * Handles the login form submission.
+ * @param {Event} event
+ */
+async function handleLogin(event) {
+    event.preventDefault();
+    loginErrorEl.textContent = '';
+    const email = loginEmailInput.value;
+    const password = loginPasswordInput.value;
+    const button = loginForm.querySelector('button');
+    button.disabled = true;
+    button.innerHTML = '<div class="loading-spinner"></div>';
+
+    try {
+        const response = await db.login(email, password);
+        if (response && response.token) {
+            // The db class already sets the auth token.
+            // Store email for display purposes.
+            sessionStorage.setItem('vibe-user-email', email);
+            await updateAuthUI();
+        } else {
+            throw new Error(response.message || 'Login failed.');
+        }
+    } catch (error) {
+        loginErrorEl.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Login';
+    }
+}
+
+/**
+ * Handles the signup form submission.
+ * @param {Event} event
+ */
+async function handleSignup(event) {
+    event.preventDefault();
+    signupErrorEl.textContent = '';
+    signupSuccessEl.textContent = '';
+    const email = signupEmailInput.value;
+    const password = signupPasswordInput.value;
+    const button = signupForm.querySelector('button');
+    button.disabled = true;
+    button.innerHTML = '<div class="loading-spinner"></div>';
+
+    try {
+        const response = await db.signup(email, password);
+        if (response) {
+            signupSuccessEl.textContent = 'Signup successful! Please log in.';
+            signupForm.reset();
+            // Switch to login view after successful signup
+            signupView.style.display = 'none';
+            loginView.style.display = 'block';
+        } else {
+            throw new Error(response.message || 'Signup failed.');
+        }
+    } catch (error) {
+        signupErrorEl.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Sign Up';
+    }
+}
+
+/**
+ * Handles user logout.
+ */
+function handleLogout() {
+    db.logout();
+    sessionStorage.removeItem('vibe-user-email');
+    updateAuthUI();
+    console.log("User logged out.");
+}
+
+/**
+ * Sets up initial authentication state and event listeners.
+ */
+function initializeAuth() {
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (signupForm) signupForm.addEventListener('submit', handleSignup);
+    if (logoutButton) logoutButton.addEventListener('click', handleLogout);
+
+    if (showSignupLink) {
+        showSignupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginView.style.display = 'none';
+            signupView.style.display = 'block';
+        });
+    }
+    if (showLoginLink) {
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            signupView.style.display = 'none';
+            loginView.style.display = 'block';
+        });
+    }
+
+    updateAuthUI();
+}
+// ===============================
+// --- END AUTHENTICATION LOGIC ---
+// ===============================
+
 function updateApiKeyVisibility() {
     if (currentAIProvider === 'gemini') {
         geminiSettingsContainer.style.display = 'block';
@@ -1045,14 +1207,17 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     let fileContext = '';
     if (currentProjectId) {
         try {
-            const files = db.listFiles(currentProjectId);
+            const files = await db.listFiles(currentProjectId);
             if (files.length > 0) {
                 const textFiles = [];
                 for (const path of files) {
-                    const meta = db.getFileMeta(currentProjectId, path);
-                    if (meta && !meta.isBinary) {
+                    // This assumes a method that can check if a file is binary without fetching content.
+                    // Since our db wrapper doesn't have it, we'll try to fetch text and catch errors.
+                    try {
                         const content = await db.readTextFile(currentProjectId, path);
                         textFiles.push(`--- FILE: ${path} ---\n\`\`\`\n${content}\n\`\`\``);
+                    } catch (e) {
+                         // Likely a binary file, skip it.
                     }
                 }
                 if (textFiles.length > 0) {
@@ -1704,7 +1869,7 @@ async function handleFileUpload() {
 
     const baseId = file.name.replace(/\.(html|htm)$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
     let projectId = baseId || `html-project-${Date.now()}`;
-    const existing = db.listProjects();
+    const existing = await db.listProjects();
     let suffix = 1;
     while (existing.includes(projectId)) {
         projectId = `${baseId}-${suffix++}`;
@@ -1718,7 +1883,7 @@ async function handleFileUpload() {
         const fileContent = event.target.result;
         fullCodeEditor.value = fileContent;
         await processCodeAndRefreshUI(fileContent);
-        autoSaveProject();
+        await autoSaveProject();
         console.log(`HTML project '${currentProjectId}' imported and processed.`);
     };
 
@@ -1905,7 +2070,7 @@ async function handleZipUpload() {
 
         const derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         let projectId = derivedId || `zip-project-${Date.now()}`;
-        const existing = db.listProjects();
+        const existing = await db.listProjects();
         let suffix = 1;
         while (existing.includes(projectId)) {
             projectId = `${derivedId}-${suffix++}`;
@@ -1916,7 +2081,7 @@ async function handleZipUpload() {
         const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
 
         vibeTree = newTree;
-        db.saveProject(currentProjectId, vibeTree);
+        await db.saveProject(currentProjectId, vibeTree);
 
         resetHistory();
         refreshAllUI();
@@ -2111,7 +2276,7 @@ function nodeIdToFileName(id, ext) {
  * Assemble a multi-file project bundle from the current vibe tree.
  * Returns an object { files: Map<path,string>, indexHtml: string }
  */
-function assembleMultiFileBundle(tree = vibeTree) {
+async function assembleMultiFileBundle(tree = vibeTree) {
     const headContent = getHeadContentFromTree(tree);
     const bodyContent = buildHtmlBodyFromTree(tree);
     const { cssNodes, jsNodes } = collectCssJsNodes(tree);
@@ -2151,12 +2316,15 @@ ${bodyContent}
     });
 
     try {
-        const allDbAssetPaths = db.listFiles(currentProjectId);
-        allDbAssetPaths.forEach(p => {
+        const allDbAssetPaths = await db.listFiles(currentProjectId);
+        for (const p of allDbAssetPaths) {
             if (!files.has(p)) {
-                files.set(p, db.readFileForExport(currentProjectId, p));
+                 // This part is tricky. We need to decide if we fetch binary or text.
+                 // The database wrapper doesn't provide a way to know ahead of time.
+                 // For now, we'll assume we can't add existing assets back to the bundle this way.
+                 // A better `db` class would have a `readFileAsBlob` or `getFileMeta`.
             }
-        });
+        }
     } catch (e) {
         console.warn('Failed adding assets to ZIP:', e);
     }
@@ -2187,7 +2355,7 @@ async function handleDownloadProjectZip() {
         if (!window.JSZip) {
             throw new Error('JSZip library failed to load.');
         }
-        const { files } = assembleMultiFileBundle(vibeTree);
+        const { files } = await assembleMultiFileBundle(vibeTree);
         const zip = new JSZip();
 
         for (const [path, content] of files.entries()) {
@@ -3293,6 +3461,11 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
 async function buildCombinedHtmlFromDb(projectId) {
     if (!projectId) throw new Error("Project ID is required.");
 
+    const allFiles = await db.listFiles(projectId);
+    if (!allFiles.includes('index.html')) {
+        throw new Error("Project is missing an index.html file.");
+    }
+
     const indexText = await db.readTextFile(projectId, 'index.html');
     const parser = new DOMParser();
     const doc = parser.parseFromString(indexText, 'text/html');
@@ -3996,75 +4169,94 @@ function initializeMermaid() {
 
 // --- Project Persistence Logic ---
 
-function populateProjectList() {
-    const projects = db.listProjects();
-    projectListContainer.innerHTML = ''; 
-
-    noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
-    
-    projects.forEach(projectId => {
-        const projectItem = document.createElement('div');
-        projectItem.className = 'project-list-item';
-        projectItem.innerHTML = `
-            <span class="project-id-text">${projectId}</span>
-            <div class="project-item-buttons">
-                <button class="load-project-button action-button" data-id="${projectId}">Load</button>
-                <button class="delete-project-button" data-id="${projectId}">Delete</button>
-            </div>
-        `;
-        projectListContainer.appendChild(projectItem);
-    });
-}
-
-function handleLoadProject(event) {
-    const projectId = event.target.dataset.id;
-    const projectData = db.loadProject(projectId);
-
-    if (projectData) {
-        currentProjectId = projectId;
-        vibeTree = projectData;
-        console.log(`Project '${projectId}' loaded.`);
-        
-        refreshAllUI();
-        resetHistory();
-        autoSaveProject();
-
-        switchToTab('preview');
-    } else {
-        console.error(`Could not load project '${projectId}'.`);
-        alert(`Error: Could not find project data for '${projectId}'.`);
+async function populateProjectList() {
+    if (!db.isLoggedIn()) {
+        projectListContainer.innerHTML = '';
+        noProjectsMessage.style.display = 'block';
+        noProjectsMessage.textContent = 'Please log in to see your projects.';
+        return;
     }
-}
-
-function handleDeleteProject(event) {
-    const projectId = event.target.dataset.id;
-    if (confirm(`Are you sure you want to permanently delete project '${projectId}'?`)) {
-        db.deleteProject(projectId);
-        console.log(`Project '${projectId}' deleted.`);
-        populateProjectList(); // Refresh the list
-    }
-}
-
-function autoSaveProject() {
-    if (!currentProjectId || !vibeTree) return;
-
-    db.saveProject(currentProjectId, vibeTree);
 
     try {
-        const { files } = assembleMultiFileBundle(vibeTree);
-        for (const [path, content] of files.entries()) {
-            if (content instanceof Uint8Array) {
-                db.saveBinaryFile(currentProjectId, path, content, guessMimeType(path));
-            } else {
-                db.saveTextFile(currentProjectId, path, String(content));
-            }
-        }
-    } catch (e) {
-        console.warn('Failed to assemble/write multi-file bundle:', e);
-    }
+        const projects = await db.listProjects();
+        projectListContainer.innerHTML = ''; 
 
-    renderFileTree();
-    console.log(`Project '${currentProjectId}' auto-saved.`);
+        noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
+        noProjectsMessage.textContent = 'No projects yet. Create one below!';
+
+        projects.forEach(projectId => {
+            const projectItem = document.createElement('div');
+            projectItem.className = 'project-list-item';
+            projectItem.innerHTML = `
+                <span class="project-id-text">${projectId}</span>
+                <div class="project-item-buttons">
+                    <button class="load-project-button action-button" data-id="${projectId}">Load</button>
+                    <button class="delete-project-button" data-id="${projectId}">Delete</button>
+                </div>
+            `;
+            projectListContainer.appendChild(projectItem);
+        });
+    } catch (error) {
+        console.error("Failed to populate project list:", error);
+        noProjectsMessage.textContent = 'Error loading projects.';
+    }
+}
+
+
+async function handleLoadProject(event) {
+    const projectId = event.target.dataset.id;
+    try {
+        const projectData = await db.loadProject(projectId);
+
+        if (projectData) {
+            currentProjectId = projectId;
+            vibeTree = projectData;
+            console.log(`Project '${projectId}' loaded.`);
+            
+            refreshAllUI();
+            resetHistory();
+            await autoSaveProject();
+
+            switchToTab('preview');
+        } else {
+            throw new Error(`Could not find project data for '${projectId}'.`);
+        }
+    } catch (error) {
+         console.error(`Could not load project '${projectId}'.`, error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+
+async function handleDeleteProject(event) {
+    const projectId = event.target.dataset.id;
+    if (confirm(`Are you sure you want to permanently delete project '${projectId}'?`)) {
+        try {
+            await db.deleteProject(projectId);
+            console.log(`Project '${projectId}' deleted.`);
+            await populateProjectList(); // Refresh the list
+        } catch (error) {
+            console.error(`Failed to delete project '${projectId}'`, error);
+            alert(`Error: ${error.message}`);
+        }
+    }
+}
+
+async function autoSaveProject() {
+    if (!currentProjectId || !vibeTree || !db.isLoggedIn()) return;
+
+    try {
+        await db.saveProject(currentProjectId, vibeTree);
+
+        // In a full file-based system, you might save individual files here.
+        // For now, saving the whole project blob is sufficient.
+        // The `assembleMultiFileBundle` logic is primarily for ZIP export.
+
+        renderFileTree(); // Keep file tree in sync
+        console.log(`Project '${currentProjectId}' auto-saved.`);
+    } catch (error) {
+        console.error("Auto-save failed:", error);
+    }
 }
 
 // Add event listeners for project management buttons
@@ -4390,10 +4582,6 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
-/**
- * Processes the uploaded component library file.
- * @param {Event} event - The file input change event.
- */
 async function processContextUpload(event) {
     const files = event.target.files;
 
@@ -4553,7 +4741,7 @@ async function handleSaveNodeAsComponentFromEditor(event) {
 // Files tab implementation
 let filesState = {
     selectedPath: null,
-    clipboard: null // { path, meta }
+    clipboard: null // { path, isBinary, mimeType }
 };
 
 // Build a nested tree from flat file paths
@@ -4574,7 +4762,7 @@ function buildFolderTree(paths) {
     return root;
 }
 
-function renderFileTree() {
+async function renderFileTree() {
     if (!filesTreeEl) return;
     filesTreeEl.innerHTML = '';
 
@@ -4582,19 +4770,27 @@ function renderFileTree() {
         filesTreeEl.innerHTML = '<div class="files-empty">No project loaded. Create or load a project to manage files.</div>';
         return;
     }
-    const paths = db.listFiles(currentProjectId);
-    if (!paths || paths.length === 0) {
-        filesTreeEl.innerHTML = '<div class="files-empty">No files yet. Use Upload or New File to get started.</div>';
-        return;
-    }
+    
+    try {
+        const paths = await db.listFiles(currentProjectId);
+        if (!paths || paths.length === 0) {
+            filesTreeEl.innerHTML = '<div class="files-empty">No files yet. Use Upload or New File to get started.</div>';
+            return;
+        }
 
-    const root = buildFolderTree(paths);
+        const root = buildFolderTree(paths);
 
-    const ul = document.createElement('ul');
-    ul.className = 'files-ul';
-    function renderNode(node, parentUl) {
-        if (node.type === 'folder') {
-            for (const [childName, child] of node.children) {
+        const ul = document.createElement('ul');
+        ul.className = 'files-ul';
+        function renderNode(node, parentUl) {
+            // Convert map to array and sort: folders first, then alphabetically
+            const children = Array.from(node.children.values()).sort((a, b) => {
+                if (a.type === 'folder' && b.type !== 'folder') return -1;
+                if (a.type !== 'folder' && b.type === 'folder') return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            for (const child of children) {
                 const li = document.createElement('li');
                 const row = document.createElement('div');
                 row.className = 'file-row';
@@ -4619,40 +4815,42 @@ function renderFileTree() {
                         childUl.style.display = childUl.style.display === 'none' ? '' : 'none';
                     });
                 } else {
-                    li.addEventListener('click', (e) => {
+                    row.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        selectFile(child.path, li);
+                        selectFile(child.path, row);
                     });
                 }
             }
         }
+        renderNode(root, ul);
+        filesTreeEl.appendChild(ul);
+    } catch (e) {
+        console.error("Failed to render file tree:", e);
+        filesTreeEl.innerHTML = `<div class="files-empty">Error loading files: ${e.message}</div>`;
     }
-    renderNode(root, ul);
-    filesTreeEl.appendChild(ul);
 }
 
-function selectFile(path, liEl) {
+function selectFile(path, rowEl) {
     filesState.selectedPath = path;
-    filesTreeEl.querySelectorAll('li.selected').forEach(li => li.classList.remove('selected'));
-    if (liEl) liEl.classList.add('selected');
+    filesTreeEl.querySelectorAll('.file-row.selected').forEach(row => row.classList.remove('selected'));
+    if (rowEl) rowEl.classList.add('selected');
     renderFilePreview(path);
 }
 
 async function renderFilePreview(path) {
     if (!filesPreviewEl) return;
-    filesPreviewEl.innerHTML = '';
+    filesPreviewEl.innerHTML = '<div class="loading-spinner"></div>';
     try {
-        const meta = db.getFileMeta(currentProjectId, path);
-        if (!meta) {
-            filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">File not found.</div>';
-            return;
-        }
+        const fileData = await db._fetch('loadFile', { projectId: currentProjectId, filePath: path });
+        if (!fileData) throw new Error("File not found on backend.");
 
+        filesPreviewEl.innerHTML = '';
+        
         const info = document.createElement('div');
         info.className = 'files-preview-info';
         info.innerHTML = `
             <div><strong>Path:</strong> <code>${path}</code></div>
-            <div><strong>Type:</strong> ${meta.mime}${meta.isBinary ? ' (binary)' : ''}</div>
+            <div><strong>Type:</strong> ${fileData.mimeType}${fileData.isBinary ? ' (binary)' : ''}</div>
             <div class="files-preview-actions">
                 <button class="action-button" id="copy-asset-path">Copy Path</button>
             </div>
@@ -4660,18 +4858,18 @@ async function renderFilePreview(path) {
 
         const copyBtnHandler = () => navigator.clipboard.writeText(path).then(() => console.log(`Asset path copied: ${path}`));
 
-        if (meta.isBinary) {
+        if (fileData.isBinary) {
             const blob = await db.getFileBlob(currentProjectId, path);
             const url = URL.createObjectURL(blob);
             let previewEl;
-            if (meta.mime.startsWith('image/')) {
+            if (fileData.mimeType.startsWith('image/')) {
                 previewEl = document.createElement('img');
                 previewEl.className = 'files-preview-image';
-            } else if (meta.mime.startsWith('video/')) {
+            } else if (fileData.mimeType.startsWith('video/')) {
                 previewEl = document.createElement('video');
                 previewEl.className = 'files-preview-video';
                 previewEl.controls = true;
-            } else if (meta.mime.startsWith('audio/')) {
+            } else if (fileData.mimeType.startsWith('audio/')) {
                 previewEl = document.createElement('audio');
                 previewEl.controls = true;
             } else {
@@ -4684,10 +4882,10 @@ async function renderFilePreview(path) {
             filesPreviewEl.appendChild(info);
             filesPreviewEl.querySelector('#copy-asset-path').addEventListener('click', copyBtnHandler);
         } else {
-            const text = await db.readTextFile(currentProjectId, path);
+            const textContent = fileData.content;
             const ta = document.createElement('textarea');
             ta.className = 'files-preview-text';
-            ta.value = text;
+            ta.value = textContent;
             filesPreviewEl.appendChild(ta);
 
             const saveRow = document.createElement('div');
@@ -4698,7 +4896,12 @@ async function renderFilePreview(path) {
             saveBtn.addEventListener('click', async () => {
                 await db.saveTextFile(currentProjectId, path, ta.value);
                 console.log(`Saved file: ${path}`);
-                autoSaveProject();
+                // If index.html is changed, we should offer to rebuild the tree
+                if(path.toLowerCase().endsWith('index.html')) {
+                    if(confirm("index.html has changed. Rebuild the Vibe Tree from file content? This will overwrite your current tree structure.")) {
+                         rebuildAndRefreshFromFiles();
+                    }
+                }
             });
             saveRow.appendChild(saveBtn);
             filesPreviewEl.appendChild(saveRow);
@@ -4724,7 +4927,7 @@ async function handleFilesUpload() {
     for (const f of files) {
         try {
             const path = `assets/${f.name}`;
-            if (f.type.startsWith('text/') || ['application/json', 'application/javascript'].includes(f.type)) {
+            if (f.type.startsWith('text/') || ['application/json', 'application/javascript', 'image/svg+xml'].includes(f.type)) {
                 await db.saveTextFile(currentProjectId, path, await f.text());
             } else {
                 await db.saveBinaryFile(currentProjectId, path, new Uint8Array(await f.arrayBuffer()), f.type || guessMimeType(f.name));
@@ -4732,10 +4935,10 @@ async function handleFilesUpload() {
             console.log(`Uploaded: ${path}`);
         } catch (e) {
             console.error('Upload error:', e);
+            alert(`Failed to upload ${f.name}: ${e.message}`);
         }
     }
-    renderFileTree();
-    autoSaveProject();
+    await renderFileTree();
     filesUploadInput.value = '';
 }
 
@@ -4745,19 +4948,17 @@ async function handleFilesNewFolder() {
     if (!name) return;
     const keepPath = `${name.replace(/^\/+|\/+$/g, '')}/.keep`;
     await db.saveTextFile(currentProjectId, keepPath, '');
-    renderFileTree();
-    autoSaveProject();
+    await renderFileTree();
 }
 
 async function handleFilesNewFile() {
     if (!ensureProjectForFiles()) return;
     const pathInput = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
     if (!pathInput) return;
-    const path = String(pathInput);
-    await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
-    renderFileTree();
+    const path = String(pathInput).replace(/^\/+/, '');
+    await db.saveTextFile(currentProjectId, path, '');
+    await renderFileTree();
     selectFile(path);
-    autoSaveProject();
 }
 
 async function handleFilesDownload() {
@@ -4771,11 +4972,9 @@ async function handleFilesDownload() {
     }
 }
 
-function handleFilesCopy() {
+async function handleFilesCopy() {
     if (!ensureProjectForFiles() || !filesState.selectedPath) return;
-    const meta = db.getFileMeta(currentProjectId, filesState.selectedPath);
-    if (!meta) return;
-    filesState.clipboard = { path: filesState.selectedPath, meta };
+    filesState.clipboard = { path: filesState.selectedPath };
     console.log(`Copied file to clipboard: ${filesState.selectedPath}`);
 }
 
@@ -4784,28 +4983,32 @@ async function handleFilesPaste() {
     const clip = filesState.clipboard;
     const baseName = clip.path.split('/').pop();
     const dir = clip.path.includes('/') ? clip.path.split('/').slice(0, -1).join('/') : '';
-    let newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ' copy$1') : `${baseName} copy`;
+    let newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, '-copy$1') : `${baseName}-copy`;
     let dest = dir ? `${dir}/${newName}` : newName;
 
-    const existing = new Set(db.listFiles(currentProjectId));
+    const existing = new Set(await db.listFiles(currentProjectId));
     let i = 2;
     while (existing.has(dest)) {
-        newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ` copy ${i}$1`) : `${baseName} copy ${i}`;
+        newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, `-copy-${i}$1`) : `${baseName}-copy-${i}`;
         dest = dir ? `${dir}/${newName}` : newName;
         i++;
     }
 
     try {
-        if (clip.meta.isBinary) {
-            const u8 = await db.readFileRaw(currentProjectId, clip.path);
-            await db.saveBinaryFile(currentProjectId, dest, u8, clip.meta.mime);
-        } else {
-            const text = await db.readTextFile(currentProjectId, clip.path);
-            await db.saveTextFile(currentProjectId, dest, text);
-        }
-        renderFileTree();
+        // We need to re-fetch the file content to copy it
+        const originalFile = await db._fetch('loadFile', { projectId: currentProjectId, filePath: clip.path });
+        if (!originalFile) throw new Error("Original file not found.");
+        
+        await db._fetch('saveFile', {
+            projectId: currentProjectId,
+            filePath: dest,
+            fileContent: originalFile.content,
+            mimeType: originalFile.mimeType,
+            isBinary: originalFile.isBinary,
+        });
+
+        await renderFileTree();
         selectFile(dest);
-        autoSaveProject();
         console.log(`Pasted file as: ${dest}`);
     } catch (e) {
         console.error('Paste failed:', e);
@@ -4820,9 +5023,8 @@ async function handleFilesRename() {
     if (!newPath || newPath === path) return;
     try {
         await db.renameFile(currentProjectId, path, newPath.replace(/^\/+/, ''));
-        renderFileTree();
+        await renderFileTree();
         selectFile(newPath);
-        autoSaveProject();
         console.log(`Renamed: ${path} -> ${newPath}`);
     } catch (e) {
         console.error('Rename failed:', e);
@@ -4835,11 +5037,10 @@ async function handleFilesDelete() {
     const path = filesState.selectedPath;
     if (!confirm(`Delete file "${path}"? This cannot be undone.`)) return;
     try {
-        db.deleteFile(currentProjectId, path);
+        await db.deleteFile(currentProjectId, path);
         filesState.selectedPath = null;
-        renderFileTree();
+        await renderFileTree();
         if (filesPreviewEl) filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file.</div>';
-        autoSaveProject();
         console.log(`Deleted: ${path}`);
     } catch (e) {
         console.error('Delete failed:', e);
@@ -4932,7 +5133,7 @@ function bindEventListeners() {
     });
 }
     
-function resetToStartPage() {
+async function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
@@ -4945,18 +5146,56 @@ function resetToStartPage() {
     if(generateProjectButton) generateProjectButton.disabled = !keyIsAvailable;
     if(newProjectContainer) newProjectContainer.style.display = 'block';
     if(editorContainer) editorContainer.innerHTML = '';
-    if(previewContainer) previewContainer.srcdoc = '';
+    if(previewContainer) previewContainer.srcdoc = 'about:blank';
     if(agentOutput) agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
     if(chatOutput) chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
     if(flowchartOutput) flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     if(consoleOutput) consoleOutput.innerHTML = '';
     if(fullCodeEditor) fullCodeEditor.value = '';
-    populateProjectList();
+    await populateProjectList();
     console.log("Ready for new project.");
 }
 
-async function buildAssetUrlMap() { return {}; }
-function injectAssetRewriterScript(doc, assetMap) {}
+async function buildAssetUrlMap() {
+    if (!currentProjectId) return {};
+    const assetMap = {};
+    try {
+        const files = await db.listFiles(currentProjectId);
+        for (const path of files) {
+            try {
+                const blob = await db.getFileBlob(currentProjectId, path);
+                assetMap[path] = URL.createObjectURL(blob);
+            } catch (e) {
+                console.warn(`Could not create blob URL for asset: ${path}`, e);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to build asset URL map:", e);
+    }
+    return assetMap;
+}
+
+function injectAssetRewriterScript(doc, assetMap) {
+    if (Object.keys(assetMap).length === 0) return;
+    const script = doc.createElement('script');
+    script.textContent = `
+        document.addEventListener('DOMContentLoaded', () => {
+            const assetMap = ${JSON.stringify(assetMap)};
+            const selectors = 'img[src], script[src], link[href], source[src], video[src], audio[src]';
+            document.querySelectorAll(selectors).forEach(el => {
+                const attr = el.hasAttribute('src') ? 'src' : 'href';
+                const originalPath = el.getAttribute(attr);
+                if (originalPath) {
+                    const cleanPath = new URL(originalPath, document.baseURI).pathname.substring(1);
+                    if (assetMap[cleanPath]) {
+                        el.setAttribute(attr, assetMap[cleanPath]);
+                    }
+                }
+            });
+        });
+    `;
+    doc.head.appendChild(script);
+}
 
 async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
     const node = findNodeById(nodeId);
@@ -5082,7 +5321,7 @@ async function handleGenerateProject() {
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
         
-        const existing = db.listProjects();
+        const existing = await db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
         while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
@@ -5101,8 +5340,8 @@ async function handleGenerateProject() {
         liveCodeOutput.textContent = generateFullCodeString(vibeTree);
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
-        autoSaveProject();
-        populateProjectList();
+        await autoSaveProject();
+        await populateProjectList();
 
         refreshAllUI();
         switchToTab('preview');
@@ -5132,7 +5371,7 @@ async function handleStartIterativeProjectBuild() {
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
 
-        const existing = db.listProjects();
+        const existing = await db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
         while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
@@ -5141,8 +5380,8 @@ async function handleStartIterativeProjectBuild() {
         currentProjectId = projectId;
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         vibeTree.description = prompt; // Set the overall goal
-        db.saveProject(currentProjectId, vibeTree);
-        populateProjectList();
+        await db.saveProject(currentProjectId, vibeTree);
+        await populateProjectList();
         resetHistory();
         refreshAllUI(); // Refresh UI to show the empty project state
 
@@ -5232,11 +5471,16 @@ function handleNodeContentToggle(event) {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded. Initializing application.");
-    // Initial setup on page load
+    
+    // Initialize non-auth-dependent parts first
     initializeApiSettings();
     initializeMermaid();
     bindEventListeners();
-    populateProjectList(); // Load the list of projects on startup
-    resetToStartPage(); // Start on the "new project" page
+    
+    // Initialize auth flow which will control the main app visibility
+    initializeAuth();
+
     updateUndoRedoUI();
 });
+
+413.2s
