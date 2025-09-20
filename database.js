@@ -12,12 +12,76 @@ export class DataBase {
     }
 
     // --- Auth & Core Methods ---
-    setAuthToken(token) { /* ... same as previous answer ... */ }
-    isLoggedIn() { return !!this.authToken; }
-    async _fetch(action, payload = {}, useAuth = true) { /* ... same as previous answer ... */ }
-    async signup(email, password) { return this._fetch('signup', { email, password }, false); }
-    async login(email, password) { /* ... same as previous answer ... */ }
-    logout() { /* ... same as previous answer ... */ }
+    setAuthToken(token) {
+        this.authToken = token;
+        if (token) {
+            sessionStorage.setItem('vibe-user-token', token);
+        } else {
+            sessionStorage.removeItem('vibe-user-token');
+        }
+    }
+
+    isLoggedIn() {
+        return !!this.authToken;
+    }
+
+    async _fetch(action, payload = {}, useAuth = true) {
+        const requestBody = {
+            action,
+            payload
+        };
+
+        if (useAuth) {
+            if (!this.authToken) {
+                throw new Error("Authentication required for this action.");
+            }
+            requestBody.authToken = this.authToken;
+        }
+
+        try {
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
+                },
+                body: JSON.stringify(requestBody),
+                redirect: 'follow'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Network error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            if (result.status === 'error') {
+                throw new Error(result.message || 'An unknown server error occurred.');
+            }
+
+            return result.data;
+
+        } catch (error) {
+            console.error(`Database fetch failed for action "${action}":`, error);
+            // Re-throw the error so the calling function's catch block can handle it
+            throw error;
+        }
+    }
+
+    async signup(email, password) {
+        return this._fetch('signup', { email, password }, false);
+    }
+
+    async login(email, password) {
+        const response = await this._fetch('login', { email, password }, false);
+        if (response && response.token) {
+            this.setAuthToken(response.token);
+        }
+        return response;
+    }
+
+    logout() {
+        this.setAuthToken(null);
+    }
 
     // --- Project Methods ---
     async saveProject(projectId, projectData) { return this._fetch('saveProject', { projectId, projectData }); }
@@ -52,6 +116,14 @@ export class DataBase {
         };
         return this._fetch('saveFile', payload);
     }
+    
+    async readTextFile(projectId, path) {
+        const fileData = await this._fetch('loadFile', { projectId, filePath: path });
+        if (!fileData || fileData.isBinary) {
+            throw new Error(`Could not read '${path}' as a text file.`);
+        }
+        return fileData.content;
+    }
 
     async getFileBlob(projectId, path) {
         const fileData = await this._fetch('loadFile', { projectId, filePath: path });
@@ -82,5 +154,21 @@ export class DataBase {
         return bytes;
     }
     
-    _guessMime(filename) { /* ... same as original file ... */ }
+    _guessMime(filename) {
+        const ext = (filename || '').toLowerCase().split('.').pop();
+        switch (ext) {
+            case 'html': case 'htm': return 'text/html';
+            case 'css': return 'text/css';
+            case 'js': return 'application/javascript';
+            case 'json': return 'application/json';
+            case 'svg': return 'image/svg+xml';
+            case 'png': return 'image/png';
+            case 'jpg': case 'jpeg': return 'image/jpeg';
+            case 'gif': return 'image/gif';
+            case 'webp': return 'image/webp';
+            case 'ico': return 'image/x-icon';
+            case 'mp4': return 'video/mp4';
+            default: return 'application/octet-stream';
+        }
+    }
 }
