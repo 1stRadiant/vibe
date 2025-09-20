@@ -4590,7 +4590,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files; // FIX: Get the first file from the FileList, not the whole list.
+    const file = files; // FIX: Get the first file from the FileList.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -5482,5 +5482,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateUndoRedoUI();
 });
-
-413.2s
