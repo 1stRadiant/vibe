@@ -1,185 +1,260 @@
 /**
- * A database wrapper that connects to a Google Apps Script backend.
- * v2: Includes full file storage capabilities.
+ * database.js
+ * Client-side wrapper for the Vibe Coding System Google Apps Script backend.
  *
- * FINAL CORRECTED VERSION: Sends JSON payload and handles CORS correctly.
+ * Usage:
+ *   const db = new DataBase('https://script.google.com/macros/s/.../exec');
+ *   await db.login({ email, password }); // returns { token }
+ *   await db.listProjects(); // uses saved token from localStorage (if any)
+ *
+ * Notes:
+ *  - Sends body as raw JSON text (`text/plain;charset=UTF-8`) because Apps Script
+ *    commonly expects the raw POST body in `e.postData.contents`.
+ *  - Uses `mode: 'cors'` and does NOT send cookies/credentials by default.
+ *  - Saves auth token to localStorage under key 'vibe_auth_token' by default.
  */
-export class DataBase {
-    constructor(apiUrl) {
-        if (!apiUrl) {
-            throw new Error("API URL is required for the database connection.");
-        }
-        this.apiUrl = apiUrl;
-        this.authToken = sessionStorage.getItem('vibe-user-token');
+
+class DataBase {
+  /**
+   * @param {string} apiUrl - The Apps Script web app URL (the /exec URL).
+   * @param {object} [opts]
+   * @param {boolean} [opts.autoSaveToken=true] - save returned token to localStorage
+   * @param {string} [opts.tokenStorageKey='vibe_auth_token']
+   * @param {number} [opts.timeout=30000] - request timeout in ms
+   */
+  constructor(apiUrl, opts = {}) {
+    if (!apiUrl) throw new Error('apiUrl is required');
+    this.apiUrl = apiUrl.replace(/\/+$/, ''); // trim trailing slashes
+    this.autoSaveToken = opts.autoSaveToken !== undefined ? !!opts.autoSaveToken : true;
+    this.tokenStorageKey = opts.tokenStorageKey || 'vibe_auth_token';
+    this.timeout = typeof opts.timeout === 'number' ? opts.timeout : 30000;
+  }
+
+  /* -----------------------
+     Token helpers
+     ----------------------- */
+  get savedToken() {
+    try {
+      return localStorage.getItem(this.tokenStorageKey);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  saveToken(token) {
+    if (!token) return;
+    if (this.autoSaveToken) {
+      try {
+        localStorage.setItem(this.tokenStorageKey, token);
+      } catch (e) {
+        // ignore storage errors silently
+      }
+    }
+  }
+
+  clearSavedToken() {
+    try {
+      localStorage.removeItem(this.tokenStorageKey);
+    } catch (e) {}
+  }
+
+  /* -----------------------
+     Internal fetch wrapper
+     ----------------------- */
+  async _fetch(action, payload = {}, authToken = null) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeout);
+
+    // If authToken is not provided, fall back to saved token (if any)
+    const token = authToken || this.savedToken || null;
+
+    const requestBody = {
+      action,
+      payload,
+      authToken: token
+    };
+
+    // Use text/plain for Apps Script compatibility but body is JSON text
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'text/plain;charset=UTF-8'
+    };
+
+    const fetchOptions = {
+      method: 'POST',
+      mode: 'cors', // ensure browser performs CORS request
+      cache: 'no-cache',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+      // DO NOT include credentials unless your backend explicitly supports them
+      // credentials: 'omit'
+    };
+
+    let res;
+    try {
+      res = await fetch(this.apiUrl + '/exec', fetchOptions);
+    } catch (err) {
+      clearTimeout(timeout);
+      // Distinguish Abort from network errors
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out.');
+      }
+      // Likely network / CORS preflight / blocked request
+      throw new Error('Network request failed. This can happen if CORS preflight failed or the endpoint redirected to a login page. Check your deployment (execute as: Me, access: Anyone, even anonymous). Original error: ' + err.message);
+    } finally {
+      clearTimeout(timeout);
     }
 
-    // --- Auth & Core Methods ---
-    setAuthToken(token) {
-        this.authToken = token;
-        if (token) {
-            sessionStorage.setItem('vibe-user-token', token);
-        } else {
-            sessionStorage.removeItem('vibe-user-token');
-        }
+    // If the response is opaque or was blocked by CORS, fetch may still return but with no usable body.
+    // Check status and headers via response.ok
+    if (!res.ok) {
+      // Try to read the response body for more details
+      let text;
+      try { text = await res.text(); } catch (e) { text = ''; }
+      throw new Error(`Server responded with ${res.status} ${res.statusText}. ${text}`);
     }
 
-    isLoggedIn() {
-        return !!this.authToken;
+    // Parse JSON response safely
+    let json;
+    try {
+      json = await res.json();
+    } catch (e) {
+      // response wasn't JSON — return raw text for debugging
+      const raw = await res.text();
+      throw new Error('Unable to parse server response as JSON. Raw response: ' + raw);
     }
 
-    /**
-     * Internal fetch method to communicate with the Google Apps Script backend.
-     * This version sends a structured JSON payload, which requires the backend
-     * to handle a CORS preflight (OPTIONS) request.
-     */
-    async _fetch(action, payload = {}, useAuth = true) {
-        // 1. Build the single request object the backend expects.
-        const requestBody = {
-            action,
-            payload
-        };
-
-        if (useAuth) {
-            if (!this.authToken) {
-                throw new Error("Authentication required for this action.");
-            }
-            requestBody.authToken = this.authToken;
-        }
-
-        try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    // 2. Set the Content-Type to application/json.
-                    'Content-Type': 'application/json',
-                },
-                // 3. Stringify the entire object into the body.
-                body: JSON.stringify(requestBody),
-                redirect: 'follow'
-            });
-
-            if (!response.ok) {
-                // This will now correctly report errors like 500 or 404
-                throw new Error(`Network error: ${response.status} ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            if (result.status === 'error') {
-                throw new Error(result.message || 'An unknown server error occurred.');
-            }
-
-            return result.data;
-
-        } catch (error) {
-            console.error(`Database fetch failed for action "${action}":`, error);
-            // Re-throw the error so the calling code (like in app.js) knows it failed.
-            throw error;
-        }
+    // The Apps Script wrapper returns { status: 'success'|'error', data|message: ... }
+    if (!json || typeof json !== 'object') {
+      throw new Error('Unexpected server response shape: ' + JSON.stringify(json));
     }
 
-    async signup(email, password) {
-        return this._fetch('signup', { email, password }, false);
+    if (json.status === 'error') {
+      throw new Error(json.message || 'Unknown server error');
     }
 
-    async login(email, password) {
-        const response = await this._fetch('login', { email, password }, false);
-        if (response && response.token) {
-            this.setAuthToken(response.token);
-        }
-        return response;
-    }
+    // success
+    return json.data;
+  }
 
-    logout() {
-        this.setAuthToken(null);
-    }
+  /* -----------------------
+     Authentication
+     ----------------------- */
 
-    // --- Project Methods ---
-    async saveProject(projectId, projectData) { return this._fetch('saveProject', { projectId, projectData }); }
-    async loadProject(projectId) { return this._fetch('loadProject', { projectId }); }
-    async deleteProject(projectId) { return this._fetch('deleteProject', { projectId }); }
-    async listProjects() { return this._fetch('listProjects'); }
-
-    // --- File Storage Methods ---
-    async listFiles(projectId) { return this._fetch('listFiles', { projectId }); }
-    async deleteFile(projectId, path) { return this._fetch('deleteFile', { projectId, filePath: path }); }
-    async renameFile(projectId, fromPath, toPath) { return this._fetch('renameFile', { projectId, fromPath, toPath }); }
-
-    async saveTextFile(projectId, path, text) {
-        const payload = {
-            projectId,
-            filePath: path,
-            fileContent: text,
-            mimeType: this._guessMime(path) || 'text/plain',
-            isBinary: false,
-        };
-        return this._fetch('saveFile', payload);
+  /**
+   * Sign up a new user.
+   * @param {{email: string, password: string}} credentials
+   * @returns {Promise<object>} { message }
+   */
+  async signup(credentials) {
+    if (!credentials || !credentials.email || !credentials.password) {
+      throw new Error('Email and password are required for signup.');
     }
+    return await this._fetch('signup', { email: credentials.email, password: credentials.password }, null);
+  }
 
-    async saveBinaryFile(projectId, path, uint8, mime) {
-        const b64 = this._uint8ToBase64(uint8);
-        const payload = {
-            projectId,
-            filePath: path,
-            fileContent: b64, // Send as Base64 string
-            mimeType: mime || this._guessMime(path),
-            isBinary: true,
-        };
-        return this._fetch('saveFile', payload);
+  /**
+   * Login user. Saves token to localStorage if autoSaveToken=true.
+   * @param {{email: string, password: string}} credentials
+   * @returns {Promise<object>} { token }
+   */
+  async login(credentials) {
+    if (!credentials || !credentials.email || !credentials.password) {
+      throw new Error('Email and password are required for login.');
     }
+    const data = await this._fetch('login', { email: credentials.email, password: credentials.password }, null);
+    if (data && data.token) {
+      this.saveToken(data.token);
+    }
+    return data;
+  }
 
-    async readTextFile(projectId, path) {
-        const fileData = await this._fetch('loadFile', { projectId, filePath: path });
-        if (!fileData || fileData.isBinary) {
-            throw new Error(`Could not read '${path}' as a text file.`);
-        }
-        return fileData.content;
-    }
+  /**
+   * Logout (clears saved token)
+   */
+  logout() {
+    this.clearSavedToken();
+  }
 
-    async getFileBlob(projectId, path) {
-        const fileData = await this._fetch('loadFile', { projectId, filePath: path });
-        if (!fileData) throw new Error(`File not found: ${path}`);
-        
-        if (fileData.isBinary) {
-            const u8 = this._base64ToUint8(fileData.content);
-            return new Blob([u8], { type: fileData.mimeType });
-        } else {
-            return new Blob([fileData.content], { type: fileData.mimeType });
-        }
-    }
+  /* -----------------------
+     Projects
+     ----------------------- */
 
-    // --- Utility Methods ---
-    _uint8ToBase64(u8) {
-        let binary = '';
-        u8.forEach(byte => binary += String.fromCharCode(byte));
-        return btoa(binary);
-    }
+  async listProjects(authToken = null) {
+    return await this._fetch('listProjects', {}, authToken);
+  }
 
-    _base64ToUint8(b64) {
-        const binary = atob(b64);
-        const len = binary.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
-        return bytes;
-    }
-    
-    _guessMime(filename) {
-        const ext = (filename || '').toLowerCase().split('.').pop();
-        switch (ext) {
-            case 'html': case 'htm': return 'text/html';
-            case 'css': return 'text/css';
-            case 'js': return 'application/javascript';
-            case 'json': return 'application/json';
-            case 'svg': return 'image/svg+xml';
-            case 'png': return 'image/png';
-            case 'jpg': case 'jpeg': return 'image/jpeg';
-            case 'gif': return 'image/gif';
-            case 'webp': return 'image/webp';
-            case 'ico': return 'image/x-icon';
-            case 'mp4': return 'video/mp4';
-            default: return 'application/octet-stream';
-        }
-    }
+  async loadProject(projectId, authToken = null) {
+    if (!projectId) throw new Error('projectId is required');
+    return await this._fetch('loadProject', { projectId }, authToken);
+  }
+
+  async saveProject(projectId, projectData, authToken = null) {
+    if (!projectId) throw new Error('projectId is required');
+    return await this._fetch('saveProject', { projectId, projectData }, authToken);
+  }
+
+  async deleteProject(projectId, authToken = null) {
+    if (!projectId) throw new Error('projectId is required');
+    return await this._fetch('deleteProject', { projectId }, authToken);
+  }
+
+  /* -----------------------
+     Files
+     ----------------------- */
+
+  async listFiles(projectId, authToken = null) {
+    if (!projectId) throw new Error('projectId is required');
+    return await this._fetch('listFiles', { projectId }, authToken);
+  }
+
+  async loadFile(projectId, filePath, authToken = null) {
+    if (!projectId || !filePath) throw new Error('projectId and filePath are required');
+    return await this._fetch('loadFile', { projectId, filePath }, authToken);
+  }
+
+  /**
+   * Save file. fileContent should be a string (base64 for binary files if needed).
+   * @param {string} projectId
+   * @param {string} filePath
+   * @param {string} fileContent
+   * @param {string} [mimeType]
+   * @param {boolean} [isBinary=false]
+   */
+  async saveFile(projectId, filePath, fileContent, mimeType = 'text/plain', isBinary = false, authToken = null) {
+    if (!projectId || !filePath) throw new Error('projectId and filePath are required');
+    return await this._fetch('saveFile', { projectId, filePath, fileContent, mimeType, isBinary }, authToken);
+  }
+
+  async deleteFile(projectId, filePath, authToken = null) {
+    if (!projectId || !filePath) throw new Error('projectId and filePath are required');
+    return await this._fetch('deleteFile', { projectId, filePath }, authToken);
+  }
+
+  async renameFile(projectId, fromPath, toPath, authToken = null) {
+    if (!projectId || !fromPath || !toPath) throw new Error('projectId, fromPath and toPath are required');
+    return await this._fetch('renameFile', { projectId, fromPath, toPath }, authToken);
+  }
 }
+
+/* Expose to window for simple browser usage */
+if (typeof window !== 'undefined') {
+  window.DataBase = DataBase;
+}
+
+/* Example (uncomment to test in-browser):
+(async () => {
+  const db = new DataBase('https://script.google.com/macros/s/YOUR_ID_HERE', { timeout: 20000 });
+  try {
+    const loginRes = await db.login({ email: 'you@example.com', password: 'password123' });
+    console.log('login', loginRes);
+    const projects = await db.listProjects();
+    console.log('projects', projects);
+  } catch (err) {
+    console.error('DB error', err);
+  }
+})();
+*/
+
+export default DataBase;
