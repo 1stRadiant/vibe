@@ -25,47 +25,48 @@ export class DataBase {
         return !!this.authToken;
     }
 
-    async _fetch(action, payload = {}, useAuth = true) {
-        const requestBody = {
-            action,
-            payload
-        };
+    // AFTER THE FIX
+async _fetch(action, payload = {}, useAuth = true) {
+    const requestBody = {
+        action,
+        payload
+    };
 
-        if (useAuth) {
-            if (!this.authToken) {
-                throw new Error("Authentication required for this action.");
-            }
-            requestBody.authToken = this.authToken;
+    if (useAuth) {
+        if (!this.authToken) {
+            throw new Error("Authentication required for this action.");
         }
-
-        try {
-            const response = await fetch(this.apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
-                },
-                body: JSON.stringify(requestBody),
-                redirect: 'follow'
-            });
-
-            if (!response.ok) {
-                throw new Error(`Network error: ${response.status} ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            if (result.status === 'error') {
-                throw new Error(result.message || 'An unknown server error occurred.');
-            }
-
-            return result.data;
-
-        } catch (error) {
-            console.error(`Database fetch failed for action "${action}":`, error);
-            // Re-throw the error so the calling function's catch block can handle it
-            throw error;
-        }
+        requestBody.authToken = this.authToken;
     }
+
+    try {
+        const response = await fetch(this.apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
+            },
+            body: JSON.stringify(requestBody),
+            redirect: 'follow' // <-- THIS IS THE FIX
+        });
+
+        if (!response.ok) {
+            // This will now correctly report errors like 500 or 404
+            throw new Error(`Network error: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === 'error') {
+            throw new Error(result.message || 'An unknown server error occurred.');
+        }
+
+        return result.data;
+
+    } catch (error) {
+        console.error(`Database fetch failed for action "${action}":`, error);
+        throw error;
+    }
+}
 
     async signup(email, password) {
         return this._fetch('signup', { email, password }, false);
