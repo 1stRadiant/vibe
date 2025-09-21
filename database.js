@@ -2,8 +2,7 @@
  * A database wrapper that connects to a Google Apps Script backend.
  * v2: Includes full file storage capabilities.
  *
- * UPDATED to work with a no-CORS-preflight Apps Script backend
- * by sending data as application/x-www-form-urlencoded.
+ * FINAL CORRECTED VERSION: Sends JSON payload and handles CORS correctly.
  */
 export class DataBase {
     constructor(apiUrl) {
@@ -30,45 +29,37 @@ export class DataBase {
 
     /**
      * Internal fetch method to communicate with the Google Apps Script backend.
-     * This version uses URLSearchParams to create a "simple" POST request,
-     * avoiding the need for a CORS preflight (OPTIONS) request.
+     * This version sends a structured JSON payload, which requires the backend
+     * to handle a CORS preflight (OPTIONS) request.
      */
     async _fetch(action, payload = {}, useAuth = true) {
-        // 1. Use URLSearchParams to build the request body.
-        const formData = new URLSearchParams();
-        formData.append('action', action);
+        // 1. Build the single request object the backend expects.
+        const requestBody = {
+            action,
+            payload
+        };
 
-        // 2. Add the authentication token if required for the action.
         if (useAuth) {
             if (!this.authToken) {
                 throw new Error("Authentication required for this action.");
             }
-            formData.append('authToken', this.authToken);
-        }
-
-        // 3. Unpack the payload object into the form data.
-        for (const key in payload) {
-            if (Object.prototype.hasOwnProperty.call(payload, key)) {
-                let value = payload[key];
-                // If a value is an object (like projectData), stringify it,
-                // as the backend expects to parse it from a string.
-                if (typeof value === 'object' && value !== null) {
-                    value = JSON.stringify(value);
-                }
-                formData.append(key, value);
-            }
+            requestBody.authToken = this.authToken;
         }
 
         try {
             const response = await fetch(this.apiUrl, {
                 method: 'POST',
-                // 4. No 'Content-Type' header is needed. The browser adds it automatically
-                //    for URLSearchParams.
-                body: formData,
+                headers: {
+                    // 2. Set the Content-Type to application/json.
+                    'Content-Type': 'application/json',
+                },
+                // 3. Stringify the entire object into the body.
+                body: JSON.stringify(requestBody),
                 redirect: 'follow'
             });
 
             if (!response.ok) {
+                // This will now correctly report errors like 500 or 404
                 throw new Error(`Network error: ${response.status} ${response.statusText}`);
             }
 
@@ -82,10 +73,10 @@ export class DataBase {
 
         } catch (error) {
             console.error(`Database fetch failed for action "${action}":`, error);
+            // Re-throw the error so the calling code (like in app.js) knows it failed.
             throw error;
         }
     }
-
 
     async signup(email, password) {
         return this._fetch('signup', { email, password }, false);
@@ -136,7 +127,7 @@ export class DataBase {
         };
         return this._fetch('saveFile', payload);
     }
-    
+
     async readTextFile(projectId, path) {
         const fileData = await this._fetch('loadFile', { projectId, filePath: path });
         if (!fileData || fileData.isBinary) {
