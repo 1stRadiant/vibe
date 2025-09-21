@@ -1,14 +1,10 @@
 /**
  * database.js
- * Exports `DataBase` as a named export and as the default export.
- * Designed for direct browser module imports: <script type="module">.
+ * Exports `DataBase` as a named export and default export.
+ * Adds isLoggedIn() and verifyAuth() to fix "isLoggedIn is not a function".
  */
 
 export class DataBase {
-  /**
-   * @param {string} apiUrl - base Apps Script URL (with or without trailing /exec)
-   * @param {object} opts
-   */
   constructor(apiUrl, opts = {}) {
     if (!apiUrl) throw new Error('apiUrl is required');
     this.apiUrl = apiUrl.replace(/\/+$/, ''); // remove trailing slash(es)
@@ -33,6 +29,31 @@ export class DataBase {
 
   clearSavedToken() {
     try { localStorage.removeItem(this.tokenStorageKey); } catch (e) {}
+  }
+
+  /**
+   * Synchronous convenience method expected by your UI:
+   * Returns true if a token exists in localStorage (fast, not guaranteed valid).
+   */
+  isLoggedIn() {
+    return !!this.savedToken;
+  }
+
+  /**
+   * Async verification: attempts a lightweight API call using the saved token.
+   * Returns true if the token is accepted by the backend; false otherwise.
+   */
+  async verifyAuth() {
+    const token = this.savedToken;
+    if (!token) return false;
+    try {
+      // call listProjects with explicit token to validate it
+      await this._fetch('listProjects', {}, token);
+      return true;
+    } catch (e) {
+      // token invalid or network error — treat as not authenticated
+      return false;
+    }
   }
 
   /* -----------------------
@@ -140,5 +161,5 @@ if (typeof window !== 'undefined') {
   window.DataBase = DataBase;
 }
 
-/* Default export for import styles that expect default */
+/* Named export and default export */
 export default DataBase;
