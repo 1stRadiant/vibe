@@ -1,6 +1,9 @@
 /**
  * A database wrapper that connects to a Google Apps Script backend.
  * v2: Includes full file storage capabilities.
+ *
+ * UPDATED to work with a no-CORS-preflight Apps Script backend
+ * by sending data as application/x-www-form-urlencoded.
  */
 export class DataBase {
     constructor(apiUrl) {
@@ -25,49 +28,64 @@ export class DataBase {
         return !!this.authToken;
     }
 
-    // AFTER THE FIX
-async _fetch(action, payload = {}, useAuth = true) {
-    const requestBody = {
-        action,
-        payload
-    };
+    /**
+     * Internal fetch method to communicate with the Google Apps Script backend.
+     * This version uses URLSearchParams to create a "simple" POST request,
+     * avoiding the need for a CORS preflight (OPTIONS) request.
+     */
+    async _fetch(action, payload = {}, useAuth = true) {
+        // 1. Use URLSearchParams to build the request body.
+        const formData = new URLSearchParams();
+        formData.append('action', action);
 
-    if (useAuth) {
-        if (!this.authToken) {
-            throw new Error("Authentication required for this action.");
+        // 2. Add the authentication token if required for the action.
+        if (useAuth) {
+            if (!this.authToken) {
+                throw new Error("Authentication required for this action.");
+            }
+            formData.append('authToken', this.authToken);
         }
-        requestBody.authToken = this.authToken;
+
+        // 3. Unpack the payload object into the form data.
+        for (const key in payload) {
+            if (Object.prototype.hasOwnProperty.call(payload, key)) {
+                let value = payload[key];
+                // If a value is an object (like projectData), stringify it,
+                // as the backend expects to parse it from a string.
+                if (typeof value === 'object' && value !== null) {
+                    value = JSON.stringify(value);
+                }
+                formData.append(key, value);
+            }
+        }
+
+        try {
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                // 4. No 'Content-Type' header is needed. The browser adds it automatically
+                //    for URLSearchParams.
+                body: formData,
+                redirect: 'follow'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Network error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            if (result.status === 'error') {
+                throw new Error(result.message || 'An unknown server error occurred.');
+            }
+
+            return result.data;
+
+        } catch (error) {
+            console.error(`Database fetch failed for action "${action}":`, error);
+            throw error;
+        }
     }
 
-    try {
-        const response = await fetch(this.apiUrl, {
-             redirect: 'follow',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
-            },
-            body: JSON.stringify(requestBody)
-           
-        });
-
-        if (!response.ok) {
-            // This will now correctly report errors like 500 or 404
-            throw new Error(`Network error: ${response.status} ${response.statusText}`);
-        }
-
-        const result = await response.json();
-
-        if (result.status === 'error') {
-            throw new Error(result.message || 'An unknown server error occurred.');
-        }
-
-        return result.data;
-
-    } catch (error) {
-        console.error(`Database fetch failed for action "${action}":`, error);
-        throw error;
-    }
-}
 
     async signup(email, password) {
         return this._fetch('signup', { email, password }, false);
