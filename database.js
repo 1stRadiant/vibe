@@ -43,18 +43,22 @@ export class DataBase {
    * Async verification: attempts a lightweight API call using the saved token.
    * Returns true if the token is accepted by the backend; false otherwise.
    */
-  async verifyAuth() {
-    const token = this.savedToken;
-    if (!token) return false;
-    try {
-      // call listProjects with explicit token to validate it
-      await this._fetch('listProjects', {}, token);
-      return true;
-    } catch (e) {
-      // token invalid or network error — treat as not authenticated
-      return false;
-    }
+  /**
+ * Async verification: attempts a lightweight API call using the saved token.
+ * Returns true if the token is accepted by the backend; false otherwise.
+ */
+async verifyAuth() {
+  const token = this.savedToken;
+  if (!token) return false;
+  try {
+    // call listProjects with explicit token to validate it
+    await this._fetch('listProjects', {}, token);
+    return true;
+  } catch (e) {
+    // token invalid or network error — treat as not authenticated
+    return false;
   }
+}
 
   /* -----------------------
      Internal fetch wrapper
