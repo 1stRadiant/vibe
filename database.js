@@ -1,18 +1,25 @@
 /**
  * database.js
- * Client-side wrapper for the Vibe Coding System Google Apps Script backend.
- * Exports DataBase as both a named export and default export.
+ * Exports `DataBase` as a named export and as the default export.
+ * Designed for direct browser module imports: <script type="module">.
  */
 
-class DataBase {
+export class DataBase {
+  /**
+   * @param {string} apiUrl - base Apps Script URL (with or without trailing /exec)
+   * @param {object} opts
+   */
   constructor(apiUrl, opts = {}) {
     if (!apiUrl) throw new Error('apiUrl is required');
-    this.apiUrl = apiUrl.replace(/\/+$/, '');
+    this.apiUrl = apiUrl.replace(/\/+$/, ''); // remove trailing slash(es)
     this.autoSaveToken = opts.autoSaveToken !== undefined ? !!opts.autoSaveToken : true;
     this.tokenStorageKey = opts.tokenStorageKey || 'vibe_auth_token';
     this.timeout = typeof opts.timeout === 'number' ? opts.timeout : 30000;
   }
 
+  /* -----------------------
+     Token helpers
+     ----------------------- */
   get savedToken() {
     try { return localStorage.getItem(this.tokenStorageKey); } catch (e) { return null; }
   }
@@ -28,6 +35,9 @@ class DataBase {
     try { localStorage.removeItem(this.tokenStorageKey); } catch (e) {}
   }
 
+  /* -----------------------
+     Internal fetch wrapper
+     ----------------------- */
   async _fetch(action, payload = {}, authToken = null) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeout);
@@ -51,7 +61,6 @@ class DataBase {
 
     let res;
     try {
-      // Allow callers to pass the /exec URL or the base URL — normalize to /exec
       const url = this.apiUrl.endsWith('/exec') ? this.apiUrl : this.apiUrl + '/exec';
       res = await fetch(url, fetchOptions);
     } catch (err) {
@@ -87,28 +96,35 @@ class DataBase {
     return json.data;
   }
 
-  /* Authentication */
-  async signup(credentials) {
-    if (!credentials || !credentials.email || !credentials.password) throw new Error('Email and password are required for signup.');
-    return await this._fetch('signup', { email: credentials.email, password: credentials.password }, null);
+  /* -----------------------
+     Authentication
+     ----------------------- */
+
+  async signup({ email, password } = {}) {
+    if (!email || !password) throw new Error('Email and password are required for signup.');
+    return await this._fetch('signup', { email, password }, null);
   }
 
-  async login(credentials) {
-    if (!credentials || !credentials.email || !credentials.password) throw new Error('Email and password are required for login.');
-    const data = await this._fetch('login', { email: credentials.email, password: credentials.password }, null);
+  async login({ email, password } = {}) {
+    if (!email || !password) throw new Error('Email and password are required for login.');
+    const data = await this._fetch('login', { email, password }, null);
     if (data && data.token) this.saveToken(data.token);
     return data;
   }
 
   logout() { this.clearSavedToken(); }
 
-  /* Projects */
+  /* -----------------------
+     Projects
+     ----------------------- */
   async listProjects(authToken = null) { return await this._fetch('listProjects', {}, authToken); }
   async loadProject(projectId, authToken = null) { if (!projectId) throw new Error('projectId is required'); return await this._fetch('loadProject', { projectId }, authToken); }
   async saveProject(projectId, projectData, authToken = null) { if (!projectId) throw new Error('projectId is required'); return await this._fetch('saveProject', { projectId, projectData }, authToken); }
   async deleteProject(projectId, authToken = null) { if (!projectId) throw new Error('projectId is required'); return await this._fetch('deleteProject', { projectId }, authToken); }
 
-  /* Files */
+  /* -----------------------
+     Files
+     ----------------------- */
   async listFiles(projectId, authToken = null) { if (!projectId) throw new Error('projectId is required'); return await this._fetch('listFiles', { projectId }, authToken); }
   async loadFile(projectId, filePath, authToken = null) { if (!projectId || !filePath) throw new Error('projectId and filePath are required'); return await this._fetch('loadFile', { projectId, filePath }, authToken); }
   async saveFile(projectId, filePath, fileContent, mimeType = 'text/plain', isBinary = false, authToken = null) {
@@ -119,11 +135,10 @@ class DataBase {
   async renameFile(projectId, fromPath, toPath, authToken = null) { if (!projectId || !fromPath || !toPath) throw new Error('projectId, fromPath and toPath are required'); return await this._fetch('renameFile', { projectId, fromPath, toPath }, authToken); }
 }
 
-/* Attach to window for old-style scripts */
+/* Attach to window for backward compatibility (non-module usage) */
 if (typeof window !== 'undefined') {
   window.DataBase = DataBase;
 }
 
-/* Named export and default export so both import styles work */
-export { DataBase };
+/* Default export for import styles that expect default */
 export default DataBase;
