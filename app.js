@@ -719,10 +719,10 @@ async function handleLogin(event) {
     button.innerHTML = '<div class="loading-spinner"></div>';
 
     try {
-        // FIX: Pass arguments as a single object
         const response = await db.login({ email, password });
-
         if (response && response.token) {
+            // The db class already sets the auth token.
+            // Store email for display purposes.
             sessionStorage.setItem('vibe-user-email', email);
             await updateAuthUI();
         } else {
@@ -756,24 +756,30 @@ async function handleSignup(event) {
     button.innerHTML = '<div class="loading-spinner"></div>';
 
     try {
-        // FIX: Pass arguments as a single object
         const response = await db.signup({ email, password });
-        
+        // A successful response should be an object.
+        // The DataBase class should throw an error for failed signups.
         if (response) {
             signupSuccessEl.textContent = 'Signup successful! Please log in.';
             signupForm.reset();
+            // Switch to login view after successful signup
             signupView.style.display = 'none';
             loginView.style.display = 'block';
         } else {
+            // This case handles unexpected scenarios where signup might return
+            // a non-error, but also non-successful, response.
             throw new Error('Received an invalid response from the server.');
         }
     } catch (error) {
+        // The 'error' object here will be a proper Error instance,
+        // which always has a .message property.
         signupErrorEl.textContent = error.message;
     } finally {
         button.disabled = false;
         button.textContent = 'Sign Up';
     }
 }
+
 
 /**
  * Handles user logout.
