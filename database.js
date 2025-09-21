@@ -41,12 +41,13 @@ async _fetch(action, payload = {}, useAuth = true) {
 
     try {
         const response = await fetch(this.apiUrl, {
+             redirect: 'follow',
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
             },
-            body: JSON.stringify(requestBody),
-            redirect: 'follow' // <-- THIS IS THE FIX
+            body: JSON.stringify(requestBody)
+           
         });
 
         if (!response.ok) {
