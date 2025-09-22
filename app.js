@@ -1,7 +1,7 @@
 import { DataBase } from './database.js';
 
 // IMPORTANT: Replace with your actual Google Apps Script Web App URL.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyQJlwx73qSP_r3ZBdqf9LMvJssUFN3SKItfWJqqjSQi3rYtGQdCrJbSpapKsS618Q48w/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzJWHjr3sQ4AKj5LK8wqCCnu1Nh4DXkmHEsAy8rIuhbqe8WWZmfz9RoIBLs4_w3iHYATg/exec';
 const db = new DataBase(API_URL);
 
 // NEW: Auth elements
