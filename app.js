@@ -1,29 +1,6 @@
 import { DataBase } from './database.js';
 
-// IMPORTANT: Replace with your actual Google Apps Script Web App URL.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyk-36Q6skIOGTTLKahb4y8FnMUX5a32QFo6auncenA18sjf5-Ddzy84hvLIOSWk5ic/exec';
-const db = new DataBase(API_URL);
-
-// NEW: Auth elements
-const authOverlay = document.getElementById('auth-overlay');
-const loginView = document.getElementById('login-view');
-const signupView = document.getElementById('signup-view');
-const loginForm = document.getElementById('login-form');
-const signupForm = document.getElementById('signup-form');
-const loginEmailInput = document.getElementById('login-email');
-const loginPasswordInput = document.getElementById('login-password');
-const loginErrorEl = document.getElementById('login-error');
-const signupEmailInput = document.getElementById('signup-email');
-const signupPasswordInput = document.getElementById('signup-password');
-const signupErrorEl = document.getElementById('signup-error');
-const signupSuccessEl = document.getElementById('signup-success');
-const showSignupLink = document.getElementById('show-signup');
-const showLoginLink = document.getElementById('show-login');
-const userDisplay = document.getElementById('user-display');
-const logoutButton = document.getElementById('logout-button');
-
-// Main app container (assuming your main content is wrapped in a <main> tag or similar)
-const appContainer = document.querySelector('main'); 
+const db = new DataBase();
 
 // NEW: Monkey-patching component library functionality onto the db instance.
 // In a real application, these methods would be part of the DataBase class.
@@ -668,156 +645,6 @@ function updateUndoRedoUI() {
    END UNDO / REDO
    ========================= */
 
-// ===================================
-// --- AUTHENTICATION LOGIC ---
-// ===================================
-
-/**
- * Updates the entire UI based on the current authentication state.
- */
-async function updateAuthUI() {
-    if (db.isLoggedIn()) {
-        if (authOverlay) authOverlay.style.display = 'none';
-        if (appContainer) appContainer.style.display = 'block';
-        if (logoutButton) logoutButton.style.display = 'block';
-        if (userDisplay) {
-            const userEmail = sessionStorage.getItem('vibe-user-email');
-            userDisplay.textContent = userEmail || 'Logged In';
-        }
-        await populateProjectList();
-        resetToStartPage();
-    } else {
-        if (authOverlay) authOverlay.style.display = 'flex';
-        if (appContainer) appContainer.style.display = 'none';
-        if (logoutButton) logoutButton.style.display = 'none';
-        if (userDisplay) userDisplay.textContent = '';
-        currentProjectId = null;
-        vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
-        resetHistory();
-    }
-}
-
-/**
- * Handles the login form submission.
- * @param {Event} event
- */
-async function handleLogin(event) {
-    event.preventDefault();
-    loginErrorEl.textContent = '';
-    const email = loginEmailInput.value;
-    const password = loginPasswordInput.value;
-    const button = loginForm.querySelector('button');
-    button.disabled = true;
-    button.innerHTML = '<div class="loading-spinner"></div>';
-
-    try {
-        const response = await db.login({ email, password });
-        if (response && response.token) {
-            sessionStorage.setItem('vibe-user-email', email);
-            await updateAuthUI();
-        } else {
-            throw new Error(response.message || 'Login failed.');
-        }
-    } catch (error) {
-        loginErrorEl.textContent = error.message;
-    } finally {
-        button.disabled = false;
-        button.textContent = 'Login';
-    }
-}
-
-/**
- * Handles the signup form submission.
- * @param {Event} event
- */
-async function handleSignup(event) {
-    event.preventDefault();
-    signupErrorEl.textContent = '';
-    signupSuccessEl.textContent = '';
-    const email = signupEmailInput.value;
-    const password = signupPasswordInput.value;
-    const button = signupForm.querySelector('button');
-    button.disabled = true;
-    button.innerHTML = '<div class="loading-spinner"></div>';
-
-    try {
-        const response = await db.signup({ email, password });
-        if (response) {
-            signupSuccessEl.textContent = 'Signup successful! Please log in.';
-            signupForm.reset();
-            signupView.style.display = 'none';
-            loginView.style.display = 'block';
-        } else {
-            throw new Error('Received an invalid response from the server.');
-        }
-    } catch (error) {
-        signupErrorEl.textContent = error.message;
-    } finally {
-        button.disabled = false;
-        button.textContent = 'Sign Up';
-    }
-}
-
-
-/**
- * Handles user logout.
- */
-function handleLogout() {
-    db.logout();
-    sessionStorage.removeItem('vibe-user-email');
-    updateAuthUI();
-    console.log("User logged out.");
-}
-
-/**
- * WORKAROUND IMPLEMENTED HERE
- * Sets up initial authentication state and event listeners using event delegation.
- * This is more robust against script loading timing issues.
- */
-function initializeAuth() {
-    console.log("Initializing auth with event delegation workaround.");
-
-    // This single listener handles submissions for both forms.
-    document.body.addEventListener('submit', (event) => {
-        // Check if the event came from the login form
-        if (event.target.id === 'login-form') {
-            console.log("Login form submitted, calling handleLogin.");
-            handleLogin(event);
-        }
-        // Check if the event came from the signup form
-        if (event.target.id === 'signup-form') {
-            console.log("Signup form submitted, calling handleSignup.");
-            handleSignup(event);
-        }
-    });
-
-    // These listeners are for simple clicks and are less prone to timing issues.
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
-    }
-
-    if (showSignupLink) {
-        showSignupLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            loginView.style.display = 'none';
-            signupView.style.display = 'block';
-        });
-    }
-    if (showLoginLink) {
-        showLoginLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            signupView.style.display = 'none';
-            loginView.style.display = 'block';
-        });
-    }
-
-    // Run the initial UI setup.
-    updateAuthUI();
-}
-// ===============================
-// --- END AUTHENTICATION LOGIC ---
-// ===============================
-
 function updateApiKeyVisibility() {
     if (currentAIProvider === 'gemini') {
         geminiSettingsContainer.style.display = 'block';
@@ -1218,17 +1045,14 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     let fileContext = '';
     if (currentProjectId) {
         try {
-            const files = await db.listFiles(currentProjectId);
+            const files = db.listFiles(currentProjectId);
             if (files.length > 0) {
                 const textFiles = [];
                 for (const path of files) {
-                    // This assumes a method that can check if a file is binary without fetching content.
-                    // Since our db wrapper doesn't have it, we'll try to fetch text and catch errors.
-                    try {
+                    const meta = db.getFileMeta(currentProjectId, path);
+                    if (meta && !meta.isBinary) {
                         const content = await db.readTextFile(currentProjectId, path);
                         textFiles.push(`--- FILE: ${path} ---\n\`\`\`\n${content}\n\`\`\``);
-                    } catch (e) {
-                         // Likely a binary file, skip it.
                     }
                 }
                 if (textFiles.length > 0) {
@@ -1880,7 +1704,7 @@ async function handleFileUpload() {
 
     const baseId = file.name.replace(/\.(html|htm)$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
     let projectId = baseId || `html-project-${Date.now()}`;
-    const existing = await db.listProjects();
+    const existing = db.listProjects();
     let suffix = 1;
     while (existing.includes(projectId)) {
         projectId = `${baseId}-${suffix++}`;
@@ -1894,7 +1718,7 @@ async function handleFileUpload() {
         const fileContent = event.target.result;
         fullCodeEditor.value = fileContent;
         await processCodeAndRefreshUI(fileContent);
-        await autoSaveProject();
+        autoSaveProject();
         console.log(`HTML project '${currentProjectId}' imported and processed.`);
     };
 
@@ -2081,7 +1905,7 @@ async function handleZipUpload() {
 
         const derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         let projectId = derivedId || `zip-project-${Date.now()}`;
-        const existing = await db.listProjects();
+        const existing = db.listProjects();
         let suffix = 1;
         while (existing.includes(projectId)) {
             projectId = `${derivedId}-${suffix++}`;
@@ -2092,7 +1916,7 @@ async function handleZipUpload() {
         const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
 
         vibeTree = newTree;
-        await db.saveProject(currentProjectId, vibeTree);
+        db.saveProject(currentProjectId, vibeTree);
 
         resetHistory();
         refreshAllUI();
@@ -2287,7 +2111,7 @@ function nodeIdToFileName(id, ext) {
  * Assemble a multi-file project bundle from the current vibe tree.
  * Returns an object { files: Map<path,string>, indexHtml: string }
  */
-async function assembleMultiFileBundle(tree = vibeTree) {
+function assembleMultiFileBundle(tree = vibeTree) {
     const headContent = getHeadContentFromTree(tree);
     const bodyContent = buildHtmlBodyFromTree(tree);
     const { cssNodes, jsNodes } = collectCssJsNodes(tree);
@@ -2327,15 +2151,12 @@ ${bodyContent}
     });
 
     try {
-        const allDbAssetPaths = await db.listFiles(currentProjectId);
-        for (const p of allDbAssetPaths) {
+        const allDbAssetPaths = db.listFiles(currentProjectId);
+        allDbAssetPaths.forEach(p => {
             if (!files.has(p)) {
-                 // This part is tricky. We need to decide if we fetch binary or text.
-                 // The database wrapper doesn't provide a way to know ahead of time.
-                 // For now, we'll assume we can't add existing assets back to the bundle this way.
-                 // A better `db` class would have a `readFileAsBlob` or `getFileMeta`.
+                files.set(p, db.readFileForExport(currentProjectId, p));
             }
-        }
+        });
     } catch (e) {
         console.warn('Failed adding assets to ZIP:', e);
     }
@@ -2366,7 +2187,7 @@ async function handleDownloadProjectZip() {
         if (!window.JSZip) {
             throw new Error('JSZip library failed to load.');
         }
-        const { files } = await assembleMultiFileBundle(vibeTree);
+        const { files } = assembleMultiFileBundle(vibeTree);
         const zip = new JSZip();
 
         for (const [path, content] of files.entries()) {
@@ -3472,11 +3293,6 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
 async function buildCombinedHtmlFromDb(projectId) {
     if (!projectId) throw new Error("Project ID is required.");
 
-    const allFiles = await db.listFiles(projectId);
-    if (!allFiles.includes('index.html')) {
-        throw new Error("Project is missing an index.html file.");
-    }
-
     const indexText = await db.readTextFile(projectId, 'index.html');
     const parser = new DOMParser();
     const doc = parser.parseFromString(indexText, 'text/html');
@@ -4180,94 +3996,75 @@ function initializeMermaid() {
 
 // --- Project Persistence Logic ---
 
-async function populateProjectList() {
-    if (!db.isLoggedIn()) {
-        projectListContainer.innerHTML = '';
-        noProjectsMessage.style.display = 'block';
-        noProjectsMessage.textContent = 'Please log in to see your projects.';
-        return;
-    }
+function populateProjectList() {
+    const projects = db.listProjects();
+    projectListContainer.innerHTML = ''; 
 
-    try {
-        const projects = await db.listProjects();
-        projectListContainer.innerHTML = ''; 
-
-        noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
-        noProjectsMessage.textContent = 'No projects yet. Create one below!';
-
-        projects.forEach(projectId => {
-            const projectItem = document.createElement('div');
-            projectItem.className = 'project-list-item';
-            projectItem.innerHTML = `
-                <span class="project-id-text">${projectId}</span>
-                <div class="project-item-buttons">
-                    <button class="load-project-button action-button" data-id="${projectId}">Load</button>
-                    <button class="delete-project-button" data-id="${projectId}">Delete</button>
-                </div>
-            `;
-            projectListContainer.appendChild(projectItem);
-        });
-    } catch (error) {
-        console.error("Failed to populate project list:", error);
-        noProjectsMessage.textContent = 'Error loading projects.';
-    }
+    noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
+    
+    projects.forEach(projectId => {
+        const projectItem = document.createElement('div');
+        projectItem.className = 'project-list-item';
+        projectItem.innerHTML = `
+            <span class="project-id-text">${projectId}</span>
+            <div class="project-item-buttons">
+                <button class="load-project-button action-button" data-id="${projectId}">Load</button>
+                <button class="delete-project-button" data-id="${projectId}">Delete</button>
+            </div>
+        `;
+        projectListContainer.appendChild(projectItem);
+    });
 }
 
-
-async function handleLoadProject(event) {
+function handleLoadProject(event) {
     const projectId = event.target.dataset.id;
-    try {
-        const projectData = await db.loadProject(projectId);
+    const projectData = db.loadProject(projectId);
 
-        if (projectData) {
-            currentProjectId = projectId;
-            vibeTree = projectData;
-            console.log(`Project '${projectId}' loaded.`);
-            
-            refreshAllUI();
-            resetHistory();
-            await autoSaveProject();
+    if (projectData) {
+        currentProjectId = projectId;
+        vibeTree = projectData;
+        console.log(`Project '${projectId}' loaded.`);
+        
+        refreshAllUI();
+        resetHistory();
+        autoSaveProject();
 
-            switchToTab('preview');
-        } else {
-            throw new Error(`Could not find project data for '${projectId}'.`);
-        }
-    } catch (error) {
-         console.error(`Could not load project '${projectId}'.`, error);
-        alert(`Error: ${error.message}`);
+        switchToTab('preview');
+    } else {
+        console.error(`Could not load project '${projectId}'.`);
+        alert(`Error: Could not find project data for '${projectId}'.`);
     }
 }
 
-
-async function handleDeleteProject(event) {
+function handleDeleteProject(event) {
     const projectId = event.target.dataset.id;
     if (confirm(`Are you sure you want to permanently delete project '${projectId}'?`)) {
-        try {
-            await db.deleteProject(projectId);
-            console.log(`Project '${projectId}' deleted.`);
-            await populateProjectList(); // Refresh the list
-        } catch (error) {
-            console.error(`Failed to delete project '${projectId}'`, error);
-            alert(`Error: ${error.message}`);
-        }
+        db.deleteProject(projectId);
+        console.log(`Project '${projectId}' deleted.`);
+        populateProjectList(); // Refresh the list
     }
 }
 
-async function autoSaveProject() {
-    if (!currentProjectId || !vibeTree || !db.isLoggedIn()) return;
+function autoSaveProject() {
+    if (!currentProjectId || !vibeTree) return;
+
+    db.saveProject(currentProjectId, vibeTree);
 
     try {
-        await db.saveProject(currentProjectId, vibeTree);
-
-        // In a full file-based system, you might save individual files here.
-        // For now, saving the whole project blob is sufficient.
-        // The `assembleMultiFileBundle` logic is primarily for ZIP export.
-
-        renderFileTree(); // Keep file tree in sync
-        console.log(`Project '${currentProjectId}' auto-saved.`);
-    } catch (error) {
-        console.error("Auto-save failed:", error);
+        const { files } = assembleMultiFileBundle(vibeTree);
+        for (const [path, content] of files.entries()) {
+            if (content instanceof Uint8Array) {
+                db.saveBinaryFile(currentProjectId, path, content, guessMimeType(path));
+            } else {
+                db.saveTextFile(currentProjectId, path, String(content));
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to assemble/write multi-file bundle:', e);
     }
+
+    renderFileTree();
+    console.log(`Project '${currentProjectId}' auto-saved.`);
 }
 
 // Add event listeners for project management buttons
@@ -4588,6 +4385,11 @@ function handleUploadContextTrigger() {
     contextUploadInput.click();
 }
 
+// START OF FIX: Correctly handle the FileList object to process the selected file.
+/**
+ * Processes the uploaded component library file.
+ * @param {Event} event - The file input change event.
+ */
 /**
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
@@ -4600,7 +4402,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files; // Get the first file from the FileList.
+    const file = files[0]; // FIX: Get the first file from the FileList, not the whole list.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4751,7 +4553,7 @@ async function handleSaveNodeAsComponentFromEditor(event) {
 // Files tab implementation
 let filesState = {
     selectedPath: null,
-    clipboard: null // { path, isBinary, mimeType }
+    clipboard: null // { path, meta }
 };
 
 // Build a nested tree from flat file paths
@@ -4772,7 +4574,7 @@ function buildFolderTree(paths) {
     return root;
 }
 
-async function renderFileTree() {
+function renderFileTree() {
     if (!filesTreeEl) return;
     filesTreeEl.innerHTML = '';
 
@@ -4780,27 +4582,19 @@ async function renderFileTree() {
         filesTreeEl.innerHTML = '<div class="files-empty">No project loaded. Create or load a project to manage files.</div>';
         return;
     }
-    
-    try {
-        const paths = await db.listFiles(currentProjectId);
-        if (!paths || paths.length === 0) {
-            filesTreeEl.innerHTML = '<div class="files-empty">No files yet. Use Upload or New File to get started.</div>';
-            return;
-        }
+    const paths = db.listFiles(currentProjectId);
+    if (!paths || paths.length === 0) {
+        filesTreeEl.innerHTML = '<div class="files-empty">No files yet. Use Upload or New File to get started.</div>';
+        return;
+    }
 
-        const root = buildFolderTree(paths);
+    const root = buildFolderTree(paths);
 
-        const ul = document.createElement('ul');
-        ul.className = 'files-ul';
-        function renderNode(node, parentUl) {
-            // Convert map to array and sort: folders first, then alphabetically
-            const children = Array.from(node.children.values()).sort((a, b) => {
-                if (a.type === 'folder' && b.type !== 'folder') return -1;
-                if (a.type !== 'folder' && b.type === 'folder') return 1;
-                return a.name.localeCompare(b.name);
-            });
-
-            for (const child of children) {
+    const ul = document.createElement('ul');
+    ul.className = 'files-ul';
+    function renderNode(node, parentUl) {
+        if (node.type === 'folder') {
+            for (const [childName, child] of node.children) {
                 const li = document.createElement('li');
                 const row = document.createElement('div');
                 row.className = 'file-row';
@@ -4825,42 +4619,40 @@ async function renderFileTree() {
                         childUl.style.display = childUl.style.display === 'none' ? '' : 'none';
                     });
                 } else {
-                    row.addEventListener('click', (e) => {
+                    li.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        selectFile(child.path, row);
+                        selectFile(child.path, li);
                     });
                 }
             }
         }
-        renderNode(root, ul);
-        filesTreeEl.appendChild(ul);
-    } catch (e) {
-        console.error("Failed to render file tree:", e);
-        filesTreeEl.innerHTML = `<div class="files-empty">Error loading files: ${e.message}</div>`;
     }
+    renderNode(root, ul);
+    filesTreeEl.appendChild(ul);
 }
 
-function selectFile(path, rowEl) {
+function selectFile(path, liEl) {
     filesState.selectedPath = path;
-    filesTreeEl.querySelectorAll('.file-row.selected').forEach(row => row.classList.remove('selected'));
-    if (rowEl) rowEl.classList.add('selected');
+    filesTreeEl.querySelectorAll('li.selected').forEach(li => li.classList.remove('selected'));
+    if (liEl) liEl.classList.add('selected');
     renderFilePreview(path);
 }
 
 async function renderFilePreview(path) {
     if (!filesPreviewEl) return;
-    filesPreviewEl.innerHTML = '<div class="loading-spinner"></div>';
+    filesPreviewEl.innerHTML = '';
     try {
-        const fileData = await db._fetch('loadFile', { projectId: currentProjectId, filePath: path });
-        if (!fileData) throw new Error("File not found on backend.");
+        const meta = db.getFileMeta(currentProjectId, path);
+        if (!meta) {
+            filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">File not found.</div>';
+            return;
+        }
 
-        filesPreviewEl.innerHTML = '';
-        
         const info = document.createElement('div');
         info.className = 'files-preview-info';
         info.innerHTML = `
             <div><strong>Path:</strong> <code>${path}</code></div>
-            <div><strong>Type:</strong> ${fileData.mimeType}${fileData.isBinary ? ' (binary)' : ''}</div>
+            <div><strong>Type:</strong> ${meta.mime}${meta.isBinary ? ' (binary)' : ''}</div>
             <div class="files-preview-actions">
                 <button class="action-button" id="copy-asset-path">Copy Path</button>
             </div>
@@ -4868,18 +4660,18 @@ async function renderFilePreview(path) {
 
         const copyBtnHandler = () => navigator.clipboard.writeText(path).then(() => console.log(`Asset path copied: ${path}`));
 
-        if (fileData.isBinary) {
+        if (meta.isBinary) {
             const blob = await db.getFileBlob(currentProjectId, path);
             const url = URL.createObjectURL(blob);
             let previewEl;
-            if (fileData.mimeType.startsWith('image/')) {
+            if (meta.mime.startsWith('image/')) {
                 previewEl = document.createElement('img');
                 previewEl.className = 'files-preview-image';
-            } else if (fileData.mimeType.startsWith('video/')) {
+            } else if (meta.mime.startsWith('video/')) {
                 previewEl = document.createElement('video');
                 previewEl.className = 'files-preview-video';
                 previewEl.controls = true;
-            } else if (fileData.mimeType.startsWith('audio/')) {
+            } else if (meta.mime.startsWith('audio/')) {
                 previewEl = document.createElement('audio');
                 previewEl.controls = true;
             } else {
@@ -4892,10 +4684,10 @@ async function renderFilePreview(path) {
             filesPreviewEl.appendChild(info);
             filesPreviewEl.querySelector('#copy-asset-path').addEventListener('click', copyBtnHandler);
         } else {
-            const textContent = fileData.content;
+            const text = await db.readTextFile(currentProjectId, path);
             const ta = document.createElement('textarea');
             ta.className = 'files-preview-text';
-            ta.value = textContent;
+            ta.value = text;
             filesPreviewEl.appendChild(ta);
 
             const saveRow = document.createElement('div');
@@ -4906,12 +4698,7 @@ async function renderFilePreview(path) {
             saveBtn.addEventListener('click', async () => {
                 await db.saveTextFile(currentProjectId, path, ta.value);
                 console.log(`Saved file: ${path}`);
-                // If index.html is changed, we should offer to rebuild the tree
-                if(path.toLowerCase().endsWith('index.html')) {
-                    if(confirm("index.html has changed. Rebuild the Vibe Tree from file content? This will overwrite your current tree structure.")) {
-                         rebuildAndRefreshFromFiles();
-                    }
-                }
+                autoSaveProject();
             });
             saveRow.appendChild(saveBtn);
             filesPreviewEl.appendChild(saveRow);
@@ -4937,7 +4724,7 @@ async function handleFilesUpload() {
     for (const f of files) {
         try {
             const path = `assets/${f.name}`;
-            if (f.type.startsWith('text/') || ['application/json', 'application/javascript', 'image/svg+xml'].includes(f.type)) {
+            if (f.type.startsWith('text/') || ['application/json', 'application/javascript'].includes(f.type)) {
                 await db.saveTextFile(currentProjectId, path, await f.text());
             } else {
                 await db.saveBinaryFile(currentProjectId, path, new Uint8Array(await f.arrayBuffer()), f.type || guessMimeType(f.name));
@@ -4945,10 +4732,10 @@ async function handleFilesUpload() {
             console.log(`Uploaded: ${path}`);
         } catch (e) {
             console.error('Upload error:', e);
-            alert(`Failed to upload ${f.name}: ${e.message}`);
         }
     }
-    await renderFileTree();
+    renderFileTree();
+    autoSaveProject();
     filesUploadInput.value = '';
 }
 
@@ -4958,17 +4745,19 @@ async function handleFilesNewFolder() {
     if (!name) return;
     const keepPath = `${name.replace(/^\/+|\/+$/g, '')}/.keep`;
     await db.saveTextFile(currentProjectId, keepPath, '');
-    await renderFileTree();
+    renderFileTree();
+    autoSaveProject();
 }
 
 async function handleFilesNewFile() {
     if (!ensureProjectForFiles()) return;
     const pathInput = prompt('New file path (e.g., assets/data/info.txt):', 'assets/new-file.txt');
     if (!pathInput) return;
-    const path = String(pathInput).replace(/^\/+/, '');
-    await db.saveTextFile(currentProjectId, path, '');
-    await renderFileTree();
+    const path = String(pathInput);
+    await db.saveTextFile(currentProjectId, path.replace(/^\/+/, ''), '');
+    renderFileTree();
     selectFile(path);
+    autoSaveProject();
 }
 
 async function handleFilesDownload() {
@@ -4982,9 +4771,11 @@ async function handleFilesDownload() {
     }
 }
 
-async function handleFilesCopy() {
+function handleFilesCopy() {
     if (!ensureProjectForFiles() || !filesState.selectedPath) return;
-    filesState.clipboard = { path: filesState.selectedPath };
+    const meta = db.getFileMeta(currentProjectId, filesState.selectedPath);
+    if (!meta) return;
+    filesState.clipboard = { path: filesState.selectedPath, meta };
     console.log(`Copied file to clipboard: ${filesState.selectedPath}`);
 }
 
@@ -4993,32 +4784,28 @@ async function handleFilesPaste() {
     const clip = filesState.clipboard;
     const baseName = clip.path.split('/').pop();
     const dir = clip.path.includes('/') ? clip.path.split('/').slice(0, -1).join('/') : '';
-    let newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, '-copy$1') : `${baseName}-copy`;
+    let newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ' copy$1') : `${baseName} copy`;
     let dest = dir ? `${dir}/${newName}` : newName;
 
-    const existing = new Set(await db.listFiles(currentProjectId));
+    const existing = new Set(db.listFiles(currentProjectId));
     let i = 2;
     while (existing.has(dest)) {
-        newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, `-copy-${i}$1`) : `${baseName}-copy-${i}`;
+        newName = baseName.includes('.') ? baseName.replace(/(\.[^.]*)$/, ` copy ${i}$1`) : `${baseName} copy ${i}`;
         dest = dir ? `${dir}/${newName}` : newName;
         i++;
     }
 
     try {
-        // We need to re-fetch the file content to copy it
-        const originalFile = await db._fetch('loadFile', { projectId: currentProjectId, filePath: clip.path });
-        if (!originalFile) throw new Error("Original file not found.");
-        
-        await db._fetch('saveFile', {
-            projectId: currentProjectId,
-            filePath: dest,
-            fileContent: originalFile.content,
-            mimeType: originalFile.mimeType,
-            isBinary: originalFile.isBinary,
-        });
-
-        await renderFileTree();
+        if (clip.meta.isBinary) {
+            const u8 = await db.readFileRaw(currentProjectId, clip.path);
+            await db.saveBinaryFile(currentProjectId, dest, u8, clip.meta.mime);
+        } else {
+            const text = await db.readTextFile(currentProjectId, clip.path);
+            await db.saveTextFile(currentProjectId, dest, text);
+        }
+        renderFileTree();
         selectFile(dest);
+        autoSaveProject();
         console.log(`Pasted file as: ${dest}`);
     } catch (e) {
         console.error('Paste failed:', e);
@@ -5033,8 +4820,9 @@ async function handleFilesRename() {
     if (!newPath || newPath === path) return;
     try {
         await db.renameFile(currentProjectId, path, newPath.replace(/^\/+/, ''));
-        await renderFileTree();
+        renderFileTree();
         selectFile(newPath);
+        autoSaveProject();
         console.log(`Renamed: ${path} -> ${newPath}`);
     } catch (e) {
         console.error('Rename failed:', e);
@@ -5047,10 +4835,11 @@ async function handleFilesDelete() {
     const path = filesState.selectedPath;
     if (!confirm(`Delete file "${path}"? This cannot be undone.`)) return;
     try {
-        await db.deleteFile(currentProjectId, path);
+        db.deleteFile(currentProjectId, path);
         filesState.selectedPath = null;
-        await renderFileTree();
+        renderFileTree();
         if (filesPreviewEl) filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">Select a file.</div>';
+        autoSaveProject();
         console.log(`Deleted: ${path}`);
     } catch (e) {
         console.error('Delete failed:', e);
@@ -5058,92 +4847,96 @@ async function handleFilesDelete() {
     }
 }
 
-// START OF FIX: Moved helper function definitions to global scope
-function bindEventListeners() {
-    handleTabSwitching();
-    if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
-    if (undoButton) undoButton.addEventListener('click', doUndo);
-    if (redoButton) redoButton.addEventListener('click', doRedo);
-    if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-    if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
-    if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
-    if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
-    if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
-    if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-    if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
-    if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
-    if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
-    if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
-    if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
-    if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
-    if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
-    if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
-    if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
-    if (searchInput) searchInput.addEventListener('input', handleSearchInput());
-    if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
-    if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
-    if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
-    if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleAiEditorSearch();
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded. Initializing application.");
     
-    // AGENT AND ITERATIVE MODE LISTENERS
-    if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
-    if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
-    if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
-    if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
-    if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
-    
-    if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
-    if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
-    if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
+    function bindEventListeners() {
+        handleTabSwitching();
+        if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
+        if (undoButton) undoButton.addEventListener('click', doUndo);
+        if (redoButton) redoButton.addEventListener('click', doRedo);
+        if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
+        if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
+        if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
+        if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
+        if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
+        if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
+        if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+        if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
+        if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
+        if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
+        if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
+        if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
+        if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
+        if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
+        if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
+        if (searchInput) searchInput.addEventListener('input', handleSearchInput());
+        if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
+        if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
+        if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
+        if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleAiEditorSearch();
+        });
+        
+        // AGENT AND ITERATIVE MODE LISTENERS
+        if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
+        if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
+        if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
+        if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
+        if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
+        
+        if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
+        if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+        if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
 
-    if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
-    if (chatPromptInput) {
-        chatPromptInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                handleSendChatMessage();
-            }
+        if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
+        if (chatPromptInput) {
+            chatPromptInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    handleSendChatMessage();
+                }
+            });
+        }
+        
+        if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
+        if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
+        if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
+        if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+        if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
+        if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
+        if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
+        if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
+
+        const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
+        if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
+        if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
+        if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
+        if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
+        if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
+        if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
+        if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
+        if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
+        if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
+        if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
+        if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
+        if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
+        if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
+        if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
+        
+        // START OF FIX: Add click listener to dismiss the global agent loader.
+        if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
+        // END OF FIX
+
+        window.addEventListener('click', (event) => {
+            if (event.target === settingsModal) settingsModal.style.display = 'none';
+            if (event.target === addNodeModal) addNodeModal.style.display = 'none';
+            if (event.target === editNodeModal) editNodeModal.style.display = 'none';
+            if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
         });
     }
     
-    if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
-    if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
-    if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
-    if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
-    if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
-    if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
-    if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
-    if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
-
-    const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
-    if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
-    if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
-    if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
-    if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
-    if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
-    if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
-    if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
-    if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
-    if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
-    if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-    if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
-    if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
-    if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
-    if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
-    
-    if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
-
-    window.addEventListener('click', (event) => {
-        if (event.target === settingsModal) settingsModal.style.display = 'none';
-        if (event.target === addNodeModal) addNodeModal.style.display = 'none';
-        if (event.target === editNodeModal) editNodeModal.style.display = 'none';
-        if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
-    });
-}
-    
-async function resetToStartPage() {
+function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
@@ -5156,57 +4949,22 @@ async function resetToStartPage() {
     if(generateProjectButton) generateProjectButton.disabled = !keyIsAvailable;
     if(newProjectContainer) newProjectContainer.style.display = 'block';
     if(editorContainer) editorContainer.innerHTML = '';
-    if(previewContainer) previewContainer.srcdoc = 'about:blank';
+    if(previewContainer) previewContainer.srcdoc = '';
     if(agentOutput) agentOutput.innerHTML = '<div class="agent-message-placeholder">The agent\'s plan and actions will appear here.</div>';
     if(chatOutput) chatOutput.innerHTML = '<div class="chat-message-placeholder">Start the conversation by typing a message below.</div>';
     if(flowchartOutput) flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     if(consoleOutput) consoleOutput.innerHTML = '';
     if(fullCodeEditor) fullCodeEditor.value = '';
-    await populateProjectList();
+    populateProjectList();
     console.log("Ready for new project.");
 }
 
-async function buildAssetUrlMap() {
-    if (!currentProjectId) return {};
-    const assetMap = {};
-    try {
-        const files = await db.listFiles(currentProjectId);
-        for (const path of files) {
-            try {
-                const blob = await db.getFileBlob(currentProjectId, path);
-                assetMap[path] = URL.createObjectURL(blob);
-            } catch (e) {
-                console.warn(`Could not create blob URL for asset: ${path}`, e);
-            }
-        }
-    } catch (e) {
-        console.error("Failed to build asset URL map:", e);
-    }
-    return assetMap;
-}
+/* --- Missing helpers (safe stubs) --- */
+async function buildAssetUrlMap() { return {}; }
+function injectAssetRewriterScript(doc, assetMap) {}
+/* --- End stubs --- */
 
-function injectAssetRewriterScript(doc, assetMap) {
-    if (Object.keys(assetMap).length === 0) return;
-    const script = doc.createElement('script');
-    script.textContent = `
-        document.addEventListener('DOMContentLoaded', () => {
-            const assetMap = ${JSON.stringify(assetMap)};
-            const selectors = 'img[src], script[src], link[href], source[src], video[src], audio[src]';
-            document.querySelectorAll(selectors).forEach(el => {
-                const attr = el.hasAttribute('src') ? 'src' : 'href';
-                const originalPath = el.getAttribute(attr);
-                if (originalPath) {
-                    const cleanPath = new URL(originalPath, document.baseURI).pathname.substring(1);
-                    if (assetMap[cleanPath]) {
-                        el.setAttribute(attr, assetMap[cleanPath]);
-                    }
-                }
-            });
-        });
-    `;
-    doc.head.appendChild(script);
-}
-
+/* --- Allow editing descriptions from the Edit Component modal --- */
 async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
     const node = findNodeById(nodeId);
     if (!node) throw new Error(`Node not found: ${nodeId}`);
@@ -5244,6 +5002,7 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
     }
 }
 
+/* --- Flowchart generation (minimal) --- */
 function buildBasicMermaidFromTree(tree) {
     let graph = 'graph TD\n';
     const addNode = (node, parentId = null) => {
@@ -5314,6 +5073,9 @@ async function handleGenerateFlowchart() {
     }
 }
 
+/**
+ * Create a brand new project from a high-level prompt.
+ */
 async function handleGenerateProject() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5331,7 +5093,7 @@ async function handleGenerateProject() {
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
         
-        const existing = await db.listProjects();
+        const existing = db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
         while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
@@ -5350,8 +5112,8 @@ async function handleGenerateProject() {
         liveCodeOutput.textContent = generateFullCodeString(vibeTree);
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
-        await autoSaveProject();
-        await populateProjectList();
+        autoSaveProject();
+        populateProjectList();
 
         refreshAllUI();
         switchToTab('preview');
@@ -5364,6 +5126,9 @@ async function handleGenerateProject() {
     }
 }
 
+/**
+ * Starts a new project and immediately enters an iterative build session.
+ */
 async function handleStartIterativeProjectBuild() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5381,7 +5146,7 @@ async function handleStartIterativeProjectBuild() {
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
 
-        const existing = await db.listProjects();
+        const existing = db.listProjects();
         let projectId = desiredId;
         let suffix = 2;
         while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
@@ -5390,8 +5155,8 @@ async function handleStartIterativeProjectBuild() {
         currentProjectId = projectId;
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         vibeTree.description = prompt; // Set the overall goal
-        await db.saveProject(currentProjectId, vibeTree);
-        await populateProjectList();
+        db.saveProject(currentProjectId, vibeTree);
+        populateProjectList();
         resetHistory();
         refreshAllUI(); // Refresh UI to show the empty project state
 
@@ -5408,6 +5173,8 @@ async function handleStartIterativeProjectBuild() {
     }
 }
 
+
+// NEW: Use AI to generate a more detailed description for the selected component.
 async function handleAiImproveDescription() {
     const nodeId = editNodeIdInput.value;
     const node = findNodeById(nodeId);
@@ -5478,17 +5245,3 @@ function handleNodeContentToggle(event) {
     const header = event.currentTarget;
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM fully loaded. Initializing application.");
-    
-    // Initialize non-auth-dependent parts first
-    initializeApiSettings();
-    initializeMermaid();
-    bindEventListeners();
-    
-    // Initialize auth flow which will control the main app visibility
-    initializeAuth();
-
-    updateUndoRedoUI();
-});
