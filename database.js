@@ -1,7 +1,7 @@
 /**
  * database.js
  * Exports `DataBase` as a named export and default export.
- * Adds isLoggedIn() and verifyAuth() to fix "isLoggedIn is not a function".
+ * This is the client-side library for communicating with the backend.
  */
 
 export class DataBase {
@@ -43,36 +43,33 @@ export class DataBase {
    * Async verification: attempts a lightweight API call using the saved token.
    * Returns true if the token is accepted by the backend; false otherwise.
    */
-  /**
- * Async verification: attempts a lightweight API call using the saved token.
- * Returns true if the token is accepted by the backend; false otherwise.
- */
-async verifyAuth() {
-  const token = this.savedToken;
-  if (!token) return false;
-  try {
-    // call listProjects with explicit token to validate it
-    await this._fetch('listProjects', {}, token);
-    return true;
-  } catch (e) {
-    // token invalid or network error — treat as not authenticated
-    return false;
+  async verifyAuth() {
+    const token = this.savedToken;
+    if (!token) return false;
+    try {
+      // call listProjects with explicit token to validate it
+      await this._fetch('listProjects', {}, token);
+      return true;
+    } catch (e) {
+      // token invalid or network error — treat as not authenticated
+      return false;
+    }
   }
-}
 
   /* -----------------------
      Internal fetch wrapper
      ----------------------- */
   async _fetch(action, payload = {}, authToken = null) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
     const token = authToken || this.savedToken || null;
 
     const requestBody = { action, payload, authToken: token };
 
     const headers = {
       'Accept': 'application/json',
-      'Content-Type': 'text/plain;charset=UTF-8'
+      // Apps Script doPost requires text/plain for raw postData.contents
+      'Content-Type': 'text/plain;charset=UTF-8' 
     };
 
     const fetchOptions = {
@@ -89,11 +86,12 @@ async verifyAuth() {
       const url = this.apiUrl.endsWith('/exec') ? this.apiUrl : this.apiUrl + '/exec';
       res = await fetch(url, fetchOptions);
     } catch (err) {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       if (err.name === 'AbortError') throw new Error('Request timed out.');
-      throw new Error('Network request failed. This can happen if CORS preflight failed or the endpoint redirected to a login page. Check your Apps Script deployment (Execute as: Me, access: Anyone, even anonymous). Original error: ' + err.message);
+      // This generic error is often more helpful than the native one for CORS issues with GAS
+      throw new Error('Network request failed. This can happen if the API URL is wrong, CORS is misconfigured on the backend, or you lost internet connection.');
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
     }
 
     if (!res.ok) {
@@ -106,16 +104,16 @@ async verifyAuth() {
     try {
       json = await res.json();
     } catch (e) {
-      const raw = await res.text();
-      throw new Error('Unable to parse server response as JSON. Raw response: ' + raw);
+      throw new Error('Unable to parse server response as JSON. Check the Network tab in developer tools for the raw response from the server.');
     }
 
     if (!json || typeof json !== 'object') {
       throw new Error('Unexpected server response shape: ' + JSON.stringify(json));
     }
 
+    // This is the standard response shape from our Google Apps Script
     if (json.status === 'error') {
-      throw new Error(json.message || 'Unknown server error');
+      throw new Error(json.message || 'An unknown server error occurred.');
     }
 
     return json.data;
@@ -165,5 +163,5 @@ if (typeof window !== 'undefined') {
   window.DataBase = DataBase;
 }
 
-/* Named export and default export */
+/* Named export and default export are both available */
 export default DataBase;
