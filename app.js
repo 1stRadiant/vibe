@@ -708,7 +708,6 @@ async function updateAuthUI() {
  * Handles the login form submission.
  * @param {Event} event
  */
-// in app.js
 async function handleLogin(event) {
     event.preventDefault();
     loginErrorEl.textContent = '';
@@ -740,11 +739,6 @@ async function handleLogin(event) {
  * Handles the signup form submission.
  * @param {Event} event
  */
-/**
- * Handles the signup form submission.
- * @param {Event} event
- */
-// in app.js
 async function handleSignup(event) {
     event.preventDefault();
     signupErrorEl.textContent = '';
@@ -4590,7 +4584,6 @@ function handleUploadContextTrigger() {
     contextUploadInput.click();
 }
 
-// START OF FIX: Correctly handle the FileList object to process the selected file.
 /**
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
