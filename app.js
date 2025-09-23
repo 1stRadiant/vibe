@@ -4402,7 +4402,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files[0]; // FIX: Get the first file from the FileList, not the whole list.
+    const file = files; // FIX: Get the first file from the FileList, not the whole list.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4847,94 +4847,90 @@ async function handleFilesDelete() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM fully loaded. Initializing application.");
+// START OF FIX: Moved helper function definitions to global scope
+function bindEventListeners() {
+    handleTabSwitching();
+    if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
+    if (undoButton) undoButton.addEventListener('click', doUndo);
+    if (redoButton) redoButton.addEventListener('click', doRedo);
+    if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
+    if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
+    if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
+    if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
+    if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
+    if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
+    if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+    if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
+    if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
+    if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
+    if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
+    if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
+    if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
+    if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
+    if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
+    if (searchInput) searchInput.addEventListener('input', handleSearchInput());
+    if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
+    if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
+    if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
+    if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleAiEditorSearch();
+    });
     
-    function bindEventListeners() {
-        handleTabSwitching();
-        if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
-        if (undoButton) undoButton.addEventListener('click', doUndo);
-        if (redoButton) redoButton.addEventListener('click', doRedo);
-        if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-        if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
-        if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
-        if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
-        if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
-        if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-        if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
-        if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
-        if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
-        if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
-        if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
-        if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
-        if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
-        if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
-        if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
-        if (searchInput) searchInput.addEventListener('input', handleSearchInput());
-        if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
-        if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
-        if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
-        if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleAiEditorSearch();
-        });
-        
-        // AGENT AND ITERATIVE MODE LISTENERS
-        if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
-        if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
-        if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
-        if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
-        if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
-        
-        if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
-        if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
-        if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
+    // AGENT AND ITERATIVE MODE LISTENERS
+    if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleRunAgent);
+    if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartIterativeSession);
+    if (acceptContinueButton) acceptContinueButton.addEventListener('click', handleAcceptAndContinue);
+    if (requestChangesButton) requestChangesButton.addEventListener('click', handleRequestChanges);
+    if (endSessionButton) endSessionButton.addEventListener('click', handleEndIterativeSession);
+    
+    if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
+    if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+    if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
 
-        if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
-        if (chatPromptInput) {
-            chatPromptInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    handleSendChatMessage();
-                }
-            });
-        }
-        
-        if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
-        if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
-        if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
-        if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
-        if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
-        if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
-        if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
-        if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
-
-        const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
-        if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
-        if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
-        if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
-        if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
-        if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
-        if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
-        if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
-        if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
-        if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
-        if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-        if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
-        if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
-        if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
-        if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
-        
-        // START OF FIX: Add click listener to dismiss the global agent loader.
-        if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
-        // END OF FIX
-
-        window.addEventListener('click', (event) => {
-            if (event.target === settingsModal) settingsModal.style.display = 'none';
-            if (event.target === addNodeModal) addNodeModal.style.display = 'none';
-            if (event.target === editNodeModal) editNodeModal.style.display = 'none';
-            if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
+    if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
+    if (chatPromptInput) {
+        chatPromptInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSendChatMessage();
+            }
         });
     }
+    
+    if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
+    if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
+    if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
+    if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+    if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
+    if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
+    if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
+    if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
+
+    const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
+    if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
+    if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
+    if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
+    if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
+    if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
+    if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
+    if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
+    if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
+    if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
+    if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
+    if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
+    if (newProjectButton) newProjectButton.addEventListener('click', resetToStartPage);
+    
+    if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
+
+    window.addEventListener('click', (event) => {
+        if (event.target === settingsModal) settingsModal.style.display = 'none';
+        if (event.target === addNodeModal) addNodeModal.style.display = 'none';
+        if (event.target === editNodeModal) editNodeModal.style.display = 'none';
+        if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
+    });
+}
     
 function resetToStartPage() {
     console.log("Resetting to new project state.");
@@ -4959,12 +4955,9 @@ function resetToStartPage() {
     console.log("Ready for new project.");
 }
 
-/* --- Missing helpers (safe stubs) --- */
 async function buildAssetUrlMap() { return {}; }
 function injectAssetRewriterScript(doc, assetMap) {}
-/* --- End stubs --- */
 
-/* --- Allow editing descriptions from the Edit Component modal --- */
 async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
     const node = findNodeById(nodeId);
     if (!node) throw new Error(`Node not found: ${nodeId}`);
@@ -5002,7 +4995,6 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
     }
 }
 
-/* --- Flowchart generation (minimal) --- */
 function buildBasicMermaidFromTree(tree) {
     let graph = 'graph TD\n';
     const addNode = (node, parentId = null) => {
@@ -5073,9 +5065,6 @@ async function handleGenerateFlowchart() {
     }
 }
 
-/**
- * Create a brand new project from a high-level prompt.
- */
 async function handleGenerateProject() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5126,9 +5115,6 @@ async function handleGenerateProject() {
     }
 }
 
-/**
- * Starts a new project and immediately enters an iterative build session.
- */
 async function handleStartIterativeProjectBuild() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -5173,8 +5159,6 @@ async function handleStartIterativeProjectBuild() {
     }
 }
 
-
-// NEW: Use AI to generate a more detailed description for the selected component.
 async function handleAiImproveDescription() {
     const nodeId = editNodeIdInput.value;
     const node = findNodeById(nodeId);
@@ -5246,7 +5230,8 @@ function handleNodeContentToggle(event) {
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
 
-// START OF FIX
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded. Initializing application.");
     // Initial setup on page load
     initializeApiSettings();
     initializeMermaid();
@@ -5255,4 +5240,3 @@ function handleNodeContentToggle(event) {
     resetToStartPage(); // Start on the "new project" page
     updateUndoRedoUI();
 });
-// END OF FIX
