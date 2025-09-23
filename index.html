@@ -13,37 +13,6 @@
     <!-- END OF FIX -->
 </head>
 <body>
-    <!-- ADD THIS RIGHT AFTER THE <body> TAG -->
-<div id="auth-overlay" class="modal" style="display: flex;">
-    <div class="modal-content" style="max-width: 400px;">
-        <div id="login-view">
-            <h2>Login</h2>
-            <form id="login-form">
-                <label for="login-email">Email</label>
-                <input type="email" id="login-email" required>
-                <label for="login-password">Password</label>
-                <input type="password" id="login-password" required>
-                <button type="submit" class="action-button">Login</button>
-                <p id="login-error" class="modal-error"></p>
-            </form>
-            <p>Don't have an account? <a href="#" id="show-signup">Sign Up</a></p>
-        </div>
-        <div id="signup-view" style="display: none;">
-            <h2>Sign Up</h2>
-            <form id="signup-form">
-                <label for="signup-email">Email</label>
-                <input type="email" id="signup-email" required>
-                <label for="signup-password">Password</label>
-                <input type="password" id="signup-password" required>
-                <button type="submit" class="action-button">Sign Up</button>
-                <p id="signup-error" class="modal-error"></p>
-                <p id="signup-success" style="color: #98c379;"></p>
-            </form>
-            <p>Already have an account? <a href="#" id="show-login">Login</a></p>
-        </div>
-    </div>
-</div>
-
 
     <!-- The main layout that is always visible -->
     <div class="main-layout">
@@ -60,8 +29,6 @@
             <button class="tab-button" data-tab="code">Full Code</button>
 
             <div class="tabs-spacer"></div>
-            <span id="user-display" style="padding: 0 15px; align-self: center;"></span>
-            <button id="logout-button" class="toolbar-button" title="Logout">Logout</button>
             <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
             <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
             <button id="new-project-button" title="New Project">+</button>
@@ -417,7 +384,7 @@
         </div>
     </div>
     <!-- END OF FIX -->
-    <script src="database.js" type="module"></script>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>           
