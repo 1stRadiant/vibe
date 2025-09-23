@@ -669,7 +669,7 @@ function updateUndoRedoUI() {
    ========================= */
 
 // ===================================
-// --- NEW AUTHENTICATION LOGIC ---
+// --- AUTHENTICATION LOGIC ---
 // ===================================
 
 /**
@@ -678,26 +678,19 @@ function updateUndoRedoUI() {
 async function updateAuthUI() {
     if (db.isLoggedIn()) {
         if (authOverlay) authOverlay.style.display = 'none';
-        if (appContainer) appContainer.style.display = 'block'; // Or whatever your display property is
+        if (appContainer) appContainer.style.display = 'block';
         if (logoutButton) logoutButton.style.display = 'block';
         if (userDisplay) {
-            // A more robust solution would decode the JWT, but for this simple case,
-            // we'll store the email from the login response.
             const userEmail = sessionStorage.getItem('vibe-user-email');
             userDisplay.textContent = userEmail || 'Logged In';
         }
-        
-        // This is the point where we initialize the rest of the app for a logged-in user.
         await populateProjectList();
         resetToStartPage();
-
     } else {
         if (authOverlay) authOverlay.style.display = 'flex';
         if (appContainer) appContainer.style.display = 'none';
         if (logoutButton) logoutButton.style.display = 'none';
         if (userDisplay) userDisplay.textContent = '';
-        
-        // Clear any project data if the user logs out
         currentProjectId = null;
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         resetHistory();
@@ -720,8 +713,6 @@ async function handleLogin(event) {
     try {
         const response = await db.login({ email, password });
         if (response && response.token) {
-            // The db class already sets the auth token.
-            // Store email for display purposes.
             sessionStorage.setItem('vibe-user-email', email);
             await updateAuthUI();
         } else {
@@ -751,22 +742,15 @@ async function handleSignup(event) {
 
     try {
         const response = await db.signup({ email, password });
-        // A successful response should be an object.
-        // The DataBase class should throw an error for failed signups.
         if (response) {
             signupSuccessEl.textContent = 'Signup successful! Please log in.';
             signupForm.reset();
-            // Switch to login view after successful signup
             signupView.style.display = 'none';
             loginView.style.display = 'block';
         } else {
-            // This case handles unexpected scenarios where signup might return
-            // a non-error, but also non-successful, response.
             throw new Error('Received an invalid response from the server.');
         }
     } catch (error) {
-        // The 'error' object here will be a proper Error instance,
-        // which always has a .message property.
         signupErrorEl.textContent = error.message;
     } finally {
         button.disabled = false;
@@ -786,12 +770,31 @@ function handleLogout() {
 }
 
 /**
- * Sets up initial authentication state and event listeners.
+ * WORKAROUND IMPLEMENTED HERE
+ * Sets up initial authentication state and event listeners using event delegation.
+ * This is more robust against script loading timing issues.
  */
 function initializeAuth() {
-    if (loginForm) loginForm.addEventListener('submit', handleLogin);
-    if (signupForm) signupForm.addEventListener('submit', handleSignup);
-    if (logoutButton) logoutButton.addEventListener('click', handleLogout);
+    console.log("Initializing auth with event delegation workaround.");
+
+    // This single listener handles submissions for both forms.
+    document.body.addEventListener('submit', (event) => {
+        // Check if the event came from the login form
+        if (event.target.id === 'login-form') {
+            console.log("Login form submitted, calling handleLogin.");
+            handleLogin(event);
+        }
+        // Check if the event came from the signup form
+        if (event.target.id === 'signup-form') {
+            console.log("Signup form submitted, calling handleSignup.");
+            handleSignup(event);
+        }
+    });
+
+    // These listeners are for simple clicks and are less prone to timing issues.
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    }
 
     if (showSignupLink) {
         showSignupLink.addEventListener('click', (e) => {
@@ -808,6 +811,7 @@ function initializeAuth() {
         });
     }
 
+    // Run the initial UI setup.
     updateAuthUI();
 }
 // ===============================
@@ -4596,7 +4600,7 @@ async function processContextUpload(event) {
         return;
     }
 
-    const file = files; // FIX: Get the first file from the FileList.
+    const file = files; // Get the first file from the FileList.
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
