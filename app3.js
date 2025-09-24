@@ -4029,6 +4029,45 @@ function initializeMermaid() {
 }
 
 // --- Project Persistence Logic ---
+// START OF FIX: Add compression helpers
+/**
+ * Compresses project data using pako and encodes it to base64.
+ * @param {object} projectData The vibeTree object.
+ * @returns {string} A compressed, base64-encoded string.
+ */
+function compressProjectData(projectData) {
+    try {
+        const jsonString = JSON.stringify(projectData);
+        const compressed = pako.deflate(jsonString, { to: 'string' });
+        return btoa(compressed);
+    } catch (e) {
+        console.error("Compression failed:", e);
+        throw new Error("Failed to compress project data for saving.");
+    }
+}
+
+/**
+ * Decompresses a base64 string using pako and parses it as JSON.
+ * @param {string} compressedString The base64-encoded compressed string.
+ * @returns {object} The parsed vibeTree object.
+ */
+function decompressProjectData(compressedString) {
+    try {
+        const compressed = atob(compressedString);
+        const jsonString = pako.inflate(compressed, { to: 'string' });
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Decompression failed:", e);
+        // Fallback for potentially uncompressed old data
+        try {
+            return JSON.parse(compressedString);
+        } catch (e2) {
+            console.error("Could not parse data as JSON either.", e2);
+            throw new Error("Failed to decompress or parse project data.");
+        }
+    }
+}
+// END OF FIX
 
 async function populateProjectList() {
     if (!currentUser) return;
@@ -4066,14 +4105,17 @@ async function handleLoadProject(event) {
     }
     
     try {
-        const projectData = await api.loadProject(currentUser.userId, projectId);
+        // START OF FIX: Decompress data on load
+        const compressedData = await api.loadProject(currentUser.userId, projectId);
+        vibeTree = decompressProjectData(compressedData);
+        // END OF FIX
+
         currentProjectId = projectId;
-        vibeTree = projectData;
         console.log(`Project '${projectId}' loaded.`);
         
         refreshAllUI();
         resetHistory();
-        // autoSaveProject(); // autoSave is implicit in refreshAllUI
+        // No autoSaveProject() needed here as we just loaded.
 
         switchToTab('preview');
     } catch (error) {
@@ -4107,7 +4149,10 @@ async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
-        await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
+        // START OF FIX: Compress data before saving
+        const compressedData = compressProjectData(vibeTree);
+        await api.saveProject(currentUser.userId, currentProjectId, compressedData);
+        // END OF FIX
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
     } catch (error) {
         console.error("Auto-save failed:", error);
