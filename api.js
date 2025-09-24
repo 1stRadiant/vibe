@@ -1,7 +1,7 @@
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
-const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby0tsuBq7W4EldesbWSIjewatywE0vIwZaIaOfTy9kOfYXRjo_PpG2kZq9Hi7WM35QjNg/exec';
 
 /**
  * Performs a JSONP request to the Google Apps Script backend.
