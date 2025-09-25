@@ -1,7 +1,7 @@
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyW37d5w1EX7kXn7tL38Mf3K0HMnZUvX7cH1bPtyG_jWsLs_7wVyn5_TmhXEpxFOcDL/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKdGhI9DdsNzY4GmcHHh07RKjb0q1Kw1shMh1MV9EGJ4jJhsPyWHzjQNep0gR8oztjTw/exec';
 /**
  * Performs a POST request to the Google Apps Script backend using the Fetch API.
  * @param {string} action - The action to perform (e.g., 'login', 'saveProject').
