@@ -20,6 +20,8 @@ async function postRequest(action, payload = {}) {
     },
     body: JSON.stringify({ action, payload }), // Send action and payload in the request body
     mode: 'cors',
+    cache: 'no-cache'
+    redirect: 'follow',
   };
 
   try {
