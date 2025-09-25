@@ -2,74 +2,75 @@
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiSh_-xVqxkVwrpD1xPBrL3rN5B2FxUbyNFSy4BqEF4CGkxA_KQ3YDaGo5ZlKHijyJYg/exec';
+// api.js
+
 /**
- * Performs a POST request to the Google Apps Script backend using the Fetch API.
+ * Performs a JSONP request to the Google Apps Script backend.
+ * This function dynamically creates a <script> tag to bypass CORS restrictions.
  * @param {string} action - The action to perform (e.g., 'login', 'saveProject').
- * @param {object} payload - An object of parameters to send with the request.
+ * @param {object} params - An object of parameters to send with the request.
  * @returns {Promise<object>} A promise that resolves with the data from the backend.
  */
-async function postRequest(action, payload = {}) {
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
-    throw new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.');
-  }
+function jsonpRequest(action, params = {}) {
+  return new Promise((resolve, reject) => {
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
+        return reject(new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.'));
+    }
 
-  const requestOptions = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script to parse the body
-    },
-    body: JSON.stringify({ action, payload }), // Send action and payload in the request body
-    cache: 'no-cache',
-    redirect: 'follow',
-  };
-
-  try {
-    const response = await fetch(APPS_SCRIPT_URL, requestOptions);
+    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
     
-    if (!response.ok) {
-        // Try to get a more specific error message from the backend if possible
-        const errorText = await response.text();
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    const script = document.createElement('script');
+    
+    let url = `${APPS_SCRIPT_URL}?action=${action}&callback=${callbackName}`;
+    for (const key in params) {
+        url += `&${key}=${encodeURIComponent(params[key])}`;
     }
+    script.src = url;
 
-    const result = await response.json();
+    // The backend will respond with a script that calls this function.
+    window[callbackName] = (data) => {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        if (data.status === 'success') {
+            resolve(data.data);
+        } else {
+            reject(new Error(data.message || 'An unknown API error occurred.'));
+        }
+    };
+    
+    script.onerror = () => {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        reject(new Error('API request failed. Check the Apps Script URL and deployment settings.'));
+    };
 
-    if (result.status === 'success') {
-      return result.data; // Resolve the promise with the actual data
-    } else {
-      // Throw an error to be caught by the calling function's .catch() block
-      throw new Error(result.message || 'An unknown API error occurred.');
-    }
-  } catch (error) {
-    console.error('Fetch API Error:', error);
-    // Re-throw the error so the UI layer can handle it
-    throw error;
-  }
+    document.body.appendChild(script);
+  });
 }
 
-// --- API Functions (These now use postRequest) ---
+// --- API Functions ---
 
 export function signup(username, password) {
-  return postRequest('signup', { username, password });
+  return jsonpRequest('signup', { username, password });
 }
 
 export function login(username, password) {
-  return postRequest('login', { username, password });
+  return jsonpRequest('login', { username, password });
 }
 
 export function listProjects(userId) {
-  return postRequest('listProjects', { userId });
+  return jsonpRequest('listProjects', { userId });
 }
 
 export function loadProject(userId, projectId) {
-  return postRequest('loadProject', { userId, projectId });
+  return jsonpRequest('loadProject', { userId, projectId });
 }
 
 export function saveProject(userId, projectId, projectData) {
-  // No need to stringify here; postRequest handles it.
-  return postRequest('saveProject', { userId, projectId, projectData });
+  const dataString = JSON.stringify(projectData);
+  return jsonpRequest('saveProject', { userId, projectId, projectData: dataString });
 }
 
 export function deleteProject(userId, projectId) {
-  return postRequest('deleteProject', { userId, projectId });
+  return jsonpRequest('deleteProject', { userId, projectId });
 }
