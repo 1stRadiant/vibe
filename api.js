@@ -1,7 +1,7 @@
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwdcDm8HP-5GlnmxxaXkHbXY9Rgy7R_WbG5RSCgZ9Fpl3qxzQJeJAUdBYHBfv4GE2dQsg/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTJz1GUWH5WyaTneAUbdRAnw_tL0EbzWVRNC6Nf3rJZr9Ah-oXcSUyQr1RuSHDwVibyQ/exec';
 // api.js
 
 /**
