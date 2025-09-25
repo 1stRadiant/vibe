@@ -19,7 +19,6 @@ async function postRequest(action, payload = {}) {
       'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script to parse the body
     },
     body: JSON.stringify({ action, payload }), // Send action and payload in the request body
-    mode: 'no-cors',
     cache: 'no-cache',
     redirect: 'follow',
   };
