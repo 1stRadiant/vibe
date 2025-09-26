@@ -2,7 +2,6 @@
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTJz1GUWH5WyaTneAUbdRAnw_tL0EbzWVRNC6Nf3rJZr9Ah-oXcSUyQr1RuSHDwVibyQ/exec';
-// api.js
 
 /**
  * Performs a JSONP request to the Google Apps Script backend.
@@ -67,8 +66,27 @@ export function loadProject(userId, projectId) {
 }
 
 export function saveProject(userId, projectId, projectData) {
-  const dataString = JSON.stringify(projectData);
-  return jsonpRequest('saveProject', { userId, projectId, projectData: dataString });
+  let dataString = JSON.stringify(projectData);
+  let isCompressed = false;
+
+  // Check if Pako library is loaded.
+  if (typeof pako !== 'undefined') {
+    try {
+      // Pako's deflate function can work directly with a string.
+      const compressedData = pako.deflate(dataString, { to: 'string' });
+      
+      // We'll encode the compressed string to Base64 to ensure it's safe for URL transmission.
+      dataString = btoa(compressedData);
+      isCompressed = true;
+    } catch (error) {
+      console.error('Data compression failed:', error);
+      // If compression fails, we proceed with uncompressed data.
+    }
+  } else {
+    console.warn('Pako library not loaded. Saving data uncompressed. This may fail for large projects.');
+  }
+  
+  return jsonpRequest('saveProject', { userId, projectId, projectData: dataString, compressed: isCompressed });
 }
 
 export function deleteProject(userId, projectId) {
