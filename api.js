@@ -101,31 +101,40 @@ function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
 export async function saveProject(userId, projectId, projectData) {
   // 1. Convert the project object to a JSON string.
   let dataString = JSON.stringify(projectData);
+  let isCompressed = false;
+
+  // 2. Compress the JSON string if pako is available.
+  if (typeof pako !== 'undefined') {
+    try {
+      const compressedData = pako.deflate(dataString, { to: 'string' });
+      // 3. Base64 encode the *compressed* string.
+      dataString = btoa(compressedData);
+      isCompressed = true;
+    } catch (error) {
+      console.error('Data compression failed:', error);
+      // If compression fails, fall back to just Base64 encoding the JSON.
+      dataString = btoa(dataString); 
+    }
+  } else {
+    console.warn('Pako library not loaded. Saving data uncompressed (but Base64 encoded).');
+    // 3b. Base64 encode the *uncompressed* JSON string.
+    dataString = btoa(dataString);
+  }
   
-  // 2. Base64 encode the JSON string. This makes it safe for URL transmission
-  //    and ensures a consistent format without special characters.
-  dataString = btoa(dataString);
-
-  // 3. The data is NOT compressed.
-  const isCompressed = false;
-
-  // Create chunks from the Base64 string.
+  // 4. Create chunks from the final processed string.
   const chunks = [];
   for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
     chunks.push(dataString.substring(i, i + CHUNK_SIZE));
   }
 
-  // Send each chunk to the server sequentially.
+  // 5. Send chunks sequentially.
   const totalChunks = chunks.length;
   for (let i = 0; i < totalChunks; i++) {
-    // Awaiting each call ensures that we send chunks one by one.
     await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
   }
 
-  // The final chunk will trigger the server to reassemble and save the data.
   return { status: 'success', message: 'Project saved successfully.' };
 }
-
 
 export function deleteProject(userId, projectId) {
   return jsonpRequest('deleteProject', { userId, projectId });
