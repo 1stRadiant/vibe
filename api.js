@@ -1,7 +1,7 @@
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwkiNqso1R8qxHCA-6ykqAAV6VaJIWOnvdxalVZBopvkFaBUSnV1B53Obi0sn0dQ1eZnQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweaHdACZ8pRO55pSX6jijTD5cNzVppF_8MESG5KCd20yYWg3qlJ7EGSUc5sA0R5xAIJA/exec';
 
 // Define a chunk size for data transmission. 1500 is a safe size for URLs.
 const CHUNK_SIZE = 1500;
