@@ -4031,26 +4031,21 @@ function initializeMermaid() {
 // --- Project Persistence Logic ---
 // START OF FIX: Add compression helpers and make them robust
 /**
- * Compresses project data using pako and encodes it to base64.
+ * Encodes project data to a base64 string without compression.
  * @param {object} projectData The vibeTree object.
- * @returns {string} A compressed, base64-encoded string, or the uncompressed JSON string if pako is not available.
+ * @returns {string} A base64-encoded JSON string.
  */
 function compressProjectData(projectData) {
-    const jsonString = JSON.stringify(projectData);
-    if (typeof pako === 'undefined' || pako === null) {
-        console.warn("Pako library not loaded. Saving data uncompressed. This may fail for large projects.");
-        return jsonString;
-    }
     try {
-        const compressed = pako.deflate(jsonString, { to: 'string' });
-        return btoa(compressed);
+        const jsonString = JSON.stringify(projectData);
+        // Simply encode the JSON string to Base64 without compression.
+        return btoa(jsonString);
     } catch (e) {
-        console.error("Compression failed:", e);
-        throw new Error("Failed to compress project data for saving.");
+        console.error("Failed to encode project data:", e);
+        throw new Error("Failed to encode project data for saving.");
     }
 }
 
-// In app3.js
 
 /**
  * Decodes a base64 string and parses it as JSON.
@@ -4058,23 +4053,15 @@ function compressProjectData(projectData) {
  * @param {string} dataString The Base64-encoded JSON string from the database.
  * @returns {object} The parsed vibeTree object.
  */
-// In app3.js
 function decompressProjectData(dataString) {
-    // This function is the correct counterpart to the fixed api.js save function.
-    if (typeof pako === 'undefined' || pako === null) {
-        throw new Error("Pako library is required for loading projects but has not loaded.");
-    }
     try {
         // 1. Decode the Base64 string from the server.
-        const compressed = atob(dataString);
-        // 2. Decompress the data using pako.
-        const jsonString = pako.inflate(compressed, { to: 'string' });
-        // 3. Parse the JSON string into an object.
+        const jsonString = atob(dataString);
+        // 2. Parse the JSON string into an object.
         return JSON.parse(jsonString);
     } catch (e) {
-        // If this fails, the data from the server is genuinely corrupt.
-        console.error("Decompression or parsing failed:", e);
-        throw new Error("Failed to decompress or parse project data.");
+        console.error("Failed to decode or parse project data:", e);
+        throw new Error("Failed to decode or parse project data. It may be corrupt.");
     }
 }
 
@@ -4159,8 +4146,7 @@ async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
-        // CRITICAL FIX: Pass the raw vibeTree object directly to the API.
-        // The API layer will now be responsible for all compression and encoding.
+        // The API layer is responsible for all encoding and chunking.
         await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
         
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
