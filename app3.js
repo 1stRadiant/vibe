@@ -4058,19 +4058,23 @@ function compressProjectData(projectData) {
  * @param {string} dataString The Base64-encoded JSON string from the database.
  * @returns {object} The parsed vibeTree object.
  */
+// In app3.js
 function decompressProjectData(dataString) {
+    // This function is the correct counterpart to the fixed api.js save function.
+    if (typeof pako === 'undefined' || pako === null) {
+        throw new Error("Pako library is required for loading projects but has not loaded.");
+    }
     try {
-        // 1. The data from the server is a Base64 encoded JSON string. Decode it.
-        const jsonString = atob(dataString);
-        
-        // 2. Parse the decoded JSON string into a JavaScript object.
+        // 1. Decode the Base64 string from the server.
+        const compressed = atob(dataString);
+        // 2. Decompress the data using pako.
+        const jsonString = pako.inflate(compressed, { to: 'string' });
+        // 3. Parse the JSON string into an object.
         return JSON.parse(jsonString);
-
     } catch (e) {
-        console.error("Failed to decode or parse project data from server:", e);
-        console.error("Received data string:", dataString.substring(0, 100) + '...'); // Log a sample
-        // This error will now only happen if the data is corrupt or not Base64.
-        throw new Error("Failed to read project data. The data may be corrupt.");
+        // If this fails, the data from the server is genuinely corrupt.
+        console.error("Decompression or parsing failed:", e);
+        throw new Error("Failed to decompress or parse project data.");
     }
 }
 
@@ -4150,21 +4154,20 @@ async function handleDeleteProject(event) {
     }
 }
 
+// In app3.js
 async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
-        // The api.saveProject function is designed to handle compression internally.
-        // Pass the raw vibeTree object directly to it.
+        // CRITICAL FIX: Pass the raw vibeTree object directly to the API.
+        // The API layer will now be responsible for all compression and encoding.
         await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
         
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
     } catch (error) {
         console.error("Auto-save failed:", error);
-        // Optionally, add some UI feedback about the save failure
     }
 }
-
 
 // Add event listeners for project management buttons
 projectListContainer.addEventListener('click', (event) => {
