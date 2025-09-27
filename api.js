@@ -1,8 +1,10 @@
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyBQC0NIzOWRz1JMKB7Q3165WwvhfxcXngBou8RcuEvzeN89H4OLExdyxKR8pDpbKwbSw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyQn9du3ixflpGknQXx6tRQIo_LUEr6q1B-5v9GRo8xkC17GzsbZ9wO83AkZWSc3_X5Ng/exec';
 
+// Define a chunk size for data transmission. 1500 is a safe size for URLs.
+const CHUNK_SIZE = 1500;
 
 /**
  * Performs a JSONP request to the Google Apps Script backend.
@@ -66,29 +68,72 @@ export function loadProject(userId, projectId) {
   return jsonpRequest('loadProject', { userId, projectId });
 }
 
-export function saveProject(userId, projectId, projectData) {
+/**
+ * Sends a single chunk of data to the server.
+ * @param {string} userId - The user's ID.
+ * @param {string} projectId - The project's ID.
+ * @param {string} chunk - The data chunk to send.
+ * @param {number} index - The index of this chunk.
+ * @param {number} totalChunks - The total number of chunks.
+ * @param {boolean} isCompressed - Whether the data is compressed.
+ * @returns {Promise<object>} A promise that resolves when the chunk is sent.
+ */
+function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
+  return jsonpRequest('saveProjectChunk', {
+    userId,
+    projectId,
+    chunkData: chunk,
+    chunkIndex: index,
+    totalChunks,
+    compressed: isCompressed,
+  });
+}
+
+
+/**
+ * Saves project data by breaking it into smaller chunks and sending them iteratively.
+ * This approach is more robust for large projects.
+ * @param {string} userId - The user's ID.
+ * @param {string} projectId - The project's ID.
+ * @param {object} projectData - The project data object to save.
+ * @returns {Promise<object>} A promise that resolves when the entire project is saved.
+ */
+export async function saveProject(userId, projectId, projectData) {
   let dataString = JSON.stringify(projectData);
   let isCompressed = false;
 
-  // Check if Pako library is loaded.
+  // Check if Pako library is loaded and attempt to compress the data.
   if (typeof pako !== 'undefined') {
     try {
-      // Pako's deflate function can work directly with a string.
       const compressedData = pako.deflate(dataString, { to: 'string' });
-      
-      // We'll encode the compressed string to Base64 to ensure it's safe for URL transmission.
-      dataString = btoa(compressedData);
+      dataString = btoa(compressedData); // Base64 encode the compressed string for safe URL transmission.
       isCompressed = true;
     } catch (error) {
       console.error('Data compression failed:', error);
-      // If compression fails, we proceed with uncompressed data.
+      // Proceed with uncompressed data if compression fails.
     }
   } else {
     console.warn('Pako library not loaded. Saving data uncompressed. This may fail for large projects.');
   }
-  
-  return jsonpRequest('saveProject', { userId, projectId, projectData: dataString, compressed: isCompressed });
+
+  // Create chunks from the data string.
+  const chunks = [];
+  for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+    chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+  }
+
+  // Send each chunk to the server sequentially.
+  const totalChunks = chunks.length;
+  for (let i = 0; i < totalChunks; i++) {
+    // Awaiting each call ensures that we send chunks one by one.
+    await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
+  }
+
+  // The final chunk will trigger the server to reassemble and save the data.
+  // We can return a success message or the result from the last chunk call.
+  return { status: 'success', message: 'Project saved successfully.' };
 }
+
 
 export function deleteProject(userId, projectId) {
   return jsonpRequest('deleteProject', { userId, projectId });
