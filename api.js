@@ -99,24 +99,17 @@ function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
  * @returns {Promise<object>} A promise that resolves when the entire project is saved.
  */
 export async function saveProject(userId, projectId, projectData) {
+  // 1. Convert the project object to a JSON string.
   let dataString = JSON.stringify(projectData);
-  let isCompressed = false;
+  
+  // 2. Base64 encode the JSON string. This makes it safe for URL transmission
+  //    and ensures a consistent format without special characters.
+  dataString = btoa(dataString);
 
-  // Check if Pako library is loaded and attempt to compress the data.
-  if (typeof pako !== 'undefined') {
-    try {
-      const compressedData = pako.deflate(dataString, { to: 'string' });
-      dataString = btoa(compressedData); // Base64 encode the compressed string for safe URL transmission.
-      isCompressed = true;
-    } catch (error) {
-      console.error('Data compression failed:', error);
-      // Proceed with uncompressed data if compression fails.
-    }
-  } else {
-    console.warn('Pako library not loaded. Saving data uncompressed. This may fail for large projects.');
-  }
+  // 3. The data is NOT compressed.
+  const isCompressed = false;
 
-  // Create chunks from the data string.
+  // Create chunks from the Base64 string.
   const chunks = [];
   for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
     chunks.push(dataString.substring(i, i + CHUNK_SIZE));
@@ -130,7 +123,6 @@ export async function saveProject(userId, projectId, projectData) {
   }
 
   // The final chunk will trigger the server to reassemble and save the data.
-  // We can return a success message or the result from the last chunk call.
   return { status: 'success', message: 'Project saved successfully.' };
 }
 
