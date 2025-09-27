@@ -4050,36 +4050,29 @@ function compressProjectData(projectData) {
     }
 }
 
+// In app3.js
+
 /**
- * Decompresses a base64 string using pako and parses it as JSON.
- * @param {string} dataString The string from the database.
+ * Decodes a base64 string and parses it as JSON.
+ * This version DOES NOT handle decompression.
+ * @param {string} dataString The Base64-encoded JSON string from the database.
  * @returns {object} The parsed vibeTree object.
  */
 function decompressProjectData(dataString) {
-    if (typeof pako === 'undefined' || pako === null) {
-        console.warn("Pako library not loaded. Attempting to parse data as uncompressed JSON.");
-        try {
-            return JSON.parse(dataString);
-        } catch(e) {
-            console.error("Could not parse uncompressed project data.", e);
-            throw new Error("Failed to parse project data. The data may be corrupt or compressed without the pako library being available.");
-        }
-    }
     try {
-        const compressed = atob(dataString);
-        const jsonString = pako.inflate(compressed, { to: 'string' });
+        // 1. The data from the server is a Base64 encoded JSON string. Decode it.
+        const jsonString = atob(dataString);
+        
+        // 2. Parse the decoded JSON string into a JavaScript object.
         return JSON.parse(jsonString);
+
     } catch (e) {
-        console.warn("Decompression failed, attempting to parse as plain JSON.", e);
-        try {
-            return JSON.parse(dataString);
-        } catch (e2) {
-            console.error("Could not parse data as JSON either.", e2);
-            throw new Error("Failed to decompress or parse project data.");
-        }
+        console.error("Failed to decode or parse project data from server:", e);
+        console.error("Received data string:", dataString.substring(0, 100) + '...'); // Log a sample
+        // This error will now only happen if the data is corrupt or not Base64.
+        throw new Error("Failed to read project data. The data may be corrupt.");
     }
 }
-// END OF FIX
 
 async function populateProjectList() {
     if (!currentUser) return;
