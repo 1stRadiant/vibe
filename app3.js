@@ -4161,16 +4161,17 @@ async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
-        // START OF FIX: Compress data before saving
-        const compressedData = compressProjectData(vibeTree);
-        await api.saveProject(currentUser.userId, currentProjectId, compressedData);
-        // END OF FIX
+        // The api.saveProject function is designed to handle compression internally.
+        // Pass the raw vibeTree object directly to it.
+        await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
+        
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
     } catch (error) {
         console.error("Auto-save failed:", error);
         // Optionally, add some UI feedback about the save failure
     }
 }
+
 
 // Add event listeners for project management buttons
 projectListContainer.addEventListener('click', (event) => {
