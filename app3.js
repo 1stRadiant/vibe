@@ -4270,13 +4270,6 @@ projectListContainer.addEventListener('click', (event) => {
 async function openShareModal(projectId) {
     if (!projectId || !currentUser) return;
     
-    // START OF FIX: Add null checks for all modal elements to prevent crash
-    if (!shareModal || !shareModalTitle || !shareModalError || !shareLinkContainer || !publishButton || !unpublishButton || !publishStatusText) {
-        console.error("Share Modal HTML elements are missing from the DOM. Cannot open share modal.");
-        return;
-    }
-    // END OF FIX
-    
     shareModal.style.display = 'block';
     shareModalTitle.textContent = `Share Project: ${projectId}`;
     shareModalError.textContent = '';
@@ -4307,7 +4300,6 @@ async function openShareModal(projectId) {
         shareModalError.textContent = `Error: ${error.message}`;
     }
 }
-
 
 /**
  * Handles the click event for the "Publish" button in the share modal.
