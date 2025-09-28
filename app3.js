@@ -4263,14 +4263,13 @@ projectListContainer.addEventListener('click', (event) => {
 });
 
 // START OF CHANGE: Share/Publish Modal Logic
-
 /**
  * Opens and configures the Share modal based on the project's current published state.
  * @param {string} projectId The ID of the project to share.
  */
 async function openShareModal(projectId) {
     if (!projectId || !currentUser) return;
-
+    
     // START OF FIX: Add null checks for all modal elements to prevent crash
     if (!shareModal || !shareModalTitle || !shareModalError || !shareLinkContainer || !publishButton || !unpublishButton || !publishStatusText) {
         console.error("Share Modal HTML elements are missing from the DOM. Cannot open share modal.");
