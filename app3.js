@@ -1,5 +1,128 @@
 import * as api from './api.js';
-// END OF CHANGE
+
+// --- START OF LIVE VIEW BOOTLOADER ---
+// This section checks if the page should be loaded as a live project preview
+// instead of the full editor. This is the core of the sharable link feature.
+
+/**
+ * Encodes project data to a base64 string without compression.
+ * @param {object} projectData The vibeTree object.
+ * @returns {string} A base64-encoded JSON string.
+ */
+function compressProjectData(projectData) {
+    try {
+        const jsonString = JSON.stringify(projectData);
+        // Simply encode the JSON string to Base64 without compression.
+        return btoa(jsonString);
+    } catch (e) {
+        console.error("Failed to encode project data:", e);
+        throw new Error("Failed to encode project data for saving.");
+    }
+}
+
+/**
+ * Decodes a base64 string and parses it as JSON.
+ * @param {string} dataString The Base64-encoded JSON string from the database.
+ * @returns {object} The parsed vibeTree object.
+ */
+function decompressProjectData(dataString) {
+    try {
+        const jsonString = atob(dataString);
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Failed to decode or parse project data:", e);
+        throw new Error("Failed to decode or parse project data. It may be corrupt.");
+    }
+}
+
+
+function generateFullCodeString(tree) {
+    let cssContent = '';
+    let jsContent = '';
+    let htmlContent = '';
+    let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
+
+    const buildHtmlRecursive = (nodes) => {
+        let currentHtml = '';
+        if (!nodes) return currentHtml;
+        const htmlNodes = nodes.filter(n => n.type === 'html');
+        htmlNodes.forEach(node => {
+            let finalCode = node.code;
+            if (finalCode && finalCode.trim().startsWith('<')) {
+                finalCode = finalCode.replace(/<([a-zA-Z0-9\-]+)/, `<$1 data-vibe-node-id="${node.id}"`);
+            }
+            if (node.children && node.children.length > 0) {
+                const innerHtml = buildHtmlRecursive(node.children);
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = finalCode;
+                if (wrapper.firstElementChild) {
+                    wrapper.firstElementChild.innerHTML = innerHtml;
+                    currentHtml += wrapper.innerHTML + '\n';
+                } else {
+                    currentHtml += finalCode + '\n';
+                }
+            } else {
+                currentHtml += finalCode + '\n';
+            }
+        });
+        return currentHtml;
+    };
+
+    function traverse(node) {
+        switch (node.type) {
+            case 'head':
+                if (node.code) headContent = node.code;
+                break;
+            case 'css':
+                cssContent += node.code + '\n\n';
+                break;
+            case 'javascript':
+            case 'js-function':
+                jsContent += node.code + '\n\n';
+                break;
+        }
+        if (node.children) {
+            node.children.forEach(traverse);
+        }
+    }
+
+    traverse(tree);
+    if (tree.children) {
+        htmlContent = buildHtmlRecursive(tree.children);
+    }
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    ${headContent.trim()}
+    <style>${cssContent.trim()}</style>
+</head>
+<body>
+${htmlContent.trim()}
+    <script>(function() {${jsContent.trim()}})();<\/script>
+</body>
+</html>`;
+}
+
+
+async function runLiveView(userId, projectId) {
+    try {
+        document.body.innerHTML = '<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #ccc; background-color: #282c34; height: 100vh; margin: 0;">Loading Project...</div>';
+        const compressedData = await api.loadProject(userId, projectId);
+        const projectTree = decompressProjectData(compressedData);
+        const fullHtml = generateFullCodeString(projectTree);
+
+        // Replace the current document with the project's generated HTML
+        document.open();
+        document.write(fullHtml);
+        document.close();
+    } catch (e) {
+        console.error("Failed to load live view:", e);
+        document.body.innerHTML = `<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #e06c75; background-color: #282c34; height: 100vh; margin: 0;"><h1>Error</h1><p>Could not load project.</p><p style="color: #999;">${e.message}</p></div>`;
+    }
+}
+
+// --- END OF LIVE VIEW BOOTLOADER ---
 
 // START OF CHANGE: Add Authentication elements
 const authModal = document.getElementById('auth-modal');
@@ -26,6 +149,7 @@ const toggleInspectButton = document.getElementById('toggle-inspect-button');
 
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
+const openLiveSiteButton = document.getElementById('open-live-site-button'); // ADDED FOR LIVE SITE
 
 const startPage = document.getElementById('start');
 const projectPromptInput = document.getElementById('project-prompt-input');
@@ -156,21 +280,6 @@ const saveEditNodeButton = document.getElementById('save-edit-node-button');
 const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
 const saveAsComponentButton = document.getElementById('save-as-component-button');
-
-// START OF CHANGE: Add Share/Publish elements
-const mainShareButton = document.getElementById('main-share-button');
-const shareModal = document.getElementById('share-modal');
-const closeShareModalButton = document.getElementById('close-share-modal-button');
-const shareModalTitle = document.getElementById('share-modal-title');
-const publishStatusText = document.getElementById('publish-status-text');
-const shareLinkContainer = document.getElementById('share-link-container');
-const shareLinkInput = document.getElementById('share-link-input');
-const copyShareLinkButton = document.getElementById('copy-share-link-button');
-const publishButton = document.getElementById('publish-button');
-const unpublishButton = document.getElementById('unpublish-button');
-const shareModalError = document.getElementById('share-modal-error');
-// END OF CHANGE
-
 
 // START OF CHANGE: Add component library logic (moved from database.js)
 const COMPONENT_LIBRARY_KEY_PREFIX = '_vibe_component_library_';
@@ -329,6 +438,7 @@ function handleLogout() {
     mainAppContainer.style.display = 'none';
     showAuthForm('login');
     authModal.style.display = 'block';
+    if(openLiveSiteButton) openLiveSiteButton.disabled = true; // ADDED
     
     console.log("User logged out.");
 }
@@ -347,53 +457,6 @@ function checkLoggedInState() {
         }
     }
 }
-
-// START OF CHANGE: Add Share/Publish View Logic
-/**
- * Checks URL for a 'share' parameter to determine if the app should
- * load in editor mode or public view mode.
- */
-function checkForShareView() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const shareId = urlParams.get('share');
-
-    if (shareId) {
-        // We are in share view mode. Hide the editor UI and load the project.
-        if(authModal) authModal.style.display = 'none';
-        if(mainAppContainer) mainAppContainer.style.display = 'none';
-        document.body.style.overflow = 'hidden'; // Prevent scrollbars from editor UI
-        loadAndDisplaySharedProject(shareId);
-    } else {
-        // Normal editor mode, proceed with authentication check.
-        checkLoggedInState();
-    }
-}
-
-/**
- * Fetches and renders a publicly shared project, replacing the current page content.
- * @param {string} shareId The unique ID of the shared project.
- */
-async function loadAndDisplaySharedProject(shareId) {
-    try {
-        // Assumes a new public API endpoint to get shared project data
-        const projectData = await api.getPublicProject(shareId); 
-        const sharedVibeTree = decompressProjectData(projectData);
-        const fullHtml = generateFullCodeString(sharedVibeTree);
-
-        // Replace the entire document with the project's rendered HTML
-        document.open();
-        document.write(fullHtml);
-        document.close();
-    } catch (error) {
-        document.body.innerHTML = `<div style="font-family: sans-serif; padding: 2em;">
-            <h1>Error</h1>
-            <p>Could not load shared project.</p>
-            <p><strong>Reason:</strong> ${error.message}</p>
-        </div>`;
-        console.error("Failed to load shared project:", error);
-    }
-}
-// END OF CHANGE
 
 // START OF FIX: Global Agent Loader functions
 /**
@@ -788,6 +851,19 @@ function updateUndoRedoUI() {
 /* =========================
    END UNDO / REDO
    ========================= */
+
+// --- START: Live Site Button Logic ---
+function handleOpenLiveSite() {
+    if (!currentProjectId || !currentUser) {
+        alert("Please load a project first to open its live site.");
+        return;
+    }
+
+    const url = `${window.location.origin}${window.location.pathname}?view=live&user=${encodeURIComponent(currentUser.userId)}&project=${encodeURIComponent(currentProjectId)}`;
+    window.open(url, '_blank');
+    console.log(`Opening live site: ${url}`);
+}
+// --- END: Live Site Button Logic ---
 
 function updateApiKeyVisibility() {
     if (currentAIProvider === 'gemini') {
@@ -1832,10 +1908,11 @@ async function handleFileUpload() {
     let projectId = baseId || `html-project-${Date.now()}`;
     const existing = await api.listProjects(currentUser.userId);
     let suffix = 1;
-    while (existing.some(p => p.projectId === projectId)) {
+    while (existing.includes(projectId)) {
         projectId = `${baseId}-${suffix++}`;
     }
     currentProjectId = projectId;
+    if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
     console.log(`New project ID assigned from file: ${currentProjectId}`);
 
     const reader = new FileReader();
@@ -2033,10 +2110,11 @@ async function handleZipUpload() {
         let projectId = derivedId || `zip-project-${Date.now()}`;
         const existing = await api.listProjects(currentUser.userId);
         let suffix = 1;
-        while (existing.some(p => p.projectId === projectId)) {
+        while (existing.includes(projectId)) {
             projectId = `${derivedId}-${suffix++}`;
         }
         currentProjectId = projectId;
+        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
 
         console.log('Decomposing ZIP website into Vibe Tree...');
         const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
@@ -2056,96 +2134,6 @@ async function handleZipUpload() {
         uploadZipButton.disabled = false;
         uploadZipButton.innerHTML = originalText;
     }
-}
-
-function generateFullCodeString(tree = vibeTree) {
-    let cssContent = '';
-    let jsContent = '';
-    let htmlContent = '';
-    let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
-
-    // Helper to recursively build HTML from nodes.
-    const buildHtmlRecursive = (nodes) => {
-        let currentHtml = '';
-        if (!nodes) return currentHtml;
-
-        const htmlNodes = nodes.filter(n => n.type === 'html');
-        
-        htmlNodes.forEach(node => {
-            let finalCode = node.code;
-            // Inject a data-attribute for the inspector to find the node.
-            // This is more reliable than relying on the 'id' attribute.
-            if (finalCode && finalCode.trim().startsWith('<')) {
-                 finalCode = finalCode.replace(
-                    /<([a-zA-Z0-9\-]+)/, 
-                    `<$1 data-vibe-node-id="${node.id}"`
-                );
-            }
-
-            if (node.children && node.children.length > 0) {
-                 const innerHtml = buildHtmlRecursive(node.children);
-                 const wrapper = document.createElement('div');
-                 wrapper.innerHTML = finalCode; // Use the modified code
-                 if(wrapper.firstElementChild) {
-                     wrapper.firstElementChild.innerHTML = innerHtml;
-                     currentHtml += wrapper.innerHTML + '\n';
-                 } else {
-                     currentHtml += finalCode + '\n'; // Fallback
-                 }
-            } else {
-                 currentHtml += finalCode + '\n'; // Use the modified code
-            }
-        });
-        return currentHtml;
-    };
-
-    function traverse(node, currentTree) {
-        switch (node.type) {
-            case 'head':
-                if (node.code) headContent = node.code;
-                break;
-            case 'css':
-                cssContent += node.code + '\n\n';
-                break;
-            case 'javascript':
-                jsContent += node.code + '\n\n';
-                break;
-            case 'js-function':
-                jsContent += node.code + '\n\n';
-                break;
-        }
-        if (node.children) {
-            node.children.forEach(child => traverse(child, currentTree));
-        }
-    }
-
-    // Traverse the provided tree to get CSS, JS, and head content
-    traverse(tree, tree);
-    
-    // Build the HTML content from the tree structure
-    if (tree.children) {
-        htmlContent = buildHtmlRecursive(tree.children);
-    }
-    
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    ${headContent.trim()}
-    <style>
-${cssContent.trim()}
-    </style>
-</head>
-<body>
-
-${htmlContent.trim()}
-
-    <script>
-(function() {
-${jsContent.trim()}
-})();
-    <\/script>
-</body>
-</html>`;
 }
 
 /**
@@ -2276,18 +2264,6 @@ ${bodyContent}
         files.set(path, wrapped);
     });
 
-    // NOTE: This part is now disabled as there is no backend file storage
-    // try {
-    //     const allDbAssetPaths = db.listFiles(currentProjectId);
-    //     allDbAssetPaths.forEach(p => {
-    //         if (!files.has(p)) {
-    //             files.set(p, db.readFileForExport(currentProjectId, p));
-    //         }
-    //     });
-    // } catch (e) {
-    //     console.warn('Failed adding assets to ZIP:', e);
-    // }
-
     return { files, indexHtml };
 }
 /**
@@ -2341,7 +2317,7 @@ function applyVibes() {
     try {
         iframeErrors = [];
         const doc = previewContainer.contentWindow.document;
-        let html = generateFullCodeString();
+        let html = generateFullCodeString(vibeTree);
 
         // START OF FIX: This single script handles inspector, console, and error logging
         const commsScriptText = `
@@ -2469,7 +2445,7 @@ function applyVibes() {
 
 
 function showFullCode() {
-    const fullCode = generateFullCodeString();
+    const fullCode = generateFullCodeString(vibeTree);
     fullCodeEditor.value = fullCode; // Use value for textarea
     console.log('Displaying full website code.');
 }
@@ -4108,42 +4084,6 @@ function initializeMermaid() {
 }
 
 // --- Project Persistence Logic ---
-// START OF FIX: Add compression helpers and make them robust
-/**
- * Encodes project data to a base64 string without compression.
- * @param {object} projectData The vibeTree object.
- * @returns {string} A base64-encoded JSON string.
- */
-function compressProjectData(projectData) {
-    try {
-        const jsonString = JSON.stringify(projectData);
-        // Simply encode the JSON string to Base64 without compression.
-        return btoa(unescape(encodeURIComponent(jsonString)));
-    } catch (e) {
-        console.error("Failed to encode project data:", e);
-        throw new Error("Failed to encode project data for saving.");
-    }
-}
-
-
-/**
- * Decodes a base64 string and parses it as JSON.
- * This version DOES NOT handle decompression.
- * @param {string} dataString The Base64-encoded JSON string from the database.
- * @returns {object} The parsed vibeTree object.
- */
-function decompressProjectData(dataString) {
-    try {
-        // 1. Decode the Base64 string from the server.
-        const jsonString = decodeURIComponent(escape(atob(dataString)));
-        // 2. Parse the JSON string into an object.
-        return JSON.parse(jsonString);
-    } catch (e) {
-        console.error("Failed to decode or parse project data:", e);
-        throw new Error("Failed to decode or parse project data. It may be corrupt.");
-    }
-}
-
 async function populateProjectList() {
     if (!currentUser) return;
     
@@ -4153,19 +4093,13 @@ async function populateProjectList() {
 
         noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
         
-        projects.forEach(project => {
+        projects.forEach(projectId => {
             const projectItem = document.createElement('div');
             projectItem.className = 'project-list-item';
-            const projectId = project.projectId || project; // Handle old and new formats
-            const isPublished = project.isPublished || false;
-
             projectItem.innerHTML = `
                 <span class="project-id-text">${projectId}</span>
                 <div class="project-item-buttons">
                     <button class="load-project-button action-button" data-id="${projectId}">Load</button>
-                    <button class="share-project-button action-button ${isPublished ? 'published' : ''}" data-id="${projectId}">
-                        ${isPublished ? 'Sharing' : 'Share'}
-                    </button>
                     <button class="delete-project-button" data-id="${projectId}">Delete</button>
                 </div>
             `;
@@ -4186,25 +4120,14 @@ async function handleLoadProject(event) {
     }
     
     try {
-        // START OF FIX: Decompress data on load
         const dataFromDb = await api.loadProject(currentUser.userId, projectId);
         vibeTree = decompressProjectData(dataFromDb);
-        // END OF FIX
-
         currentProjectId = projectId;
+        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         console.log(`Project '${projectId}' loaded.`);
-        
-        // START OF CHANGE: Show share button in sidebar
-        if (mainShareButton) {
-            mainShareButton.style.display = 'block';
-            mainShareButton.dataset.id = projectId;
-        }
-        // END OF CHANGE
         
         refreshAllUI();
         resetHistory();
-        // No autoSaveProject() needed here as we just loaded.
-
         switchToTab('preview');
     } catch (error) {
         console.error(`Could not load project '${projectId}':`, error);
@@ -4233,14 +4156,11 @@ async function handleDeleteProject(event) {
     }
 }
 
-// In app3.js
 async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
-        // The API layer is responsible for all encoding and chunking.
         await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
-        
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
     } catch (error) {
         console.error("Auto-save failed:", error);
@@ -4255,119 +4175,7 @@ projectListContainer.addEventListener('click', (event) => {
     if (event.target.classList.contains('delete-project-button')) {
         handleDeleteProject(event);
     }
-    // START OF CHANGE: Handle share button click from project list
-    if (event.target.classList.contains('share-project-button')) {
-        openShareModal(event.target.dataset.id);
-    }
-    // END OF CHANGE
 });
-
-// START OF CHANGE: Share/Publish Modal Logic
-/**
- * Opens and configures the Share modal based on the project's current published state.
- * @param {string} projectId The ID of the project to share.
- */
-async function openShareModal(projectId) {
-    if (!projectId || !currentUser) return;
-    
-    shareModal.style.display = 'block';
-    shareModalTitle.textContent = `Share Project: ${projectId}`;
-    shareModalError.textContent = '';
-    shareLinkContainer.style.display = 'none';
-    publishButton.style.display = 'none';
-    unpublishButton.style.display = 'none';
-    publishStatusText.textContent = 'Checking status...';
-
-    try {
-        // Assumes an API function that returns { isPublished, publishId }
-        const details = await api.getProjectDetails(currentUser.userId, projectId);
-        
-        publishButton.dataset.id = projectId;
-        unpublishButton.dataset.id = projectId;
-        
-        if (details.isPublished && details.publishId) {
-            publishStatusText.textContent = 'This project is public. Anyone with the link can view it.';
-            const shareUrl = `${window.location.origin}${window.location.pathname}?share=${details.publishId}`;
-            shareLinkInput.value = shareUrl;
-            shareLinkContainer.style.display = 'flex';
-            unpublishButton.style.display = 'inline-block';
-        } else {
-            publishStatusText.textContent = 'Publish this project to generate a shareable public link.';
-            publishButton.style.display = 'inline-block';
-        }
-    } catch (error) {
-        console.error('Failed to get project share details:', error);
-        shareModalError.textContent = `Error: ${error.message}`;
-    }
-}
-
-/**
- * Handles the click event for the "Publish" button in the share modal.
- */
-async function handlePublishClick() {
-    const projectId = publishButton.dataset.id;
-    if (!projectId) return;
-
-    publishButton.disabled = true;
-    publishButton.innerHTML = 'Publishing...';
-    shareModalError.textContent = '';
-
-    try {
-        // Assumes API returns { success: true, publishId: '...' }
-        const result = await api.publishProject(currentUser.userId, projectId);
-        if (result.success && result.publishId) {
-            await populateProjectList(); // Refresh project list to show new status
-            await openShareModal(projectId); // Re-open modal to show the new link
-        } else {
-            throw new Error(result.message || 'Failed to get publish ID from server.');
-        }
-    } catch (error) {
-        shareModalError.textContent = `Publish failed: ${error.message}`;
-    } finally {
-        publishButton.disabled = false;
-        publishButton.innerHTML = 'Publish';
-    }
-}
-
-/**
- * Handles the click event for the "Unpublish" button in the share modal.
- */
-async function handleUnpublishClick() {
-    const projectId = unpublishButton.dataset.id;
-    if (!projectId) return;
-
-    unpublishButton.disabled = true;
-    unpublishButton.innerHTML = 'Unpublishing...';
-    shareModalError.textContent = '';
-
-    try {
-        await api.unpublishProject(currentUser.userId, projectId);
-        await populateProjectList(); // Refresh list
-        await openShareModal(projectId); // Re-open modal to show "Publish" button again
-    } catch (error) {
-        shareModalError.textContent = `Unpublish failed: ${error.message}`;
-    } finally {
-        unpublishButton.disabled = false;
-        unpublishButton.innerHTML = 'Unpublish';
-    }
-}
-
-/**
- * Copies the share link to the user's clipboard.
- */
-function handleCopyShareLink() {
-    shareLinkInput.select();
-    document.execCommand('copy');
-    copyShareLinkButton.textContent = 'Copied!';
-    setTimeout(() => {
-        copyShareLinkButton.textContent = 'Copy';
-    }, 2000);
-}
-
-function closeShareModal() {
-    if(shareModal) shareModal.style.display = 'none';
-}
-// END OF CHANGE
 
 // =============================
 // CONTEXT / COMPONENT LIBRARY
@@ -4682,19 +4490,14 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
-/**
- * Processes the uploaded component library file.
- * @param {Event} event - The file input change event.
- */
 async function processContextUpload(event) {
-    const files = event.target.files;
+    const file = event.target.files;
 
-    if (!files || files.length === 0) {
+    if (!file) {
         console.log("No file selected for context upload.");
         return;
     }
 
-    const file = files; 
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4940,6 +4743,7 @@ function bindEventListeners() {
     if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
     if (undoButton) undoButton.addEventListener('click', doUndo);
     if (redoButton) redoButton.addEventListener('click', doRedo);
+    if (openLiveSiteButton) openLiveSiteButton.addEventListener('click', handleOpenLiveSite); // ADDED
     if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
     if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
     if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
@@ -5011,20 +4815,11 @@ function bindEventListeners() {
     
     if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
 
-    // START OF CHANGE: Add Share/Publish Listeners
-    if (mainShareButton) mainShareButton.addEventListener('click', () => openShareModal(currentProjectId));
-    if (closeShareModalButton) closeShareModalButton.addEventListener('click', closeShareModal);
-    if (publishButton) publishButton.addEventListener('click', handlePublishClick);
-    if (unpublishButton) unpublishButton.addEventListener('click', handleUnpublishClick);
-    if (copyShareLinkButton) copyShareLinkButton.addEventListener('click', handleCopyShareLink);
-    // END OF CHANGE
-    
     window.addEventListener('click', (event) => {
         if (event.target === settingsModal) settingsModal.style.display = 'none';
         if (event.target === addNodeModal) addNodeModal.style.display = 'none';
         if (event.target === editNodeModal) editNodeModal.style.display = 'none';
         if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
-        if (event.target === shareModal) closeShareModal();
     });
 }
 // END OF FIX
@@ -5032,7 +4827,7 @@ function bindEventListeners() {
 function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
-    if (mainShareButton) mainShareButton.style.display = 'none'; // Hide share button
+    if(openLiveSiteButton) openLiveSiteButton.disabled = true; // ADDED
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
     resetHistory();
     switchToTab('start');
@@ -5183,7 +4978,7 @@ async function handleGenerateProject() {
         const existing = await api.listProjects(currentUser.userId);
         let projectId = desiredId;
         let suffix = 2;
-        while (existing.some(p => p.projectId === projectId)) projectId = `${desiredId}-${suffix++}`;
+        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
 
         newProjectContainer.style.display = 'none';
         startPageGenerationOutput.style.display = 'block';
@@ -5194,6 +4989,7 @@ async function handleGenerateProject() {
         vibeTree.children = await generateCompleteSubtree(vibeTree);
 
         currentProjectId = projectId;
+        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         resetHistory();
         
         liveCodeOutput.textContent = generateFullCodeString(vibeTree);
@@ -5233,10 +5029,11 @@ async function handleStartIterativeProjectBuild() {
         const existing = await api.listProjects(currentUser.userId);
         let projectId = desiredId;
         let suffix = 2;
-        while (existing.some(p => p.projectId === projectId)) projectId = `${desiredId}-${suffix++}`;
+        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
 
         // Initialize a new, empty project
         currentProjectId = projectId;
+        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         vibeTree.description = prompt; // Set the overall goal
         await autoSaveProject();
@@ -5328,14 +5125,25 @@ function handleNodeContentToggle(event) {
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOM fully loaded. Initializing application.");
-    
+function initMainApp() {
+    console.log("DOM fully loaded. Initializing application editor.");
     initializeApiSettings();
     initializeMermaid();
     bindEventListeners();
-    
-    // START OF CHANGE: Check for share view mode before checking login state.
-    checkForShareView();
-    // END OF CHANGE
+    checkLoggedInState();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const isLiveView = params.get('view') === 'live';
+    const userId = params.get('user');
+    const projectId = params.get('project');
+
+    if (isLiveView && userId && projectId) {
+        // If it's a live view, run the lightweight viewer and stop
+        runLiveView(userId, projectId);
+    } else {
+        // Otherwise, initialize the full editor application
+        initMainApp();
+    }
 });
