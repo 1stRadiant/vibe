@@ -1,128 +1,5 @@
 import * as api from './api.js';
-
-// --- START OF LIVE VIEW BOOTLOADER ---
-// This section checks if the page should be loaded as a live project preview
-// instead of the full editor. This is the core of the sharable link feature.
-
-/**
- * Encodes project data to a base64 string without compression.
- * @param {object} projectData The vibeTree object.
- * @returns {string} A base64-encoded JSON string.
- */
-function compressProjectData(projectData) {
-    try {
-        const jsonString = JSON.stringify(projectData);
-        // Simply encode the JSON string to Base64 without compression.
-        return btoa(jsonString);
-    } catch (e) {
-        console.error("Failed to encode project data:", e);
-        throw new Error("Failed to encode project data for saving.");
-    }
-}
-
-/**
- * Decodes a base64 string and parses it as JSON.
- * @param {string} dataString The Base64-encoded JSON string from the database.
- * @returns {object} The parsed vibeTree object.
- */
-function decompressProjectData(dataString) {
-    try {
-        const jsonString = atob(dataString);
-        return JSON.parse(jsonString);
-    } catch (e) {
-        console.error("Failed to decode or parse project data:", e);
-        throw new Error("Failed to decode or parse project data. It may be corrupt.");
-    }
-}
-
-
-function generateFullCodeString(tree) {
-    let cssContent = '';
-    let jsContent = '';
-    let htmlContent = '';
-    let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
-
-    const buildHtmlRecursive = (nodes) => {
-        let currentHtml = '';
-        if (!nodes) return currentHtml;
-        const htmlNodes = nodes.filter(n => n.type === 'html');
-        htmlNodes.forEach(node => {
-            let finalCode = node.code;
-            if (finalCode && finalCode.trim().startsWith('<')) {
-                finalCode = finalCode.replace(/<([a-zA-Z0-9\-]+)/, `<$1 data-vibe-node-id="${node.id}"`);
-            }
-            if (node.children && node.children.length > 0) {
-                const innerHtml = buildHtmlRecursive(node.children);
-                const wrapper = document.createElement('div');
-                wrapper.innerHTML = finalCode;
-                if (wrapper.firstElementChild) {
-                    wrapper.firstElementChild.innerHTML = innerHtml;
-                    currentHtml += wrapper.innerHTML + '\n';
-                } else {
-                    currentHtml += finalCode + '\n';
-                }
-            } else {
-                currentHtml += finalCode + '\n';
-            }
-        });
-        return currentHtml;
-    };
-
-    function traverse(node) {
-        switch (node.type) {
-            case 'head':
-                if (node.code) headContent = node.code;
-                break;
-            case 'css':
-                cssContent += node.code + '\n\n';
-                break;
-            case 'javascript':
-            case 'js-function':
-                jsContent += node.code + '\n\n';
-                break;
-        }
-        if (node.children) {
-            node.children.forEach(traverse);
-        }
-    }
-
-    traverse(tree);
-    if (tree.children) {
-        htmlContent = buildHtmlRecursive(tree.children);
-    }
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    ${headContent.trim()}
-    <style>${cssContent.trim()}</style>
-</head>
-<body>
-${htmlContent.trim()}
-    <script>(function() {${jsContent.trim()}})();<\/script>
-</body>
-</html>`;
-}
-
-
-async function runLiveView(userId, projectId) {
-    try {
-        document.body.innerHTML = '<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #ccc; background-color: #282c34; height: 100vh; margin: 0;">Loading Project...</div>';
-        const compressedData = await api.loadProject(userId, projectId);
-        const projectTree = decompressProjectData(compressedData);
-        const fullHtml = generateFullCodeString(projectTree);
-
-        // Replace the current document with the project's generated HTML
-        document.open();
-        document.write(fullHtml);
-        document.close();
-    } catch (e) {
-        console.error("Failed to load live view:", e);
-        document.body.innerHTML = `<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #e06c75; background-color: #282c34; height: 100vh; margin: 0;"><h1>Error</h1><p>Could not load project.</p><p style="color: #999;">${e.message}</p></div>`;
-    }
-}
-
-// --- END OF LIVE VIEW BOOTLOADER ---
+// END OF CHANGE
 
 // START OF CHANGE: Add Authentication elements
 const authModal = document.getElementById('auth-modal');
@@ -149,7 +26,6 @@ const toggleInspectButton = document.getElementById('toggle-inspect-button');
 
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
-const openLiveSiteButton = document.getElementById('open-live-site-button'); // ADDED FOR LIVE SITE
 
 const startPage = document.getElementById('start');
 const projectPromptInput = document.getElementById('project-prompt-input');
@@ -438,7 +314,6 @@ function handleLogout() {
     mainAppContainer.style.display = 'none';
     showAuthForm('login');
     authModal.style.display = 'block';
-    if(openLiveSiteButton) openLiveSiteButton.disabled = true; // ADDED
     
     console.log("User logged out.");
 }
@@ -851,19 +726,6 @@ function updateUndoRedoUI() {
 /* =========================
    END UNDO / REDO
    ========================= */
-
-// --- START: Live Site Button Logic ---
-function handleOpenLiveSite() {
-    if (!currentProjectId || !currentUser) {
-        alert("Please load a project first to open its live site.");
-        return;
-    }
-
-    const url = `${window.location.origin}${window.location.pathname}?view=live&user=${encodeURIComponent(currentUser.userId)}&project=${encodeURIComponent(currentProjectId)}`;
-    window.open(url, '_blank');
-    console.log(`Opening live site: ${url}`);
-}
-// --- END: Live Site Button Logic ---
 
 function updateApiKeyVisibility() {
     if (currentAIProvider === 'gemini') {
@@ -1912,7 +1774,6 @@ async function handleFileUpload() {
         projectId = `${baseId}-${suffix++}`;
     }
     currentProjectId = projectId;
-    if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
     console.log(`New project ID assigned from file: ${currentProjectId}`);
 
     const reader = new FileReader();
@@ -2114,7 +1975,6 @@ async function handleZipUpload() {
             projectId = `${derivedId}-${suffix++}`;
         }
         currentProjectId = projectId;
-        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
 
         console.log('Decomposing ZIP website into Vibe Tree...');
         const newTree = await decomposeCodeIntoVibeTree(combinedHtml);
@@ -2134,6 +1994,96 @@ async function handleZipUpload() {
         uploadZipButton.disabled = false;
         uploadZipButton.innerHTML = originalText;
     }
+}
+
+function generateFullCodeString(tree = vibeTree) {
+    let cssContent = '';
+    let jsContent = '';
+    let htmlContent = '';
+    let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
+
+    // Helper to recursively build HTML from nodes.
+    const buildHtmlRecursive = (nodes) => {
+        let currentHtml = '';
+        if (!nodes) return currentHtml;
+
+        const htmlNodes = nodes.filter(n => n.type === 'html');
+        
+        htmlNodes.forEach(node => {
+            let finalCode = node.code;
+            // Inject a data-attribute for the inspector to find the node.
+            // This is more reliable than relying on the 'id' attribute.
+            if (finalCode && finalCode.trim().startsWith('<')) {
+                 finalCode = finalCode.replace(
+                    /<([a-zA-Z0-9\-]+)/, 
+                    `<$1 data-vibe-node-id="${node.id}"`
+                );
+            }
+
+            if (node.children && node.children.length > 0) {
+                 const innerHtml = buildHtmlRecursive(node.children);
+                 const wrapper = document.createElement('div');
+                 wrapper.innerHTML = finalCode; // Use the modified code
+                 if(wrapper.firstElementChild) {
+                     wrapper.firstElementChild.innerHTML = innerHtml;
+                     currentHtml += wrapper.innerHTML + '\n';
+                 } else {
+                     currentHtml += finalCode + '\n'; // Fallback
+                 }
+            } else {
+                 currentHtml += finalCode + '\n'; // Use the modified code
+            }
+        });
+        return currentHtml;
+    };
+
+    function traverse(node, currentTree) {
+        switch (node.type) {
+            case 'head':
+                if (node.code) headContent = node.code;
+                break;
+            case 'css':
+                cssContent += node.code + '\n\n';
+                break;
+            case 'javascript':
+                jsContent += node.code + '\n\n';
+                break;
+            case 'js-function':
+                jsContent += node.code + '\n\n';
+                break;
+        }
+        if (node.children) {
+            node.children.forEach(child => traverse(child, currentTree));
+        }
+    }
+
+    // Traverse the provided tree to get CSS, JS, and head content
+    traverse(tree, tree);
+    
+    // Build the HTML content from the tree structure
+    if (tree.children) {
+        htmlContent = buildHtmlRecursive(tree.children);
+    }
+    
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    ${headContent.trim()}
+    <style>
+${cssContent.trim()}
+    </style>
+</head>
+<body>
+
+${htmlContent.trim()}
+
+    <script>
+(function() {
+${jsContent.trim()}
+})();
+    <\/script>
+</body>
+</html>`;
 }
 
 /**
@@ -2264,6 +2214,18 @@ ${bodyContent}
         files.set(path, wrapped);
     });
 
+    // NOTE: This part is now disabled as there is no backend file storage
+    // try {
+    //     const allDbAssetPaths = db.listFiles(currentProjectId);
+    //     allDbAssetPaths.forEach(p => {
+    //         if (!files.has(p)) {
+    //             files.set(p, db.readFileForExport(currentProjectId, p));
+    //         }
+    //     });
+    // } catch (e) {
+    //     console.warn('Failed adding assets to ZIP:', e);
+    // }
+
     return { files, indexHtml };
 }
 /**
@@ -2317,7 +2279,7 @@ function applyVibes() {
     try {
         iframeErrors = [];
         const doc = previewContainer.contentWindow.document;
-        let html = generateFullCodeString(vibeTree);
+        let html = generateFullCodeString();
 
         // START OF FIX: This single script handles inspector, console, and error logging
         const commsScriptText = `
@@ -2445,7 +2407,7 @@ function applyVibes() {
 
 
 function showFullCode() {
-    const fullCode = generateFullCodeString(vibeTree);
+    const fullCode = generateFullCodeString();
     fullCodeEditor.value = fullCode; // Use value for textarea
     console.log('Displaying full website code.');
 }
@@ -4084,6 +4046,42 @@ function initializeMermaid() {
 }
 
 // --- Project Persistence Logic ---
+// START OF FIX: Add compression helpers and make them robust
+/**
+ * Encodes project data to a base64 string without compression.
+ * @param {object} projectData The vibeTree object.
+ * @returns {string} A base64-encoded JSON string.
+ */
+function compressProjectData(projectData) {
+    try {
+        const jsonString = JSON.stringify(projectData);
+        // Simply encode the JSON string to Base64 without compression.
+        return btoa(jsonString);
+    } catch (e) {
+        console.error("Failed to encode project data:", e);
+        throw new Error("Failed to encode project data for saving.");
+    }
+}
+
+
+/**
+ * Decodes a base64 string and parses it as JSON.
+ * This version DOES NOT handle decompression.
+ * @param {string} dataString The Base64-encoded JSON string from the database.
+ * @returns {object} The parsed vibeTree object.
+ */
+function decompressProjectData(dataString) {
+    try {
+        // 1. Decode the Base64 string from the server.
+        const jsonString = atob(dataString);
+        // 2. Parse the JSON string into an object.
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Failed to decode or parse project data:", e);
+        throw new Error("Failed to decode or parse project data. It may be corrupt.");
+    }
+}
+
 async function populateProjectList() {
     if (!currentUser) return;
     
@@ -4120,14 +4118,18 @@ async function handleLoadProject(event) {
     }
     
     try {
+        // START OF FIX: Decompress data on load
         const dataFromDb = await api.loadProject(currentUser.userId, projectId);
         vibeTree = decompressProjectData(dataFromDb);
+        // END OF FIX
+
         currentProjectId = projectId;
-        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         console.log(`Project '${projectId}' loaded.`);
         
         refreshAllUI();
         resetHistory();
+        // No autoSaveProject() needed here as we just loaded.
+
         switchToTab('preview');
     } catch (error) {
         console.error(`Could not load project '${projectId}':`, error);
@@ -4156,11 +4158,14 @@ async function handleDeleteProject(event) {
     }
 }
 
+// In app3.js
 async function autoSaveProject() {
     if (!currentProjectId || !vibeTree || !currentUser) return;
 
     try {
+        // The API layer is responsible for all encoding and chunking.
         await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
+        
         console.log(`Project '${currentProjectId}' auto-saved to backend.`);
     } catch (error) {
         console.error("Auto-save failed:", error);
@@ -4490,14 +4495,19 @@ function handleUploadContextTrigger() {
  * Processes the uploaded component library file.
  * @param {Event} event - The file input change event.
  */
+/**
+ * Processes the uploaded component library file.
+ * @param {Event} event - The file input change event.
+ */
 async function processContextUpload(event) {
-    const file = event.target.files;
+    const files = event.target.files;
 
-    if (!file) {
+    if (!files || files.length === 0) {
         console.log("No file selected for context upload.");
         return;
     }
 
+    const file = files; 
     console.log(`Context library file selected: ${file.name}`);
 
     const reader = new FileReader();
@@ -4743,7 +4753,6 @@ function bindEventListeners() {
     if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
     if (undoButton) undoButton.addEventListener('click', doUndo);
     if (redoButton) redoButton.addEventListener('click', doRedo);
-    if (openLiveSiteButton) openLiveSiteButton.addEventListener('click', handleOpenLiveSite); // ADDED
     if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
     if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
     if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
@@ -4827,7 +4836,6 @@ function bindEventListeners() {
 function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
-    if(openLiveSiteButton) openLiveSiteButton.disabled = true; // ADDED
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
     resetHistory();
     switchToTab('start');
@@ -4989,7 +4997,6 @@ async function handleGenerateProject() {
         vibeTree.children = await generateCompleteSubtree(vibeTree);
 
         currentProjectId = projectId;
-        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         resetHistory();
         
         liveCodeOutput.textContent = generateFullCodeString(vibeTree);
@@ -5033,7 +5040,6 @@ async function handleStartIterativeProjectBuild() {
 
         // Initialize a new, empty project
         currentProjectId = projectId;
-        if(openLiveSiteButton) openLiveSiteButton.disabled = false; // ADDED
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         vibeTree.description = prompt; // Set the overall goal
         await autoSaveProject();
@@ -5125,25 +5131,12 @@ function handleNodeContentToggle(event) {
     header.closest('.vibe-node').classList.toggle('collapsed');
 }
 
-function initMainApp() {
-    console.log("DOM fully loaded. Initializing application editor.");
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded. Initializing application.");
+    
     initializeApiSettings();
     initializeMermaid();
-    bindEventListeners();
-    checkLoggedInState();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const params = new URLSearchParams(window.location.search);
-    const isLiveView = params.get('view') === 'live';
-    const userId = params.get('user');
-    const projectId = params.get('project');
-
-    if (isLiveView && userId && projectId) {
-        // If it's a live view, run the lightweight viewer and stop
-        runLiveView(userId, projectId);
-    } else {
-        // Otherwise, initialize the full editor application
-        initMainApp();
-    }
+    bindEventListeners(); // This one call now correctly binds everything, including auth.
+    
+    checkLoggedInState(); // Check if user is already logged in from a previous session
 });
