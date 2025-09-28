@@ -48,7 +48,7 @@
         <div class="container-fluid">
             <div class="row flex-nowrap">
                 <!-- START OF CHANGE: Centered Icon-Only Bootstrap Sidebar -->
-                <div class="col-auto px-0 bg-dark">
+                <div class="col-auto px-0 bg-dark d-none d-md-flex">
                     <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
                         <a href="#" class="d-flex align-items-center p-3 text-white text-decoration-none" title="Vibe Coding System">
                             <i class="fs-4 bi-lightning-charge"></i>
@@ -350,6 +350,31 @@
         </div>
     </div>
     
+    <!-- START OF CHANGE: Bottom Navigation for Mobile -->
+    <div class="fixed-bottom bg-dark d-md-none">
+        <div class="d-flex justify-content-around">
+            <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
+                <i class="fs-4 bi-house text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                <i class="fs-4 bi-display text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                <i class="fs-4 bi-pencil-square text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
+                <i class="fs-4 bi-robot text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                <i class="fs-4 bi-folder text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                <i class="fs-4 bi-code-slash text-white"></i>
+            </a>
+        </div>
+    </div>
+    <!-- END OF CHANGE: Bottom Navigation for Mobile -->
+
     <!-- Modals -->
      <div id="add-node-modal" class="modal">
         <div class="modal-content">
