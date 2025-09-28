@@ -1,4 +1,3 @@
-
 import * as api from './api.js';
 
 // --- START OF LIVE VIEW BOOTLOADER ---
@@ -866,7 +865,9 @@ async function handleShareProject() {
         await navigator.clipboard.writeText(url);
         
         const originalHtml = shareProjectButton.innerHTML;
-        shareProjectButton.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        // START OF FIX: Replaced Font Awesome icon with Bootstrap icon
+        shareProjectButton.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+        // END OF FIX
         shareProjectButton.disabled = true;
 
         console.log(`Copied shareable link: ${url}`);
@@ -4020,41 +4021,45 @@ function highlightSearchResults(nodeIds) {
     }
 }
 
-// --- START OF FIX: Refactored Tab Switching Logic to support Bootstrap sidebar ---
+// --- START OF FIX: Refactored Tab Switching Logic to be responsive ---
 
 /**
- * Switches the active tab in the main UI.
+ * Switches the active tab in the main UI and syncs desktop/mobile navs.
  * @param {string} tabId The data-tab value of the tab to switch to.
  */
 function switchToTab(tabId) {
-    // Target the new sidebar menu for buttons and the existing content area
-    const tabsContainer = document.getElementById('menu');
     const tabContents = document.querySelector('.tab-content-area');
-
-    if (!tabsContainer || !tabContents) {
-        console.error("Critical layout elements (#menu or .tab-content-area) not found.");
+    if (!tabContents) {
+        console.error("Critical layout element .tab-content-area not found.");
         return;
     }
 
-    const button = tabsContainer.querySelector(`.tab-button[data-tab="${tabId}"]`);
-    if (!button || button.classList.contains('active')) return; // Do nothing if not found or already active
+    const newContent = tabContents.querySelector(`#${tabId}`);
+    // Do nothing if the target content doesn't exist or if it's already active
+    if (!newContent || newContent.classList.contains('active')) {
+        return;
+    }
 
     // Special handlers for activating certain tabs
-    if (tabId === 'console') consoleErrorIndicator.classList.remove('active');
+    if (tabId === 'console') {
+        consoleErrorIndicator.classList.remove('active');
+    }
 
-    // Deactivate current
-    const currentButton = tabsContainer.querySelector('.active');
+    // Deactivate all currently active buttons and content
+    document.querySelectorAll('.tab-button.active').forEach(btn => btn.classList.remove('active'));
     const currentContent = tabContents.querySelector('.tab-content.active');
-    if (currentButton) currentButton.classList.remove('active');
-    if (currentContent) currentContent.classList.remove('active');
+    if (currentContent) {
+        currentContent.classList.remove('active');
+    }
 
-    // Activate new
-    button.classList.add('active');
-    const newContent = tabContents.querySelector(`#${tabId}`);
-    if (newContent) newContent.classList.add('active');
+    // Activate new buttons (plural, for both navs) and content
+    document.querySelectorAll(`.tab-button[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
+    newContent.classList.add('active');
 
     // Post-activation tasks
-    if (tabId === 'code') showFullCode();
+    if (tabId === 'code') {
+        showFullCode();
+    }
     if (tabId === 'files') {
         renderFileTree();
         if (filesPreviewEl) {
@@ -4063,22 +4068,21 @@ function switchToTab(tabId) {
     }
     if (tabId === 'context') {
         renderComponentList();
-        if(contextComponentViewer) {
-             contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
+        if (contextComponentViewer) {
+            contextComponentViewer.innerHTML = '<div class="files-preview-placeholder">Select a component to view it.</div>';
         }
     }
 }
 
+/**
+ * Adds a single, delegated event listener to the body to handle all tab switching.
+ */
 function handleTabSwitching() {
-    const tabsContainer = document.getElementById('menu');
-    if (!tabsContainer) {
-        console.error("Sidebar tab container #menu not found.");
-        return;
-    }
-    tabsContainer.addEventListener('click', (event) => {
-        event.preventDefault(); // Prevent default anchor tag behavior
+    document.body.addEventListener('click', (event) => {
         const button = event.target.closest('.tab-button');
         if (!button) return;
+
+        event.preventDefault(); // Prevent default anchor tag behavior
         const tabId = button.dataset.tab;
         switchToTab(tabId);
     });
