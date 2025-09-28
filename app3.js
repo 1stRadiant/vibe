@@ -157,6 +157,21 @@ const editNodeError = document.getElementById('edit-node-error');
 const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
 const saveAsComponentButton = document.getElementById('save-as-component-button');
 
+// START OF CHANGE: Add Share/Publish elements
+const mainShareButton = document.getElementById('main-share-button');
+const shareModal = document.getElementById('share-modal');
+const closeShareModalButton = document.getElementById('close-share-modal-button');
+const shareModalTitle = document.getElementById('share-modal-title');
+const publishStatusText = document.getElementById('publish-status-text');
+const shareLinkContainer = document.getElementById('share-link-container');
+const shareLinkInput = document.getElementById('share-link-input');
+const copyShareLinkButton = document.getElementById('copy-share-link-button');
+const publishButton = document.getElementById('publish-button');
+const unpublishButton = document.getElementById('unpublish-button');
+const shareModalError = document.getElementById('share-modal-error');
+// END OF CHANGE
+
+
 // START OF CHANGE: Add component library logic (moved from database.js)
 const COMPONENT_LIBRARY_KEY_PREFIX = '_vibe_component_library_';
 const getComponentLibraryKey = () => `${COMPONENT_LIBRARY_KEY_PREFIX}${currentUser.userId}`;
@@ -332,6 +347,53 @@ function checkLoggedInState() {
         }
     }
 }
+
+// START OF CHANGE: Add Share/Publish View Logic
+/**
+ * Checks URL for a 'share' parameter to determine if the app should
+ * load in editor mode or public view mode.
+ */
+function checkForShareView() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('share');
+
+    if (shareId) {
+        // We are in share view mode. Hide the editor UI and load the project.
+        if(authModal) authModal.style.display = 'none';
+        if(mainAppContainer) mainAppContainer.style.display = 'none';
+        document.body.style.overflow = 'hidden'; // Prevent scrollbars from editor UI
+        loadAndDisplaySharedProject(shareId);
+    } else {
+        // Normal editor mode, proceed with authentication check.
+        checkLoggedInState();
+    }
+}
+
+/**
+ * Fetches and renders a publicly shared project, replacing the current page content.
+ * @param {string} shareId The unique ID of the shared project.
+ */
+async function loadAndDisplaySharedProject(shareId) {
+    try {
+        // Assumes a new public API endpoint to get shared project data
+        const projectData = await api.getPublicProject(shareId); 
+        const sharedVibeTree = decompressProjectData(projectData);
+        const fullHtml = generateFullCodeString(sharedVibeTree);
+
+        // Replace the entire document with the project's rendered HTML
+        document.open();
+        document.write(fullHtml);
+        document.close();
+    } catch (error) {
+        document.body.innerHTML = `<div style="font-family: sans-serif; padding: 2em;">
+            <h1>Error</h1>
+            <p>Could not load shared project.</p>
+            <p><strong>Reason:</strong> ${error.message}</p>
+        </div>`;
+        console.error("Failed to load shared project:", error);
+    }
+}
+// END OF CHANGE
 
 // START OF FIX: Global Agent Loader functions
 /**
@@ -1770,7 +1832,7 @@ async function handleFileUpload() {
     let projectId = baseId || `html-project-${Date.now()}`;
     const existing = await api.listProjects(currentUser.userId);
     let suffix = 1;
-    while (existing.includes(projectId)) {
+    while (existing.some(p => p.projectId === projectId)) {
         projectId = `${baseId}-${suffix++}`;
     }
     currentProjectId = projectId;
@@ -1971,7 +2033,7 @@ async function handleZipUpload() {
         let projectId = derivedId || `zip-project-${Date.now()}`;
         const existing = await api.listProjects(currentUser.userId);
         let suffix = 1;
-        while (existing.includes(projectId)) {
+        while (existing.some(p => p.projectId === projectId)) {
             projectId = `${derivedId}-${suffix++}`;
         }
         currentProjectId = projectId;
@@ -4056,7 +4118,7 @@ function compressProjectData(projectData) {
     try {
         const jsonString = JSON.stringify(projectData);
         // Simply encode the JSON string to Base64 without compression.
-        return btoa(jsonString);
+        return btoa(unescape(encodeURIComponent(jsonString)));
     } catch (e) {
         console.error("Failed to encode project data:", e);
         throw new Error("Failed to encode project data for saving.");
@@ -4073,7 +4135,7 @@ function compressProjectData(projectData) {
 function decompressProjectData(dataString) {
     try {
         // 1. Decode the Base64 string from the server.
-        const jsonString = atob(dataString);
+        const jsonString = decodeURIComponent(escape(atob(dataString)));
         // 2. Parse the JSON string into an object.
         return JSON.parse(jsonString);
     } catch (e) {
@@ -4091,13 +4153,19 @@ async function populateProjectList() {
 
         noProjectsMessage.style.display = projects.length === 0 ? 'block' : 'none';
         
-        projects.forEach(projectId => {
+        projects.forEach(project => {
             const projectItem = document.createElement('div');
             projectItem.className = 'project-list-item';
+            const projectId = project.projectId || project; // Handle old and new formats
+            const isPublished = project.isPublished || false;
+
             projectItem.innerHTML = `
                 <span class="project-id-text">${projectId}</span>
                 <div class="project-item-buttons">
                     <button class="load-project-button action-button" data-id="${projectId}">Load</button>
+                    <button class="share-project-button action-button ${isPublished ? 'published' : ''}" data-id="${projectId}">
+                        ${isPublished ? 'Sharing' : 'Share'}
+                    </button>
                     <button class="delete-project-button" data-id="${projectId}">Delete</button>
                 </div>
             `;
@@ -4125,6 +4193,13 @@ async function handleLoadProject(event) {
 
         currentProjectId = projectId;
         console.log(`Project '${projectId}' loaded.`);
+        
+        // START OF CHANGE: Show share button in sidebar
+        if (mainShareButton) {
+            mainShareButton.style.display = 'block';
+            mainShareButton.dataset.id = projectId;
+        }
+        // END OF CHANGE
         
         refreshAllUI();
         resetHistory();
@@ -4180,7 +4255,119 @@ projectListContainer.addEventListener('click', (event) => {
     if (event.target.classList.contains('delete-project-button')) {
         handleDeleteProject(event);
     }
+    // START OF CHANGE: Handle share button click from project list
+    if (event.target.classList.contains('share-project-button')) {
+        openShareModal(event.target.dataset.id);
+    }
+    // END OF CHANGE
 });
+
+// START OF CHANGE: Share/Publish Modal Logic
+/**
+ * Opens and configures the Share modal based on the project's current published state.
+ * @param {string} projectId The ID of the project to share.
+ */
+async function openShareModal(projectId) {
+    if (!projectId || !currentUser) return;
+    
+    shareModal.style.display = 'block';
+    shareModalTitle.textContent = `Share Project: ${projectId}`;
+    shareModalError.textContent = '';
+    shareLinkContainer.style.display = 'none';
+    publishButton.style.display = 'none';
+    unpublishButton.style.display = 'none';
+    publishStatusText.textContent = 'Checking status...';
+
+    try {
+        // Assumes an API function that returns { isPublished, publishId }
+        const details = await api.getProjectDetails(currentUser.userId, projectId);
+        
+        publishButton.dataset.id = projectId;
+        unpublishButton.dataset.id = projectId;
+        
+        if (details.isPublished && details.publishId) {
+            publishStatusText.textContent = 'This project is public. Anyone with the link can view it.';
+            const shareUrl = `${window.location.origin}${window.location.pathname}?share=${details.publishId}`;
+            shareLinkInput.value = shareUrl;
+            shareLinkContainer.style.display = 'flex';
+            unpublishButton.style.display = 'inline-block';
+        } else {
+            publishStatusText.textContent = 'Publish this project to generate a shareable public link.';
+            publishButton.style.display = 'inline-block';
+        }
+    } catch (error) {
+        console.error('Failed to get project share details:', error);
+        shareModalError.textContent = `Error: ${error.message}`;
+    }
+}
+
+/**
+ * Handles the click event for the "Publish" button in the share modal.
+ */
+async function handlePublishClick() {
+    const projectId = publishButton.dataset.id;
+    if (!projectId) return;
+
+    publishButton.disabled = true;
+    publishButton.innerHTML = 'Publishing...';
+    shareModalError.textContent = '';
+
+    try {
+        // Assumes API returns { success: true, publishId: '...' }
+        const result = await api.publishProject(currentUser.userId, projectId);
+        if (result.success && result.publishId) {
+            await populateProjectList(); // Refresh project list to show new status
+            await openShareModal(projectId); // Re-open modal to show the new link
+        } else {
+            throw new Error(result.message || 'Failed to get publish ID from server.');
+        }
+    } catch (error) {
+        shareModalError.textContent = `Publish failed: ${error.message}`;
+    } finally {
+        publishButton.disabled = false;
+        publishButton.innerHTML = 'Publish';
+    }
+}
+
+/**
+ * Handles the click event for the "Unpublish" button in the share modal.
+ */
+async function handleUnpublishClick() {
+    const projectId = unpublishButton.dataset.id;
+    if (!projectId) return;
+
+    unpublishButton.disabled = true;
+    unpublishButton.innerHTML = 'Unpublishing...';
+    shareModalError.textContent = '';
+
+    try {
+        await api.unpublishProject(currentUser.userId, projectId);
+        await populateProjectList(); // Refresh list
+        await openShareModal(projectId); // Re-open modal to show "Publish" button again
+    } catch (error) {
+        shareModalError.textContent = `Unpublish failed: ${error.message}`;
+    } finally {
+        unpublishButton.disabled = false;
+        unpublishButton.innerHTML = 'Unpublish';
+    }
+}
+
+/**
+ * Copies the share link to the user's clipboard.
+ */
+function handleCopyShareLink() {
+    shareLinkInput.select();
+    document.execCommand('copy');
+    copyShareLinkButton.textContent = 'Copied!';
+    setTimeout(() => {
+        copyShareLinkButton.textContent = 'Copy';
+    }, 2000);
+}
+
+function closeShareModal() {
+    if(shareModal) shareModal.style.display = 'none';
+}
+// END OF CHANGE
 
 // =============================
 // CONTEXT / COMPONENT LIBRARY
@@ -4824,11 +5011,20 @@ function bindEventListeners() {
     
     if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
 
+    // START OF CHANGE: Add Share/Publish Listeners
+    if (mainShareButton) mainShareButton.addEventListener('click', () => openShareModal(currentProjectId));
+    if (closeShareModalButton) closeShareModalButton.addEventListener('click', closeShareModal);
+    if (publishButton) publishButton.addEventListener('click', handlePublishClick);
+    if (unpublishButton) unpublishButton.addEventListener('click', handleUnpublishClick);
+    if (copyShareLinkButton) copyShareLinkButton.addEventListener('click', handleCopyShareLink);
+    // END OF CHANGE
+    
     window.addEventListener('click', (event) => {
         if (event.target === settingsModal) settingsModal.style.display = 'none';
         if (event.target === addNodeModal) addNodeModal.style.display = 'none';
         if (event.target === editNodeModal) editNodeModal.style.display = 'none';
         if (event.target === contextComponentModal) contextComponentModal.style.display = 'none';
+        if (event.target === shareModal) closeShareModal();
     });
 }
 // END OF FIX
@@ -4836,6 +5032,7 @@ function bindEventListeners() {
 function resetToStartPage() {
     console.log("Resetting to new project state.");
     currentProjectId = null;
+    if (mainShareButton) mainShareButton.style.display = 'none'; // Hide share button
     vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
     resetHistory();
     switchToTab('start');
@@ -4986,7 +5183,7 @@ async function handleGenerateProject() {
         const existing = await api.listProjects(currentUser.userId);
         let projectId = desiredId;
         let suffix = 2;
-        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
+        while (existing.some(p => p.projectId === projectId)) projectId = `${desiredId}-${suffix++}`;
 
         newProjectContainer.style.display = 'none';
         startPageGenerationOutput.style.display = 'block';
@@ -5036,7 +5233,7 @@ async function handleStartIterativeProjectBuild() {
         const existing = await api.listProjects(currentUser.userId);
         let projectId = desiredId;
         let suffix = 2;
-        while (existing.includes(projectId)) projectId = `${desiredId}-${suffix++}`;
+        while (existing.some(p => p.projectId === projectId)) projectId = `${desiredId}-${suffix++}`;
 
         // Initialize a new, empty project
         currentProjectId = projectId;
@@ -5136,7 +5333,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     initializeApiSettings();
     initializeMermaid();
-    bindEventListeners(); // This one call now correctly binds everything, including auth.
+    bindEventListeners();
     
-    checkLoggedInState(); // Check if user is already logged in from a previous session
+    // START OF CHANGE: Check for share view mode before checking login state.
+    checkForShareView();
+    // END OF CHANGE
 });
