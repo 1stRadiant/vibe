@@ -78,6 +78,7 @@ function generateFullCodeString(tree) {
                 break;
             case 'javascript':
             case 'js-function':
+            case 'declaration':
                 jsContent += node.code + '\n\n';
                 break;
         }
@@ -1461,7 +1462,7 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
 
 1.  **Component Node Object:** Each object in the array must have:
     *   id: A unique, descriptive, kebab-case identifier (e.g., "main-header", "feature-section-styles").
-    *   type: "head", "html", "css", "javascript", or "js-function". Only the root "whole-page" container should have a "head" child.
+    *   type: "head", "html", "css", "javascript", "js-function", or "declaration".
     *   description: A concise, one-sentence summary of what this specific component does.
     *   code: The raw code for the component. For HTML, this can be a container tag with its children defined in a nested array.
     *   children: (Optional) For html nodes that act as containers, provide a nested array of child component nodes.
@@ -1482,7 +1483,10 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
 
 4.  **GLOBAL SCOPE:** CSS nodes should generally be children of the "whole-page" container to apply globally.
 
-5.  **JAVASCRIPT FUNCTIONS:** For interactivity, create individual nodes with \`type: "js-function"\` for each piece of logic. Give them descriptive IDs like \`function-handle-form-submission\`. The code should be the full function definition. Use a \`javascript\` node for any global setup code that isn't a function.
+5.  **JAVASCRIPT & DECLARATIONS:**
+    *   For interactivity, create individual nodes with \`type: "js-function"\` for each piece of logic. Give them descriptive IDs like \`function-handle-form-submission\`. The code should be the full function definition.
+    *   For global-scope variables or constants (e.g., \`const API_KEY = "..."\`), create nodes with \`type: "declaration"\`. Use IDs like \`declaration-api-key\`.
+    *   Use a \`javascript\` node for any global setup code that is not a function or a simple declaration (e.g., an IIFE that sets up event listeners).
 
 **EXAMPLE of a valid response for a simple portfolio page:**
 [
@@ -1493,6 +1497,12 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     "code": "<meta charset=\"UTF-8\">\n<title>My Page</title>"
   },
   {
+    "id": "declaration-api-endpoint",
+    "type": "declaration",
+    "description": "The base URL for the API.",
+    "code": "const API_ENDPOINT = '/api/v1';"
+  },
+  {
     "id": "main-header",
     "type": "html",
     "description": "The main header container for the page.",
@@ -1500,14 +1510,14 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
     "selector": "#${parentNode.id}",
     "position": "beforeend",
     "children": [
-        {
-          "id": "header-title",
-          "type": "html",
-          "description": "The main H1 title in the header.",
-          "code": "<h1>My Page</h1>",
-          "selector": "#main-header",
-          "position": "beforeend"
-        }
+      {
+        "id": "header-title",
+        "type": "html",
+        "description": "The main H1 title in the header.",
+        "code": "<h1>My Page</h1>",
+        "selector": "#main-header",
+        "position": "beforeend"
+      }
     ]
   },
   {
@@ -1697,23 +1707,32 @@ function parseHtmlToVibeTree(fullCode) {
 
             // Regex to find "function functionName(...) { ... }"
             const functionRegex = /((async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\([\s\S]*?\)\s*\{[\s\S]*?\})/g;
-            let match;
             
-            while ((match = functionRegex.exec(scriptTag.textContent)) !== null) {
-                const functionCode = match[0];
-                const functionName = match[3];
-
+            remainingCode = remainingCode.replace(functionRegex, (match, functionCode, async, functionName) => {
                 const kebabCaseName = functionName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
-
                 jsNodes.push({
                     id: `function-${kebabCaseName}-${index}`,
                     type: 'js-function',
                     description: `The ${functionName} function.`,
                     code: functionCode
                 });
+                return ''; // Remove from remaining code
+            });
 
-                remainingCode = remainingCode.replace(functionCode, '');
-            }
+            // Regex to find top-level declarations (const, let, var)
+            const declarationRegex = /^(?:(const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*[\s\S]*?;)/gm;
+
+            remainingCode = remainingCode.replace(declarationRegex, (match, keyword, varName) => {
+                const kebabCaseName = varName.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
+                jsNodes.push({
+                    id: `declaration-${kebabCaseName}-${index}`,
+                    type: 'declaration',
+                    description: `The ${varName} ${keyword} declaration.`,
+                    code: match
+                });
+                return ''; // Remove from remaining code
+            });
+
 
             // The rest of the code is considered global
             remainingCode = remainingCode.trim();
@@ -1757,7 +1776,7 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 
 2.  **Component Nodes:** Each object in a children array must have:
     *   id: A unique, descriptive, kebab-case identifier (e.g., "main-header", "feature-section-styles").
-    *   type: "head", "html", "css", "javascript", or "js-function".
+    *   type: "head", "html", "css", "javascript", "js-function", or "declaration".
     *   description: A concise, one-sentence summary of what this specific component does.
     *   code: The raw code for the component. Do not include <style> or <script> tags. For parent HTML nodes, this should be the outer wrapper element. For the 'head' node, this is the combined content of all meta, title, and link tags.
     *   children: (Optional) A nested array of child component nodes.
@@ -1775,12 +1794,11 @@ async function decomposeCodeIntoVibeTree(fullCode) {
 4.  **CSS DECOMPOSITION:**
     *   Extract content of <style> tags into \`css\` nodes.
 
-5.  **JAVASCRIPT FUNCTION DECOMPOSITION (CRITICAL):**
-    *   Instead of one large \`javascript\` node, break down script content.
-    *   Place any code in the global scope (variable declarations, top-level event listeners) into a single node with \`type: "javascript"\`, and a descriptive \`id\` like \`"global-event-listeners"\`.
-    *   Extract each JavaScript function (\`function doSomething() {...}\` or \`const doSomething = () => {...}\`) into its own separate node with \`type: "js-function"\`.
-    *   The \`id\` for a function node should be \`function-\` followed by the function name in kebab-case (e.g., \`"id": "function-do-something"\`).
-    *   The \`code\` property for a \`js-function\` node must contain the entire function definition.
+5.  **JAVASCRIPT DECOMPOSITION (CRITICAL):**
+    *   Break down script content granularly.
+    *   Extract each top-level variable or constant declaration (\`const x = ...\`) into its own separate node with \`type: "declaration"\`. The ID should be \`declaration-\` followed by the variable name in kebab-case (e.g., \`"id": "declaration-api-url"\`).
+    *   Extract each JavaScript function (\`function doSomething() {...}\`) into its own separate node with \`type: "js-function"\`. The ID should be \`function-\` followed by the function name in kebab-case.
+    *   Place any remaining code in the global scope (e.g., top-level event listeners, IIFEs) into a single node with \`type: "javascript"\` and a descriptive ID like \`"global-event-listeners"\`.
 
 6.  **HEAD DECOMPOSITION:**
     *   Create a single node with type: "head" and id: "head-content".
@@ -1823,10 +1841,16 @@ async function decomposeCodeIntoVibeTree(fullCode) {
       "code": "header { background-color: #333; color: white; }"
     },
     {
+      "id": "declaration-new-title",
+      "type": "declaration",
+      "description": "A constant holding the new title text.",
+      "code": "const NEW_TITLE = 'New Title';"
+    },
+    {
       "id": "function-update-header",
       "type": "js-function",
-      "description": "Updates the header text.",
-      "code": "function updateHeader() { document.getElementById('header-title').querySelector('h1').textContent = 'New Title'; }"
+      "description": "Updates the header text using the constant.",
+      "code": "function updateHeader() { document.getElementById('header-title').querySelector('h1').textContent = NEW_TITLE; }"
     }
   ]
 }
@@ -2651,7 +2675,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
       "parentId": "the-id-of-the-container-node-for-the-new-component",
       "newNode": {
          "id": "new-unique-kebab-case-id",
-         "type": "html" | "css" | "javascript" | "js-function",
+         "type": "html" | "css" | "javascript" | "js-function" | "declaration",
          "description": "A concise description of the new component.",
          "code": "The full code for the new component.",
          "selector": "#some-existing-element",
@@ -2667,6 +2691,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
 - For **'update'** actions, provide the nodeId, newDescription, and the complete newCode. The newCode must be the full code, not a diff. The head node can also be updated this way.
 - For **'create'** actions, provide the parentId and a complete newNode object.
   - The newNode.id must be unique and in kebab-case.
+  - Use the \`declaration\` type for creating new global variables or constants.
   - For new \`js-function\` nodes, the code must be a complete function definition. They do not need a selector or position.
   - For new HTML nodes, you MUST correctly define the selector and position to place it correctly in the DOM. Chain off existing elements.
 - The response must be a single, valid JSON object and nothing else.`;
@@ -2711,7 +2736,7 @@ You must respond ONLY with a single, valid JSON object with the following schema
       "parentId": "the-id-of-the-container-node-for-the-new-component",
       "newNode": {
          "id": "new-unique-kebab-case-id",
-         "type": "html" | "css" | "javascript" | "js-function",
+         "type": "html" | "css" | "javascript" | "js-function" | "declaration",
          "description": "A concise description of the new component.",
          "code": "The full code for the new component.",
          "selector": "#some-existing-element",
