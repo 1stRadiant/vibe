@@ -5,17 +5,23 @@ import * as api from './api.js';
 // instead of the full editor. This is the core of the sharable link feature.
 
 /**
- * Encodes project data to a base64 string, correctly handling Unicode characters.
+ * Encodes project data to a base64 string using the modern TextEncoder API,
+ * which correctly handles all Unicode characters.
  * @param {object} projectData The vibeTree object.
  * @returns {string} A base64-encoded JSON string.
  */
 function compressProjectData(projectData) {
     try {
         const jsonString = JSON.stringify(projectData);
-        // Encode multi-byte Unicode characters to a UTF-8 string representation
-        // that can be safely processed by btoa.
-        const utf8String = unescape(encodeURIComponent(jsonString));
-        return btoa(utf8String);
+        // 1. Encode the string to a Uint8Array of UTF-8 bytes.
+        const uint8Array = new TextEncoder().encode(jsonString);
+        // 2. Convert the byte array to a binary string.
+        let binaryString = '';
+        uint8Array.forEach(byte => {
+            binaryString += String.fromCharCode(byte);
+        });
+        // 3. Base64-encode the binary string.
+        return btoa(binaryString);
     } catch (e) {
         console.error("Failed to encode project data:", e);
         throw new Error("Failed to encode project data for saving.");
@@ -23,16 +29,21 @@ function compressProjectData(projectData) {
 }
 
 /**
- * Decodes a base64 string (that was encoded from UTF-8) and parses it as JSON.
+ * Decodes a base64 string and parses it as JSON using the modern TextDecoder API.
  * @param {string} dataString The Base64-encoded JSON string from the database.
  * @returns {object} The parsed vibeTree object.
  */
 function decompressProjectData(dataString) {
     try {
-        // First, decode from Base64 to the intermediate UTF-8 string.
-        const utf8String = atob(dataString);
-        // Then, decode the UTF-8 string back to the original multi-byte Unicode string.
-        const jsonString = decodeURIComponent(escape(utf8String));
+        // 1. Decode the Base64 string to a binary string.
+        const binaryString = atob(dataString);
+        // 2. Convert the binary string back to a Uint8Array.
+        const uint8Array = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i);
+        }
+        // 3. Decode the UTF-8 byte array back to a string.
+        const jsonString = new TextDecoder().decode(uint8Array);
         return JSON.parse(jsonString);
     } catch (e) {
         console.error("Failed to decode or parse project data:", e);
