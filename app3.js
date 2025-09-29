@@ -5,15 +5,17 @@ import * as api from './api.js';
 // instead of the full editor. This is the core of the sharable link feature.
 
 /**
- * Encodes project data to a base64 string without compression.
+ * Encodes project data to a base64 string, correctly handling Unicode characters.
  * @param {object} projectData The vibeTree object.
  * @returns {string} A base64-encoded JSON string.
  */
 function compressProjectData(projectData) {
     try {
         const jsonString = JSON.stringify(projectData);
-        // Simply encode the JSON string to Base64 without compression.
-        return btoa(jsonString);
+        // Encode multi-byte Unicode characters to a UTF-8 string representation
+        // that can be safely processed by btoa.
+        const utf8String = unescape(encodeURIComponent(jsonString));
+        return btoa(utf8String);
     } catch (e) {
         console.error("Failed to encode project data:", e);
         throw new Error("Failed to encode project data for saving.");
@@ -21,20 +23,22 @@ function compressProjectData(projectData) {
 }
 
 /**
- * Decodes a base64 string and parses it as JSON.
+ * Decodes a base64 string (that was encoded from UTF-8) and parses it as JSON.
  * @param {string} dataString The Base64-encoded JSON string from the database.
  * @returns {object} The parsed vibeTree object.
  */
 function decompressProjectData(dataString) {
     try {
-        const jsonString = atob(dataString);
+        // First, decode from Base64 to the intermediate UTF-8 string.
+        const utf8String = atob(dataString);
+        // Then, decode the UTF-8 string back to the original multi-byte Unicode string.
+        const jsonString = decodeURIComponent(escape(utf8String));
         return JSON.parse(jsonString);
     } catch (e) {
         console.error("Failed to decode or parse project data:", e);
         throw new Error("Failed to decode or parse project data. It may be corrupt.");
     }
 }
-
 
 function generateFullCodeString(tree) {
     let cssContent = '';
