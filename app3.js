@@ -4220,17 +4220,7 @@ async function handleDeleteProject(event) {
     }
 }
 
-// --- Application State ---
-// START OF CHANGE: Add user state management
-let currentUser = null; // Will be { userId, username }
-let isCurrentlySaving = false; // START OF FIX: Add a flag to prevent concurrent saves.
-// END OF CHANGE
 
-let currentProjectId = null;
-// ... (rest of the state variables)
-
-
-// ... (scroll down to the autoSaveProject function)
 
 
 let isCurrentlySaving = false;
