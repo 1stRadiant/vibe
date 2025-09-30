@@ -4220,15 +4220,45 @@ async function handleDeleteProject(event) {
     }
 }
 
-async function autoSaveProject() {
-    if (!currentProjectId || !vibeTree || !currentUser) return;
+// --- Application State ---
+// START OF CHANGE: Add user state management
+let currentUser = null; // Will be { userId, username }
+let isCurrentlySaving = false; // START OF FIX: Add a flag to prevent concurrent saves.
+// END OF CHANGE
 
-    try {
-        await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
-        console.log(`Project '${currentProjectId}' auto-saved to backend.`);
-    } catch (error) {
-        console.error("Auto-save failed:", error);
+let currentProjectId = null;
+// ... (rest of the state variables)
+
+
+// ... (scroll down to the autoSaveProject function)
+
+
+let isCurrentlySaving = false;
+
+async function autoSaveProject() {
+  // START OF FIX: Implement a lock to prevent concurrent saves.
+  if (isCurrentlySaving || !currentProjectId || !vibeTree || !currentUser) {
+    if (isCurrentlySaving) {
+      console.log("Auto-save skipped: A save operation is already in progress.");
     }
+    return;
+  }
+
+  isCurrentlySaving = true;
+  console.log(`Project '${currentProjectId}' auto-saving to backend...`);
+
+  try {
+    await api.saveProject(currentUser.userId, currentProjectId, vibeTree);
+    console.log(`Project '${currentProjectId}' auto-saved successfully.`);
+  } catch (error) {
+    // The error will now be caught here and logged, preventing the app from crashing.
+    console.error("Auto-save failed:", error);
+    // You could add a user-facing notification here if desired.
+  } finally {
+    // This ensures the lock is always released, even if the save fails.
+    isCurrentlySaving = false;
+  }
+  // END OF FIX
 }
 
 // Add event listeners for project management buttons
