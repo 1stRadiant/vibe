@@ -90,8 +90,14 @@ function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
 }
 
 
+// Helper function for adding a delay
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Saves project data by correctly encoding it for Unicode, then breaking it into chunks.
+ * Includes a small delay between chunks to prevent server-side race conditions.
  * @param {string} userId - The user's ID.
  * @param {string} projectId - The project's ID.
  * @param {object} projectData - The project data object to save.
@@ -116,12 +122,15 @@ export async function saveProject(userId, projectId, projectData) {
     chunks.push(dataString.substring(i, i + CHUNK_SIZE));
   }
 
-  // 4. Send chunks sequentially.
+  // 4. Send chunks sequentially with a small delay.
   const totalChunks = chunks.length;
-  // The 'isCompressed' flag is now always false.
   const isCompressed = false; 
   for (let i = 0; i < totalChunks; i++) {
+    // Await the chunk sending
     await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
+    // THEN wait for a very short period before sending the next one.
+    // 100ms is usually enough to let the server process the request.
+    await delay(100); 
   }
 
   return { status: 'success', message: 'Project saved successfully.' };
