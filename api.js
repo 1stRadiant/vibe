@@ -91,8 +91,7 @@ function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
 
 
 /**
- * Saves project data by encoding it and breaking it into smaller chunks.
- * This approach is more robust for large projects.
+ * Saves project data by correctly encoding it for Unicode, then breaking it into chunks.
  * @param {string} userId - The user's ID.
  * @param {string} projectId - The project's ID.
  * @param {object} projectData - The project data object to save.
@@ -102,10 +101,16 @@ export async function saveProject(userId, projectId, projectData) {
   // 1. Convert the project object to a JSON string.
   const jsonString = JSON.stringify(projectData);
 
-  // 2. Base64 encode the JSON string to ensure it's safe for transport.
-  const dataString = btoa(jsonString);
+  // 2. Correctly handle Unicode by converting the string to a UTF-8 byte array,
+  //    then to a binary string that btoa can safely encode.
+  const uint8Array = new TextEncoder().encode(jsonString);
+  let binaryString = '';
+  uint8Array.forEach(byte => {
+      binaryString += String.fromCharCode(byte);
+  });
+  const dataString = btoa(binaryString);
   
-  // 3. Create chunks from the encoded string.
+  // 3. Create chunks from the now safely-encoded string.
   const chunks = [];
   for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
     chunks.push(dataString.substring(i, i + CHUNK_SIZE));
