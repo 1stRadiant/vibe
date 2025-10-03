@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,13 +9,14 @@
     <link rel="stylesheet" href="style.css">
     <!-- JSZip for ZIP import (global JSZip) -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <!-- START OF FIX: CSS for new header layout and hamburger menu -->
+    <!-- START OF FIX: CSS for header layout, hamburger menu, and preview toolbar -->
     <style>
         .tabs {
             position: relative; /* Needed for absolute positioning of the dropdown */
             display: flex;
             align-items: center;
             padding: 5px 15px;
+            overflow: visible; /* Ensures the dropdown menu is not clipped */
         }
 
         .logo {
@@ -94,6 +94,20 @@
             display: none; /* No longer needed with margin: auto */
         }
         
+        /* Styles for the new toolbar in the preview header */
+        .preview-header {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             width: 100%;
+        }
+
+        .preview-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
         /* Responsive adjustments for smaller screens */
         @media (max-width: 768px) {
              .files-browser, .context-browser {
@@ -125,12 +139,11 @@
     <!-- The main layout that is always visible -->
     <div class="main-layout">
         <div class="tabs">
-            <!-- START OF FIX: Added Logo, rearranged toolbar and hamburger -->
             <div class="logo">Vibe</div>
 
-            <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
-            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
+            <!-- START OF FIX: Undo/Redo buttons removed from here -->
             <button id="new-project-button" title="New Project">+</button>
+            <!-- END OF FIX -->
             
             <button id="hamburger-menu" class="hamburger-menu">
                 <span></span>
@@ -150,7 +163,6 @@
                 <button class="tab-button" data-tab="context">Context</button>
                 <button class="tab-button" data-tab="code">Full Code</button>
             </div>
-            <!-- END OF FIX -->
         </div>
 
         <div class="tab-content-area">
@@ -194,7 +206,13 @@
                 <div class="preview-container">
                     <div class="preview-header">
                         <h2>Live Website Preview</h2>
-                        <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                        <!-- START OF FIX: Moved undo/redo buttons here inside a toolbar div -->
+                        <div class="preview-toolbar">
+                            <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
+                            <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
+                            <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                        </div>
+                        <!-- END OF FIX -->
                     </div>
                     <iframe id="website-preview" title="Live Website Preview"></iframe>
                 </div>
@@ -502,7 +520,7 @@
         </div>
     </div>
 
-    <!-- START OF FIX: Script for hamburger menu functionality -->
+    <!-- Script for hamburger menu functionality -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const hamburgerMenu = document.getElementById('hamburger-menu');
@@ -533,7 +551,6 @@
             });
         });
     </script>
-    <!-- END OF FIX -->
     <script type="module" src="app.js"></script>
 </body>
-  </html>
+                    </html>
