@@ -141,9 +141,7 @@
         <div class="tabs">
             <div class="logo">Vibe</div>
 
-            <!-- START OF FIX: Undo/Redo buttons removed from here -->
             <button id="new-project-button" title="New Project">+</button>
-            <!-- END OF FIX -->
             
             <button id="hamburger-menu" class="hamburger-menu">
                 <span></span>
@@ -152,7 +150,9 @@
             </button>
 
             <div id="nav-links" class="nav-links">
-                <button class="tab-button active" data-tab="start">Start</button>
+                <!-- START OF FIX: Added Projects tab, changed default active tab -->
+                <button class="tab-button" data-tab="start">Start</button>
+                <button class="tab-button active" data-tab="projects">Projects</button>
                 <button class="tab-button" data-tab="preview">Live Preview</button>
                 <button class="tab-button" data-tab="editor">Vibe Editor</button>
                 <button class="tab-button" data-tab="agent">Agent</button>
@@ -162,17 +162,28 @@
                 <button class="tab-button" data-tab="files">Files</button>
                 <button class="tab-button" data-tab="context">Context</button>
                 <button class="tab-button" data-tab="code">Full Code</button>
+                <!-- END OF FIX -->
             </div>
         </div>
 
         <div class="tab-content-area">
-            <div id="start" class="tab-content active">
+            <!-- START OF FIX: Updated Start Page -->
+            <div id="start" class="tab-content">
                 <div class="start-page-content">
                     <div class="start-header">
-                        <h1>Vibe Coding System</h1>
+                        <h1>Welcome to Vibe</h1>
                         <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                     </div>
+                    <p style="margin-top: 1rem;">Your AI-powered web development environment.</p>
+                    <p>To begin, please visit the <strong>Projects</strong> tab to load an existing project or create a new one.</p>
+                    <button id="go-to-projects-button" class="action-button" style="margin-top: 20px;">Go to Projects</button>
+                </div>
+            </div>
+            <!-- END OF FIX -->
 
+            <!-- START OF FIX: New Projects Tab -->
+            <div id="projects" class="tab-content active">
+                 <div class="start-page-content">
                     <div id="existing-projects-container">
                         <h2>Your Projects</h2>
                         <div id="project-list"></div>
@@ -201,12 +212,12 @@
                     </div>
                 </div>
             </div>
+            <!-- END OF FIX -->
 
             <div id="preview" class="tab-content">
                 <div class="preview-container">
                     <div class="preview-header">
-                        <h2>Live Website Preview</h2>
-                        <!-- START OF FIX: Moved undo/redo buttons here inside a toolbar div -->
+                        <!-- START OF FIX: Title removed -->
                         <div class="preview-toolbar">
                             <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
                             <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
@@ -222,7 +233,7 @@
                  <div class="editor-container">
                     <div class="editor-header">
                         <div class="editor-header-left">
-                            <h2>Vibe Editor</h2>
+                            <!-- START OF FIX: Title removed -->
                             <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
                         </div>
                         <div class="editor-header-right">
@@ -239,7 +250,7 @@
 
             <div id="agent" class="tab-content">
                 <div class="agent-container">
-                    <h2>AI Agent</h2>
+                    <!-- START OF FIX: Title removed -->
                     <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
                     
                     <div id="agent-controls">
@@ -277,7 +288,7 @@
                         <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
                     </div>
                     <div class="chat-output-container">
-                        <h3>Chat</h3>
+                        <!-- START OF FIX: Title removed -->
                         <div id="chat-output">
                             <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
                         </div>
@@ -291,7 +302,7 @@
 
             <div id="flowchart" class="tab-content">
                 <div class="flowchart-container">
-                    <h2>Website Functionality Flowchart</h2>
+                    <!-- START OF FIX: Title removed -->
                     <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
                     <div class="flowchart-controls">
                         <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
@@ -304,14 +315,14 @@
 
             <div id="console" class="tab-content">
                 <div id="console-container">
-                    <h3>Console</h3>
+                    <!-- START OF FIX: Title removed -->
                     <div id="console-output"></div>
                 </div>
             </div>
 
             <div id="files" class="tab-content">
                 <div class="files-container">
-                    <h2>Project Files & Assets</h2>
+                    <!-- START OF FIX: Title removed -->
                     <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
                     <div class="files-toolbar">
                         <input type="file" id="files-upload-input" multiple style="display: none;">
@@ -338,7 +349,7 @@
             
             <div id="context" class="tab-content">
                 <div class="context-container">
-                    <h2>Component Context Library</h2>
+                    <!-- START OF FIX: Title removed -->
                     <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
                     <div class="context-browser">
                         <div class="context-list-panel">
@@ -360,7 +371,7 @@
 
             <div id="code" class="tab-content">
                 <div class="full-code-container">
-                    <h3>Full Website Code</h3>
+                    <!-- START OF FIX: Title removed -->
                     <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
                     <div class="file-upload-container">
                         <p>Or, upload an HTML file to start a new project:</p>
@@ -520,7 +531,7 @@
         </div>
     </div>
 
-    <!-- Script for hamburger menu functionality -->
+    <!-- Script for menu functionality -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const hamburgerMenu = document.getElementById('hamburger-menu');
@@ -529,12 +540,11 @@
 
             if (hamburgerMenu && navLinks) {
                 hamburgerMenu.addEventListener('click', (event) => {
-                    event.stopPropagation(); // Prevents the window click listener from firing immediately
+                    event.stopPropagation();
                     navLinks.classList.toggle('open');
                 });
             }
             
-            // Close menu when a tab is clicked
             tabButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     if (navLinks.classList.contains('open')) {
@@ -543,14 +553,25 @@
                 });
             });
 
-            // Close menu when clicking anywhere else on the page
             window.addEventListener('click', (event) => {
                 if (navLinks.classList.contains('open') && !navLinks.contains(event.target) && !hamburgerMenu.contains(event.target)) {
                     navLinks.classList.remove('open');
                 }
             });
+
+            // START OF FIX: Add functionality for the "Go to Projects" button
+            const goToProjectsButton = document.getElementById('go-to-projects-button');
+            const projectsTabButton = document.querySelector('.tab-button[data-tab="projects"]');
+
+            if(goToProjectsButton && projectsTabButton) {
+                goToProjectsButton.addEventListener('click', () => {
+                    // Simulate a click on the projects tab, which will trigger the main app.js logic
+                    projectsTabButton.click();
+                });
+            }
+            // END OF FIX
         });
     </script>
     <script type="module" src="app.js"></script>
 </body>
-                    </html>
+                            </html>
