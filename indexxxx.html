@@ -141,7 +141,9 @@
         <div class="tabs">
             <div class="logo">Vibe</div>
 
-            <button id="new-project-button" title="New Project">+</button>
+            <!-- START OF FIX: Renamed button ID for clarity -->
+            <button id="go-to-new-project-page-button" title="New Project">+</button>
+            <!-- END OF FIX -->
             
             <button id="hamburger-menu" class="hamburger-menu">
                 <span></span>
@@ -150,9 +152,10 @@
             </button>
 
             <div id="nav-links" class="nav-links">
-                <!-- START OF FIX: Added Projects tab, changed default active tab -->
+                <!-- START OF FIX: Added "New Project" tab -->
                 <button class="tab-button" data-tab="start">Start</button>
                 <button class="tab-button active" data-tab="projects">Projects</button>
+                <button class="tab-button" data-tab="new-project">New Project</button>
                 <button class="tab-button" data-tab="preview">Live Preview</button>
                 <button class="tab-button" data-tab="editor">Vibe Editor</button>
                 <button class="tab-button" data-tab="agent">Agent</button>
@@ -167,7 +170,6 @@
         </div>
 
         <div class="tab-content-area">
-            <!-- START OF FIX: Updated Start Page -->
             <div id="start" class="tab-content">
                 <div class="start-page-content">
                     <div class="start-header">
@@ -175,21 +177,26 @@
                         <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                     </div>
                     <p style="margin-top: 1rem;">Your AI-powered web development environment.</p>
-                    <p>To begin, please visit the <strong>Projects</strong> tab to load an existing project or create a new one.</p>
+                    <p>To begin, please visit the <strong>Projects</strong> tab to load an existing project or create a new one from the <strong>New Project</strong> tab.</p>
                     <button id="go-to-projects-button" class="action-button" style="margin-top: 20px;">Go to Projects</button>
                 </div>
             </div>
-            <!-- END OF FIX -->
 
-            <!-- START OF FIX: New Projects Tab -->
+            <!-- START OF FIX: Projects tab only shows existing projects -->
             <div id="projects" class="tab-content active">
                  <div class="start-page-content">
                     <div id="existing-projects-container">
                         <h2>Your Projects</h2>
                         <div id="project-list"></div>
-                        <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                        <p id="no-projects-message" style="display: none;">You have no saved projects. Go to the "New Project" page to create one!</p>
                     </div>
+                </div>
+            </div>
+            <!-- END OF FIX -->
 
+            <!-- START OF FIX: New "New Project" tab for creating projects -->
+            <div id="new-project" class="tab-content">
+                <div class="start-page-content">
                     <div id="new-project-container">
                          <h2>Create a New Project</h2>
                          <p>Enter a unique ID and a description, then choose how to build your site.</p>
@@ -217,13 +224,11 @@
             <div id="preview" class="tab-content">
                 <div class="preview-container">
                     <div class="preview-header">
-                        <!-- START OF FIX: Title removed -->
                         <div class="preview-toolbar">
                             <button id="undo-button" class="toolbar-button" title="Undo (Ctrl/Cmd+Z)">↶</button>
                             <button id="redo-button" class="toolbar-button" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷</button>
                             <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
                         </div>
-                        <!-- END OF FIX -->
                     </div>
                     <iframe id="website-preview" title="Live Website Preview"></iframe>
                 </div>
@@ -233,7 +238,6 @@
                  <div class="editor-container">
                     <div class="editor-header">
                         <div class="editor-header-left">
-                            <!-- START OF FIX: Title removed -->
                             <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
                         </div>
                         <div class="editor-header-right">
@@ -250,7 +254,6 @@
 
             <div id="agent" class="tab-content">
                 <div class="agent-container">
-                    <!-- START OF FIX: Title removed -->
                     <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
                     
                     <div id="agent-controls">
@@ -288,7 +291,6 @@
                         <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
                     </div>
                     <div class="chat-output-container">
-                        <!-- START OF FIX: Title removed -->
                         <div id="chat-output">
                             <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
                         </div>
@@ -302,7 +304,6 @@
 
             <div id="flowchart" class="tab-content">
                 <div class="flowchart-container">
-                    <!-- START OF FIX: Title removed -->
                     <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
                     <div class="flowchart-controls">
                         <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
@@ -315,14 +316,12 @@
 
             <div id="console" class="tab-content">
                 <div id="console-container">
-                    <!-- START OF FIX: Title removed -->
                     <div id="console-output"></div>
                 </div>
             </div>
 
             <div id="files" class="tab-content">
                 <div class="files-container">
-                    <!-- START OF FIX: Title removed -->
                     <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
                     <div class="files-toolbar">
                         <input type="file" id="files-upload-input" multiple style="display: none;">
@@ -349,7 +348,6 @@
             
             <div id="context" class="tab-content">
                 <div class="context-container">
-                    <!-- START OF FIX: Title removed -->
                     <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
                     <div class="context-browser">
                         <div class="context-list-panel">
@@ -371,7 +369,6 @@
 
             <div id="code" class="tab-content">
                 <div class="full-code-container">
-                    <!-- START OF FIX: Title removed -->
                     <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
                     <div class="file-upload-container">
                         <p>Or, upload an HTML file to start a new project:</p>
@@ -559,14 +556,22 @@
                 }
             });
 
-            // START OF FIX: Add functionality for the "Go to Projects" button
             const goToProjectsButton = document.getElementById('go-to-projects-button');
             const projectsTabButton = document.querySelector('.tab-button[data-tab="projects"]');
 
             if(goToProjectsButton && projectsTabButton) {
                 goToProjectsButton.addEventListener('click', () => {
-                    // Simulate a click on the projects tab, which will trigger the main app.js logic
                     projectsTabButton.click();
+                });
+            }
+
+            // START OF FIX: Add functionality for the "+" button to go to the New Project page
+            const goToNewProjectButton = document.getElementById('go-to-new-project-page-button');
+            const newProjectTabButton = document.querySelector('.tab-button[data-tab="new-project"]');
+
+            if(goToNewProjectButton && newProjectTabButton) {
+                goToNewProjectButton.addEventListener('click', () => {
+                     newProjectTabButton.click();
                 });
             }
             // END OF FIX
