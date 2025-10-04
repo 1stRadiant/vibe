@@ -1,3 +1,4 @@
+
 // api.js
 
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
@@ -104,11 +105,13 @@ function delay(ms) {
  * @returns {Promise<object>} A promise that resolves when the entire project is saved.
  */
 export async function saveProject(userId, projectId, projectData) {
+  console.log(`Starting save for project: ${projectId}`);
+  
   // 1. Convert the project object to a JSON string.
   const jsonString = JSON.stringify(projectData);
 
-  // 2. Correctly handle Unicode by converting the string to a UTF-8 byte array,
-  //    then to a binary string that btoa can safely encode.
+  // 2. Encode the string to Base64, correctly handling all Unicode characters.
+  // This is a two-step process to avoid issues with btoa and multi-byte characters.
   const uint8Array = new TextEncoder().encode(jsonString);
   let binaryString = '';
   uint8Array.forEach(byte => {
@@ -116,23 +119,47 @@ export async function saveProject(userId, projectId, projectData) {
   });
   const dataString = btoa(binaryString);
   
-  // 3. Create chunks from the now safely-encoded string.
+  // 3. Split the encoded data into chunks small enough for a GET request URL.
   const chunks = [];
-  for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
-    chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+  if (dataString.length > 0) {
+    for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+      chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+    }
+  } else {
+    // If the project data is empty, send a single empty chunk
+    // so the backend can handle saving an empty file.
+    chunks.push('');
   }
 
-  // 4. Send chunks sequentially with a small delay.
+  // 4. Send each chunk to the server one by one.
+  // We send them sequentially and with a delay to ensure the Google Apps Script
+  // backend can process them in order without hitting concurrency limits.
   const totalChunks = chunks.length;
+  console.log(`Project data is ${dataString.length} bytes, split into ${totalChunks} chunks.`);
+  
   const isCompressed = false; 
   for (let i = 0; i < totalChunks; i++) {
-    // Await the chunk sending
-    await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
-    // THEN wait for a very short period before sending the next one.
-    // 100ms is usually enough to let the server process the request.
-    await delay(100); 
+    console.log(`Sending chunk ${i + 1} of ${totalChunks}...`);
+    try {
+        await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
+        console.log(`Chunk ${i + 1} successfully sent.`);
+        
+        // Wait for a short period before sending the next chunk. This is critical for stability.
+        if (i < totalChunks - 1) {
+            await delay(150); // Increased delay for more reliability
+        }
+    } catch (error) {
+        // If any chunk fails, the entire save operation fails.
+        console.error(`Error sending chunk ${i + 1}. Aborting save operation.`, error);
+        // Propagate the error up so the UI can display a failure message.
+        throw new Error(`Save failed on chunk ${i + 1}: ${error.message}`);
+    }
   }
 
+  console.log(`All ${totalChunks} chunks sent. Finalizing save on server.`);
+  // The success of the final `sendChunk` call implies the backend has assembled and saved the data.
+  // If an error occurred during assembly, the backend should have returned an error status,
+  // which would have been caught by the `try...catch` block above.
   return { status: 'success', message: 'Project saved successfully.' };
 }
 
