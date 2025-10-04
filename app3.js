@@ -5218,6 +5218,6 @@ document.addEventListener('DOMContentLoaded', () => {
         runLiveView(userId, projectId);
     } else {
         // Otherwise, initialize the full editor application
-        initMainApp;
+        initMainApp();
     }
 });
