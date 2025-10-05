@@ -6,6 +6,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5p0NpHuIfVUuz
 // Define a chunk size for data transmission. 1500 is a safe size for URLs.
 const CHUNK_SIZE = 1500;
 
+// --- START OF FIX: Add a state variable (lock) for the save operation ---
+let isSaveInProgress = false;
+// --- END OF FIX ---
+
 /**
  * Performs a JSONP request to the Google Apps Script backend.
  * This function dynamically creates a <script> tag to bypass CORS restrictions.
@@ -98,42 +102,62 @@ function delay(ms) {
 /**
  * Saves project data by correctly encoding it for Unicode, then breaking it into chunks.
  * Includes a small delay between chunks to prevent server-side race conditions.
+ * This version includes a lock to prevent concurrent save operations.
  * @param {string} userId - The user's ID.
  * @param {string} projectId - The project's ID.
  * @param {object} projectData - The project data object to save.
  * @returns {Promise<object>} A promise that resolves when the entire project is saved.
  */
 export async function saveProject(userId, projectId, projectData) {
-  // 1. Convert the project object to a JSON string.
-  const jsonString = JSON.stringify(projectData);
-
-  // 2. Correctly handle Unicode by converting the string to a UTF-8 byte array,
-  //    then to a binary string that btoa can safely encode.
-  const uint8Array = new TextEncoder().encode(jsonString);
-  let binaryString = '';
-  uint8Array.forEach(byte => {
-      binaryString += String.fromCharCode(byte);
-  });
-  const dataString = btoa(binaryString);
-  
-  // 3. Create chunks from the now safely-encoded string.
-  const chunks = [];
-  for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
-    chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+  // --- START OF FIX ---
+  // 1. Check if a save is already happening. If so, reject immediately.
+  if (isSaveInProgress) {
+    // This will be caught by the calling code, which shows the "Auto-save skipped" message.
+    return Promise.reject(new Error('A save operation is already in progress.'));
   }
 
-  // 4. Send chunks sequentially with a small delay.
-  const totalChunks = chunks.length;
-  const isCompressed = false; 
-  for (let i = 0; i < totalChunks; i++) {
-    // Await the chunk sending
-    await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
-    // THEN wait for a very short period before sending the next one.
-    // 100ms is usually enough to let the server process the request.
-    await delay(100); 
-  }
+  try {
+    // 2. Set the lock to prevent other saves from starting.
+    isSaveInProgress = true;
 
-  return { status: 'success', message: 'Project saved successfully.' };
+    // --- Original save logic starts here ---
+    // 1. Convert the project object to a JSON string.
+    const jsonString = JSON.stringify(projectData);
+
+    // 2. Correctly handle Unicode by converting the string to a UTF-8 byte array,
+    //    then to a binary string that btoa can safely encode.
+    const uint8Array = new TextEncoder().encode(jsonString);
+    let binaryString = '';
+    uint8Array.forEach(byte => {
+        binaryString += String.fromCharCode(byte);
+    });
+    const dataString = btoa(binaryString);
+    
+    // 3. Create chunks from the now safely-encoded string.
+    const chunks = [];
+    for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+      chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+    }
+
+    // 4. Send chunks sequentially with a small delay.
+    const totalChunks = chunks.length;
+    const isCompressed = false; 
+    for (let i = 0; i < totalChunks; i++) {
+      // Await the chunk sending
+      await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
+      // THEN wait for a very short period before sending the next one.
+      // 100ms is usually enough to let the server process the request.
+      await delay(100); 
+    }
+
+    return { status: 'success', message: 'Project saved successfully.' };
+    // --- Original save logic ends here ---
+
+  } finally {
+    // 3. IMPORTANT: Release the lock, whether the save succeeded or failed.
+    isSaveInProgress = false;
+  }
+  // --- END OF FIX ---
 }
 
 export function deleteProject(userId, projectId) {
