@@ -6,9 +6,11 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5p0NpHuIfVUuz
 // Define a chunk size for data transmission. 1500 is a safe size for URLs.
 const CHUNK_SIZE = 1500;
 
-// --- START OF FIX: Add a state variable (lock) for the save operation ---
+// --- START OF FIX: Add state variables for a save queue ---
 let isSaveInProgress = false;
+let pendingSaveData = null; // Will store the arguments for the next save
 // --- END OF FIX ---
+
 
 /**
  * Performs a JSONP request to the Google Apps Script backend.
@@ -18,6 +20,7 @@ let isSaveInProgress = false;
  * @returns {Promise<object>} A promise that resolves with the data from the backend.
  */
 function jsonpRequest(action, params = {}) {
+  // ... (This function remains unchanged)
   return new Promise((resolve, reject) => {
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
         return reject(new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.'));
@@ -72,17 +75,8 @@ export function loadProject(userId, projectId) {
   return jsonpRequest('loadProject', { userId, projectId });
 }
 
-/**
- * Sends a single chunk of data to the server.
- * @param {string} userId - The user's ID.
- * @param {string} projectId - The project's ID.
- * @param {string} chunk - The data chunk to send.
- * @param {number} index - The index of this chunk.
- * @param {number} totalChunks - The total number of chunks.
- * @param {boolean} isCompressed - Whether the data is compressed.
- * @returns {Promise<object>} A promise that resolves when the chunk is sent.
- */
 function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
+  // ... (This function remains unchanged)
   return jsonpRequest('saveProjectChunk', {
     userId,
     projectId,
@@ -93,73 +87,81 @@ function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
   });
 }
 
-
-// Helper function for adding a delay
 function delay(ms) {
+  // ... (This function remains unchanged)
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+
+// --- START OF REFACTORED SAVE LOGIC ---
+
 /**
- * Saves project data by correctly encoding it for Unicode, then breaking it into chunks.
- * Includes a small delay between chunks to prevent server-side race conditions.
- * This version includes a lock to prevent concurrent save operations.
- * @param {string} userId - The user's ID.
- * @param {string} projectId - The project's ID.
- * @param {object} projectData - The project data object to save.
- * @returns {Promise<object>} A promise that resolves when the entire project is saved.
+ * The internal async function that performs the actual save operation.
+ * It should only be called by the `saveProject` gatekeeper function.
  */
-export async function saveProject(userId, projectId, projectData) {
-  // --- START OF FIX ---
-  // 1. Check if a save is already happening. If so, reject immediately.
-  if (isSaveInProgress) {
-    // This will be caught by the calling code, which shows the "Auto-save skipped" message.
-    return Promise.reject(new Error('A save operation is already in progress.'));
-  }
-
+async function _runSave(userId, projectId, projectData) {
   try {
-    // 2. Set the lock to prevent other saves from starting.
-    isSaveInProgress = true;
-
-    // --- Original save logic starts here ---
-    // 1. Convert the project object to a JSON string.
     const jsonString = JSON.stringify(projectData);
-
-    // 2. Correctly handle Unicode by converting the string to a UTF-8 byte array,
-    //    then to a binary string that btoa can safely encode.
     const uint8Array = new TextEncoder().encode(jsonString);
     let binaryString = '';
     uint8Array.forEach(byte => {
-        binaryString += String.fromCharCode(byte);
+      binaryString += String.fromCharCode(byte);
     });
     const dataString = btoa(binaryString);
     
-    // 3. Create chunks from the now safely-encoded string.
     const chunks = [];
     for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
       chunks.push(dataString.substring(i, i + CHUNK_SIZE));
     }
 
-    // 4. Send chunks sequentially with a small delay.
     const totalChunks = chunks.length;
-    const isCompressed = false; 
+    const isCompressed = false;
     for (let i = 0; i < totalChunks; i++) {
-      // Await the chunk sending
       await sendChunk(userId, projectId, chunks[i], i, totalChunks, isCompressed);
-      // THEN wait for a very short period before sending the next one.
-      // 100ms is usually enough to let the server process the request.
-      await delay(100); 
+      await delay(100);
     }
+    console.log('Project saved successfully.');
 
-    return { status: 'success', message: 'Project saved successfully.' };
-    // --- Original save logic ends here ---
-
+  } catch (error) {
+    console.error('Save operation failed:', error);
   } finally {
-    // 3. IMPORTANT: Release the lock, whether the save succeeded or failed.
-    isSaveInProgress = false;
+    // After the save attempt (success or fail), check if a new save is pending.
+    if (pendingSaveData) {
+      // A new save was requested while this one was running.
+      // Start the next save immediately with the latest data.
+      const { userId, projectId, projectData } = pendingSaveData;
+      pendingSaveData = null; // Clear the pending data
+      _runSave(userId, projectId, projectData); // Note: We don't release the lock
+    } else {
+      // No new saves were requested. We can release the lock.
+      isSaveInProgress = false;
+    }
   }
-  // --- END OF FIX ---
 }
+
+/**
+ * Saves project data. Acts as a gatekeeper to the internal _runSave function.
+ * If a save is in progress, it queues the latest data to be saved next.
+ * This function itself is not async and returns immediately.
+ * @param {string} userId - The user's ID.
+ * @param {string} projectId - The project's ID.
+ * @param {object} projectData - The project data object to save.
+ */
+export function saveProject(userId, projectId, projectData) {
+  if (isSaveInProgress) {
+    // A save is already running. Queue this new data, overwriting any older pending data.
+    console.log('Save in progress. Queuing latest data.');
+    pendingSaveData = { userId, projectId, projectData };
+  } else {
+    // No save is running. Start one now.
+    console.log('Starting a new save operation.');
+    isSaveInProgress = true;
+    _runSave(userId, projectId, projectData);
+  }
+}
+
+// --- END OF REFACTORED SAVE LOGIC ---
 
 export function deleteProject(userId, projectId) {
   return jsonpRequest('deleteProject', { userId, projectId });
-}
+                       }
