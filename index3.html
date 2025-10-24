@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +16,7 @@
             --text-color: #abb2bf;
             --border-color: #3e4451;
             --primary-color: #61afef;
+            --input-bg: #2c313a;
         }
         body {
             background-color: var(--bg-color);
@@ -29,14 +31,29 @@
         }
         .main-layout {
             display: grid;
-            grid-template-columns: auto 1fr;
+            grid-template-columns: 280px 1fr;
             grid-template-rows: 100vh;
             height: 100%;
         }
         .sidebar {
             background-color: var(--sidebar-color);
             padding: 1rem;
-            width: 280px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+        }
+        .sidebar-header {
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .sidebar-footer {
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
         }
         .main-content {
             display: flex;
@@ -69,9 +86,13 @@
             height: 100%;
             width: 100%;
             overflow: auto;
+            position: absolute;
         }
         .tab-content.active {
             display: block;
+        }
+        #start {
+            padding: 2rem;
         }
         #website-preview, #node-canvas-iframe {
             width: 100%;
@@ -81,6 +102,32 @@
         }
         #canvas {
              background-color: #0a0e27;
+        }
+        /* Project List Styling */
+        .project-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        .project-id-text {
+            word-break: break-all;
+        }
+        .action-button, .delete-project-button {
+             background: var(--input-bg);
+             border: 1px solid var(--border-color);
+             color: var(--text-color);
+             padding: 0.25rem 0.5rem;
+             border-radius: 4px;
+             margin-left: 0.5rem;
+        }
+        .action-button:hover {
+            background: var(--primary-color);
+            color: white;
         }
         /* Auth Modal */
         #auth-modal {
@@ -93,6 +140,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 1000;
         }
         .auth-box {
             background: var(--bg-color);
@@ -102,7 +150,18 @@
             max-width: 400px;
             border: 1px solid var(--border-color);
         }
-        /* Add other placeholder styles for your elements here */
+        /* General form styling */
+        .form-control {
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+        .form-control:focus {
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 .25rem rgba(var(--primary-color), .25);
+        }
         textarea {
             width: 100%;
             background-color: var(--sidebar-color);
@@ -135,10 +194,10 @@
             <p id="auth-error" class="text-danger"></p>
             <form id="login-form">
                 <div class="mb-3">
-                    <input type="text" id="login-username" class="form-control" placeholder="Username" required>
+                    <input type="text" id="login-username" class="form-control" placeholder="Username (e.g., testuser)" required>
                 </div>
                 <div class="mb-3">
-                    <input type="password" id="login-password" class="form-control" placeholder="Password" required>
+                    <input type="password" id="login-password" class="form-control" placeholder="Password (e.g., password123)" required>
                 </div>
                 <button type="button" id="login-button" class="btn btn-primary w-100">Login</button>
             </form>
@@ -161,31 +220,64 @@
     <!-- Main Application Container -->
     <div id="main-app-container">
         <div class="main-layout">
-            <!-- Sidebar (Dummy) -->
+            <!-- Sidebar -->
             <div class="sidebar">
-                <h4>Vibe Builder</h4>
-                <hr>
-                <div class="dropdown">
-                    <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
-                        <strong class="d-none d-sm-inline mx-1">User</strong>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                        <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
-                    </ul>
+                <div class="sidebar-header">
+                    <h4>Vibe Builder</h4>
+                    <button id="new-project-button" class="btn btn-sm btn-primary w-100 mt-2">New Project</button>
                 </div>
-                 <!-- All the other sidebar elements like project list, modals etc. would go here -->
-                 <!-- For this example, we keep it simple -->
+                
+                <div class="sidebar-content">
+                    <h5>My Projects</h5>
+                    <div id="project-list">
+                        <!-- Project items will be dynamically inserted here -->
+                    </div>
+                    <p id="no-projects-message" style="display: none;">No projects found. Create a new one!</p>
+                </div>
+                
+                <div class="sidebar-footer">
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle fs-4 me-2"></i>
+                            <strong class="d-none d-sm-inline mx-1">User</strong>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                            <li><button class="dropdown-item" id="logout-button">Sign out</button></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             
             <!-- Main Content Area -->
             <div class="main-content">
                 <div class="tab-bar">
+                    <button class="tab-button" data-tab="start"><i class="bi bi-play-circle"></i> Start</button>
                     <button class="tab-button active" data-tab="preview"><i class="bi bi-display"></i> Preview</button>
                     <button class="tab-button" data-tab="editor"><i class="bi bi-braces"></i> Editor</button>
                     <button class="tab-button" data-tab="canvas"><i class="bi bi-diagram-3"></i> Canvas</button>
                     <!-- Add other tab buttons here as needed -->
                 </div>
                 <div class="tab-content-area">
+                    <div id="start" class="tab-content">
+                         <!-- Content for the start page, where new projects are created -->
+                         <h3>Create a New Project</h3>
+                         <div id="new-project-container">
+                             <div class="mb-3">
+                                 <label for="project-prompt-input" class="form-label">Describe your project:</label>
+                                 <textarea id="project-prompt-input" class="form-control" rows="3" placeholder="e.g., a modern portfolio website for a photographer"></textarea>
+                             </div>
+                              <div class="mb-3">
+                                 <label for="new-project-id-input" class="form-label">Project ID (optional):</label>
+                                 <input type="text" id="new-project-id-input" class="form-control" placeholder="my-awesome-project">
+                             </div>
+                             <button id="generate-project-button" class="btn btn-primary">Generate Project</button>
+                             <button id="start-iterative-build-button" class="btn btn-secondary">Start Iterative Build</button>
+                         </div>
+                         <div id="start-page-generation-output" style="display:none;">
+                             <p id="generation-status-text"></p>
+                             <pre><code id="live-code-output"></code></pre>
+                         </div>
+                    </div>
                     <div id="preview" class="tab-content active">
                         <iframe id="website-preview"></iframe>
                     </div>
@@ -202,27 +294,33 @@
     </div>
     
     <!-- All other modals and hidden elements required by the script -->
-    <div id="edit-node-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background: #333; padding: 20px; border-radius: 5px; z-index:100;">
+    <div id="edit-node-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background: #333; padding: 20px; border-radius: 5px; z-index:100; min-width: 400px;">
+        <button id="close-edit-node-modal-button" type="button" class="btn-close btn-close-white" style="position:absolute; top:10px; right:10px;"></button>
+        <h5>Edit Element</h5>
         <input id="edit-node-id" type="hidden">
         <input id="edit-node-type" type="hidden">
-        Description: <textarea id="edit-node-description"></textarea><br>
-        Code: <textarea id="edit-node-code" rows="10"></textarea><br>
-        <button id="save-edit-node-button">Save</button>
-        <button id="close-edit-node-modal-button">Close</button>
-        <p id="edit-node-error" class="text-danger"></p>
-        <!-- Dummy elements to prevent errors -->
-        <button id="ai-improve-description-button">AI Improve</button>
-        <button id="save-as-component-button">Save as Component</button>
+        <div class="mb-2">
+            <label class="form-label">Description:</label>
+            <textarea id="edit-node-description" class="form-control"></textarea>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Code:</label>
+            <textarea id="edit-node-code" rows="10" class="form-control font-monospace"></textarea>
+        </div>
+        <button id="save-edit-node-button" class="btn btn-primary">Save & Update Vibe</button>
+        <button id="ai-improve-description-button" class="btn btn-secondary">AI Improve Desc</button>
+        <button id="save-as-component-button" class="btn btn-info">Save as Component</button>
+        <p id="edit-node-error" class="text-danger mt-2"></p>
     </div>
     
     <!-- Dummy elements to prevent "Cannot read properties of null" errors -->
     <div style="display:none;">
-        <button id="toggle-inspect-button"></button> <button id="undo-button"></button> <button id="redo-button"></button> <button id="share-project-button"></button> <button id="manual-save-button"></button> <div id="start"></div> <input id="project-prompt-input"> <button id="generate-project-button"></button> <div id="start-page-generation-output"></div> <div id="generation-status-text"></div> <div id="live-code-output"></div> <input id="new-project-id-input"> <div id="project-list"></div> <div id="no-projects-message"></div> <div id="new-project-container"></div> <button id="start-iterative-build-button"></button> <textarea id="full-code-editor"></textarea> <button id="update-tree-from-code-button"></button> <input id="search-input"> <button id="find-next-button"></button> <button id="find-prev-button"></button> <div id="search-results-count"></div> <input id="ai-editor-search-input"> <button id="ai-editor-search-button"></button> <input type="file" id="html-file-input"> <button id="upload-html-button"></button> <input type="file" id="zip-file-input"> <button id="upload-zip-button"></button> <button id="download-zip-button"></button> <select id="ai-provider-select"></select> <div id="gemini-settings-container"></div> <select id="gemini-model-select"></select> <div id="gemini-api-key-container"></div> <div id="nscale-api-key-container"></div> <input id="api-key-input"> <button id="save-api-key-button"></button> <div id="api-key-status"></div> <input id="nscale-api-key-input"> <button id="save-nscale-api-key-button"></button> <div id="nscale-api-key-status"></div> <textarea id="agent-prompt-input"></textarea> <button id="run-agent-single-task-button"></button> <button id="start-iterative-session-button"></button> <div id="agent-output"></div> <div id="iterative-session-ui"></div> <div id="iterative-plan-display"></div> <div id="iterative-controls"></div> <button id="accept-continue-button"></button> <button id="request-changes-button"></button> <button id="end-session-button"></button> <textarea id="chat-system-prompt-input"></textarea> <div id="chat-output"></div> <textarea id="chat-prompt-input"></textarea> <button id="send-chat-button"></button> <button id="generate-flowchart-button"></button> <div id="flowchart-output"></div> <div id="console-error-indicator"></div> <button id="new-project-button"></button> <div id="files-tree"></div> <div id="files-preview"></div> <input type="file" id="files-upload-input"> <button id="files-upload-button"></button> <button id="files-new-folder-button"></button> <button id="files-new-file-button"></button> <button id="files-download-button"></button> <button id="files-copy-button"></button> <button id="files-paste-button"></button> <button id="files-rename-button"></button> <button id="files-delete-button"></button> <div id="global-agent-loader"></div> <div id="global-agent-status-text"></div> <div id="global-agent-progress-text"></div> <div id="context-component-list"></div> <button id="add-new-component-button"></button> <div id="context-component-viewer"></div> <button id="download-context-button"></button> <button id="upload-context-button"></button> <input type="file" id="context-upload-input"> <div id="context-component-modal"></div> <button id="close-context-modal-button"></button> <button id="save-component-button"></button> <button id="delete-component-button"></button> <input id="component-id-input"> <input id="component-name-input"> <textarea id="component-description-input"></textarea> <textarea id="component-html-input"></textarea> <textarea id="component-css-input"></textarea> <textarea id="component-js-input"></textarea> <div id="component-modal-error"></div> <div id="component-modal-title"></div> <input id="component-ai-prompt-input"> <button id="generate-component-button"></button> <div id="settings-modal"></div> <button id="close-settings-modal-button"></button> <button id="start-page-settings-button"></button> <button id="open-settings-modal-button"></button> <div id="add-node-modal"></div> <button class="close-button"></button> <button id="create-node-button"></button> <input id="add-node-parent-id"> <input id="new-node-id"> <textarea id="new-node-description"></textarea> <select id="new-node-type"></select> <div id="add-node-error"></div> <input id="add-node-target-id"> <input id="add-node-position"></div>
+        <button id="toggle-inspect-button"></button> <button id="undo-button"></button> <button id="redo-button"></button> <button id="share-project-button"></button> <button id="manual-save-button"></button> <textarea id="full-code-editor"></textarea> <button id="update-tree-from-code-button"></button> <input id="search-input"> <button id="find-next-button"></button> <button id="find-prev-button"></button> <div id="search-results-count"></div> <input id="ai-editor-search-input"> <button id="ai-editor-search-button"></button> <input type="file" id="html-file-input"> <button id="upload-html-button"></button> <input type="file" id="zip-file-input"> <button id="upload-zip-button"></button> <button id="download-zip-button"></button> <select id="ai-provider-select"></select> <div id="gemini-settings-container"></div> <select id="gemini-model-select"></select> <div id="gemini-api-key-container"></div> <div id="nscale-api-key-container"></div> <input id="api-key-input"> <button id="save-api-key-button"></button> <div id="api-key-status"></div> <input id="nscale-api-key-input"> <button id="save-nscale-api-key-button"></button> <div id="nscale-api-key-status"></div> <textarea id="agent-prompt-input"></textarea> <button id="run-agent-single-task-button"></button> <button id="start-iterative-session-button"></button> <div id="agent-output"></div> <div id="iterative-session-ui"></div> <div id="iterative-plan-display"></div> <div id="iterative-controls"></div> <button id="accept-continue-button"></button> <button id="request-changes-button"></button> <button id="end-session-button"></button> <textarea id="chat-system-prompt-input"></textarea> <div id="chat-output"></div> <textarea id="chat-prompt-input"></textarea> <button id="send-chat-button"></button> <button id="generate-flowchart-button"></button> <div id="flowchart-output"></div> <div id="console-error-indicator"></div> <div id="files-tree"></div> <div id="files-preview"></div> <input type="file" id="files-upload-input"> <button id="files-upload-button"></button> <button id="files-new-folder-button"></button> <button id="files-new-file-button"></button> <button id="files-download-button"></button> <button id="files-copy-button"></button> <button id="files-paste-button"></button> <button id="files-rename-button"></button> <button id="files-delete-button"></button> <div id="global-agent-loader"></div> <div id="global-agent-status-text"></div> <div id="global-agent-progress-text"></div> <div id="context-component-list"></div> <button id="add-new-component-button"></button> <div id="context-component-viewer"></div> <button id="download-context-button"></button> <button id="upload-context-button"></button> <input type="file" id="context-upload-input"> <div id="context-component-modal"></div> <button id="close-context-modal-button"></button> <button id="save-component-button"></button> <button id="delete-component-button"></button> <input id="component-id-input"> <input id="component-name-input"> <textarea id="component-description-input"></textarea> <textarea id="component-html-input"></textarea> <textarea id="component-css-input"></textarea> <textarea id="component-js-input"></textarea> <div id="component-modal-error"></div> <div id="component-modal-title"></div> <input id="component-ai-prompt-input"> <button id="generate-component-button"></button> <div id="settings-modal"></div> <button id="close-settings-modal-button"></button> <button id="start-page-settings-button"></button> <button id="open-settings-modal-button"></button> <div id="add-node-modal"></div> <button class="close-button"></button> <button id="create-node-button"></button> <input id="add-node-parent-id"> <input id="new-node-id"> <textarea id="new-node-description"></textarea> <select id="new-node-type"></select> <div id="add-node-error"></div> <input id="add-node-target-id"> <input id="add-node-position"></div>
 
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JS for dropdowns -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- THIS IS THE LINE YOU WERE LOOKING FOR -->
-    <script src="app3.js" type="module"></script>
+    <!-- Load the main application logic -->
+    <script src="app.js" type="module"></script>
 </body>
 </html>
