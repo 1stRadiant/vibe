@@ -1,0 +1,261 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futuristic Node Canvas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; overflow: hidden; background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%); }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+        #node-canvas { width: 100%; height: 100%; cursor: grab; }
+        #node-canvas.dragging { cursor: grabbing; }
+        #node-canvas.hovering { cursor: pointer; }
+        .toolbar, .info-panel, .legend, .selected-panel {
+            position: absolute; background: rgba(15, 23, 42, 0.95); padding: 10px;
+            border-radius: 12px; backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); z-index: 10;
+        }
+        .toolbar { top: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; padding: 10px 20px; }
+        .toolbar button { background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; transition: all 0.2s; }
+        .toolbar button:hover { background: rgba(59, 130, 246, 0.3); transform: translateY(-2px); }
+        .info-panel { bottom: 20px; left: 20px; padding: 15px 20px; font-size: 12px; }
+        .legend { top: 20px; right: 20px; font-size: 11px; min-width: 150px; }
+        .selected-panel { bottom: 20px; right: 20px; border: 2px solid rgba(139, 92, 246, 0.5); font-size: 13px; min-width: 250px; display: none; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <canvas id="node-canvas"></canvas>
+        <div class="toolbar">
+            <button id="zoom-in-btn">Zoom In</button>
+            <button id="zoom-out-btn">Zoom Out</button>
+            <button id="reset-view-btn">Reset</button>
+        </div>
+        <div class="info-panel"><h3>Controls</h3><div class="controls">• Drag nodes<br>• Shift+Drag to pan<br>• Scroll to zoom</div><div class="stats" style="margin-top:10px; padding-top:10px; border-top: 1px solid rgba(139,92,246,0.2);">Zoom: <span id="zoom-display">100</span>% | Nodes: <span id="node-count">0</span></div></div>
+        <div class="legend"><h3>Node Types</h3><div id="legend-items"></div></div>
+        <div class="selected-panel" id="selected-panel"><h3>Selected Node</h3><div class="field"><span class="label">ID:</span> <span id="selected-id"></span></div><div class="field"><span class="label">Type:</span> <span id="selected-type"></span></div><div class="description" id="selected-description" style="margin-top:8px;"></div></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('node-canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        let nodes = [];
+        let connections = [];
+        let selectedNodeId = null;
+        let draggingNodeId = null;
+        let dragOffset = { x: 0, y: 0 };
+        let zoom = 1;
+        let pan = { x: 0, y: 0 };
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+        let hoveredNodeId = null;
+
+        const nodeColors = {
+            container: { bg: 'rgba(139, 92, 246, 0.2)', border: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)' },
+            html: { bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)' },
+            css: { bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899', glow: 'rgba(236, 72, 153, 0.5)' },
+            javascript: { bg: 'rgba(234, 179, 8, 0.2)', border: '#eab308', glow: 'rgba(234, 179, 8, 0.5)' },
+            'js-function': { bg: 'rgba(249, 115, 22, 0.2)', border: '#f97316', glow: 'rgba(249, 115, 22, 0.5)' },
+            head: { bg: 'rgba(16, 185, 129, 0.2)', border: '#10b981', glow: 'rgba(16, 185, 129, 0.5)' },
+            declaration: { bg: 'rgba(168, 85, 247, 0.2)', border: '#a855f7', glow: 'rgba(168, 85, 247, 0.5)' },
+        };
+
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            canvas.style.width = `${container.clientWidth}px`;
+            canvas.style.height = `${container.clientHeight}px`;
+            ctx.scale(dpr, dpr);
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(pan.x, pan.y);
+            ctx.scale(zoom, zoom);
+            drawConnections();
+            drawNodes();
+            ctx.restore();
+            document.getElementById('zoom-display').textContent = Math.round(zoom * 100);
+            document.getElementById('node-count').textContent = nodes.length;
+        }
+
+        function drawConnections() {
+            connections.forEach(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from);
+                const toNode = nodes.find(n => n.id === conn.to);
+                if (!fromNode || !toNode) return;
+                ctx.beginPath();
+                ctx.moveTo(fromNode.x, fromNode.y);
+                const midY = (fromNode.y + toNode.y) / 2;
+                ctx.bezierCurveTo(fromNode.x, midY, toNode.x, midY, toNode.x, toNode.y);
+                ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        function drawNodes() {
+            nodes.forEach(node => {
+                const colors = nodeColors[node.type] || nodeColors.container;
+                const isSelected = selectedNodeId === node.id;
+                const isHovered = hoveredNodeId === node.id;
+                const nodeWidth = 160, nodeHeight = 80;
+                const x = node.x - nodeWidth / 2, y = node.y - nodeHeight / 2;
+
+                if (isSelected || isHovered) {
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = colors.glow;
+                }
+                ctx.fillStyle = colors.bg;
+                ctx.strokeStyle = colors.border;
+                ctx.lineWidth = isSelected ? 3 : 2;
+                ctx.beginPath();
+                ctx.roundRect(x, y, nodeWidth, nodeHeight, 8);
+                ctx.fill();
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                const idText = node.id.length > 18 ? node.id.substring(0, 15) + '...' : node.id;
+                ctx.fillText(idText, node.x, node.y + 5);
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.font = '11px Inter, sans-serif';
+                const descText = node.description && node.description.length > 25 ? node.description.substring(0, 22) + '...' : node.description;
+                ctx.fillText(descText || '', node.x, node.y + 25);
+            });
+        }
+
+        function getNodeAtPosition(x, y) {
+            const adjX = (x - pan.x) / zoom, adjY = (y - pan.y) / zoom;
+            const nodeWidth = 160, nodeHeight = 80;
+            for (let i = nodes.length - 1; i >= 0; i--) {
+                const node = nodes[i];
+                if (adjX >= node.x - nodeWidth / 2 && adjX <= node.x + nodeWidth / 2 && adjY >= node.y - nodeHeight / 2 && adjY <= node.y + nodeHeight / 2) {
+                    return node;
+                }
+            }
+            return null;
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const node = getNodeAtPosition(e.offsetX, e.offsetY);
+            if (node && !e.shiftKey) {
+                draggingNodeId = node.id;
+                dragOffset = { x: (e.offsetX - pan.x) / zoom - node.x, y: (e.offsetY - pan.y) / zoom - node.y };
+                window.parent.postMessage({ type: 'vibe-node-click', nodeId: node.id }, '*');
+            } else {
+                isPanning = true;
+                panStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+                canvas.classList.add('dragging');
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingNodeId) {
+                const node = nodes.find(n => n.id === draggingNodeId);
+                if (node) {
+                    node.x = (e.offsetX - pan.x) / zoom - dragOffset.x;
+                    node.y = (e.offsetY - pan.y) / zoom - dragOffset.y;
+                    draw();
+                }
+            } else if (isPanning) {
+                pan = { x: e.clientX - panStart.x, y: e.clientY - panStart.y };
+                draw();
+            } else {
+                const node = getNodeAtPosition(e.offsetX, e.offsetY);
+                hoveredNodeId = node?.id || null;
+                canvas.classList.toggle('hovering', !!node);
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (draggingNodeId) {
+                const node = nodes.find(n => n.id === draggingNodeId);
+                if (node) {
+                    window.parent.postMessage({ type: 'vibe-node-move-end', payload: { nodeId: node.id, x: node.x, y: node.y } }, '*');
+                }
+            }
+            draggingNodeId = null;
+            isPanning = false;
+            canvas.classList.remove('dragging');
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            zoom = Math.max(0.1, Math.min(3, zoom * delta));
+            draw();
+        });
+
+        document.getElementById('zoom-in-btn').addEventListener('click', () => { zoom = Math.min(3, zoom * 1.2); draw(); });
+        document.getElementById('zoom-out-btn').addEventListener('click', () => { zoom = Math.max(0.1, zoom / 1.2); draw(); });
+        document.getElementById('reset-view-btn').addEventListener('click', () => { zoom = 1; pan = { x: 0, y: 0 }; draw(); });
+
+        function updateSelectedPanel(node) {
+            const panel = document.getElementById('selected-panel');
+            if (node) {
+                panel.style.display = 'block';
+                document.getElementById('selected-id').textContent = node.id;
+                document.getElementById('selected-type').textContent = node.type;
+                document.getElementById('selected-description').textContent = node.description;
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        
+        function centerOnNode(nodeId) {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return;
+            
+            zoom = 1; // Reset zoom for clarity
+            const targetX = canvas.clientWidth / 2 - node.x * zoom;
+            const targetY = canvas.clientHeight / 2 - node.y * zoom;
+
+            pan = { x: targetX, y: targetY };
+            draw();
+        }
+
+        window.addEventListener('message', (event) => {
+            const { type, payload } = event.data;
+            if (type === 'vibe-tree-update') {
+                nodes = payload.nodes || [];
+                connections = payload.connections || [];
+                draw();
+            } else if (type === 'vibe-node-select') {
+                selectedNodeId = payload.nodeId;
+                const node = nodes.find(n => n.id === selectedNodeId);
+                updateSelectedPanel(node);
+                if (node) {
+                    centerOnNode(node.id);
+                }
+                draw();
+            }
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        // Init legend, etc.
+        (function initLegend() {
+            const legendItems = document.getElementById('legend-items');
+            legendItems.innerHTML = '';
+            Object.entries(nodeColors).forEach(([type, colors]) => {
+                const item = document.createElement('div');
+                item.innerHTML = `<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><div style="width:12px; height:12px; border-radius:3px; background:${colors.bg}; border:2px solid ${colors.border};"></div><span>${type}</span></div>`;
+                legendItems.appendChild(item);
+            });
+        })();
+    </script>
+</body>
+</html>
