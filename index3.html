@@ -16,7 +16,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-    <!-- START OF CHANGE: Updated styles for explicit scroll container -->
     <style>
         /* Basic layout and theme styles */
         :root {
@@ -163,20 +162,39 @@
             background-color: var(--primary-color);
             color: white;
         }
-        /* New class for the scrollable container */
         .sidebar-scroll-area {
             flex-grow: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            /* For browsers that support modern scrollbar styling */
             scrollbar-width: thin;
             scrollbar-color: var(--primary-color) var(--sidebar-color);
         }
         .offcanvas-md {
-            width: 80px !important; /* Fixed width for the sidebar */
+            width: 80px !important;
         }
+
+        /* START OF CHANGE: Restored Project List Item Styling */
+        .project-list-item {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .project-list-item:hover {
+            background-color: #3e4451; /* A slightly lighter hover */
+        }
+        .project-id-text {
+            word-break: break-all; /* Prevents long project IDs from overflowing */
+        }
+        /* END OF CHANGE */
     </style>
-    <!-- END OF CHANGE -->
 </head>
 <body>
 
@@ -210,12 +228,10 @@
             <div class="row flex-nowrap">
                 <div class="col-auto px-0">
                     <div class="offcanvas-md offcanvas-start" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarLabel" style="background-color: var(--sidebar-color);">
-                        <!-- START OF CHANGE: Updated structure for robust scrolling -->
                         <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
                             <a href="#" class="d-flex align-items-center p-3 text-white text-decoration-none" title="Vibe Coding System">
                                 <i class="fs-4 bi-lightning-charge"></i>
                             </a>
-                            <!-- This div is now the scrollable container -->
                             <div class="sidebar-scroll-area w-100">
                                 <ul class="nav nav-pills flex-column text-center" id="menu">
                                     <li class="nav-item">
@@ -275,7 +291,7 @@
                                     </li>
                                 </ul>
                             </div>
-                            <div class="dropdown pb-4 mt-auto"> <!-- mt-auto pushes this to the bottom -->
+                            <div class="dropdown pb-4 mt-auto">
                                 <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fs-4 bi-person-circle"></i>
                                     <span class="d-none" id="user-status-text">User</span>
@@ -289,7 +305,6 @@
                                 </ul>
                             </div>
                         </div>
-                        <!-- END OF CHANGE -->
                     </div>
                 </div>
 
