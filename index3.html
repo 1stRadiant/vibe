@@ -7,29 +7,7 @@
     <title>Vibe Web Builder</title>
 
     <!-- 1. LIVE VIEW PRE-BOOTSTRAPPER (Runs before anything else) -->
-    <script>
-        (function() {
-            try {
-                const params = new URLSearchParams(window.location.search);
-                if (params.get('view') === 'live') {
-                    // Set a generic title immediately for link previews and browser tabs
-                    document.title = 'Loading Project...';
-
-                    // Inject styles to hide the editor shell immediately
-                    const style = document.createElement('style');
-                    style.textContent = `
-                        /* Hide editor UI during live view load */
-                        body { background-color: #282c34; }
-                        #auth-modal, #main-app-container { display: none !important; }
-                    `;
-                    // Using requestAnimationFrame ensures the <head> is available when the style is appended.
-                    requestAnimationFrame(() => document.head.appendChild(style));
-                }
-            } catch (e) {
-                console.error('Live view pre-bootstrapper failed:', e);
-            }
-        })();
-    </script>
+    
 
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
