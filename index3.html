@@ -187,13 +187,13 @@
             transition: background-color 0.2s;
         }
         .project-list-item:hover {
-            background-color: #3e4451; /* A slightly lighter hover */
+            background-color: #3e4451;
         }
         .project-id-text {
-            word-break: break-all; /* Prevents long project IDs from overflowing */
+            word-break: break-all;
         }
 
-        /* START OF CHANGE: Vibe Editor Specific Styles */
+        /* Vibe Editor Specific Styles */
         #vibe-editor {
             padding: 10px;
         }
@@ -248,19 +248,15 @@
             background-color: var(--primary-color);
             color: white;
         }
-        /* This is the key rule for collapsing */
         .vibe-node.collapsed > .node-children {
             display: none;
         }
-        /* This rule rotates the arrow */
         .vibe-node.collapsed .toggle-children-button {
             transform: rotate(-90deg);
         }
-        /* Hide toggle button if there are no children */
         .toggle-children-button.hidden {
             visibility: hidden;
         }
-        /* END OF CHANGE */
     </style>
 </head>
 <body>
@@ -395,7 +391,7 @@
                     </div>
 
                     <div class="tab-content-area" style="height: calc(100vh - 70px); position: relative;">
-                        <!-- All tab content divs remain here, unchanged -->
+                        <!-- All tab content divs remain here -->
                         <div id="projects" class="tab-content active">
                             <h2>Your Projects</h2>
                             <p>Select a project to load it into the editor.</p>
@@ -437,10 +433,26 @@
                                 <iframe id="website-preview" title="Live Website Preview" class="flex-grow-1"></iframe>
                             </div>
                         </div>
+                        <!-- START OF CHANGE: Restored the HTML structure for the editor tab -->
                         <div id="editor" class="tab-content">
-                            <!-- This empty div will be populated by the JS, and the new CSS will style it correctly -->
-                            <div id="vibe-editor"></div>
+                            <div class="editor-container">
+                                <div class="editor-header d-flex justify-content-between align-items-start mb-3">
+                                    <div class="editor-header-left">
+                                        <h2>Vibe Editor</h2>
+                                        <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
+                                    </div>
+                                    <div class="editor-header-right d-flex gap-2">
+                                        <div id="ai-editor-search-container" class="d-flex">
+                                            <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                            <button id="ai-editor-search-button" class="action-button ms-2">Search</button>
+                                        </div>
+                                        <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                                    </div>
+                                </div>
+                                <div id="vibe-editor"></div>
+                            </div>
                         </div>
+                        <!-- END OF CHANGE -->
                         <div id="agent" class="tab-content">
                             <div class="agent-container">
                                 <h2>AI Agent</h2>
