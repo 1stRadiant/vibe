@@ -16,7 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
-    <!-- START OF CHANGE: Added class for scrollable sidebar nav -->
+    <!-- START OF CHANGE: Updated styles for explicit scroll container -->
     <style>
         /* Basic layout and theme styles */
         :root {
@@ -163,10 +163,14 @@
             background-color: var(--primary-color);
             color: white;
         }
-        /* New class for making the icon list scrollable on short screens */
-        .sidebar-nav-scroll {
+        /* New class for the scrollable container */
+        .sidebar-scroll-area {
+            flex-grow: 1;
             overflow-y: auto;
             overflow-x: hidden;
+            /* For browsers that support modern scrollbar styling */
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-color) var(--sidebar-color);
         }
         .offcanvas-md {
             width: 80px !important; /* Fixed width for the sidebar */
@@ -204,72 +208,74 @@
     <div id="main-app-container" style="width:100%; height: 100vh; display: none;">
         <div class="container-fluid">
             <div class="row flex-nowrap">
-                <!-- START OF CHANGE: Sidebar converted to responsive Offcanvas -->
                 <div class="col-auto px-0">
                     <div class="offcanvas-md offcanvas-start" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarLabel" style="background-color: var(--sidebar-color);">
+                        <!-- START OF CHANGE: Updated structure for robust scrolling -->
                         <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
                             <a href="#" class="d-flex align-items-center p-3 text-white text-decoration-none" title="Vibe Coding System">
                                 <i class="fs-4 bi-lightning-charge"></i>
                             </a>
-                            <!-- Added sidebar-nav-scroll class for scrollability -->
-                            <ul class="nav nav-pills flex-column mb-auto text-center sidebar-nav-scroll" id="menu">
-                                <li class="nav-item">
-                                    <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="projects" title="Projects">
-                                        <i class="fs-4 bi-collection"></i>
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="start" title="New Project">
-                                        <i class="fs-4 bi-plus-circle"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
-                                        <i class="fs-4 bi-display"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
-                                        <i class="fs-4 bi-pencil-square"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
-                                        <i class="fs-4 bi-robot"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
-                                        <i class="fs-4 bi-chat-dots"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
-                                        <i class="fs-4 bi-diagram-3"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
-                                        <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
-                                        <i class="fs-4 bi-folder"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
-                                        <i class="fs-4 bi-archive"></i>
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
-                                        <i class="fs-4 bi-code-slash"></i>
-                                    </a>
-                                </li>
-                            </ul>
-                            <div class="dropdown pb-4">
+                            <!-- This div is now the scrollable container -->
+                            <div class="sidebar-scroll-area w-100">
+                                <ul class="nav nav-pills flex-column text-center" id="menu">
+                                    <li class="nav-item">
+                                        <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="projects" title="Projects">
+                                            <i class="fs-4 bi-collection"></i>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="start" title="New Project">
+                                            <i class="fs-4 bi-plus-circle"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                                            <i class="fs-4 bi-display"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                                            <i class="fs-4 bi-pencil-square"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
+                                            <i class="fs-4 bi-robot"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
+                                            <i class="fs-4 bi-chat-dots"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
+                                            <i class="fs-4 bi-diagram-3"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
+                                            <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                                            <i class="fs-4 bi-folder"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
+                                            <i class="fs-4 bi-archive"></i>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                                            <i class="fs-4 bi-code-slash"></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="dropdown pb-4 mt-auto"> <!-- mt-auto pushes this to the bottom -->
                                 <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fs-4 bi-person-circle"></i>
                                     <span class="d-none" id="user-status-text">User</span>
@@ -283,18 +289,17 @@
                                 </ul>
                             </div>
                         </div>
+                        <!-- END OF CHANGE -->
                     </div>
                 </div>
-                <!-- END OF CHANGE -->
 
                 <!-- Content Area -->
                 <div class="col p-0">
-                    <!-- START OF CHANGE: Added hamburger button for mobile -->
                     <div class="d-flex align-items-center p-3" style="border-bottom: 1px solid var(--border-color);">
                         <button class="btn d-md-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas">
                             <i class="bi bi-list text-white fs-3"></i>
                         </button>
-                        <div class="flex-grow-1"></div> <!-- This spacer pushes the right-side buttons to the end -->
+                        <div class="flex-grow-1"></div>
                         <div>
                             <button id="manual-save-button" class="btn btn-primary" title="Save Project (Ctrl/Cmd+S)" disabled>
                                 <i class="bi bi-save"></i> <span class="d-none d-sm-inline">Save</span>
@@ -306,7 +311,6 @@
                             <button id="redo-button" class="btn btn-secondary ms-2" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷ <span class="d-none d-sm-inline">Redo</span></button>
                         </div>
                     </div>
-                    <!-- END OF CHANGE -->
 
                     <div class="tab-content-area" style="height: calc(100vh - 70px); position: relative;">
                         <!-- All tab content divs remain here, unchanged -->
