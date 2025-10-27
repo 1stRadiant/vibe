@@ -1,0 +1,2387 @@
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Test Interface</title>
+  <link rel="stylesheet" href="styles.css">
+<style>      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        margin: 0;
+        padding: 0; /* Remove padding */
+        background: #1a1a2e;
+        height: 100vh;
+        overflow: hidden; /* Prevent scrolling */
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+      }
+
+      .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: auto;
+        min-height: 60px;
+        background: linear-gradient(90deg, #162447 0%, #1f4068 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 1000;
+        border-bottom: 2px solid #4169e1;
+        box-shadow: 
+          0 0 15px rgba(65, 105, 225, 0.3),
+          0 0 5px rgba(65, 105, 225, 0.2);
+        padding-bottom: 0.5rem;
+      }
+
+      .navbar-title {
+        font-family: 'Orbitron', system-ui, sans-serif;
+        color: #4169e1;
+        font-size: 2rem;
+        font-weight: bold;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        text-shadow: 
+          0 0 10px rgba(65, 105, 225, 0.5),
+          0 0 20px rgba(65, 105, 225, 0.3),
+          0 0 30px rgba(65, 105, 225, 0.2);
+        background: linear-gradient(45deg, #4169e1, #87CEEB);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      
+      .navbar-input-area {
+        display: flex;
+        gap: 1rem;
+        flex: 1;
+        max-width: 600px;
+        margin-left: 2rem;
+      }
+      /* New styles for auth and project management */
+      .auth-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        color: #e6e6ff;
+      }
+      .project-controls {
+          margin-left: 2rem;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+      }
+      #save-project-btn {
+          background: #4CAF50;
+      }
+      #save-project-btn:hover {
+          background: #45a049;
+      }
+      #auth-status {
+          font-size: 0.9em;
+      }
+      .logout-btn {
+          padding: 0.3rem 0.8rem;
+          font-size: 0.9rem;
+          background: #dc3545;
+      }
+      .logout-btn:hover {
+          background: #c82333;
+      }
+      .login-modal {
+        display: flex;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7);
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+      }
+      .login-content {
+        background: #1f4068;
+        color: #fff;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid #4169e1;
+        box-shadow: 0 0 20px rgba(65, 105, 225, 0.5);
+      }
+      .login-content h3 {
+        color: #4169e1;
+        text-align: center;
+        margin-top: 0;
+      }
+      .login-content input {
+        width: 100%;
+        padding: 0.8rem;
+        margin-bottom: 1rem;
+        background: #162447;
+        color: #fff;
+        border: 1px solid #4169e1;
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
+      .login-buttons {
+        display: flex;
+        justify-content: space-between;
+      }
+      #login-error {
+        color: #dc3545;
+        text-align: center;
+        margin-top: 1rem;
+        min-height: 1.2em;
+      }
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .new-project-btn {
+          font-size: 1.5rem;
+          padding: 0 0.5rem;
+      }
+      .topic-item.active {
+          background: rgba(65, 105, 225, 0.4);
+          border-color: #87CEEB;
+      }
+      /* End new styles */
+      .tip-container {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .tip-message {
+        color: #87CEEB;
+        font-size: 0.9rem;
+        text-align: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        font-style: italic;
+        text-shadow: 0 0 5px rgba(135, 206, 235, 0.3);
+      }
+
+      .tip-message.visible {
+        opacity: 1;
+      }
+
+      #particles-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      .chat-container {
+        margin-left: 0; /* Remove left margin since sidebar is hidden by default */
+        width: 100vw; /* Full viewport width */
+        height: 100vh; /* Full viewport height */
+        padding: 0 0.5rem;
+        margin: 0; /* Remove margin */
+        background: rgba(22, 36, 71, 0.7); /* Make slightly transparent */
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        z-index: 1;
+      }
+
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 250px;
+        background: #162447;
+        border-right: 2px solid #4169e1;
+        padding: 1rem;
+        overflow-y: auto;
+        box-shadow: 2px 0 15px rgba(65, 105, 225, 0.3);
+        z-index: 100;
+        transform: translateX(-100%); /* Changed from -250px to -100% to ensure complete hiding */
+        transition: transform 0.3s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .sidebar-title {
+        color: #4169e1;
+        font-family: 'Orbitron', system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid rgba(65, 105, 225, 0.3);
+        text-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .topic-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .topic-item {
+        background: rgba(31, 64, 104, 0.3);
+        margin: 0.5rem 0;
+        padding: 0.8rem 1rem;
+        border: 1px solid rgba(65, 105, 225, 0.3);
+        border-radius: 8px;
+        color: #e6e6ff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: 'Rajdhani', system-ui, sans-serif;
+        letter-spacing: 0.5px;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.1);
+      }
+
+      .topic-item:hover {
+        background: rgba(65, 105, 225, 0.2);
+        border-color: #4169e1;
+        box-shadow: 
+          0 0 15px rgba(65, 105, 225, 0.3),
+          0 0 5px rgba(65, 105, 225, 0.2),
+          inset 0 0 10px rgba(65, 105, 225, 0.1);
+        transform: translateX(5px);
+      }
+
+      .delete-topic-btn {
+        float: right;
+        background: rgba(220, 53, 69, 0.3);
+        border: 1px solid #dc3545;
+        color: #dc3545;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+      }
+
+      .delete-topic-btn:hover {
+        background: rgba(220, 53, 69, 0.5);
+      }
+
+      .sidebar-toggle {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        background: linear-gradient(135deg, #162447 0%, #1f4068 100%);
+        border: 2px solid #4169e1;
+        color: #4169e1;
+        font-size: 1.5rem;
+        width: 30px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 101;
+        border-radius: 0 8px 8px 0;
+        box-shadow: 
+          0 0 15px rgba(65, 105, 225, 0.3),
+          inset 0 0 10px rgba(65, 105, 225, 0.1);
+        transition: all 0.3s ease;
+        text-shadow: 0 0 5px rgba(65, 105, 225, 0.5);
+      }
+
+      .sidebar.open + .sidebar-toggle {
+        left: 250px;
+      }
+
+      .sidebar-toggle:hover {
+        background: linear-gradient(135deg, #1f4068 0%, #162447 100%);
+        box-shadow: 
+          0 0 20px rgba(65, 105, 225, 0.5),
+          inset 0 0 15px rgba(65, 105, 225, 0.2);
+        color: #fff;
+      }
+
+      .input-area {
+        display: none;
+      }
+
+      #user-input {
+        flex: 1;
+        padding: 1rem;
+        background: #1f4068;
+        color: #fff;
+        border: 2px solid #1f4068;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+      }
+
+      #user-input:focus {
+        border-color: #2196F3;
+        outline: none;
+      }
+
+      #user-input::placeholder {
+        color: #8f9bba;
+      }
+
+      button {
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s, box-shadow 0.2s;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      button:hover {
+        background: #2848c8;
+        box-shadow: 0 0 15px rgba(65, 105, 225, 0.7);
+      }
+
+      .node-container {
+        flex: 1;
+        position: relative;
+        overflow: visible;
+        transform-origin: center center;
+        transition: transform 0.3s ease;
+        touch-action: none;
+        background: transparent;
+        margin: 0.5rem;
+        height: calc(100vh - 60px);
+        width: calc(100% - 1rem);
+        cursor: grab;
+      }
+
+      .node-container:active {
+        cursor: grabbing;
+      }
+
+      .node {
+        position: absolute;
+        background: rgba(31, 64, 104, 0.85);
+        border: 2px solid #4169e1;
+        opacity: 0; /* Start invisible for animation */
+        transform: scale(0.8); /* Start smaller */
+        transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        box-shadow: 
+          0 0 15px rgba(65, 105, 225, 0.5),
+          0 0 5px rgba(65, 105, 225, 0.3),
+          inset 0 0 10px rgba(65, 105, 225, 0.2),
+          0 0 2px #4169e1,
+          0 0 4px #4169e1,
+          0 0 6px #4169e1;
+        backdrop-filter: blur(8px);
+        font-family: 'Orbitron', 'Rajdhani', system-ui, sans-serif;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        text-shadow: 0 0 10px rgba(65, 105, 225, 0.8);
+        min-width: 100px; /* Updated */
+        min-height: 30px; /* Updated */
+        max-width: 300px; /* Updated */
+        max-height: 300px; /* Updated */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 0.8em;
+        padding: 0.5rem;
+        cursor: pointer;
+        transition: left 0.5s ease-out, top 0.5s ease-out;
+        z-index: 2;
+        will-change: transform, left, top;
+        touch-action: none;
+        user-select: none;
+        color: #aaaaaa; /* Light grey color */
+        flex-direction: column;
+        pointer-events: all;
+      }
+      .node.vibe-node { /* Special styling for main Vibe nodes */
+        border-color: #87CEEB;
+        color: #e6e6ff;
+      }
+      .node:not(.center) {
+        transition: all 0.3s ease;
+        min-width: 100px;
+        min-height: 30px;
+        max-width: 300px;
+        max-height: 300px;
+      }
+
+      .node:not(.center).minimized {
+        max-height: 30px !important;
+        overflow: hidden;
+      }
+
+      .node:not(.center).minimized .node-content {
+        display: none;
+        pointer-events: none; /* Prevent content from interfering with clicks */
+      }
+
+      .node:not(.center).minimized .node-input-area {
+        display: none;
+        pointer-events: none; /* Prevent input area from interfering with clicks */
+      }
+
+      .node:not(.center).maximized {
+        max-height: 300px;
+        overflow: auto;
+      }
+
+      .node-title {
+        font-size: 0.9em;
+        margin-bottom: 0;
+        color: #aaaaaa;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 0 5px;
+      }
+      .node.vibe-node .node-title {
+        color: #e6e6ff;
+        font-weight: bold;
+      }
+
+      .node-content {
+        font-size: 0.85em;
+        color: #aaaaaa;
+      }
+
+      .delete-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(220, 53, 69, 0.3);  /* red with transparency */
+        border: 1px solid #dc3545;
+        color: #dc3545;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        display: none;  /* Hidden by default */
+        z-index: 5;
+        transition: all 0.3s ease;
+      }
+
+      .delete-btn:hover {
+        background: rgba(220, 53, 69, 0.5);
+        box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+      }
+
+      .node.maximized .delete-btn {
+        display: block; /* Show when node is maximized */
+      }
+
+      .interactive-node {
+        min-width: 410px !important;
+        min-height: 400px !important;
+        max-width: none !important;
+        max-height: none !important;
+        width: auto !important;
+        height: auto !important;
+        background: rgba(31, 64, 104, 0.95) !important;
+      }
+
+      .interactive-node .node-content {
+        flex: 1;
+        overflow: auto;
+        padding: 8px;
+      }
+
+      .node.dragging {
+        will-change: transform, left, top;
+        transition: none !important;
+      }
+
+      .node.center {
+        background: rgba(65, 105, 225, 0.85);
+        border: 2px solid #87CEEB;
+        box-shadow: 
+          0 0 20px rgba(135, 206, 235, 0.8),
+          0 0 10px rgba(135, 206, 235, 0.6),
+          inset 0 0 15px rgba(255, 255, 255, 0.3),
+          0 0 6px #87CEEB,
+          0 0 12px #87CEEB,
+          0 0 18px #87CEEB;
+        color: #cccccc; /* Slightly lighter grey for center nodes */
+      }
+
+      .node:hover {
+        box-shadow: 
+          0 0 25px rgba(65, 105, 225, 0.8),
+          0 0 15px rgba(65, 105, 225, 0.6),
+          0 0 5px rgba(65, 105, 225, 0.4),
+          inset 0 0 15px rgba(65, 105, 225, 0.4),
+          0 0 4px #4169e1,
+          0 0 8px #4169e1,
+          0 0 12px #4169e1;
+      }
+
+      .node.center:hover {
+        box-shadow: 
+          0 0 25px rgba(135, 206, 235, 0.8),
+          0 0 15px rgba(135, 206, 235, 0.6),
+          0 0 5px rgba(135, 206, 235, 0.4),
+          inset 0 0 15px rgba(135, 206, 235, 0.4),
+          0 0 4px #87CEEB,
+          0 0 8px #87CEEB,
+          0 0 12px #87CEEB;
+      }
+
+      .node.visible {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .node:not(.visible):not(.center) {
+        pointer-events: none;
+      }
+
+      .node.center {
+        opacity: 1;
+        transform: scale(1);
+      }
+      
+      .node.center .close-btn {
+        opacity: 1;
+        transform: scale(1);
+        min-width: 40px;
+        min-height: 35px;
+        background: #4169e1;
+        font-size: 1em;
+        z-index: 3;
+        box-shadow: 
+          0 0 20px rgba(65, 105, 225, 0.8),
+          0 0 10px rgba(65, 105, 225, 0.6),
+          inset 0 0 15px rgba(255, 255, 255, 0.3),
+          0 0 6px #87CEEB,
+          0 0 12px #87CEEB,
+          0 0 18px #87CEEB;
+      }
+
+      .connector {
+        position: absolute;
+        height: 2px;
+        background: rgba(65, 105, 225, 0.3);
+        pointer-events: none;
+        z-index: 1;
+        transform-origin: 0% 50%;
+        display: block;  /* Change from none to block */
+        box-shadow: 0 0 5px rgba(65, 105, 225, 0.3);
+      }
+
+      .connector.visible {
+        opacity: 1;
+        transition: opacity 0.3s ease;
+      }
+
+      .connector.hidden {
+        opacity: 0;
+      }
+
+      .commands-button {
+        position: fixed;
+        bottom: 1rem;
+        left: 22rem; 
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 100;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .commands-button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000; 
+      }
+
+      .modal-content {
+        background: #1f4068;
+        color: #fff;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 80%;
+        max-width: 600px;
+      }
+
+      .modal textarea {
+        width: 100%;
+        min-height: 200px;
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: #162447;
+        color: #fff;
+        border: 1px solid #4169e1;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+      }
+
+      @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 15px #4169e1; }
+        70% { transform: scale(1.1); box-shadow: 0 0 25px #4caf50; }
+        100% { transform: scale(1); box-shadow: 0 0 15px #4169e1; }
+      }
+
+      @keyframes flash {
+        0% { border-color: #4169e1; }
+        50% { border-color: #4caf50; }
+        100% { border-color: #4169e1; }
+      }
+
+      .node.updated {
+        animation: pulse 0.5s ease-in-out, flash 1s ease-in-out;
+      }
+
+      .loader {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+      }
+
+      .loader svg {
+        width: 50px;
+        height: 50px;
+        animation: rotate 2s linear infinite;
+      }
+
+      @keyframes rotate {
+        100% { transform: rotate(360deg); }
+      }
+
+      .loader circle {
+        fill: none;
+        stroke: #4169e1;
+        stroke-width: 4;
+        stroke-dasharray: 150, 200;
+        stroke-dashoffset: -10;
+        animation: dash 1.5s ease-in-out infinite;
+      }
+
+      @keyframes dash {
+        0% { stroke-dasharray: 1, 200; stroke-dashoffset: 0; }
+        50% { stroke-dasharray: 89, 200; stroke-dashoffset: -35; }
+        100% { stroke-dasharray: 89, 200; stroke-dashoffset: -124; }
+      }
+
+      .node-container.modal-open {
+        filter: blur(2px);
+        pointer-events: none;
+      }
+
+      .category-section {
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: rgba(31, 64, 104, 0.3);
+      }
+
+      .category-header {
+        color: #4169e1;
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+        border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+      }
+
+      .guide-button {
+        position: fixed;
+        bottom: 1rem;
+        left: 1rem;
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 100;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .guide-button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .guide-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.8);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+      }
+
+      .guide-content {
+        background: #1f4068;
+        color: #e6e6ff;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 0 20px rgba(65, 105, 225, 0.5);
+      }
+
+      .guide-section {
+        margin-bottom: 1.5rem;
+      }
+
+      .guide-section h3 {
+        color: #4169e1;
+        border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .guide-close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: none;
+        border: none;
+        color: #e6e6ff;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+      }
+
+      .docs-button {
+        position: fixed;
+        bottom: 1rem;
+        left: 8rem; /* Position after the guide button */
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 100;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .docs-button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .docs-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.8);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+      }
+
+      .docs-content {
+        background: #1f4068;
+        color: #e6e6ff;
+        padding: 2rem;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 0 20px rgba(65, 105, 225, 0.5);
+        position: relative;
+      }
+
+      .docs-section {
+        margin-bottom: 2rem;
+      }
+
+      .docs-section h3 {
+        color: #4169e1;
+        border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .docs-section h4 {
+        color: #87CEEB;
+        margin: 1rem 0 0.5rem;
+      }
+
+      .docs-section ul {
+        list-style-type: disc;
+        padding-left: 1.5rem;
+        margin: 0.5rem 0;
+      }
+
+      .docs-close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: none;
+        border: none;
+        color: #e6e6ff;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0.5rem;
+      }
+
+      .node-input-area {
+        margin-top: 10px;
+        display: flex;
+        gap: 0.5rem;
+        display: none; /* Hidden by default */
+      }
+
+      .node.maximized .node-input-area {
+        display: flex; /* Show when node is maximized */
+      }
+
+      .node-user-input {
+        flex: 1;
+        padding: 0.5rem;
+        background: #1f4068;
+        color: #fff;
+        border: 1px solid #4169e1;
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
+
+      .node-send-button {
+        padding: 0.5rem;
+        min-width: 60px;
+      }
+
+      .node.faded {
+        opacity: 0.3;
+        pointer-events: auto; /* Keep it clickable */
+        transition: opacity 0.3s ease;
+      }
+
+      .node.faded:hover {
+        opacity: 0.5; /* Slightly more visible on hover */
+      }
+
+      .back-button {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        background: rgba(65, 105, 225, 0.3);
+        border: 1px solid #4169e1;
+        color: #aaaaaa;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: all 0.3s ease;
+        display: none; /* Hidden by default */
+      }
+
+      .back-button:hover {
+        background: rgba(65, 105, 225, 0.5);
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .node.maximized .back-button {
+        display: block; /* Show when node is maximized */
+      }
+
+      .pin-btn {
+        position: absolute;
+        top: 5px;
+        right: 30px; /* Position next to delete button */
+        background: rgba(65, 105, 225, 0.3);
+        border: 1px solid #4169e1;
+        color: #aaaaaa;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        display: none; /* Hidden by default */
+        z-index: 5;
+        transition: all 0.3s ease;
+      }
+
+      .pin-btn:hover {
+        background: rgba(65, 105, 225, 0.5);
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .node.maximized .pin-btn {
+        display: block; /* Show when node is maximized */
+      }
+
+      .pin-btn.pinned {
+        background: rgba(65, 105, 225, 0.8);
+        border-color: #4169e1;
+        color: white;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .tts-btn {
+        position: absolute;
+        top: 5px;
+        right: 55px; /* Position next to pin button */
+        background: rgba(65, 105, 225, 0.3);
+        border: 1px solid #4169e1;
+        color: #aaaaaa;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        display: none; /* Hidden by default */
+        z-index: 5;
+        transition: all 0.3s ease;
+      }
+
+      .tts-btn:hover {
+        background: rgba(65, 105, 225, 0.5);
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .node.maximized .tts-btn {
+        display: block; /* Show when node is maximized */
+      }
+
+      .tts-btn.speaking {
+        background: rgba(65, 105, 225, 0.8);
+        color: white;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      /* Add inside the existing <style> tag */
+      .node.maximized {
+        resize: both;
+        overflow: auto;
+        min-width: 200px;
+        min-height: 200px;
+        max-width: 800px;
+        max-height: 800px;
+      }
+
+      .resize-handle {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 24px; /* Larger touch target */
+        height: 24px; /* Larger touch target */
+        background: rgba(65, 105, 225, 0.3);
+        border-radius: 0 0 8px 0;
+        cursor: se-resize;
+        display: none;
+        z-index: 10;
+      }
+
+      .node.maximized .resize-handle {
+        display: block;
+      }
+
+      /* Remove the previous resize indicator */
+      .node.maximized::after {
+        display: none;
+      }
+
+      /* Adjust the content area to account for handle */
+      .node.maximized .node-content {
+        height: calc(100% - 70px); /* Additional space for handle */
+        padding-bottom: 24px;
+      }
+
+      .iframe-container {
+        width: calc(100% + 10px); 
+        height: 100%;
+        min-height: 400px;
+        display: flex;
+        background: transparent;
+        overflow: visible; 
+      }
+
+      .rendered-iframe {
+        width: calc(100% + 10px); 
+        height: 100%;
+        min-height: 400px;
+        border: none;
+        flex: 1;
+        background: transparent;
+      }
+
+      .search-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(31, 64, 104, 0.95);
+        border: 1px solid #4169e1;
+        border-radius: 0 0 8px 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1001;
+        display: none;
+      }
+
+      .search-suggestions.visible {
+        display: block;
+      }
+
+      .suggestion-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        color: #e6e6ff;
+        border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+      }
+
+      .suggestion-item:hover {
+        background: rgba(65, 105, 225, 0.3);
+      }
+      
+      .node.reading {
+        box-shadow: 
+          0 0 25px rgba(135, 206, 235, 0.8),
+          0 0 15px rgba(135, 206, 235, 0.6),
+          inset 0 0 15px rgba(255, 255, 255, 0.3);
+        border-color: #87CEEB;
+      }
+
+      .rendered-html-container {
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background: transparent;
+        color: black;
+        padding: 1rem;
+        border-radius: 4px;
+      }
+
+      .rendered-html-container * {
+        max-width: 100%;
+      }
+      
+      .view-source-btn {
+        position: absolute;
+        top: 5px;
+        right: 80px; 
+        background: rgba(65, 105, 225, 0.3);
+        border: 1px solid #4169e1;
+        color: #aaaaaa;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        display: none; 
+        z-index: 5;
+        transition: all 0.3s ease;
+      }
+
+      .view-source-btn:hover {
+        background: rgba(65, 105, 225, 0.5);
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .node.maximized .view-source-btn {
+        display: block; 
+      }
+
+      .source-code {
+        display: none;
+        white-space: pre-wrap;
+        font-family: monospace;
+        background: #1a1a2e;
+        color: #e6e6ff;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-top: 1rem;
+        overflow: auto;
+        max-height: 400px;
+      }
+
+      .app-center-node {
+        min-width: 400px !important;
+        background: rgba(31, 64, 104, 0.95) !important;
+        padding: 1rem !important;
+      }
+
+      .app-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+
+      .app-item {
+        display: flex;
+        align-items: center;
+        padding: 0.8rem;
+        background: rgba(65, 105, 225, 0.2);
+        border: 1px solid rgba(65, 105, 225, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .app-item:hover {
+        background: rgba(65, 105, 225, 0.3);
+        transform: translateX(5px);
+      }
+
+      .app-item-title {
+        flex: 1;
+        color: #e6e6ff;
+        font-size: 0.9em;
+      }
+
+      .app-item-ref {
+        color: #aaaaaa;
+        font-size: 0.8em;
+        padding: 0.2rem 0.5rem;
+        background: rgba(31, 64, 104, 0.5);
+        border-radius: 4px;
+      }
+      .app-center-button {
+        position: fixed;
+        bottom: 1rem;
+        left: 15rem; /* Position after other buttons */
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 100;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+      }
+
+      .app-center-button svg {
+        width: 16px;
+        height: 16px;
+      }
+      
+      .node.pinned {
+        box-shadow: 
+          0 0 35px rgba(65, 105, 225, 0.8),
+          0 0 25px rgba(65, 105, 225, 0.6), 
+          inset 0 0 20px rgba(65, 105, 225, 0.4),
+          0 0 8px #4169e1,
+          0 0 12px #4169e1,
+          0 0 16px #4169e1;
+        border-color: #4169e1;
+      }
+
+      .home-button {
+        background: #4169e1;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem;
+        margin-right: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+        width: 42px;
+        height: 90%;  
+      }
+
+      .home-button:hover {
+        background: #2848c8;
+        box-shadow: 0 0 15px rgba(65, 105, 225, 0.7);
+      }
+
+      .home-button svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .command-button {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background: rgba(65, 105, 225, 0.1);
+        border: 1px solid rgba(65, 105, 225, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .command-button:hover {
+        background: rgba(65, 105, 225, 0.2);
+        transform: translateX(5px);
+      }
+
+      .command-info {
+        flex: 1;
+        padding-right: 1rem;
+      }
+
+      .command-title {
+        font-weight: bold;
+        color: #4169e1;
+        margin-bottom: 0.5rem;
+      }
+
+      .command-description {
+        font-size: 0.9em;
+        color: #aaaaaa;
+      }
+
+      .command-example {
+        font-style: italic;
+        color: #87CEEB;
+        margin-top: 0.5rem;
+      }
+
+      @media (max-width: 768px) {
+        .navbar {
+          flex-direction: column;
+          height: auto;
+          padding: 10px;
+        }
+
+        .navbar-input-area {
+          width: 100%;
+          margin: 10px 0;
+          gap: 0.5rem;
+        }
+
+        .navbar-title {
+          font-size: 1.5rem;
+        }
+
+        .tip-container {
+          padding: 0.25rem 0.5rem;
+        }
+
+        .tip-message {
+          font-size: 0.8rem;
+        }
+
+        .guide-button,
+        .docs-button,
+        .app-center-button,
+        .commands-button {
+          font-size: 0.9rem;
+          padding: 0.4rem 0.8rem;
+          left: auto;
+          right: 1rem;
+        }
+
+        .docs-button {
+          bottom: 4rem;
+        }
+
+        .app-center-button {
+          bottom: 7rem;
+        }
+
+        .commands-button {
+          bottom: 10rem;
+        }
+
+        .node {
+          max-width: 90vw !important;
+        }
+
+        .node.maximized {
+          width: 90vw !important;
+          height: 80vh !important;
+          max-height: 80vh !important;
+        }
+
+        .node.interactive-node {
+          width: 90vw !important;
+          min-width: 90vw !important;
+        }
+
+        .guide-content,
+        .docs-content,
+        .modal-content {
+          width: 95%;
+          max-height: 90vh;
+          padding: 1rem;
+        }
+
+        .search-suggestions {
+          width: 90vw;
+          left: 5vw;
+        }
+
+        .sidebar {
+          width: 80vw;
+        }
+
+        .sidebar.open + .sidebar-toggle {
+          left: 80vw;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .navbar-title {
+          font-size: 1.2rem;
+        }
+
+        #user-input {
+          font-size: 0.9rem;
+        }
+
+        .node-title {
+          font-size: 0.8em;
+        }
+
+        .node-content {
+          font-size: 0.8em;
+        }
+
+        .command-button {
+          padding: 0.5rem;
+        }
+
+        .command-title {
+          font-size: 0.9em;
+        }
+
+        .command-description,
+        .command-example {
+          font-size: 0.8em;
+        }
+
+        .app-item {
+          padding: 0.5rem;
+        }
+
+        .app-item-title {
+          font-size: 0.9em;
+        }
+      }
+      
+      .role-options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+
+      .role-option {
+        background: rgba(65, 105, 225, 0.2);
+        border: 1px solid rgba(65, 105, 225, 0.3);
+        border-radius: 8px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .role-option:hover {
+        background: rgba(65, 105, 225, 0.3);
+        transform: translateX(5px);
+      }
+
+      .role-context {
+        color: #aaaaaa;
+        font-style: italic;
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        border-left: 3px solid #4169e1;
+      }
+      
+      .roleplay-narrative {
+        color: #e6e6ff;
+        font-style: italic;
+        margin: 1rem 0;
+        padding: 1rem;
+        background: rgba(65, 105, 225, 0.1);
+        border-radius: 8px;
+        border-left: 3px solid #4169e1;
+        line-height: 1.5;
+      }
+      
+      .app-item {
+        display: flex;
+        align-items: center;
+        padding: 0.8rem;
+        background: rgba(65, 105, 225, 0.2);
+        border: 1px solid rgba(65, 105, 225, 0.3);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .app-delete-btn {
+        position: absolute;
+        right: 10px;
+        background: rgba(220, 53, 69, 0.3);
+        border: 1px solid #dc3545;
+        color: #dc3545;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: all 0.3s ease;
+      }
+
+      .app-delete-btn:hover {
+        background: rgba(220, 53, 69, 0.5);
+        box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+      }
+    </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="navbar-title">APUI</div>
+    <div id="auth-container" class="auth-container" style="display: none;">
+        <div id="auth-status"></div>
+        <div class="project-controls">
+            <button id="save-project-btn" onclick="handleSaveProject()">Save Project</button>
+        </div>
+        <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
+    <div class="navbar-input-area">
+      <input type="text" id="user-input" placeholder="Enter a command or create a new Vibe...">
+      <button onclick="handleUserInput()">Create Vibe</button>
+    </div>
+    <div class="tip-container">
+      <div class="tip-message"></div>
+    </div>
+  </div>
+  <br><br><br>
+  <canvas id="particles-canvas"></canvas>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2 class="sidebar-title">Projects</h2>
+      <button class="new-project-btn" title="New Project" onclick="handleNewProject()">+</button>
+    </div>
+    <ul id="topic-list" class="topic-list">
+        <!-- Project list will be populated here -->
+    </ul>
+  </div>
+  <div class="sidebar-toggle" onclick="toggleSidebar()">&#x2261;</div>
+  <div class="chat-container">
+    <div id="node-container" class="node-container"></div>
+  </div>
+
+  <div class="loader">
+    <svg viewBox="0 0 50 50">
+      <circle cx="25" cy="25" r="20"/>
+    </svg>
+  </div>
+  
+  <div id="login-modal" class="login-modal" style="display: none;">
+      <div class="login-content">
+          <h3>Login or Sign Up</h3>
+          <input type="text" id="username-input" placeholder="Username" autocomplete="username">
+          <input type="password" id="password-input" placeholder="Password" autocomplete="current-password">
+          <div class="login-buttons">
+              <button onclick="handleLogin()">Login</button>
+              <button onclick="handleSignup()">Sign Up</button>
+          </div>
+          <p id="login-error"></p>
+      </div>
+  </div>
+
+  <div id="edit-modal" class="modal">
+    <div class="modal-content">
+      <h3 id="modal-title"></h3>
+      <textarea id="modal-content"></textarea>
+      <div class="modal-buttons">
+        <button onclick="cancelEdit()">Cancel</button>
+        <button onclick="saveEdit()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="guide-button" onclick="showGuide()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 16v-4"/>
+      <path d="M12 8h.01"/>
+    </svg>
+    User Guide
+  </button>
+
+  <button class="docs-button" onclick="showDocs()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-6"/>
+      <path d="M12 12l4-4"/>
+      <path d="M16 8h-4V4"/>
+    </svg>
+    Documentation
+  </button>
+
+  <button class="app-center-button" onclick="createAppCenter()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/>
+    </svg>
+    App Center
+  </button>
+
+  <button class="commands-button" onclick="showCommandsNode()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+    Commands
+  </button>
+
+  <div class="docs-modal" id="docs-modal">
+    <div class="docs-content">
+      <button class="docs-close" onclick="hideDocs()">&#xd7;</button>
+      <h2>Project Documentation</h2>
+      
+      <div class="docs-section">
+        <h3>Project Overview</h3>
+        <p>This is an AI-powered interactive mind mapping tool that allows users to create, explore, and organize ideas visually. The project combines natural language processing with an intuitive visual interface.</p>
+      </div>
+      
+      <div class="docs-section">
+        <h3>Key Features</h3>
+        <ul>
+          <li>Interactive node-based visualization</li>
+          <li>AI-powered content generation</li>
+          <li>Drag and drop interface</li>
+          <li>Topic categorization</li>
+          <li>Zoom and pan controls</li>
+        </ul>
+      </div>
+      
+      <div class="docs-section">
+        <h3>How to Use</h3>
+        <h4>Basic Input</h4>
+        <p>Type any question or topic in the input box and press Enter or click Send. The AI will generate relevant content displayed as connected nodes.</p>
+        
+        <h4>Create Command</h4>
+        <p>Use the &quot;create:&quot; command to generate comprehensive mind maps. For example:</p>
+        <ul>
+          <li>create: solar system</li>
+          <li>create: web development basics</li>
+          <li>create: machine learning concepts</li>
+        </ul>
+        
+        <h4>Node Interaction</h4>
+        <p>Click and drag nodes to reposition them. Center nodes will move together with their connected child nodes.</p>
+      </div>
+      
+      <div class="docs-section">
+        <h3>Technical Details</h3>
+        <p>The project uses:</p>
+        <ul>
+          <li>Advanced AI language model for content generation</li>
+          <li>HTML5 Canvas for particle effects</li>
+          <li>CSS3 for animations and styling</li>
+          <li>Vanilla JavaScript for interactivity</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-modal" id="guide-modal">
+    <div class="guide-content">
+      <button class="guide-close" onclick="hideGuide()">&#xd7;</button>
+      <h2>Interactive Mind Map User Guide</h2>
+      
+      <div class="guide-section">
+        <h3>Basic Navigation</h3>
+        <ul>
+          <li>Click and drag nodes to move them</li>
+          <li>Use the zoom buttons (+/-) to adjust the view</li>
+          <li>Click a node to view its details</li>
+        </ul>
+      </div>
+      
+      <div class="guide-section">
+        <h3>Creating Content</h3>
+        <ul>
+          <li>Type in the input box and press Enter or click Send to create a new topic</li>
+          <li>Use &quot;create:&quot; command to generate mind maps (e.g., &quot;create: solar system&quot;)</li>
+          <li>Click the center node to show/hide connected ideas</li>
+        </ul>
+      </div>
+      
+      <div class="guide-section">
+        <h3>Organization</h3>
+        <ul>
+          <li>Topics are automatically categorized</li>
+          <li>Use the sidebar (&#x2261;) to access all your topics</li>
+          <li>Drag topics from the sidebar to reposition them</li>
+        </ul>
+      </div>
+      
+      <div class="guide-section">
+        <h3>Tips &amp; Shortcuts</h3>
+        <ul>
+          <li>Double-click nodes to edit their content</li>
+          <li>Parent nodes move together with their children</li>
+          <li>Click empty space to collapse all nodes</li>
+        </ul>
+      </div>
+      
+      <div class="guide-section">
+        <h3>Voice Command Features</h3>
+        <ul>
+          <li>Use &quot;read:&quot; command followed by your search queries separated by &quot;and&quot; or commas to find and read content</li>
+          <li>Example: &quot;read: future of ai, applications of ai&quot;</li>
+          <li>The system will:
+            <ul>
+              <li>Search through all nodes for relevant content</li>
+              <li>Navigate to each matching node in sequence</li>
+              <li>Expand them if needed</li>
+              <li>Read the content aloud for each node</li>
+            </ul>
+          </li>
+          <li>You can stop the reading at any time by clicking the speaker icon</li>
+        </ul>
+      </div>
+      <div class="guide-section">
+        <h3>Text Analysis Feature</h3>
+        <ul>
+          <li>Use &quot;parse:&quot; command followed by your text or code to analyze it in sections</li>
+          <li>The system will:
+            <ul>
+              <li>Analyze the content and break it into relevant sections</li>
+              <li>Create a hierarchical structure of nodes</li>
+              <li>Group related concepts together</li>
+              <li>Allow easy navigation between different sections</li>
+            </ul>
+          </li>
+          <li>Example: &quot;parse: [your text or code block here]&quot;</li>
+        </ul>
+      </div>
+      <div class="guide-section">
+        <h3>Parent-Child Node Reading</h3>
+        <ul>
+          <li>Use &quot;read: children:[search query]&quot; to find and read a parent node and all its child nodes</li>
+          <li>Example: &quot;read: children:quantum computing advantages&quot;</li>
+          <li>The system will:
+            <ul>
+              <li>Find the most relevant parent node matching your query</li>
+              <li>Read the parent node&apos;s content</li>
+              <li>Then read each child node&apos;s content in sequence</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+      <div class="guide-section">
+        <h3>Asking Questions About Content</h3>
+        <ul>
+          <li>Use &quot;ask:&quot; command followed by your question to query information from existing nodes</li>
+          <li>Example: &quot;ask: what are the main benefits of quantum computing?&quot;</li>
+          <li>The system will:
+            <ul>
+              <li>Find relevant nodes containing the answer</li>
+              <li>Provide a spoken response</li>
+              <li>Open relevant nodes as it speaks</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+      <div class="guide-section">
+        <h3>Interactive Roleplay</h3>
+        <ul>
+          <li>Use &quot;roleplay:&quot; command followed by the role you want the AI to play</li>
+          <li>Example: &quot;roleplay: medieval merchant&quot;</li>
+          <li>The system will:
+            <ul>
+              <li>Create an interactive node with the specified role</li>
+              <li>Present multiple response options relevant to the role</li>
+              <li>Allow you to either:
+                <ul>
+                  <li>Click on predefined options to continue the roleplay</li>
+                  <li>Type your own custom response</li>
+                </ul>
+              </li>
+              <li>Generate contextual follow-up responses based on your choices</li>
+              <li>Maintain conversation history and context throughout the interaction</li>
+              <li>Automatically open new response nodes as the roleplay progresses</li>
+            </ul>
+          </li>
+          <li>The roleplay will:
+            <ul>
+              <li>Adapt responses based on previous interactions</li>
+              <li>Maintain character consistency</li>
+              <li>Create branching conversation paths</li>
+              <li>Save progress in local storage</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+      <div class="guide-section">
+        <h3>URL Parameters</h3>
+        <p>You can pass commands and queries through the URL using parameters:</p>
+        <ul>
+          <li>Command and query: <code>?command=create&amp;query=solar%20system</code>
+            <br>Example: <code>https://yourdomain.com/?command=create&amp;query=quantum%20computing</code>
+          </li>
+          <li>Read command with multiple topics: <code>?command=read&amp;query=future%20of%20ai,applications%20of%20ai</code>
+            <br>Example: <code>https://yourdomain.com/?command=read&amp;query=future%20of%20ai,applications%20of%20ai</code>
+          </li>
+          <li>HTML with instructions: <code>?command=html&amp;instructions=%3Chtml%3E...%3C/html%3E---%20instructions</code>
+            <br>Example: <code>https://yourdomain.com/?command=html&amp;instructions=%3Chtml%3E%3Cbody%3EHello%3C/body%3E%3C/html%3E---add%20styling</code>
+          </li>
+          <li>Parse text: <code>?command=parse&amp;query=your%20text%20here</code>
+            <br>Example: <code>https://yourdomain.com/?command=parse&amp;query=The%20solar%20system%20consists%20of...</code>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as api from './api (6).js';
+
+    // --- State Management ---
+    let currentUser = null;
+    let currentProject = null;
+
+    // --- Original State Variables (some might be deprecated or repurposed) ---
+    let topZIndex = 100;
+    // topics, categories, nodes will now be managed within currentProject
+    let activeNodeId = null;
+    let currentZoom = 0.8;
+    let isDragging = false;
+    let currentNode = null;
+    let offsetX = 0;
+    let offsetY = 0;
+    let isMoving = false;
+    const MOVEMENT_THRESHOLD = 5;
+    let sidebarOpen = false;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    const particlesCanvas = document.getElementById('particles-canvas');
+    const ctx = particlesCanvas.getContext('2d');
+    let particles = [];
+    const particleCount = 50;
+    const connectionDistance = 100;
+    const particleSpeed = 0.5;
+    let isTextBlock = false;
+    let appNodes = new Map();
+    let roleplayContext = new Map();
+
+    // Make functions globally accessible for inline HTML event handlers
+    window.handleLogin = handleLogin;
+    window.handleSignup = handleSignup;
+    window.handleLogout = handleLogout;
+    window.handleSaveProject = handleSaveProject;
+    window.handleNewProject = handleNewProject;
+    window.handleUserInput = handleUserInput;
+    window.toggleSidebar = toggleSidebar;
+    window.createAppCenter = () => {}; // Placeholder for now
+    window.showCommandsNode = () => {}; // Placeholder for now
+    window.showGuide = showGuide;
+    window.hideGuide = hideGuide;
+    window.showDocs = showDocs;
+    window.hideDocs = hideDocs;
+    window.cancelEdit = () => document.getElementById('edit-modal').style.display = 'none';
+    window.saveEdit = () => { /* Logic to be added if needed */ };
+
+
+    // --- NEW: Auth and Project Management ---
+
+    function showLoginModal() {
+        document.getElementById('login-modal').style.display = 'flex';
+        document.getElementById('auth-container').style.display = 'none';
+    }
+
+    function hideLoginModal() {
+        document.getElementById('login-modal').style.display = 'none';
+        document.getElementById('auth-container').style.display = 'flex';
+    }
+
+    async function handleLogin() {
+        const username = document.getElementById('username-input').value;
+        const password = document.getElementById('password-input').value;
+        const errorEl = document.getElementById('login-error');
+        errorEl.textContent = '';
+        if (!username || !password) {
+            errorEl.textContent = 'Please enter username and password.';
+            return;
+        }
+        showLoader();
+        try {
+            const user = await api.login(username, password);
+            currentUser = user;
+            sessionStorage.setItem('currentUser', JSON.stringify(user));
+            document.getElementById('auth-status').textContent = `Logged in as: ${user.username}`;
+            hideLoginModal();
+            await populateProjectList();
+            showTip(`Welcome, ${user.username}! Select a project to begin.`, 5000);
+        } catch (error) {
+            errorEl.textContent = error.message;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function handleSignup() {
+        const username = document.getElementById('username-input').value;
+        const password = document.getElementById('password-input').value;
+        const errorEl = document.getElementById('login-error');
+        errorEl.textContent = '';
+        if (!username || !password) {
+            errorEl.textContent = 'Please enter username and password.';
+            return;
+        }
+        showLoader();
+        try {
+            const result = await api.signup(username, password);
+            errorEl.textContent = 'Signup successful! Please log in.';
+            showTip('Signup successful! Please log in.', 3000);
+        } catch (error) {
+            errorEl.textContent = error.message;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    function handleLogout() {
+        currentUser = null;
+        currentProject = null;
+        sessionStorage.removeItem('currentUser');
+        clearCanvas();
+        document.getElementById('topic-list').innerHTML = ''; // Clear project list
+        showLoginModal();
+    }
+    
+    async function populateProjectList() {
+        if (!currentUser) return;
+        const projectList = document.getElementById('topic-list');
+        projectList.innerHTML = 'Loading projects...';
+        try {
+            const projects = await api.listProjects(currentUser.id);
+            projectList.innerHTML = '';
+            if (projects.length === 0) {
+                projectList.innerHTML = '<li>No projects found. Create one!</li>';
+            } else {
+                projects.forEach(project => {
+                    const li = document.createElement('li');
+                    li.className = 'topic-item';
+                    li.textContent = project.name;
+                    li.dataset.projectId = project.id;
+                    li.onclick = () => handleProjectSelect(project.id);
+                    projectList.appendChild(li);
+                });
+            }
+        } catch (error) {
+            projectList.innerHTML = `<li>Error loading projects: ${error.message}</li>`;
+        }
+    }
+
+    async function handleProjectSelect(projectId) {
+        if (!currentUser) return;
+        showLoader();
+        try {
+            const projectData = await api.loadProject(currentUser.id, projectId);
+            currentProject = {
+                id: projectId,
+                data: projectData // This is the full project object including name, vibes, etc.
+            };
+            
+            // Highlight selected project in the sidebar
+            document.querySelectorAll('#topic-list .topic-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.projectId === projectId);
+            });
+
+            clearCanvas();
+            renderProject(projectData);
+            showTip(`Loaded project: ${projectData.projectName}`, 3000);
+        } catch (error) {
+            alert(`Failed to load project: ${error.message}`);
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function handleNewProject() {
+        if (!currentUser) return;
+        const projectName = prompt("Enter a name for the new project:");
+        if (!projectName || !projectName.trim()) return;
+
+        const newProjectId = 'proj_' + Date.now();
+        const newProjectData = {
+            projectId: newProjectId,
+            projectName: projectName.trim(),
+            vibes: [] // Start with an empty project
+        };
+
+        showLoader();
+        try {
+            // Use saveProject to create the new project file
+            api.saveProject(currentUser.id, newProjectId, newProjectData);
+            showTip(`Project "${projectName}" created!`, 4000);
+            await populateProjectList();
+            
+            // Automatically select the new project
+            handleProjectSelect(newProjectId);
+
+        } catch (error) {
+            alert(`Could not create project: ${error.message}`);
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function handleSaveProject() {
+        if (!currentUser || !currentProject) {
+            showTip('No active project to save.', 3000);
+            return;
+        }
+
+        const projectData = collectProjectDataFromCanvas();
+        showLoader();
+        showTip('Saving...', 10000);
+        try {
+            // The api.saveProject function is fire-and-forget due to the queue
+            api.saveProject(currentUser.id, currentProject.id, projectData);
+            // We can't await the result, so we just assume it will work and show a message
+            // The queue handles multiple saves gracefully.
+            setTimeout(() => {
+              showTip(`Project "${projectData.projectName}" saved!`, 4000);
+              hideLoader();
+            }, 1000); // Give it a moment to feel like it's saving
+        } catch (error) {
+            hideLoader();
+            alert(`Error saving project: ${error.message}`);
+        }
+    }
+
+    function collectProjectDataFromCanvas() {
+        const vibes = [];
+        document.querySelectorAll('.node.vibe-node').forEach(vibeNode => {
+            const vibeData = JSON.parse(vibeNode.dataset.vibeData || '{}');
+            
+            // Update position from the node's current style
+            const position = { 
+                left: vibeNode.style.left, 
+                top: vibeNode.style.top 
+            };
+            
+            // Find and update content of children
+            const childrenData = vibeData.children || [];
+            document.querySelectorAll(`.node[data-parent-id="${vibeNode.dataset.id}"]`).forEach(childNode => {
+                const childType = childNode.dataset.vibeType; // 'description', 'analysis', 'code'
+                const childContentEl = childNode.querySelector('.node-content');
+                if (childType && childContentEl) {
+                    const existingChild = childrenData.find(c => c.type === childType);
+                    if (existingChild) {
+                        existingChild.content = childContentEl.innerHTML; // Use innerHTML to preserve formatting/iframes
+                    }
+                }
+            });
+            
+            vibes.push({
+                ...vibeData,
+                position: position,
+                children: childrenData,
+            });
+        });
+
+        return {
+            projectId: currentProject.id,
+            projectName: currentProject.data.projectName,
+            vibes: vibes
+        };
+    }
+
+    function clearCanvas() {
+        document.getElementById('node-container').innerHTML = '';
+        document.querySelectorAll('.connector').forEach(c => c.remove());
+    }
+
+    function renderProject(projectData) {
+        if (!projectData || !projectData.vibes) return;
+        const container = document.getElementById('node-container');
+
+        projectData.vibes.forEach(vibe => {
+            const pos = vibe.position || { left: `${Math.random() * 500 + 200}px`, top: `${Math.random() * 300 + 150}px` };
+            const node = createNode(vibe.title, '', parseInt(pos.left), parseInt(pos.top));
+            node.classList.add('vibe-node');
+            node.dataset.vibeId = vibe.vibeId;
+            node.dataset.vibeData = JSON.stringify(vibe); // Store all data for child creation
+            container.appendChild(node);
+            
+            // Make it visible immediately
+            setTimeout(() => {
+              node.classList.add('visible');
+            }, 10);
+        });
+        drawConnectors();
+    }
+    
+    // --- MODIFIED: User Input now creates a new Vibe in the current project ---
+
+    function handleUserInput() {
+      if (!currentUser || !currentProject) {
+        showTip("Please select a project before creating a new vibe.", 4000);
+        return;
+      }
+      
+      const input = document.getElementById('user-input');
+      const vibeTitle = input.value.trim();
+      if (!vibeTitle) return;
+
+      const container = document.getElementById('node-container');
+      const centerX = container.offsetWidth / 2;
+      const centerY = container.offsetHeight / 2;
+      
+      // Create a new vibe object
+      const newVibe = {
+        vibeId: 'vibe_' + Date.now(),
+        title: vibeTitle,
+        position: { left: `${centerX}px`, top: `${centerY}px` },
+        children: [
+          { type: "description", content: "Description of " + vibeTitle },
+          { type: "analysis", content: "Analysis of " + vibeTitle },
+          { type: "code", content: "<!-- Code for " + vibeTitle + " -->" }
+        ]
+      };
+      
+      // Add to current project data in memory
+      currentProject.data.vibes.push(newVibe);
+
+      // Render the new vibe node on the canvas
+      const node = createNode(newVibe.title, '', centerX, centerY);
+      node.classList.add('vibe-node');
+      node.dataset.vibeId = newVibe.vibeId;
+      node.dataset.vibeData = JSON.stringify(newVibe);
+      container.appendChild(node);
+
+      setTimeout(() => {
+        node.classList.add('visible');
+        scrollToNode(node);
+      }, 10);
+      
+      input.value = '';
+      showTip(`Vibe "${vibeTitle}" created. Click to expand. Don't forget to save!`, 5000);
+    }
+    
+    // --- MODIFIED: Node click handler to spawn Vibe children ---
+    
+    function handleVibeNodeClick(vibeNode) {
+        // Check if children are already rendered
+        const existingChildren = document.querySelectorAll(`.node[data-parent-id="${vibeNode.dataset.id}"]`);
+        if (existingChildren.length > 0) {
+            // Just toggle visibility if they exist
+            existingChildren.forEach(child => child.classList.toggle('visible'));
+            drawConnectors();
+            return;
+        }
+
+        // If not rendered, create them
+        const vibeData = JSON.parse(vibeNode.dataset.vibeData);
+        if (!vibeData || !vibeData.children) return;
+        
+        const container = document.getElementById('node-container');
+        const parentX = parseInt(vibeNode.style.left);
+        const parentY = parseInt(vibeNode.style.top);
+        const radius = 250;
+
+        vibeData.children.forEach((childData, index) => {
+            const angle = (2 * Math.PI / vibeData.children.length) * index - (Math.PI / 2); // Start from top
+            const x = parentX + radius * Math.cos(angle);
+            const y = parentY + radius * Math.sin(angle);
+            
+            const childNode = createNode(childData.type, childData.content, x, y);
+            childNode.dataset.parentId = vibeNode.dataset.id;
+            childNode.dataset.vibeType = childData.type; // e.g., 'description'
+            container.appendChild(childNode);
+            
+            setTimeout(() => childNode.classList.add('visible'), 50 * (index + 1));
+        });
+
+        setTimeout(drawConnectors, 200);
+    }
+
+
+    // --- Original Functions (with minor modifications) ---
+    class Particle {
+      constructor() { this.reset(); }
+      reset() {
+        this.x = Math.random() * particlesCanvas.width;
+        this.y = Math.random() * particlesCanvas.height;
+        this.vx = (Math.random() - 0.5) * particleSpeed;
+        this.vy = (Math.random() - 0.5) * particleSpeed;
+        this.size = Math.random() * 2 + 1;
+      }
+      update() {
+        this.x += this.vx; this.y += this.vy;
+        if (this.x < 0 || this.x > particlesCanvas.width) this.vx *= -1;
+        if (this.y < 0 || this.y > particlesCanvas.height) this.vy *= -1;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(65, 105, 225, 0.5)';
+        ctx.fill();
+      }
+    }
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+    }
+    function drawConnectors() {
+      document.querySelectorAll('.connector').forEach(connector => connector.remove());
+      const nodes = document.querySelectorAll('.node.visible');
+      nodes.forEach(node => {
+        const parentId = node.dataset.parentId;
+        if (parentId) {
+          const parent = document.querySelector(`.node[data-id="${parentId}"]`);
+          if (parent && parent.classList.contains('visible')) {
+            drawConnection(parent, node);
+          }
+        }
+      });
+    }
+    function drawConnection(fromNode, toNode) {
+      const container = document.getElementById('node-container');
+      const fromRect = fromNode.getBoundingClientRect();
+      const toRect = toNode.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const fromX = fromRect.left + fromRect.width / 2 - containerRect.left;
+      const fromY = fromRect.top + fromRect.height / 2 - containerRect.top;
+      const toX = toRect.left + toRect.width / 2 - containerRect.left;
+      const toY = toRect.top + toRect.height / 2 - containerRect.top;
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const connector = document.createElement('div');
+      connector.className = 'connector';
+      container.appendChild(connector);
+      connector.style.width = `${length}px`;
+      connector.style.left = `${fromX}px`;
+      connector.style.top = `${fromY}px`;
+      connector.style.transform = `rotate(${angle}deg)`;
+      connector.style.opacity = fromNode.classList.contains('faded') || toNode.classList.contains('faded') ? '0.3' : '1';
+    }
+    function animate() {
+      ctx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+      particles.forEach(p => { p.update(); p.draw(); });
+      drawConnectors();
+      requestAnimationFrame(animate);
+    }
+    function resizeCanvas() {
+      particlesCanvas.width = window.innerWidth;
+      particlesCanvas.height = window.innerHeight;
+    }
+    
+    function createNode(title, content, x, y) {
+      const node = document.createElement('div');
+      node.className = 'node minimized';
+      node.style.zIndex = topZIndex++;
+      const titleElement = document.createElement('div');
+      titleElement.className = 'node-title';
+      titleElement.textContent = title;
+      node.appendChild(titleElement);
+      const contentContainer = document.createElement('div');
+      contentContainer.className = 'node-content';
+      contentContainer.innerHTML = content; // Use innerHTML to render HTML content for code nodes
+      node.appendChild(contentContainer);
+      node.style.left = x + 'px';
+      node.style.top = y + 'px';
+      node.dataset.content = content;
+      node.dataset.title = title;
+      node.dataset.id = 'node_' + Date.now() + Math.random();
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.innerHTML = '&#x2715;';
+      deleteBtn.onclick = e => { e.stopPropagation(); deleteNode(node); };
+      node.appendChild(deleteBtn);
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'pin-btn';
+      pinBtn.innerHTML = '&#x1F4CC;';
+      pinBtn.onclick = e => { e.stopPropagation(); togglePinNode(node); };
+      node.appendChild(pinBtn);
+      node.onpointerdown = handlePointerDown;
+      node.onpointermove = handlePointerMove;
+      node.onpointerup = handlePointerUp;
+      node.onpointercancel = handlePointerUp;
+      return node;
+    }
+    function deleteNode(node) {
+        const nodeId = node.dataset.id;
+        
+        // If it's a vibe node, remove it from the project data
+        if (node.classList.contains('vibe-node')) {
+            const vibeId = node.dataset.vibeId;
+            currentProject.data.vibes = currentProject.data.vibes.filter(v => v.vibeId !== vibeId);
+            // Also delete its children from the DOM
+             document.querySelectorAll(`.node[data-parent-id="${nodeId}"]`).forEach(child => child.remove());
+        }
+        
+        node.remove();
+        drawConnectors();
+        showTip('Node removed. Save project to make it permanent.', 3000);
+    }
+    function togglePinNode(node) {
+        node.classList.toggle('pinned');
+    }
+    function handlePointerDown(e) {
+      if (e.target.closest('.node-content, button, input')) return;
+      e.preventDefault();
+      isMoving = false;
+      currentNode = e.target.closest('.node');
+      if (!currentNode) {
+        isPanning = true; panStartX = e.clientX; panStartY = e.clientY;
+        return;
+      }
+      currentNode.style.zIndex = ++topZIndex;
+      const rect = currentNode.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      currentNode.style.transition = 'none';
+      if (currentNode.classList.contains('vibe-node')) {
+          document.querySelectorAll(`.node[data-parent-id="${currentNode.dataset.id}"]`).forEach(child => child.style.transition = 'none');
+      }
+      currentNode.setPointerCapture(e.pointerId);
+    }
+    function handlePointerMove(e) {
+      if (isPanning) {
+        const dx = e.clientX - panStartX; const dy = e.clientY - panStartY;
+        document.querySelectorAll('.node').forEach(n => {
+          n.style.left = `${(parseFloat(n.style.left) || 0) + dx}px`;
+          n.style.top = `${(parseFloat(n.style.top) || 0) + dy}px`;
+        });
+        panStartX = e.clientX; panStartY = e.clientY;
+        return;
+      }
+      if (!currentNode) return;
+      isMoving = true;
+      let newX = e.clientX - offsetX;
+      let newY = e.clientY - offsetY;
+
+      // Move children with parent vibe node
+      if (currentNode.classList.contains('vibe-node')) {
+          const deltaX = newX - (parseFloat(currentNode.style.left) || 0);
+          const deltaY = newY - (parseFloat(currentNode.style.top) || 0);
+          document.querySelectorAll(`.node[data-parent-id="${currentNode.dataset.id}"]`).forEach(child => {
+              child.style.left = `${(parseFloat(child.style.left) || 0) + deltaX}px`;
+              child.style.top = `${(parseFloat(child.style.top) || 0) + deltaY}px`;
+          });
+      }
+
+      currentNode.style.left = `${newX}px`;
+      currentNode.style.top = `${newY}px`;
+    }
+    function handlePointerUp(e) {
+      if (isPanning) { isPanning = false; return; }
+      if (!currentNode) return;
+      currentNode.releasePointerCapture(e.pointerId);
+      currentNode.style.transition = '';
+      if (currentNode.classList.contains('vibe-node')) {
+          document.querySelectorAll(`.node[data-parent-id="${currentNode.dataset.id}"]`).forEach(child => child.style.transition = '');
+      }
+      if (!isMoving) { // This was a click, not a drag
+        if (currentNode.classList.contains('vibe-node')) {
+            handleVibeNodeClick(currentNode);
+        } else {
+            // Standard child node click
+            currentNode.classList.toggle('minimized');
+            currentNode.classList.toggle('maximized');
+        }
+      }
+      currentNode = null;
+    }
+    function scrollToNode(node) {
+        if (!node) return;
+        const container = document.getElementById('node-container');
+        const containerRect = container.getBoundingClientRect();
+        const nodeRect = node.getBoundingClientRect();
+        const dx = (containerRect.width / 2) - (nodeRect.left - containerRect.left + nodeRect.width / 2);
+        const dy = (containerRect.height / 2) - (nodeRect.top - containerRect.top + nodeRect.height / 2);
+
+        document.querySelectorAll('.node').forEach(n => {
+            n.style.transition = 'left 0.5s ease, top 0.5s ease';
+            n.style.left = `${(parseFloat(n.style.left) || 0) + dx}px`;
+            n.style.top = `${(parseFloat(n.style.top) || 0) + dy}px`;
+            setTimeout(() => n.style.transition = '', 500);
+        });
+    }
+
+    function showLoader() { document.querySelector('.loader').style.display = 'block'; }
+    function hideLoader() { document.querySelector('.loader').style.display = 'none'; }
+    function showGuide() { document.getElementById('guide-modal').style.display = 'flex'; }
+    function hideGuide() { document.getElementById('guide-modal').style.display = 'none'; }
+    function showDocs() { document.getElementById('docs-modal').style.display = 'flex'; }
+    function hideDocs() { document.getElementById('docs-modal').style.display = 'none'; }
+
+    let activeTipTimeout;
+    function showTip(message, duration = 5000) {
+      const tipMessage = document.querySelector('.tip-message');
+      if (!tipMessage) return;
+      if (activeTipTimeout) clearTimeout(activeTipTimeout);
+      tipMessage.textContent = message;
+      tipMessage.classList.add('visible');
+      activeTipTimeout = setTimeout(() => tipMessage.classList.remove('visible'), duration);
+    }
+    
+    // --- Initial Load ---
+    document.addEventListener('DOMContentLoaded', () => {
+        resizeCanvas();
+        initParticles();
+        animate();
+        
+        const storedUser = sessionStorage.getItem('currentUser');
+        if (storedUser) {
+            currentUser = JSON.parse(storedUser);
+            document.getElementById('auth-status').textContent = `Logged in as: ${currentUser.username}`;
+            hideLoginModal();
+            populateProjectList();
+        } else {
+            showLoginModal();
+        }
+    });
+
+  </script>
+</body></html>
