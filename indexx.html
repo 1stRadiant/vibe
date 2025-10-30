@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -125,8 +126,12 @@
 
                 <!-- Content Area -->
                 <div class="col py-3">
-                    <!-- START OF CHANGE: Added Share Button -->
-                    <div class="d-flex justify-content-end mb-3">
+                    <div class="main-toolbar">
+                        <!-- START OF CHANGE: New "AI Structure" button -->
+                        <button id="open-ai-structure-modal-button" class="btn btn-info me-auto" title="Modify the project's node structure with an AI command" disabled>
+                            <i class="bi bi-diagram-2"></i> AI Structure
+                        </button>
+                        <!-- END OF CHANGE -->
                         <button id="manual-save-button" class="btn btn-primary me-2" title="Save Project (Ctrl/Cmd+S)" disabled>
                             <i class="bi bi-save"></i> Save
                         </button>
@@ -136,12 +141,10 @@
                         <button id="undo-button" class="btn btn-secondary me-2" title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
                         <button id="redo-button" class="btn btn-secondary" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷ Redo</button>
                     </div>
-                    <!-- END OF CHANGE: Added Share Button -->
 
                     <div class="tab-content-area">
                         <!-- All tab content divs remain here -->
                         <div id="start" class="tab-content active">
-                            <!-- Start tab content -->
                              <div class="start-page-content">
                                 <div class="start-header">
                                     <h1>Vibe Coding System</h1>
@@ -156,13 +159,30 @@
 
                                 <div id="new-project-container">
                                     <h2>Create a New Project</h2>
-                                    <p>Enter a unique ID and a description, then choose how to build your site.</p>
-                                    <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                                    <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                                    <div id="agent-buttons-container">
-                                        <button id="generate-project-button">Generate Project (Single Task)</button>
-                                        <button id="start-iterative-build-button" class="action-button">Start Iterative Build</button>
+                                    
+                                    <div class="project-creation-method">
+                                        <h3>From a High-Level Goal</h3>
+                                        <p>Describe your website, and let the AI figure out the structure and code.</p>
+                                        <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                                        <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                        <div class="agent-buttons-container">
+                                            <button id="generate-project-button">Generate Project</button>
+                                            <button id="start-iterative-build-button" class="action-button">Build with Agent</button>
+                                        </div>
                                     </div>
+                                    
+                                    <!-- START OF CHANGE: Added new section for structural instructions -->
+                                    <hr class="section-divider">
+                                    
+                                    <div class="project-creation-method">
+                                        <h3>From Structural Instructions</h3>
+                                        <p>Tell the AI exactly how to structure the Vibe Nodes, and it will generate the boilerplate.</p>
+                                        <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
+                                        <div class="agent-buttons-container">
+                                            <button id="generate-from-instructions-button">Generate from Instructions</button>
+                                        </div>
+                                    </div>
+                                    <!-- END OF CHANGE -->
                                 </div>
 
                                 <div id="start-page-generation-output" style="display: none;">
@@ -206,28 +226,18 @@
                         </div>
                         <div id="agent" class="tab-content">
                             <div class="agent-container">
-                                <h2>AI Agent</h2>
-                                <p>Describe a task or overall goal. The agent can execute it as a single task or start an interactive, step-by-step session.</p>
+                                <h2>AI Agent Task Queue</h2>
+                                <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
                                 
                                 <div id="agent-controls">
-                                    <textarea id="agent-prompt-input" rows="4" placeholder="Describe the overall goal for your website..."></textarea>
-                                    <div id="agent-buttons-container">
-                                        <button id="run-agent-single-task-button" class="action-button">Execute as Single Task</button>
-                                        <button id="start-iterative-session-button" class="action-button">Start Iterative Session</button>
+                                    <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
+                                    <div class="agent-buttons-container">
+                                        <button id="run-agent-single-task-button" class="action-button">Add Task</button>
+                                        <button id="start-iterative-session-button" class="action-button">Process Queue</button>
+                                        <button id="end-session-button" style="display: none;">Stop Queue</button>
                                     </div>
                                 </div>
-                        
-                                <div id="iterative-session-ui" class="hidden">
-                                    <h4>Project Plan:</h4>
-                                    <div id="iterative-plan-display"></div>
-                                    <div id="iterative-controls" class="hidden">
-                                        <p>Review the changes in the preview. Then, provide feedback or continue.</p>
-                                        <button id="accept-continue-button" class="action-button">Looks Good, Continue</button>
-                                        <button id="request-changes-button" class="action-button">Request Changes</button>
-                                        <button id="end-session-button">End Session</button>
-                                    </div>
-                                </div>
-                        
+
                                 <div id="agent-output-container">
                                     <h3>Agent Log</h3>
                                     <div id="agent-output">
@@ -509,7 +519,6 @@
         </div>
     </div>
     
-    <!-- START OF CHANGE: Add the new AI Project Edit Modal -->
     <div id="ai-project-edit-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -527,6 +536,27 @@
             </div>
             <div class="modal-footer">
                 <button id="ai-project-edit-execute-button" class="action-button">Execute Command</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- START OF CHANGE: Add the new AI Structure Update Modal -->
+    <div id="ai-structure-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>AI Structure Update</h2>
+                <button id="ai-structure-close-button" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Describe how you want to change the current Vibe Tree structure. The AI will generate a new tree based on your instructions. This is a powerful tool for refactoring.</p>
+                <div class="form-group">
+                    <label for="ai-structure-prompt-input">Your Instructions:</label>
+                    <textarea id="ai-structure-prompt-input" rows="6" placeholder="e.g., 'Move the 'login-button' node inside the 'user-profile-card' node. Create a new CSS node called 'card-styles' and link it.'"></textarea>
+                </div>
+                <p id="ai-structure-error" class="modal-error"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="ai-structure-execute-button" class="action-button">Update Structure</button>
             </div>
         </div>
     </div>
