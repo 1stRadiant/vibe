@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,21 +127,44 @@
 
                 <!-- Content Area -->
                 <div class="col py-3">
-                    <div class="main-toolbar">
-                        <!-- START OF CHANGE: New "AI Structure" button -->
-                        <button id="open-ai-structure-modal-button" class="btn btn-info me-auto" title="Modify the project's node structure with an AI command" disabled>
-                            <i class="bi bi-diagram-2"></i> AI Structure
-                        </button>
-                        <!-- END OF CHANGE -->
-                        <button id="manual-save-button" class="btn btn-primary me-2" title="Save Project (Ctrl/Cmd+S)" disabled>
-                            <i class="bi bi-save"></i> Save
-                        </button>
-                        <button id="share-project-button" class="btn btn-secondary me-2" title="Share a link to the live project" disabled>
-                            <i class="bi bi-share"></i> Share
-                        </button>
-                        <button id="undo-button" class="btn btn-secondary me-2" title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
-                        <button id="redo-button" class="btn btn-secondary" title="Redo (Ctrl+Y or Shift+Ctrl/Cmd+Z)">↷ Redo</button>
+                    <!-- START OF CHANGE: Refactored toolbar buttons into a 3-dot menu -->
+                    <div class="main-toolbar d-flex justify-content-end">
+                        <div class="dropdown">
+                            <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <button class="dropdown-item" type="button" id="open-ai-structure-modal-button" disabled>
+                                        <i class="bi bi-diagram-2 me-2"></i>AI Structure
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="manual-save-button" disabled>
+                                        <i class="bi bi-save me-2"></i>Save Project
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="share-project-button" disabled>
+                                        <i class="bi bi-share me-2"></i>Share Project
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="undo-button">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Undo
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="redo-button">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Redo
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
+                    <!-- END OF CHANGE -->
 
                     <div class="tab-content-area">
                         <!-- All tab content divs remain here -->
