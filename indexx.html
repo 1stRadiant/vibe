@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,88 +48,26 @@
     <div id="main-app-container" style="width:100%; height: 100vh; display: none;">
         <div class="container-fluid">
             <div class="row flex-nowrap">
-                <!-- START OF CHANGE: Centered Icon-Only Bootstrap Sidebar -->
-                <div class="col-auto px-0 bg-dark d-none d-md-flex">
-                    <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
-                        <a href="#" class="d-flex align-items-center p-3 text-white text-decoration-none" title="Vibe Coding System">
-                            <i class="fs-4 bi-lightning-charge"></i>
-                        </a>
-                        <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
-                            <li class="nav-item">
-                                <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
-                                    <i class="fs-4 bi-house"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
-                                    <i class="fs-4 bi-display"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
-                                    <i class="fs-4 bi-pencil-square"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
-                                    <i class="fs-4 bi-robot"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
-                                    <i class="fs-4 bi-chat-dots"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
-                                    <i class="fs-4 bi-diagram-3"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
-                                    <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
-                                    <i class="fs-4 bi-folder"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
-                                    <i class="fs-4 bi-archive"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
-                                    <i class="fs-4 bi-code-slash"></i>
-                                </a>
-                            </li>
-                        </ul>
-                        <div class="dropdown pb-4">
-                            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fs-4 bi-person-circle"></i>
-                                <!-- The span is now hidden but its ID is kept for the JS to update the username -->
-                                <span class="d-none" id="user-status-text">User</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                                <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <!-- END OF CHANGE: Centered Icon-Only Bootstrap Sidebar -->
-
                 <!-- Content Area -->
                 <div class="col py-3">
-                    <!-- START OF CHANGE: Refactored toolbar with title and 3-dot menu -->
-                    <div class="main-toolbar d-flex justify-content-between align-items-center">
-                        <h3 class="m-0 text-white-50">Vibe</h3>
-                        <div class="dropdown">
+                    <!-- START OF CHANGE: New unified top navigation bar -->
+                    <div class="main-nav-bar d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="m-0 text-info" style="flex-shrink: 0; font-weight: bold;">Vibe</h3>
+                        
+                        <ul class="nav nav-pills mx-auto d-none d-md-flex">
+                            <li class="nav-item"><a href="#" class="nav-link tab-button active" data-tab="start">Start</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="preview">Preview</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="editor">Editor</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="agent">Agent</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="chat">Chat</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="flowchart">Flowchart</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="console">Console<span id="console-error-indicator"></span></a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="files">Files</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="context">Context</a></li>
+                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="code">Code</a></li>
+                        </ul>
+
+                        <div class="dropdown" style="flex-shrink: 0;">
                             <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
                                 <i class="bi bi-three-dots-vertical"></i>
                             </button>
@@ -162,6 +99,9 @@
                                         <i class="bi bi-arrow-clockwise me-2"></i>Redo
                                     </button>
                                 </li>
+                                 <li><hr class="dropdown-divider"></li>
+                                 <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
+                                 <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
                             </ul>
                         </div>
                     </div>
@@ -171,8 +111,7 @@
                         <!-- All tab content divs remain here -->
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
-                                <div class="start-header">
-                                    <h1>Vibe Coding System</h1>
+                                <div class="start-header d-flex justify-content-end">
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
 
@@ -196,7 +135,6 @@
                                         </div>
                                     </div>
                                     
-                                    <!-- START OF CHANGE: Added new section for structural instructions -->
                                     <hr class="section-divider">
                                     
                                     <div class="project-creation-method">
@@ -207,7 +145,6 @@
                                             <button id="generate-from-instructions-button">Generate from Instructions</button>
                                         </div>
                                     </div>
-                                    <!-- END OF CHANGE -->
                                 </div>
 
                                 <div id="start-page-generation-output" style="display: none;">
@@ -223,8 +160,7 @@
                         </div>
                          <div id="preview" class="tab-content" style="height:1000px;">
                             <div class="preview-container">
-                                <div class="preview-header">
-                                    <h2>Live Website Preview</h2>
+                                <div class="preview-header d-flex justify-content-end">
                                     <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
                                 </div>
                                 <iframe id="website-preview" title="Live Website Preview"></iframe>
@@ -235,7 +171,6 @@
                             <div class="editor-container">
                                 <div class="editor-header">
                                     <div class="editor-header-left">
-                                        <h2>Vibe Editor</h2>
                                         <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
                                     </div>
                                     <div class="editor-header-right">
@@ -251,7 +186,6 @@
                         </div>
                         <div id="agent" class="tab-content">
                             <div class="agent-container">
-                                <h2>AI Agent Task Queue</h2>
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
                                 
                                 <div id="agent-controls">
@@ -278,7 +212,6 @@
                                     <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
                                 </div>
                                 <div class="chat-output-container">
-                                    <h3>Chat</h3>
                                     <div id="chat-output">
                                         <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
                                     </div>
@@ -291,7 +224,6 @@
                         </div>
                         <div id="flowchart" class="tab-content">
                             <div class="flowchart-container">
-                                <h2>Website Functionality Flowchart</h2>
                                 <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
                                 <div class="flowchart-controls">
                                     <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
@@ -303,13 +235,11 @@
                         </div>
                         <div id="console" class="tab-content">
                             <div id="console-container">
-                                <h3>Console</h3>
                                 <div id="console-output"></div>
                             </div>
                         </div>
                         <div id="files" class="tab-content">
                             <div class="files-container">
-                                <h2>Project Files & Assets</h2>
                                 <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
                                 <div class="files-toolbar">
                                     <input type="file" id="files-upload-input" multiple style="display: none;">
@@ -335,7 +265,6 @@
                         </div>
                          <div id="context" class="tab-content">
                             <div class="context-container">
-                                <h2>Component Context Library</h2>
                                 <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
                                 <div class="context-browser">
                                     <div class="context-list-panel">
@@ -356,7 +285,6 @@
                         </div>
                         <div id="code" class="tab-content">
                             <div class="full-code-container">
-                                <h3>Full Website Code</h3>
                                 <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
                                 <div class="file-upload-container">
                                     <p>Or, upload an HTML file to start a new project:</p>
@@ -388,7 +316,7 @@
         </div>
     </div>
 
-    <!-- START OF CHANGE: Bottom Navigation for Mobile -->
+    <!-- Bottom Navigation for Mobile -->
     <div class="fixed-bottom bg-dark d-md-none">
         <div class="d-flex justify-content-around">
             <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
@@ -411,7 +339,6 @@
             </a>
         </div>
     </div>
-    <!-- END OF CHANGE: Bottom Navigation for Mobile -->
     
     <!-- Modals -->
      <div id="add-node-modal" class="modal">
@@ -565,7 +492,6 @@
         </div>
     </div>
     
-    <!-- START OF CHANGE: Add the new AI Structure Update Modal -->
     <div id="ai-structure-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -585,7 +511,6 @@
             </div>
         </div>
     </div>
-    <!-- END OF CHANGE -->
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
