@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,26 +49,86 @@
     <div id="main-app-container" style="width:100%; height: 100vh; display: none;">
         <div class="container-fluid">
             <div class="row flex-nowrap">
+                <!-- START OF CHANGE: Restored Desktop Sidebar -->
+                <div class="col-auto px-0 bg-dark d-none d-md-flex">
+                    <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
+                        <a href="#" class="d-flex align-items-center p-3 text-white text-decoration-none" title="Vibe Coding System">
+                            <i class="fs-4 bi-lightning-charge"></i>
+                        </a>
+                        <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
+                            <li class="nav-item">
+                                <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
+                                    <i class="fs-4 bi-house"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                                    <i class="fs-4 bi-display"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                                    <i class="fs-4 bi-pencil-square"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
+                                    <i class="fs-4 bi-robot"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
+                                    <i class="fs-4 bi-chat-dots"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
+                                    <i class="fs-4 bi-diagram-3"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
+                                    <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                                    <i class="fs-4 bi-folder"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
+                                    <i class="fs-4 bi-archive"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                                    <i class="fs-4 bi-code-slash"></i>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="dropdown pb-4">
+                            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fs-4 bi-person-circle"></i>
+                                <span class="d-none" id="user-status-text">User</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                                <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <!-- END OF CHANGE: Restored Desktop Sidebar -->
+
                 <!-- Content Area -->
                 <div class="col py-3">
-                    <!-- START OF CHANGE: New unified top navigation bar -->
-                    <div class="main-nav-bar d-flex justify-content-between align-items-center mb-3">
-                        <h3 class="m-0 text-info" style="flex-shrink: 0; font-weight: bold;">Vibe</h3>
-                        
-                        <ul class="nav nav-pills mx-auto d-none d-md-flex">
-                            <li class="nav-item"><a href="#" class="nav-link tab-button active" data-tab="start">Start</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="preview">Preview</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="editor">Editor</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="agent">Agent</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="chat">Chat</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="flowchart">Flowchart</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="console">Console<span id="console-error-indicator"></span></a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="files">Files</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="context">Context</a></li>
-                            <li class="nav-item"><a href="#" class="nav-link tab-button" data-tab="code">Code</a></li>
-                        </ul>
-
-                        <div class="dropdown" style="flex-shrink: 0;">
+                    <div class="main-toolbar d-flex justify-content-between align-items-center">
+                        <h3 class="m-0 text-info" style="font-weight: bold;">Vibe</h3>
+                        <div class="dropdown">
                             <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
                                 <i class="bi bi-three-dots-vertical"></i>
                             </button>
@@ -99,19 +160,15 @@
                                         <i class="bi bi-arrow-clockwise me-2"></i>Redo
                                     </button>
                                 </li>
-                                 <li><hr class="dropdown-divider"></li>
-                                 <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
-                                 <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
                             </ul>
                         </div>
                     </div>
-                    <!-- END OF CHANGE -->
 
                     <div class="tab-content-area">
-                        <!-- All tab content divs remain here -->
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
-                                <div class="start-header d-flex justify-content-end">
+                                <div class="start-header d-flex justify-content-between">
+                                    <h1>Welcome to Vibe</h1>
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
 
