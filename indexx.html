@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,7 +53,7 @@
                 <div class="col-auto px-0 bg-dark d-none d-md-flex">
                     <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
                         <a href="#" class="d-flex align-items-center p-3 text-info text-decoration-none" title="Vibe Coding System">
-                           <span class="fs-4" style="font-weight: bold;">Vibe</span>
+                           <span class="fs-4" style="font-weight: bold;"></span>
                         </a>
                         <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
                             <li class="nav-item">
@@ -126,7 +125,6 @@
 
                 <!-- Content Area -->
                 <div class="col py-3">
-                    <!-- START OF CHANGE: Simplified top toolbar -->
                     <div class="main-toolbar d-flex justify-content-end">
                         <div class="dropdown">
                             <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
@@ -163,13 +161,13 @@
                             </ul>
                         </div>
                     </div>
-                    <!-- END OF CHANGE -->
 
                     <div class="tab-content-area">
-                        <!-- START OF CHANGE: Removed redundant titles from all tabs -->
+                        <!-- START OF CHANGE: Added "Vibe" title to all tabs -->
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
-                                <div class="start-header d-flex justify-content-end">
+                                <div class="start-header d-flex justify-content-between align-items-center">
+                                    <h1>Vibe</h1>
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
 
@@ -218,7 +216,8 @@
                         </div>
                          <div id="preview" class="tab-content" style="height:1000px;">
                             <div class="preview-container">
-                                <div class="preview-header d-flex justify-content-end">
+                                <div class="preview-header d-flex justify-content-between align-items-center">
+                                    <h2>Vibe</h2>
                                     <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
                                 </div>
                                 <iframe id="website-preview" title="Live Website Preview"></iframe>
@@ -229,6 +228,7 @@
                             <div class="editor-container">
                                 <div class="editor-header">
                                     <div class="editor-header-left">
+                                        <h2>Vibe</h2>
                                         <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
                                     </div>
                                     <div class="editor-header-right">
@@ -244,6 +244,7 @@
                         </div>
                         <div id="agent" class="tab-content">
                             <div class="agent-container">
+                                <h2>Vibe</h2>
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
                                 
                                 <div id="agent-controls">
@@ -265,6 +266,7 @@
                         </div>
                         <div id="chat" class="tab-content">
                             <div class="chat-container">
+                                <h2>Vibe</h2>
                                 <div class="system-prompt-container">
                                     <label for="chat-system-prompt-input">System Prompt (Optional)</label>
                                     <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
@@ -282,6 +284,7 @@
                         </div>
                         <div id="flowchart" class="tab-content">
                             <div class="flowchart-container">
+                                <h2>Vibe</h2>
                                 <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
                                 <div class="flowchart-controls">
                                     <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
@@ -293,11 +296,13 @@
                         </div>
                         <div id="console" class="tab-content">
                             <div id="console-container">
+                                <h2>Vibe</h2>
                                 <div id="console-output"></div>
                             </div>
                         </div>
                         <div id="files" class="tab-content">
                             <div class="files-container">
+                                <h2>Vibe</h2>
                                 <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
                                 <div class="files-toolbar">
                                     <input type="file" id="files-upload-input" multiple style="display: none;">
@@ -323,6 +328,7 @@
                         </div>
                          <div id="context" class="tab-content">
                             <div class="context-container">
+                                <h2>Vibe</h2>
                                 <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
                                 <div class="context-browser">
                                     <div class="context-list-panel">
@@ -343,6 +349,7 @@
                         </div>
                         <div id="code" class="tab-content">
                             <div class="full-code-container">
+                                <h2>Vibe</h2>
                                 <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
                                 <div class="file-upload-container">
                                     <p>Or, upload an HTML file to start a new project:</p>
