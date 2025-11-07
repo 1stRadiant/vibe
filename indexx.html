@@ -1,0 +1,611 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibe Coding System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+
+    <!-- Login Modal -->
+    <div id="auth-modal" class="modal" style="display: block;">
+        <div class="modal-content">
+            <h2 id="auth-title">Login</h2>
+            <div id="auth-error" class="modal-error"></div>
+            <div id="login-form">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" autocomplete="username">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" autocomplete="current-password">
+                <button id="login-button" class="action-button">Login</button>
+                <p>Don't have an account? <a href="#" id="show-signup">Sign Up</a></p>
+            </div>
+            <div id="signup-form" style="display: none;">
+                <label for="signup-username">Username</label>
+                <input type="text" id="signup-username" autocomplete="username">
+                <label for="signup-password">Password</label>
+                <input type="password" id="signup-password" autocomplete="new-password">
+                <button id="signup-button" class="action-button">Sign Up</button>
+                <p>Already have an account? <a href="#" id="show-login">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="main-app-container" style="width:100%; height: 100vh; display: none;">
+        <div class="container-fluid">
+            <div class="row flex-nowrap">
+                <!-- Desktop Sidebar -->
+                <div class="col-auto px-0 bg-dark d-none d-md-flex">
+                    <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
+                        <a href="#" class="d-flex align-items-center p-3 text-info text-decoration-none" title="Vibe Coding System">
+                           <span class="fs-4" style="font-weight: bold;"></span>
+                        </a>
+                        <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
+                            <li class="nav-item">
+                                <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
+                                    <i class="fs-4 bi-house"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                                    <i class="fs-4 bi-display"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                                    <i class="fs-4 bi-pencil-square"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
+                                    <i class="fs-4 bi-robot"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
+                                    <i class="fs-4 bi-chat-dots"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
+                                    <i class="fs-4 bi-diagram-3"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
+                                    <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                                    <i class="fs-4 bi-folder"></i>
+                                </a>
+                            </li>
+                             <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
+                                    <i class="fs-4 bi-archive"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                                    <i class="fs-4 bi-code-slash"></i>
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="dropdown pb-4">
+                            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fs-4 bi-person-circle"></i>
+                                <span class="d-none" id="user-status-text">User</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                                <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Area -->
+                <div class="col py-3">
+                    <div class="main-toolbar d-flex justify-content-end align-items-start">
+                        <!-- START OF CHANGE: Replaced single Save button with two specific buttons -->
+                        <div class="btn-group me-2" role="group" aria-label="Save actions">
+                            <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
+                                <i class="bi bi-cloud-arrow-up"></i>
+                            </button>
+                            <button class="btn btn-secondary" type="button" id="save-to-local-button" disabled title="Save to Local Storage">
+                                <i class="bi bi-hdd"></i>
+                            </button>
+                        </div>
+                        <!-- END OF CHANGE -->
+                        <div class="dropdown">
+                            <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <button class="dropdown-item" type="button" id="open-ai-structure-modal-button" disabled>
+                                        <i class="bi bi-diagram-2 me-2"></i>AI Structure
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="share-project-button" disabled>
+                                        <i class="bi bi-share me-2"></i>Share Project
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="undo-button">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Undo
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" type="button" id="redo-button">
+                                        <i class="bi bi-arrow-clockwise me-2"></i>Redo
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="tab-content-area">
+                        <!-- START OF CHANGE: Added "Vibe" title to all tabs -->
+                        <div id="start" class="tab-content active">
+                             <div class="start-page-content">
+                                <div class="start-header d-flex justify-content-between align-items-center">
+                                    <h1>Vibe</h1>
+                                    <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+                                </div>
+
+                                <div id="existing-projects-container">
+                                    <h2>Your Projects</h2>
+                                    <div class="storage-toggle btn-group" role="group">
+                                        <button type="button" class="btn btn-outline-primary active" data-storage="cloud">
+                                            <i class="bi bi-cloud me-1"></i> Cloud
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary" data-storage="local">
+                                            <i class="bi bi-hdd me-1"></i> Local
+                                        </button>
+                                    </div>
+                                    <div id="project-list"></div>
+                                    <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                                </div>
+
+                                <div id="new-project-container">
+                                    <h2>Create a New Project</h2>
+                                    <div class="form-group">
+                                        <label>Project Name:</label>
+                                        <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                                    </div>
+                                     <div class="form-group">
+                                        <label>Save to:</label>
+                                         <div class="btn-group" role="group" aria-label="New project storage location">
+                                             <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
+                                             <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
+
+                                             <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
+                                             <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
+                                         </div>
+                                     </div>
+                                    
+                                    <div class="project-creation-method">
+                                        <h3>From a High-Level Goal</h3>
+                                        <p>Describe your website, and let the AI figure out the structure and code.</p>
+                                        <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                        <div class="agent-buttons-container">
+                                            <button id="generate-project-button">Generate Project</button>
+                                            <button id="start-iterative-build-button" class="action-button">Build with Agent</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <hr class="section-divider">
+                                    
+                                    <div class="project-creation-method">
+                                        <h3>From Structural Instructions</h3>
+                                        <p>Tell the AI exactly how to structure the Vibe Nodes, and it will generate the boilerplate.</p>
+                                        <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
+                                        <div class="agent-buttons-container">
+                                            <button id="generate-from-instructions-button">Generate from Instructions</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="start-page-generation-output" style="display: none;">
+                                    <div id="generation-status-container">
+                                        <h3 id="generation-status-text">Generating your project...</h3>
+                                        <div class="loading-spinner"></div>
+                                    </div>
+                                    <div id="live-code-container">
+                                        <pre><code id="live-code-output" class="language-html"></code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                         <div id="preview" class="tab-content" style="height:1000px;">
+                            <div class="preview-container">
+                                <div class="preview-header d-flex justify-content-between align-items-center">
+                                    <h2>Vibe</h2>
+                                    <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                                </div>
+                                <iframe id="website-preview" title="Live Website Preview"></iframe>
+                            </div>
+                        </div>
+
+                        <div id="editor" class="tab-content">
+                            <div class="editor-container">
+                                <div class="editor-header">
+                                    <div class="editor-header-left">
+                                        <h2>Vibe</h2>
+                                        <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
+                                    </div>
+                                    <div class="editor-header-right">
+                                        <div id="ai-editor-search-container">
+                                            <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                            <button id="ai-editor-search-button" class="action-button">Search</button>
+                                        </div>
+                                        <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                                    </div>
+                                </div>
+                                <div id="vibe-editor"></div>
+                            </div>
+                        </div>
+                        <div id="agent" class="tab-content">
+                            <div class="agent-container">
+                                <h2>Vibe</h2>
+                                <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
+                                
+                                <div id="agent-controls">
+                                    <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
+                                    <div class="agent-buttons-container">
+                                        <button id="run-agent-single-task-button" class="action-button">Add Task</button>
+                                        <button id="start-iterative-session-button" class="action-button">Process Queue</button>
+                                        <button id="end-session-button" style="display: none;">Stop Queue</button>
+                                    </div>
+                                </div>
+
+                                <div id="agent-output-container">
+                                    <h3>Agent Log</h3>
+                                    <div id="agent-output">
+                                        <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="chat" class="tab-content">
+                            <div class="chat-container">
+                                <h2>Vibe</h2>
+                                <div class="system-prompt-container">
+                                    <label for="chat-system-prompt-input">System Prompt (Optional)</label>
+                                    <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
+                                </div>
+                                <div class="chat-output-container">
+                                    <div id="chat-output">
+                                        <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
+                                    </div>
+                                </div>
+                                <div class="chat-controls">
+                                    <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
+                                    <button id="send-chat-button" class="action-button">Send</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="flowchart" class="tab-content">
+                            <div class="flowchart-container">
+                                <h2>Vibe</h2>
+                                <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
+                                <div class="flowchart-controls">
+                                    <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
+                                </div>
+                                <div id="flowchart-output">
+                                    <div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website's logic.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="console" class="tab-content">
+                            <div id="console-container">
+                                <h2>Vibe</h2>
+                                <div id="console-output"></div>
+                            </div>
+                        </div>
+                        <div id="files" class="tab-content">
+                            <div class="files-container">
+                                <h2>Vibe</h2>
+                                <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
+                                <div class="files-toolbar">
+                                    <input type="file" id="files-upload-input" multiple style="display: none;">
+                                    <button id="files-upload-button" class="action-button">Upload</button>
+                                    <button id="files-new-folder-button" class="action-button">New Folder</button>
+                                    <button id="files-new-file-button" class="action-button">New File</button>
+                                    <button id="files-download-button" class="action-button">Download</button>
+                                    <button id="files-copy-button" class="action-button">Copy</button>
+                                    <button id="files-paste-button" class="action-button">Paste</button>
+                                    <button id="files-rename-button" class="action-button">Rename</button>
+                                    <button id="files-delete-button" class="action-button danger">Delete</button>
+                                </div>
+                                <div class="assets-hint">
+                                    <strong>Hint:</strong> You can reference these assets in your prompts and code. The AI receives a list of available assets. Use paths exactly as shown below.
+                                </div>
+                                <div class="files-browser">
+                                    <div class="files-tree" id="files-tree"></div>
+                                    <div class="files-preview" id="files-preview">
+                                        <div class="files-preview-placeholder">Select a file to preview it here.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                         <div id="context" class="tab-content">
+                            <div class="context-container">
+                                <h2>Vibe</h2>
+                                <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
+                                <div class="context-browser">
+                                    <div class="context-list-panel">
+                                        <h3>Components</h3>
+                                        <div id="context-component-list"></div>
+                                        <button id="add-new-component-button" class="action-button">Add New Component</button>
+                                        <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
+                                            <input type="file" id="context-upload-input" accept=".json,application/json" style="display: none;">
+                                            <button id="upload-context-button" class="action-button" title="Import a component library from a .json file">Upload Library</button>
+                                            <button id="download-context-button" class="action-button" title="Export the current component library to a .json file">Download Library</button>
+                                        </div>
+                                    </div>
+                                    <div id="context-component-viewer" class="context-viewer-panel">
+                                        <div class="files-preview-placeholder">Select a component to view it here.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="code" class="tab-content">
+                            <div class="full-code-container">
+                                <h2>Vibe</h2>
+                                <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
+                                <div class="file-upload-container">
+                                    <p>Or, upload an HTML file to start a new project:</p>
+                                    <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
+                                    <button id="upload-html-button" class="action-button">Upload & Process File</button>
+                                </div>
+                                <div class="file-upload-container">
+                                    <p>Upload a ZIP of a multi-file website (HTML, CSS, JS, images). We'll inline CSS/JS and re-link assets automatically.</p>
+                                    <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
+                                    <button id="upload-zip-button" class="action-button">Upload ZIP & Import Project</button>
+                                </div>
+                                <div class="file-upload-container">
+                                    <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
+                                    <button id="download-zip-button" class="action-button">Download Project ZIP</button>
+                                </div>
+                                <div class="search-container">
+                                    <input type="text" id="search-input" placeholder="Find in code...">
+                                    <button id="find-prev-button" class="action-button">&lt; Prev</button>
+                                    <button id="find-next-button" class="action-button">Next &gt;</button>
+                                    <span id="search-results-count"></span>
+                                </div>
+                                <textarea id="full-code-editor"></textarea>
+                                <button id="update-tree-from-code-button" class="action-button">Process Code and Update Nodes</button>
+                            </div>
+                        </div>
+                        <!-- END OF CHANGE -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation for Mobile -->
+    <div class="fixed-bottom bg-dark d-md-none">
+        <div class="d-flex justify-content-around">
+            <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
+                <i class="fs-4 bi-house text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                <i class="fs-4 bi-display text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                <i class="fs-4 bi-pencil-square text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
+                <i class="fs-4 bi-robot text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                <i class="fs-4 bi-folder text-white"></i>
+            </a>
+            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                <i class="fs-4 bi-code-slash text-white"></i>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+     <div id="add-node-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Add New Child Node</h2>
+            <p>Define the new component to add to the selected container.</p>
+            <input type="hidden" id="add-node-parent-id">
+            <input type="hidden" id="add-node-target-id">
+            <input type="hidden" id="add-node-position">
+            <label for="new-node-id">New Node ID (kebab-case):</label>
+            <input type="text" id="new-node-id" placeholder="e.g., my-new-button">
+            <label for="new-node-description">Description:</label>
+            <textarea id="new-node-description" rows="2" placeholder="A concise description..."></textarea>
+            <label for="new-node-type">Node Type:</label>
+            <select id="new-node-type">
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="javascript">JavaScript</option>
+            </select>
+            <button id="create-node-button" class="action-button">Create Node</button>
+            <div id="add-node-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-settings-modal-button">&times;</span>
+            <h2>API Settings</h2>
+            <div class="ai-provider-container">
+                <h3>AI Provider</h3>
+                <select id="ai-provider-select">
+                    <option value="gemini">Google Gemini</option>
+                    <option value="nscale">nscale</option>
+                </select>
+            </div>
+            <div id="gemini-settings-container">
+                 <h3>Gemini Model</h3>
+                 <select id="gemini-model-select">
+                    <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
+                    <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
+                    <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
+                    <optgroup label="Advanced & Experimental Models">
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    </optgroup>
+                 </select>
+                <div id="gemini-api-key-container" class="api-key-container">
+                    <h3>Gemini API Key</h3>
+                    <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
+                    <button id="save-api-key-button">Save Key</button>
+                    <div id="api-key-status"></div>
+                </div>
+            </div>
+            <div id="nscale-api-key-container" class="api-key-container" style="display: none;">
+                <h3>nscale API Key</h3>
+                <input type="password" id="nscale-api-key-input" placeholder="Enter your nscale API Key here...">
+                <button id="save-nscale-api-key-button">Save Key</button>
+                <div id="nscale-api-key-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-node-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-edit-node-modal-button">&times;</span>
+            <h2>Edit Component</h2>
+            <label>Node ID</label>
+            <input type="text" id="edit-node-id" readonly>
+            <label>Type</label>
+            <input type="text" id="edit-node-type" readonly>
+            <label for="edit-node-description">Description</label>
+            <textarea id="edit-node-description" rows="3"></textarea>
+            <button id="ai-improve-description-button" class="action-button" style="margin-top: 10px;">AI: Improve Description</button>
+            <label for="edit-node-code">Code</label>
+            <textarea id="edit-node-code" rows="10"></textarea>
+            <div class="button-row">
+                <button id="save-edit-node-button" class="action-button">Save & Update Vibe</button>
+                <button id="save-as-component-button" class="action-button">Save as Component</button>
+            </div>
+            <div id="edit-node-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <div id="context-component-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-context-modal-button">&times;</span>
+            <h2 id="component-modal-title">Add New Component</h2>
+            <div class="component-ai-generator">
+                <label for="component-ai-prompt-input">Generate with AI:</label>
+                <textarea id="component-ai-prompt-input" rows="3" placeholder="e.g., 'a responsive card with an image...'"></textarea>
+                <button id="generate-component-button" class="action-button">Generate Component</button>
+            </div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #4b5263;">
+            <label for="component-id-input">Component ID (unique, kebab-case):</label>
+            <input type="text" id="component-id-input" placeholder="e.g., responsive-navbar">
+            <label for="component-name-input">Display Name:</label>
+            <input type="text" id="component-name-input" placeholder="e.g., Responsive Navbar">
+            <label for="component-description-input">Description:</label>
+            <textarea id="component-description-input" rows="2"></textarea>
+            <div class="component-modal-code-fields">
+                <div>
+                    <label for="component-html-input">HTML Snippet:</label>
+                    <textarea id="component-html-input" rows="6"></textarea>
+                </div>
+                <div>
+                    <label for="component-css-input">CSS Snippet:</label>
+                    <textarea id="component-css-input" rows="6"></textarea>
+                </div>
+                <div>
+                    <label for="component-js-input">JavaScript Snippet:</label>
+                    <textarea id="component-js-input" rows="6"></textarea>
+                </div>
+            </div>
+            <div class="button-row">
+                <button id="save-component-button" class="action-button">Save Component</button>
+                <button id="delete-component-button" class="action-button danger" style="display: none;">Delete</button>
+            </div>
+            <div id="component-modal-error" class="modal-error"></div>
+        </div>
+    </div>
+
+    <div id="global-agent-loader">
+        <div class="loading-spinner"></div>
+        <div class="loader-text">
+            <p id="global-agent-status-text">Agent is working...</p>
+            <p id="global-agent-progress-text"></p>
+        </div>
+    </div>
+    
+    <div id="ai-project-edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ai-project-edit-modal-title">AI Command</h2>
+                <button id="ai-project-edit-close-button" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Enter a command to modify the project. The AI will use the selected component as context but can edit any part of the project to achieve your goal.</p>
+                <input type="hidden" id="ai-project-edit-node-id">
+                <div class="form-group">
+                    <label for="ai-project-edit-prompt-input">Your Command:</label>
+                    <textarea id="ai-project-edit-prompt-input" rows="4" placeholder="e.g., 'Make all the links in this navigation bar turn red on hover'"></textarea>
+                </div>
+                <p id="ai-project-edit-error" class="modal-error"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="ai-project-edit-execute-button" class="action-button">Execute Command</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="ai-structure-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>AI Structure Update</h2>
+                <button id="ai-structure-close-button" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Describe how you want to change the current Vibe Tree structure. The AI will generate a new tree based on your instructions. This is a powerful tool for refactoring.</p>
+                <div class="form-group">
+                    <label for="ai-structure-prompt-input">Your Instructions:</label>
+                    <textarea id="ai-structure-prompt-input" rows="6" placeholder="e.g., 'Move the 'login-button' node inside the 'user-profile-card' node. Create a new CSS node called 'card-styles' and link it.'"></textarea>
+                </div>
+                <p id="ai-structure-error" class="modal-error"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="ai-structure-execute-button" class="action-button">Update Structure</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="app3.js"></script>
+
+</body>
+</html>
