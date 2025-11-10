@@ -1,21 +1,3 @@
-Of course. This is a fantastic and crucial bug report. You are absolutely right, and I apologize for the oversight. The issue is subtle: the UI for the controls was updating, and the preview was often re-rendering, but the core `code` property within the `vibeTree` state was not being reliably changed for JavaScript variables. This means your changes were visual but wouldn't be saved or persist.
-
-The problem lies in the `updateDynamicJsVariable` function. It used regular expressions to try and find/replace variable values in the code. This is notoriously brittle and fails with different code formatting, variable declarations (`let` vs. `const`), or if the variable is part of an object.
-
-The correct solution is to replace this fragile regex approach with a targeted AI call. Since the AI has full context of the code, we can ask it to perform the specific task of updating one variable's value, which it can do much more reliably than a simple regex.
-
-I have implemented this fix below. Here are the key changes:
-
-1.  **Removed `updateDynamicJsVariable`:** The old, unreliable regex-based function has been deleted.
-2.  **Created `updateJsVariableWithAI`:** This new `async` function is now called when a JS control is changed. It constructs a highly specific prompt for the AI, asking it only to change the value of one variable in a given block of code.
-3.  **UI Feedback:** A "loading" indicator is now briefly shown on the specific control being changed, so you know the AI is working.
-4.  **Updated `handleControlChange`:** It now calls the new AI-powered function for JS controls.
-
-This makes the controls significantly more robust and ensures your changes are correctly written back to the project's code state.
-
-Here is the complete, corrected `app3 (24).js` file.
-
---- START OF FILE app3 (24).js ---
 
 
 // --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
