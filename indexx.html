@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -174,59 +173,81 @@
                                     <h1>Vibe</h1>
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
-
-                                <div id="existing-projects-container">
-                                    <h2>Your Projects</h2>
-                                    <div class="storage-toggle btn-group" role="group">
-                                        <button type="button" class="btn btn-outline-primary active" data-storage="cloud">
-                                            <i class="bi bi-cloud me-1"></i> Cloud
-                                        </button>
-                                        <button type="button" class="btn btn-outline-primary" data-storage="local">
-                                            <i class="bi bi-hdd me-1"></i> Local
-                                        </button>
-                                    </div>
-                                    <div id="project-list"></div>
-                                    <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
-                                </div>
-
-                                <div id="new-project-container">
-                                    <h2>Create a New Project</h2>
-                                    <div class="form-group">
-                                        <label>Project Name:</label>
-                                        <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                                    </div>
-                                     <div class="form-group">
-                                        <label>Save to:</label>
-                                         <div class="btn-group" role="group" aria-label="New project storage location">
-                                             <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
-                                             <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
-
-                                             <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
-                                             <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
-                                         </div>
-                                     </div>
-                                    
-                                    <div class="project-creation-method">
-                                        <h3>From a High-Level Goal</h3>
-                                        <p>Describe your website, and let the AI figure out the structure and code.</p>
-                                        <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                                        <div class="agent-buttons-container">
-                                            <button id="generate-project-button">Generate Project</button>
-                                            <button id="start-iterative-build-button" class="action-button">Build with Agent</button>
+                                
+                                <!-- START OF CHANGE: Replaced static sections with a collapsible accordion -->
+                                <div class="accordion" id="start-page-accordion">
+                                    <!-- Your Projects Section -->
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingProjects">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProjects" aria-expanded="true" aria-controls="collapseProjects">
+                                                Your Projects
+                                            </button>
+                                        </h2>
+                                        <div id="collapseProjects" class="accordion-collapse collapse show" aria-labelledby="headingProjects" data-bs-parent="#start-page-accordion">
+                                            <div class="accordion-body">
+                                                <div class="storage-toggle btn-group" role="group">
+                                                    <button type="button" class="btn btn-outline-primary active" data-storage="cloud">
+                                                        <i class="bi bi-cloud me-1"></i> Cloud
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-primary" data-storage="local">
+                                                        <i class="bi bi-hdd me-1"></i> Local
+                                                    </button>
+                                                </div>
+                                                <div id="project-list"></div>
+                                                <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    <hr class="section-divider">
-                                    
-                                    <div class="project-creation-method">
-                                        <h3>From Structural Instructions</h3>
-                                        <p>Tell the AI exactly how to structure the Vibe Nodes, and it will generate the boilerplate.</p>
-                                        <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
-                                        <div class="agent-buttons-container">
-                                            <button id="generate-from-instructions-button">Generate from Instructions</button>
+
+                                    <!-- Create New Project Section -->
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingNewProject">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewProject" aria-expanded="false" aria-controls="collapseNewProject">
+                                                Create a New Project
+                                            </button>
+                                        </h2>
+                                        <div id="collapseNewProject" class="accordion-collapse collapse" aria-labelledby="headingNewProject" data-bs-parent="#start-page-accordion">
+                                            <div class="accordion-body">
+                                                <div class="form-group">
+                                                    <label>Project Name:</label>
+                                                    <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                                                </div>
+                                                 <div class="form-group">
+                                                    <label>Save to:</label>
+                                                     <div class="btn-group" role="group" aria-label="New project storage location">
+                                                         <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
+                                                         <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
+
+                                                         <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
+                                                         <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
+                                                     </div>
+                                                 </div>
+                                                
+                                                <div class="project-creation-method">
+                                                    <h3>From a High-Level Goal</h3>
+                                                    <p>Describe your website, and let the AI figure out the structure and code.</p>
+                                                    <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                                    <div class="agent-buttons-container">
+                                                        <button id="generate-project-button">Generate Project</button>
+                                                        <button id="start-iterative-build-button" class="action-button">Build with Agent</button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <hr class="section-divider">
+                                                
+                                                <div class="project-creation-method">
+                                                    <h3>From Structural Instructions</h3>
+                                                    <p>Tell the AI exactly how to structure the Vibe Nodes, and it will generate the boilerplate.</p>
+                                                    <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
+                                                    <div class="agent-buttons-container">
+                                                        <button id="generate-from-instructions-button">Generate from Instructions</button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                                <!-- END OF CHANGE -->
 
                                 <div id="start-page-generation-output" style="display: none;">
                                     <div id="generation-status-container">
@@ -264,7 +285,44 @@
                                         <button id="open-settings-modal-button" class="action-button">API Settings</button>
                                     </div>
                                 </div>
-                                <div id="vibe-editor"></div>
+                                <div id="vibe-editor">
+                                <!-- START OF CHANGE: Example of the new Vibe Node structure with an options dropdown menu. -->
+                                <!-- Your JavaScript should generate nodes based on this template. -->
+                                <!--
+                                <div class="vibe-node" data-node-id="example-node">
+                                    <div class="vibe-node-header">
+                                        <span class="drag-handle bi bi-grip-vertical"></span>
+                                        <span class="id">example-node</span>
+                                        <span class="type">HTML</span>
+                                        <button class="collapse-toggle" aria-expanded="true" title="Collapse/Expand">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                        
+                                        <div class="vibe-node-options dropdown ms-auto">
+                                            <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Options">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-dark">
+                                                <li><button class="dropdown-item" type="button" data-action="edit"><i class="bi bi-pencil me-2"></i>Edit Details & Code</button></li>
+                                                <li><button class="dropdown-item" type="button" data-action="ai-command"><i class="bi bi-robot me-2"></i>AI Command...</button></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><button class="dropdown-item" type="button" data-action="add-child-inside"><i class="bi bi-plus-lg me-2"></i>Add Child Inside</button></li>
+                                                <li><button class="dropdown-item" type="button" data-action="add-sibling-above"><i class="bi bi-arrow-up me-2"></i>Add Sibling Above</button></li>
+                                                <li><button class="dropdown-item" type="button" data-action="add-sibling-below"><i class="bi bi-arrow-down me-2"></i>Add Sibling Below</button></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><button class="dropdown-item text-danger" type="button" data-action="delete"><i class="bi bi-trash me-2"></i>Delete Node</button></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="vibe-node-content">
+                                        <textarea class="description-input" placeholder="A concise description of this component..."></textarea>
+                                        <div class="children">
+                                        </div>
+                                    </div>
+                                </div>
+                                -->
+                                <!-- END OF CHANGE -->
+                                </div>
                             </div>
                         </div>
                         <div id="agent" class="tab-content">
