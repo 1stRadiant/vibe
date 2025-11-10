@@ -69,10 +69,61 @@ body {
     margin-bottom: 30px;
 }
 
+/* START OF CHANGE: Styles for new Start Page Accordion */
+.accordion-item {
+    background-color: #2c313a;
+    border: 1px solid #4b5263;
+    margin-bottom: 1rem;
+    border-radius: 8px !important; /* Override bootstrap */
+}
+.accordion-header {
+    margin-bottom: 0;
+}
+.accordion-button {
+    background-color: transparent;
+    color: #e2e2e2;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 1.5em;
+    font-weight: normal;
+    border-radius: 8px !important;
+}
+.accordion-button:not(.collapsed) {
+    background-color: #3a3f4b;
+    color: #61afef;
+    box-shadow: none;
+}
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(97, 175, 239, 0.25);
+    border-color: transparent;
+}
+.accordion-button::after {
+    filter: invert(75%) sepia(10%) saturate(1000%) hue-rotate(180deg) brightness(90%) contrast(90%);
+}
+.accordion-button:not(.collapsed)::after {
+    filter: invert(60%) sepia(50%) saturate(1500%) hue-rotate(180deg) brightness(100%) contrast(100%);
+}
+.accordion-body {
+    background-color: #282c34;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+.accordion-body h3 {
+    font-family: 'Roboto Mono', monospace;
+    color: #98c379;
+    font-size: 1.2em;
+    margin-top: 0;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+/* END OF CHANGE */
+
 #existing-projects-container {
-    margin-bottom: 40px;
+    margin-bottom: 20px;
 }
 
+/* REMOVED: Old h2 styles are replaced by accordion button styles */
+/*
 #existing-projects-container h2, #new-project-container h2 {
     font-family: 'Roboto Mono', monospace;
     color: #98c379;
@@ -82,6 +133,7 @@ body {
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
+*/
 
 #new-project-container p {
     font-size: 1em;
@@ -677,6 +729,9 @@ h2 {
     color: #abb2bf;
 }
 
+
+/* START OF CHANGE: Commented out old button styles that are now replaced by the options dropdown */
+/*
 .button-group {
     display: flex;
     gap: 10px;
@@ -693,6 +748,8 @@ h2 {
     flex-shrink: 0;
     margin-top: 0;
 }
+*/
+/* END OF CHANGE */
 
 button.save-code-button {
     padding: 10px 15px;
@@ -724,6 +781,8 @@ button.toggle-code-button:hover {
     background-color: #5c6370;
 }
 
+/* START OF CHANGE: Commented out old button styles that are now replaced by the options dropdown */
+/*
 button.add-child-button {
     padding: 10px 15px;
     background-color: #4b5263;
@@ -733,12 +792,15 @@ button.add-child-button {
     font-weight: bold;
     cursor: pointer;
     transition: background-color 0.2s;
-    margin-left: auto; /* Pushes it to the right */
+    margin-left: auto; 
 }
 
 button.add-child-button:hover {
      background-color: #5c6370;
 }
+*/
+/* END OF CHANGE */
+
 
 /* Style for the "Save as Component" button in the editor */
 button.save-as-component-button {
@@ -1471,23 +1533,15 @@ button.update-button:disabled {
 
 .vibe-node-header {
     display: flex;
-    /* justify-content: space-between; */
     align-items: center;
     margin-bottom: 10px;
     font-family: 'Roboto Mono', monospace;
     gap: 8px;
-    cursor: pointer; /* Indicate the header is clickable */
-    transition: background-color 0.2s;
-    padding: 2px 4px; /* Add slight padding for hover effect */
-    border-radius: 4px;
+    /* START OF CHANGE: Remove cursor pointer from header as individual elements are interactive now */
 }
 
 .vibe-node:not(.collapsed) .vibe-node-header {
     margin-bottom: 15px; /* Increase spacing when expanded */
-}
-
-.vibe-node-header:hover {
-    background-color: #3a3f4b;
 }
 
 .vibe-node-header .id {
@@ -1555,6 +1609,26 @@ button.update-button:disabled {
     resize: vertical;
     margin-bottom: 15px;
 }
+
+/* START OF CHANGE: Styles for Vibe Node Options Dropdown */
+.vibe-node-options .btn-ghost {
+    background: transparent;
+    border: none;
+    color: #abb2bf;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+}
+.vibe-node-options .btn-ghost:hover {
+    background-color: #3a3f4b;
+    color: #f0f0f0;
+}
+.vibe-node-options .btn-ghost:focus {
+    box-shadow: none;
+}
+.dropdown-item i {
+    width: 1.5em; /* Align text for items with and without icons */
+}
+/* END OF CHANGE */
 
 /* Modal Styles */
 .modal {
@@ -1876,16 +1950,18 @@ body.is-dragging-vibe .drag-handle {
 }
 
 /* Style for the "Save as Component" button in the editor */
+/* START OF CHANGE: This style is for a modal button now, the old node button is removed */
+/*
 .button-group > button.save-as-component-button {
     padding: 10px 15px;
-    background-color: #c678dd; /* Purple */
+    background-color: #c678dd;
     color: #1a1a1a;
     border: none;
     border-radius: 4px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
-    flex-shrink: 0; /* Prevents the button from shrinking */
+    flex-shrink: 0; 
     margin-top: 0;
 }
 
@@ -1898,6 +1974,8 @@ body.is-dragging-vibe .drag-handle {
     opacity: 0.7;
     cursor: not-allowed;
 }
+*/
+/* END OF CHANGE */
 
 .context-list-panel {
     display: flex;
