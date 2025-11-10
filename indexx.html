@@ -174,7 +174,7 @@
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
                                 
-                                <!-- START OF CHANGE: Replaced static sections with a collapsible accordion -->
+                                <!-- Replaced static sections with a collapsible accordion -->
                                 <div class="accordion" id="start-page-accordion">
                                     <!-- Your Projects Section -->
                                     <div class="accordion-item">
@@ -208,46 +208,49 @@
                                         </h2>
                                         <div id="collapseNewProject" class="accordion-collapse collapse" aria-labelledby="headingNewProject" data-bs-parent="#start-page-accordion">
                                             <div class="accordion-body">
-                                                <div class="form-group">
-                                                    <label>Project Name:</label>
-                                                    <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                                                </div>
-                                                 <div class="form-group">
-                                                    <label>Save to:</label>
-                                                     <div class="btn-group" role="group" aria-label="New project storage location">
-                                                         <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
-                                                         <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
+                                                <!-- START OF CHANGE: Simplified and cleaned up the new project form -->
+                                                <div class="new-project-form">
+                                                    <div class="form-group">
+                                                        <label for="new-project-id-input">Project Name</label>
+                                                        <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
+                                                    </div>
+                                                     <div class="form-group">
+                                                        <label>Save Location</label>
+                                                         <div class="btn-group" role="group" aria-label="New project storage location">
+                                                             <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
+                                                             <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
 
-                                                         <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
-                                                         <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
+                                                             <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
+                                                             <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
+                                                         </div>
                                                      </div>
-                                                 </div>
+                                                </div>
                                                 
+                                                <hr class="section-divider">
+
                                                 <div class="project-creation-method">
                                                     <h3>From a High-Level Goal</h3>
                                                     <p>Describe your website, and let the AI figure out the structure and code.</p>
                                                     <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                                                    <div class="agent-buttons-container">
-                                                        <button id="generate-project-button">Generate Project</button>
-                                                        <button id="start-iterative-build-button" class="action-button">Build with Agent</button>
+                                                    <div class="button-container">
+                                                        <button id="generate-project-button" class="action-button primary"><i class="bi bi-stars me-2"></i>Generate Project</button>
+                                                        <button id="start-iterative-build-button" class="action-button agent"><i class="bi bi-robot me-2"></i>Build with Agent</button>
                                                     </div>
                                                 </div>
-                                                
-                                                <hr class="section-divider">
                                                 
                                                 <div class="project-creation-method">
                                                     <h3>From Structural Instructions</h3>
-                                                    <p>Tell the AI exactly how to structure the Vibe Nodes, and it will generate the boilerplate.</p>
+                                                    <p>Tell the AI exactly how to structure the Vibe Nodes for boilerplate generation.</p>
                                                     <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
-                                                    <div class="agent-buttons-container">
-                                                        <button id="generate-from-instructions-button">Generate from Instructions</button>
+                                                    <div class="button-container">
+                                                        <button id="generate-from-instructions-button" class="action-button primary"><i class="bi bi-diagram-2 me-2"></i>Generate from Instructions</button>
                                                     </div>
                                                 </div>
+                                                <!-- END OF CHANGE -->
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <!-- END OF CHANGE -->
 
                                 <div id="start-page-generation-output" style="display: none;">
                                     <div id="generation-status-container">
@@ -286,7 +289,7 @@
                                     </div>
                                 </div>
                                 <div id="vibe-editor">
-                                <!-- START OF CHANGE: Example of the new Vibe Node structure with an options dropdown menu. -->
+                                <!-- Example of the new Vibe Node structure with an options dropdown menu. -->
                                 <!-- Your JavaScript should generate nodes based on this template. -->
                                 <!--
                                 <div class="vibe-node" data-node-id="example-node">
@@ -321,7 +324,6 @@
                                     </div>
                                 </div>
                                 -->
-                                <!-- END OF CHANGE -->
                                 </div>
                             </div>
                         </div>
