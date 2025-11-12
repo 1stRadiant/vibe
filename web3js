@@ -1,0 +1,565 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Explorer</title>
+    <style>
+        /* --- Core Theme and Variables --- */
+        :root {
+            --bg-color: #1a1a1d;
+            --sidebar-bg: #2c2c34;
+            --content-bg: #212125;
+            --text-color: #f0f0f0;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --border-color: #444;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* --- Global Styles & Reset --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            display: flex;
+        }
+
+        button, input, select, textarea, label {
+            font-family: inherit;
+            color: inherit;
+            background-color: #3a3a42;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+        }
+        
+        button {
+            cursor: pointer;
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* --- Main Layout --- */
+        #sidebar {
+            width: 300px;
+            height: 100vh;
+            background-color: var(--sidebar-bg);
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #sidebar.visible {
+            transform: translateX(0);
+        }
+
+        #sidebar-toggle-btn {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: grid;
+            place-items: center;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            margin-left: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease-in-out;
+        }
+
+        body.sidebar-open #main-content {
+            margin-left: 300px;
+        }
+        
+        /* --- Views (Playground & Code Explorer) --- */
+        #playground-view {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #preview-iframe {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            background-color: #fff; /* Default background for empty iframe */
+        }
+        
+        #console-output {
+            height: 100px;
+            background-color: #111;
+            border-top: 1px solid var(--border-color);
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+        }
+
+        #code-explorer-view {
+            padding: 20px;
+            background-color: var(--content-bg);
+            height: 100%;
+            display: none; /* Toggled by JS */
+        }
+
+        #view-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 500;
+        }
+
+        /* --- Sidebar Sections --- */
+        details {
+            background-color: var(--content-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        summary {
+            font-weight: bold;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #3a3a42;
+            border-radius: 4px 4px 0 0;
+        }
+        .details-content {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Upload Project Section */
+        #drop-zone {
+            border: 2px dashed var(--border-color);
+            padding: 30px;
+            text-align: center;
+            border-radius: 4px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        #drop-zone.drag-over {
+            background-color: #333;
+            border-color: var(--accent-color);
+        }
+        #browse-label {
+            display: block;
+            width: 100%;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        /* Project Files Section */
+        #file-tree ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+        #file-tree li {
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        #file-tree li:hover {
+            background-color: var(--accent-color);
+        }
+
+        /* Component Library Section */
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); }
+        .tab-btn { background: none; border: none; padding: 10px 15px; cursor: pointer; border-radius: 0; }
+        .tab-btn.active { background-color: var(--accent-color); }
+        .tab-content { padding-top: 10px; display: none; }
+        .tab-content.active { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .component-item {
+            padding: 10px;
+            background-color: #3a3a42;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            cursor: grab;
+            border-radius: 4px;
+        }
+
+        /* Element Tools Section */
+        .tool-group {
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .tool-group h5 { margin-bottom: 8px; }
+        .tool-group .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tool-group input, .tool-group select { width: 100%; }
+        .color-picker-wrapper { display: flex; align-items: center; gap: 5px; }
+        .color-picker-wrapper input[type="color"] { padding: 0; height: 30px; width: 30px; border: none; }
+        #element-tools-section[disabled] summary, #element-tools-section[disabled] .details-content { opacity: 0.5; pointer-events: none; }
+        .context-aware-tool { display: none; } /* Hidden by default */
+
+        /* --- Fixed UI Elements --- */
+        #edit-mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 999;
+        }
+        #edit-mode-toggle.active {
+            background-color: var(--success-color);
+        }
+
+        #chat-bubble {
+            position: fixed;
+            bottom: 20px;
+            right: 80px;
+            z-index: 1002;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            padding: 0;
+            display: grid;
+            place-items: center;
+        }
+
+        #help-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: grid;
+            place-items: center;
+        }
+        
+        /* --- Modals and Overlays --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            display: none; /* JS toggles display */
+            place-items: center;
+        }
+        .modal-content {
+            background-color: var(--sidebar-bg);
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+        .modal-content h2 { margin-bottom: 10px; }
+        .modal-content .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+        }
+        
+        /* Specific Modals */
+        #ai-edit-modal textarea, #ai-gen-modal textarea {
+            width: 100%;
+            min-height: 150px;
+            resize: vertical;
+        }
+        
+        #code-review-modal .modal-content {
+            max-width: 1000px;
+        }
+        #ace-editor {
+            width: 100%;
+            height: 50vh;
+            border: 1px solid var(--border-color);
+        }
+        #code-review-modal .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #chat-window {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 350px;
+            height: 450px;
+            background-color: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            z-index: 1001;
+            display: none; /* Toggled by JS */
+            flex-direction: column;
+        }
+        .chat-header { padding: 10px; background-color: #3a3a42; border-bottom: 1px solid var(--border-color); }
+        .chat-messages { flex-grow: 1; padding: 10px; overflow-y: auto; }
+        .chat-input { display: flex; padding: 10px; border-top: 1px solid var(--border-color); }
+        .chat-input input { flex-grow: 1; }
+    </style>
+</head>
+<body>
+
+    <!-- ======== SIDEBAR ======== -->
+    <button id="sidebar-toggle-btn">☰</button>
+    <div id="sidebar">
+        <h3>Web Code Explorer</h3>
+
+        <!-- Project Management -->
+        <details open>
+            <summary>Project Management</summary>
+            <div class="details-content">
+                <div id="drop-zone">
+                    <p>Drag & Drop .zip or .html file here</p>
+                    <p>or</p>
+                    <label for="file-input" id="browse-label" class="button">Browse Files</label>
+                    <input type="file" id="file-input" accept=".zip,.html" style="display:none;">
+                </div>
+                <button id="save-project-btn">Save Project</button>
+                <button id="load-project-btn">Load Project</button>
+                <button id="download-project-btn">Review & Download</button>
+            </div>
+        </details>
+
+        <!-- Project Files -->
+        <details>
+            <summary>Project Files</summary>
+            <div class="details-content">
+                <div id="file-tree">
+                    <p>Upload a .zip to see the file tree.</p>
+                </div>
+            </div>
+        </details>
+        
+        <!-- Component Library -->
+        <details>
+            <summary>Component Library</summary>
+            <div class="details-content">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="basic">Basic</button>
+                    <button class="tab-btn" data-tab="forms">Forms</button>
+                    <button class="tab-btn" data-tab="layout">Layout</button>
+                </div>
+                <div id="basic-tab" class="tab-content active">
+                    <div class="component-item" draggable="true" data-html="<h1>New Heading</h1>">Heading</div>
+                    <div class="component-item" draggable="true" data-html="<p>New Paragraph</p>">Paragraph</div>
+                    <div class="component-item" draggable="true" data-html="<button>Click Me</button>">Button</div>
+                    <div class="component-item" draggable="true" data-html="<a href='#'>Link</a>">Link</div>
+                    <div class="component-item" draggable="true" data-html="<img src='https://via.placeholder.com/150' alt='placeholder'>">Image</div>
+                </div>
+                <div id="forms-tab" class="tab-content">
+                    <div class="component-item" draggable="true" data-html='<input type="text" placeholder="Text Input">'>Text Input</div>
+                    <div class="component-item" draggable="true" data-html='<textarea placeholder="Text Area"></textarea>'>Text Area</div>
+                </div>
+                <div id="layout-tab" class="tab-content">
+                    <div class="component-item" draggable="true" data-html='<div style="padding: 20px; border: 1px solid #ccc;">Container</div>'>Container</div>
+                </div>
+            </div>
+        </details>
+
+        <!-- Element Tools -->
+        <details id="element-tools-section" disabled>
+            <summary>Element Tools</summary>
+            <div class="details-content">
+                <p id="element-tools-placeholder">Select an element in Edit Mode to see its properties.</p>
+                <div id="element-tools-content" style="display: none;">
+                    <div class="tool-group">
+                        <h5>Content</h5>
+                        <input type="text" id="content-input" placeholder="Element text content...">
+                    </div>
+                    <div class="tool-group">
+                        <h5>Dimensions</h5>
+                        <div class="input-grid">
+                            <input type="text" id="style-width-input" placeholder="Width (e.g., 100px)">
+                            <input type="text" id="style-height-input" placeholder="Height (e.g., 50%)">
+                        </div>
+                    </div>
+                    <div class="tool-group">
+                        <h5>Styling</h5>
+                        <div class="input-grid">
+                            <label>Font Size: <input type="text" id="style-font-size-input"></label>
+                            <label>Font Family: <input type="text" id="style-font-family-input"></label>
+                        </div>
+                        <div class="color-picker-wrapper">
+                            <label>Text</label><input type="color" id="style-color-input">
+                            <label>BG</label><input type="color" id="style-background-color-input">
+                        </div>
+                        <label>BG Opacity: <input type="range" id="style-opacity-slider" min="0" max="1" step="0.05"></label>
+                    </div>
+                    <div class="tool-group context-aware-tool" id="image-tools">
+                        <h5>Image Attributes</h5>
+                        <label>Src: <input type="text" id="attr-src-input"></label>
+                        <label>Alt: <input type="text" id="attr-alt-input"></label>
+                    </div>
+                    <div class="tool-group context-aware-tool" id="link-tools">
+                        <h5>Link Attributes</h5>
+                        <label>Href: <input type="text" id="attr-href-input"></label>
+                        <label>Target: <input type="text" id="attr-target-input"></label>
+                    </div>
+                    <label><input type="checkbox" id="enable-movement-toggle"> Enable Element Movement</label>
+                </div>
+            </div>
+        </details>
+        
+        <!-- AI Tools -->
+        <details>
+            <summary>AI Tools</summary>
+            <div class="details-content">
+                <button id="ai-edit-btn">AI Edit Website</button>
+                <h5>Create New Website</h5>
+                <textarea id="ai-gen-prompt" placeholder="Describe the website you want to build... e.g., 'A modern portfolio for a photographer'"></textarea>
+                <button id="ai-gen-btn">Generate with AI</button>
+            </div>
+        </details>
+
+        <!-- API Configuration -->
+        <details>
+            <summary>API Configuration</summary>
+            <div class="details-content">
+                <label for="api-key-input">Gemini API Key</label>
+                <input type="password" id="api-key-input" placeholder="Enter your API key">
+            </div>
+        </details>
+    </div>
+
+    <!-- ======== MAIN CONTENT AREA ======== -->
+    <div id="main-content">
+        <div id="playground-view">
+            <iframe id="preview-iframe" title="Website Preview"></iframe>
+            <div id="console-output">
+                <p>> Console Ready...</p>
+            </div>
+        </div>
+        <div id="code-explorer-view">
+            <h2>Code Explorer</h2>
+            <p>This view will be implemented to show code directly.</p>
+        </div>
+    </div>
+
+    <!-- ======== FIXED UI ELEMENTS ======== -->
+    <button id="view-toggle-btn">Switch to Code Explorer</button>
+    <button id="edit-mode-toggle">Edit Mode: OFF</button>
+    <button id="chat-bubble">💬</button>
+    <button id="help-btn">?</button>
+    
+    <!-- ======== MODALS & OVERLAYS ======== -->
+
+    <!-- AI Edit Modal -->
+    <div id="ai-edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2>AI Edit Website</h2>
+            <p>Describe the changes you want to make to the entire website. The AI will attempt to modify the project files.</p>
+            <textarea id="ai-edit-prompt" placeholder="e.g., 'Change the color scheme to a light theme with blue accents' or 'Add a footer with contact info'"></textarea>
+            <button id="submit-ai-edit-btn">Apply Changes</button>
+        </div>
+    </div>
+
+    <!-- Code Review Modal -->
+    <div id="code-review-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2>Code Review & Download</h2>
+            <p>Review the generated/modified code for the current file below. You can make final edits here.</p>
+            <div id="ace-editor"></div>
+            <div class="modal-footer">
+                <button id="fix-paths-btn">Remove Leading Slashes from Paths</button>
+                <button id="confirm-download-btn">Confirm & Download</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2>Help Guide</h2>
+            <h4>How to Use Web Code Explorer</h4>
+            <ul>
+                <li><strong>Upload:</strong> Drag-and-drop a .zip or .html file into the sidebar to start.</li>
+                <li><strong>Edit Mode:</strong> Toggle 'Edit Mode' on to visually edit the site in the preview. Click elements to select them.</li>
+                <li><strong>Element Tools:</strong> Once an element is selected, use the sidebar to change its style, content, and attributes.</li>
+                <li><strong>Component Library:</strong> Drag components from the library and drop them into the preview window.</li>
+                <li><strong>AI Tools:</strong> Use the AI chat for help, generate a new site from a prompt, or make site-wide edits automatically.</li>
+                <li><strong>Save/Load:</strong> Use the "Save Project" and "Load Project" buttons to manage your work in progress. This functionality is handled by `app.js`.</li>
+                <li><strong>Download:</strong> Click 'Review & Download' to inspect the final code in a professional editor and download your project.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- AI Chat Window -->
+    <div id="chat-window">
+        <div class="chat-header">AI Assistant</div>
+        <div class="chat-messages">
+            <p>Ask me anything about your code!</p>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="chat-message-input" placeholder="Type your message...">
+            <button id="chat-send-btn">Send</button>
+        </div>
+    </div>
+
+    <!-- ======== JAVASCRIPT LIBRARIES ======== -->
+    <!-- Client-side ZIP library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Ace Code Editor library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.15.2/ace.js"></script>
+
+    <!-- ======== APPLICATION LOGIC (EXTERNAL) ======== -->
+    <!-- All the application's functionality (event listeners, logic, etc.) will be in this file -->
+    <script src="app.js" defer></script>
+    
+    <!-- ======== INITIALIZATION BRIDGE ======== -->
+    <!-- This small inline script initializes the application by calling the main function from app.js -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if the main App object from app.js is available and run its initializer.
+            if (window.App && typeof window.App.init === 'function') {
+                console.log("Initializing application from app.js...");
+                window.App.init();
+            } else {
+                // This error will show if app.js fails to load or doesn't define window.App.init
+                console.error('CRITICAL: app.js is not loaded or App.init is not defined.');
+                document.body.innerHTML = '<div style="color: #ff6b6b; font-size: 1.2rem; text-align: center; padding: 50px;">Error: Application failed to start. Please check the console for details.</div>';
+            }
+        });
+    </script>
+
+</body>
+</html>
