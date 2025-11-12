@@ -1,0 +1,1291 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Explorer</title>
+    <!-- Dependencies: JSZip for handling .zip files, Ace for the code editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js" integrity="sha512-9bH+D9dccb3C9tF+m2st5rE7iY2fKk3TSoiABn2OQ2Xsc3Xl5TRPMRCAzC4NdeARu/qcAPMlzfY1G00JOpf+dw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        /* --- Core Styles & Dark Theme --- */
+        :root {
+            --bg-color: #1e1e1e;
+            --bg-light: #2a2a2a;
+            --bg-lighter: #3c3c3c;
+            --text-color: #d4d4d4;
+            --accent-color: #007acc;
+            --accent-hover: #009bff;
+            --border-color: #444;
+            --danger-color: #f44747;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        /* --- Layout --- */
+        #app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #sidebar {
+            width: 300px;
+            background-color: var(--bg-light);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
+        }
+
+        #main-content {
+            flex-grow: 1;
+            margin-left: 0;
+            transition: margin-left 0.3s ease-in-out;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #main-content.sidebar-open {
+            margin-left: 300px;
+        }
+
+        #playground-view {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #code-explorer-view {
+            flex-grow: 1;
+            display: none; /* Hidden by default */
+            padding: 10px;
+        }
+
+        #preview-frame {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            background-color: #fff;
+        }
+
+        #console-output {
+            height: 100px;
+            background-color: #111;
+            border-top: 1px solid var(--border-color);
+            padding: 8px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 12px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* --- UI Controls --- */
+        .fixed-button {
+            position: fixed;
+            z-index: 1001;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            transition: background-color 0.2s;
+        }
+        .fixed-button:hover { background-color: var(--accent-hover); }
+
+        #sidebar-toggle { top: 15px; left: 15px; }
+        #view-toggle { bottom: 15px; left: 15px; }
+        #edit-mode-toggle { bottom: 15px; right: 15px; }
+        #edit-mode-toggle.active { background-color: #4caf50; }
+        
+        /* --- Sidebar Sections --- */
+        .sidebar-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-section-header {
+            padding: 12px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: var(--bg-lighter);
+            user-select: none;
+        }
+        .sidebar-section-header::after {
+            content: '▼';
+            float: right;
+            transition: transform 0.2s;
+        }
+        .sidebar-section-header.collapsed::after {
+            transform: rotate(-90deg);
+        }
+        .sidebar-section-content {
+            padding: 15px;
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
+        }
+        .sidebar-section-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        /* Upload Zone */
+        #upload-zone {
+            border: 2px dashed var(--border-color);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        #upload-zone.dragover {
+            background-color: var(--accent-color);
+            border-color: var(--accent-hover);
+        }
+        #upload-zone p { margin-bottom: 10px; }
+        .browse-button {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .browse-button:hover { background-color: var(--accent-hover); }
+        #file-input { display: none; }
+
+        /* File Tree & Cloud Project List */
+        #file-tree, #cloud-projects-list { list-style: none; padding-left: 0; }
+        #file-tree li, #cloud-projects-list li {
+            padding: 5px 0 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        #file-tree li:hover, #cloud-projects-list li:hover { background-color: var(--bg-lighter); }
+        #file-tree li.active { background-color: var(--accent-color); }
+
+        /* Component Library */
+        .component-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; }
+        .component-tab { padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+        .component-tab.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+        .component-panel { display: none; }
+        .component-panel.active { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .component-item {
+            background-color: var(--bg-lighter);
+            padding: 10px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: grab;
+            user-select: none;
+        }
+        
+        /* Element Tools */
+        .tool-group { margin-bottom: 15px; }
+        .tool-group label { display: block; margin-bottom: 5px; font-size: 12px; }
+        .tool-group input, .tool-group select, .tool-group textarea {
+            width: 100%;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px;
+            border-radius: 3px;
+        }
+        .input-group { display: flex; gap: 5px; }
+        .input-group input[type="color"] { padding: 0; height: 32px; }
+        #element-tools-content[disabled] { opacity: 0.5; pointer-events: none; }
+
+        /* --- Live Editing Overlays --- */
+        #selection-box {
+            position: absolute;
+            outline: 2px dashed var(--accent-color);
+            pointer-events: none;
+            z-index: 9999; /* In iframe context */
+        }
+        
+        .resize-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border: 1px solid white;
+            z-index: 10000;
+        }
+        .resize-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+        .resize-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+        .resize-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+        .resize-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+        #delete-btn {
+            position: absolute;
+            top: -25px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: var(--danger-color);
+            color: white;
+            border: 1px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            text-align: center;
+            line-height: 18px;
+            font-weight: bold;
+            z-index: 10000;
+        }
+
+        /* --- Modals --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: var(--bg-light);
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; }
+        .modal-close { font-size: 24px; font-weight: bold; cursor: pointer; border: none; background: none; color: var(--text-color); }
+        .modal-footer { margin-top: 20px; text-align: right; }
+        
+        #code-review-editor {
+            height: 50vh;
+            width: 100%;
+        }
+
+        /* --- AI Features --- */
+        #ai-chat-bubble {
+            bottom: 80px;
+            right: 15px;
+        }
+        .action-button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .action-button:hover { background-color: var(--accent-hover); }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- ==== SIDEBAR ==== -->
+        <aside id="sidebar">
+            <!-- Upload Project -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Upload Project</div>
+                <div class="sidebar-section-content">
+                    <div id="upload-zone">
+                        <p>Drag & Drop a .zip or .html file</p>
+                        <p>or</p>
+                        <button class="browse-button" onclick="document.getElementById('file-input').click()">Browse</button>
+                        <input type="file" id="file-input" accept=".zip,.html">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Files -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Project Files</div>
+                <div class="sidebar-section-content">
+                    <ul id="file-tree"><li>No project loaded.</li></ul>
+                </div>
+            </div>
+
+            <!-- Cloud Projects -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Cloud Projects</div>
+                <div class="sidebar-section-content">
+                    <button class="action-button" id="load-projects-list-btn" style="margin-top: 0;">Fetch My Projects</button>
+                    <ul id="cloud-projects-list" style="margin-top: 15px;">
+                        <!-- Project list will be populated here -->
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Component Library -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Component Library</div>
+                <div class="sidebar-section-content">
+                    <div class="component-tabs">
+                        <div class="component-tab active" data-tab="basic">Basic</div>
+                        <div class="component-tab" data-tab="forms">Forms</div>
+                        <div class="component-tab" data-tab="layout">Layout</div>
+                    </div>
+                    <div id="components-basic" class="component-panel active">
+                        <div class="component-item" draggable="true" data-type="h1">Heading</div>
+                        <div class="component-item" draggable="true" data-type="p">Paragraph</div>
+                        <div class="component-item" draggable="true" data-type="button">Button</div>
+                        <div class="component-item" draggable="true" data-type="a">Link</div>
+                        <div class="component-item" draggable="true" data-type="img">Image</div>
+                    </div>
+                    <div id="components-forms" class="component-panel">
+                        <div class="component-item" draggable="true" data-type="form">Form</div>
+                        <div class="component-item" draggable="true" data-type="input">Input</div>
+                        <div class="component-item" draggable="true" data-type="textarea">Textarea</div>
+                        <div class="component-item" draggable="true" data-type="label">Label</div>
+                    </div>
+                     <div id="components-layout" class="component-panel">
+                        <div class="component-item" draggable="true" data-type="div">Container</div>
+                        <div class="component-item" draggable="true" data-type="section">Section</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Element Tools -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Element Tools</div>
+                <div class="sidebar-section-content" id="element-tools-content" disabled>
+                    <div class="tool-group">
+                        <label>Content</label>
+                        <textarea id="tool-text-content" rows="3"></textarea>
+                    </div>
+                    <!-- Context-aware controls will be added here -->
+                    <div id="context-aware-tools"></div>
+                    <div class="tool-group">
+                        <label>Dimensions</label>
+                        <div class="input-group">
+                            <input type="text" id="tool-width" placeholder="width">
+                            <input type="text" id="tool-height" placeholder="height">
+                        </div>
+                    </div>
+                    <div class="tool-group">
+                        <label>Styling</label>
+                        <div class="input-group">
+                           <input type="color" id="tool-color" title="Text Color">
+                           <input type="color" id="tool-bgcolor" title="Background Color">
+                        </div>
+                        <label style="margin-top: 10px;">Font Size</label>
+                        <input type="text" id="tool-font-size" placeholder="e.g., 16px">
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Tools -->
+             <div class="sidebar-section">
+                <div class="sidebar-section-header">AI Tools</div>
+                <div class="sidebar-section-content">
+                    <button class="action-button" id="ai-edit-btn">AI Edit Website</button>
+                    <hr style="border-color: var(--border-color); margin: 15px 0;">
+                    <label>Create New Website from Prompt:</label>
+                    <textarea id="ai-generate-prompt" rows="4" placeholder="e.g., A modern portfolio for a photographer..."></textarea>
+                    <button class="action-button" id="ai-generate-btn">Generate</button>
+                </div>
+            </div>
+            
+             <!-- Save / Download -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">Export</div>
+                <div class="sidebar-section-content">
+                     <button class="action-button" id="save-project-btn">Save to Cloud</button>
+                     <button class="action-button" id="download-project-btn" style="background-color: #3a86ff; margin-top: 10px;">Download Project</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ==== MAIN CONTENT ==== -->
+        <main id="main-content">
+            <div id="playground-view">
+                <iframe id="preview-frame" title="Website Preview"></iframe>
+                <div id="console-output" title="Iframe Console Logs"></div>
+            </div>
+            <div id="code-explorer-view">
+                <h2>Code Explorer</h2>
+                <p>Click a file from the 'Project Files' list to view its code here.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- ==== FIXED UI CONTROLS ==== -->
+    <button id="sidebar-toggle" class="fixed-button" title="Toggle Sidebar">☰</button>
+    <button id="view-toggle" class="fixed-button" title="Toggle View">↔️</button>
+    <button id="edit-mode-toggle" class="fixed-button" title="Toggle Edit Mode">✏️</button>
+    <button id="ai-chat-bubble" class="fixed-button" title="AI Chat">💬</button>
+    
+    <!-- ==== MODALS ==== -->
+    <!-- Code Review Modal -->
+    <div id="code-review-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Code Review & Download</h2>
+                <button class="modal-close" data-modal-id="code-review-modal">&times;</button>
+            </div>
+            <div id="code-review-editor"></div>
+            <div class="modal-footer">
+                <button class="browse-button" id="remove-slashes-btn">Fix Image Paths</button>
+                <button class="action-button" id="confirm-download-btn" style="width: auto; margin-left: 10px;">Confirm & Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Edit Modal -->
+    <div id="ai-edit-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Global AI Edit</h2>
+                <button class="modal-close" data-modal-id="ai-edit-modal">&times;</button>
+            </div>
+            <p>Describe the changes you want to apply to the entire website.</p>
+            <textarea id="ai-global-edit-prompt" rows="6" placeholder="e.g., 'Change the color scheme to a light theme with blue accents' or 'Add a footer with my social media links'"></textarea>
+            <div class="modal-footer">
+                <button class="action-button" id="confirm-ai-edit-btn">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Modal -->
+    <!-- Add '?' button and modal content here if needed -->
+
+<script>
+// Wrap all JS in an IIFE to avoid polluting the global scope
+(function() {
+    'use strict';
+
+    // =================================================================================
+    // START OF INCLUDED api.js LOGIC
+    // The `export` keyword has been removed and functions are attached to a `WebAppAPI` object.
+    // =================================================================================
+    const WebAppAPI = {};
+
+    // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
+    WebAppAPI.APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5p0NpHuIfVUuziW4VkqwTJERjAMpgIdKz0yCO4vVkFt38FerGObaxQQxqPJ2h8RB1yA/exec';
+
+    // In your Google Apps Script 'Code.gs' file, you will need to add handlers
+    // for the new 'saveFormData' and 'loadFormData' actions to enable database features
+    // for your live, shared projects.
+    
+    const CHUNK_SIZE = 1500;
+    let isSaveInProgress = false;
+    let pendingSaveData = null;
+
+    function jsonpRequest(action, params = {}) {
+        return new Promise((resolve, reject) => {
+            if (!WebAppAPI.APPS_SCRIPT_URL || WebAppAPI.APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
+                return reject(new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.'));
+            }
+
+            const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+            const script = document.createElement('script');
+            
+            let url = `${WebAppAPI.APPS_SCRIPT_URL}?action=${action}&callback=${callbackName}`;
+            for (const key in params) {
+                if (params.hasOwnProperty(key)) {
+                    url += `&${key}=${encodeURIComponent(params[key])}`;
+                }
+            }
+            script.src = url;
+
+            window[callbackName] = (data) => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                if (data.status === 'success') {
+                    resolve(data.data);
+                } else {
+                    reject(new Error(data.message || 'An unknown API error occurred.'));
+                }
+            };
+            
+            script.onerror = () => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                reject(new Error('API request failed. Check the Apps Script URL and deployment settings.'));
+            };
+
+            document.body.appendChild(script);
+        });
+    }
+
+    WebAppAPI.signup = function(username, password) { return jsonpRequest('signup', { username, password }); };
+    WebAppAPI.login = function(username, password) { return jsonpRequest('login', { username, password }); };
+    WebAppAPI.listProjects = function(userId) { return jsonpRequest('listProjects', { userId }); };
+    WebAppAPI.loadProject = function(userId, projectId) { return jsonpRequest('loadProject', { userId, projectId }); };
+    
+    function sendChunk(userId, projectId, chunk, index, totalChunks, isCompressed) {
+        return jsonpRequest('saveProjectChunk', { userId, projectId, chunkData: chunk, chunkIndex: index, totalChunks, compressed: isCompressed });
+    }
+
+    function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+    async function _runSave(userId, projectId, projectData) {
+        try {
+            const jsonString = JSON.stringify(projectData);
+            const dataString = btoa(unescape(encodeURIComponent(jsonString))); // Handle UTF-8
+            
+            const chunks = [];
+            for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+                chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+            }
+
+            const totalChunks = chunks.length;
+            for (let i = 0; i < totalChunks; i++) {
+                await sendChunk(userId, projectId, chunks[i], i, totalChunks, false);
+                await delay(100);
+            }
+            console.log('Project saved successfully via queue.');
+            alert('Project saved to cloud!');
+
+        } catch (error) {
+            console.error('Save operation failed:', error);
+            alert('Save failed: ' + error.message);
+        } finally {
+            if (pendingSaveData) {
+                const { userId: pUserId, projectId: pProjectId, projectData: pProjectData } = pendingSaveData;
+                pendingSaveData = null;
+                setTimeout(() => _runSave(pUserId, pProjectId, pProjectData), 0);
+            } else {
+                isSaveInProgress = false;
+            }
+        }
+    }
+
+    WebAppAPI.saveProject = function(userId, projectId, projectData) {
+        const dataToSave = JSON.parse(JSON.stringify(projectData));
+        if (isSaveInProgress) {
+            console.log('Save in progress. Queuing latest data.');
+            pendingSaveData = { userId, projectId, projectData: dataToSave };
+        } else {
+            console.log('Starting a new save operation.');
+            isSaveInProgress = true;
+            _runSave(userId, projectId, dataToSave);
+        }
+    };
+    
+    WebAppAPI.saveFormData = function(userId, projectId, formId, formData) {
+        const dataString = JSON.stringify(formData);
+        return jsonpRequest('saveFormData', { userId, projectId, formId, data: dataString });
+    };
+
+    WebAppAPI.loadFormData = function(userId, projectId, formId) {
+        return jsonpRequest('loadFormData', { userId, projectId, formId });
+    };
+
+    WebAppAPI.deleteProject = function(userId, projectId) {
+        return jsonpRequest('deleteProject', { userId, projectId });
+    };
+    // =================================================================================
+    // END OF INCLUDED api.js LOGIC
+    // =================================================================================
+
+
+    // =================================================================================
+    // Web Code Explorer Application Logic
+    // =================================================================================
+    
+    // --- State Management ---
+    let projectFiles = {}; // Stores file contents { 'path/file.html': 'content', ... }
+    let mainHtmlFile = 'index.html';
+    let isEditMode = false;
+    let selectedElement = null;
+    let codeReviewEditor = null;
+    // Mock user data for API calls
+    let currentUser = { id: 'testUser123', projectId: 'project' + Date.now() }; 
+
+    // --- DOM Element Cache ---
+    const DOMElements = {
+        sidebar: document.getElementById('sidebar'),
+        mainContent: document.getElementById('main-content'),
+        sidebarToggle: document.getElementById('sidebar-toggle'),
+        viewToggle: document.getElementById('view-toggle'),
+        editModeToggle: document.getElementById('edit-mode-toggle'),
+        uploadZone: document.getElementById('upload-zone'),
+        fileInput: document.getElementById('file-input'),
+        fileTree: document.getElementById('file-tree'),
+        previewFrame: document.getElementById('preview-frame'),
+        consoleOutput: document.getElementById('console-output'),
+        elementTools: document.getElementById('element-tools-content'),
+        loadProjectsListBtn: document.getElementById('load-projects-list-btn'),
+        cloudProjectsList: document.getElementById('cloud-projects-list'),
+    };
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        initUIEventListeners();
+        initUploadHandling();
+        initSidebar();
+        initComponentLibrary();
+        initCodeReviewModal();
+        logToConsole("Web Code Explorer initialized.");
+        loadInitialContent();
+    });
+
+    function loadInitialContent() {
+        const defaultHTML = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <title>New Project</title>
+                <style>
+                    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f0f0; flex-direction: column; }
+                    h1 { color: #333; }
+                    p { color: #555; }
+                </style>
+            </head>
+            <body>
+                <h1>Welcome to Your New Project</h1>
+                <p>Upload a .zip or .html file, or use the AI tools to generate a new website.</p>
+            </body>
+            </html>`;
+        projectFiles = { 'index.html': defaultHTML };
+        mainHtmlFile = 'index.html';
+        updateFileTree();
+        loadProjectIntoIframe();
+    }
+    
+    // --- UI Event Listeners ---
+    function initUIEventListeners() {
+        DOMElements.sidebarToggle.addEventListener('click', toggleSidebar);
+        DOMElements.viewToggle.addEventListener('click', toggleView);
+        DOMElements.editModeToggle.addEventListener('click', toggleEditMode);
+        
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
+        });
+
+        document.getElementById('download-project-btn').addEventListener('click', showCodeReviewModal);
+        document.getElementById('ai-edit-btn').addEventListener('click', () => openModal('ai-edit-modal'));
+        document.getElementById('save-project-btn').addEventListener('click', saveProjectToCloud);
+
+        // API-related listeners
+        DOMElements.loadProjectsListBtn.addEventListener('click', fetchAndDisplayProjects);
+        DOMElements.cloudProjectsList.addEventListener('click', handleCloudProjectClick);
+
+        // Placeholder alert for AI buttons
+        document.getElementById('ai-chat-bubble').addEventListener('click', () => alert('AI Chat Assistant feature is coming soon!'));
+        document.getElementById('ai-generate-btn').addEventListener('click', () => alert('AI Website Generation feature is coming soon!'));
+        document.getElementById('confirm-ai-edit-btn').addEventListener('click', () => {
+            alert('AI Website Edit feature is coming soon!');
+            closeModal('ai-edit-modal');
+        });
+    }
+
+    function toggleSidebar() {
+        DOMElements.sidebar.classList.toggle('open');
+        DOMElements.mainContent.classList.toggle('sidebar-open');
+    }
+
+    function toggleView() {
+        // This is a simplified implementation. A real one might need more state management.
+        const playground = document.getElementById('playground-view');
+        const explorer = document.getElementById('code-explorer-view');
+        if (playground.style.display !== 'none') {
+            playground.style.display = 'none';
+            explorer.style.display = 'flex';
+        } else {
+            playground.style.display = 'flex';
+            explorer.style.display = 'none';
+        }
+    }
+
+    function toggleEditMode() {
+        isEditMode = !isEditMode;
+        DOMElements.editModeToggle.classList.toggle('active', isEditMode);
+        DOMElements.previewFrame.contentWindow.postMessage({ type: 'toggleEditMode', enabled: isEditMode }, '*');
+        if (!isEditMode && selectedElement) {
+            clearSelection();
+        }
+        logToConsole(`Edit Mode: ${isEditMode ? 'ON' : 'OFF'}`);
+    }
+
+    // --- Sidebar Logic ---
+    function initSidebar() {
+        document.querySelectorAll('.sidebar-section-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = header.nextElementSibling;
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+            });
+        });
+    }
+
+    function updateFileTree() {
+        if (Object.keys(projectFiles).length === 0) {
+            DOMElements.fileTree.innerHTML = '<li>No project loaded.</li>';
+            return;
+        }
+        DOMElements.fileTree.innerHTML = '';
+        Object.keys(projectFiles).sort().forEach(path => {
+            const li = document.createElement('li');
+            li.textContent = path;
+            li.dataset.path = path;
+            if (path === mainHtmlFile) {
+                li.classList.add('active');
+            }
+            DOMElements.fileTree.appendChild(li);
+        });
+
+        DOMElements.fileTree.addEventListener('click', e => {
+            if (e.target.tagName === 'LI' && e.target.dataset.path) {
+                const path = e.target.dataset.path;
+                if (path.endsWith('.html')) {
+                    mainHtmlFile = path;
+                    loadProjectIntoIframe();
+                    document.querySelectorAll('#file-tree li').forEach(item => item.classList.remove('active'));
+                    e.target.classList.add('active');
+                } else {
+                    alert(`Viewing non-HTML files in the code explorer is not yet implemented. File: ${path}`);
+                }
+            }
+        });
+    }
+
+    // --- File Handling (Upload & ZIP) ---
+    function initUploadHandling() {
+        const { uploadZone, fileInput } = DOMElements;
+        uploadZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+        });
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => uploadZone.classList.add('dragover'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => uploadZone.classList.remove('dragover'), false);
+        });
+
+        uploadZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
+    }
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function handleFiles(files) {
+        if (files.length === 0) return;
+        const file = files[0];
+        // Create a new project ID for this new upload
+        currentUser.projectId = 'project' + Date.now();
+        if (file.type === 'text/html') {
+            handleHtmlFile(file);
+        } else if (file.name.endsWith('.zip')) {
+            handleZipFile(file);
+        } else {
+            alert('Unsupported file type. Please upload a .html or .zip file.');
+        }
+    }
+
+    function handleHtmlFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            projectFiles = { [file.name]: e.target.result };
+            mainHtmlFile = file.name;
+            updateFileTree();
+            loadProjectIntoIframe();
+            logToConsole(`Loaded HTML file: ${file.name}`);
+        };
+        reader.readAsText(file);
+    }
+
+    function handleZipFile(file) {
+        JSZip.loadAsync(file).then(zip => {
+            projectFiles = {};
+            const promises = [];
+            let foundHtml = false;
+            zip.forEach((relativePath, zipEntry) => {
+                if (!zipEntry.dir) {
+                    const promise = zipEntry.async('string').then(content => {
+                        projectFiles[relativePath] = content;
+                        if (relativePath.toLowerCase() === 'index.html' || (!foundHtml && relativePath.endsWith('.html'))) {
+                            mainHtmlFile = relativePath;
+                            foundHtml = true;
+                        }
+                    });
+                    promises.push(promise);
+                }
+            });
+            return Promise.all(promises);
+        }).then(() => {
+            if (!mainHtmlFile) {
+                mainHtmlFile = Object.keys(projectFiles).find(f => f.endsWith('.html'));
+                if (!mainHtmlFile) {
+                  alert('No HTML file found in the zip file.');
+                  return;
+                }
+            }
+            updateFileTree();
+            loadProjectIntoIframe();
+            logToConsole(`Unpacked and loaded project from: ${file.name}`);
+        }).catch(err => {
+            console.error(err);
+            alert('Failed to process ZIP file.');
+        });
+    }
+
+    // --- Iframe Management ---
+    function loadProjectIntoIframe() {
+        let htmlContent = projectFiles[mainHtmlFile];
+        if (!htmlContent) {
+            logToConsole("Error: Main HTML file not found in project.", 'error');
+            return;
+        }
+
+        // Create blob URLs for local assets (CSS, JS, images)
+        const doc = new DOMParser().parseFromString(htmlContent, 'text/html');
+        const blobUrls = {};
+
+        const processNode = async (node, attr) => {
+            const path = node.getAttribute(attr);
+            if (path && !path.startsWith('http') && !path.startsWith('//') && !path.startsWith('data:')) {
+                const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+                if (projectFiles[cleanPath]) {
+                    const fileContent = projectFiles[cleanPath];
+                    const mimeType = getMimeType(cleanPath);
+                    const blob = new Blob([fileContent], { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+                    blobUrls[path] = url; // Store for revocation later
+                    node.setAttribute(attr, url);
+                }
+            }
+        };
+
+        doc.querySelectorAll('link[href]').forEach(node => processNode(node, 'href'));
+        doc.querySelectorAll('script[src]').forEach(node => processNode(node, 'src'));
+        doc.querySelectorAll('img[src]').forEach(node => processNode(node, 'src'));
+        
+        const modifiedHtml = doc.documentElement.outerHTML;
+
+        const iframe = DOMElements.previewFrame;
+        iframe.srcdoc = modifiedHtml;
+
+        iframe.onload = () => {
+            injectEditorScript();
+            // Revoke old blob URLs to prevent memory leaks (if any)
+        };
+    }
+    
+    function getMimeType(filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        const mimeTypes = {
+            'css': 'text/css',
+            'js': 'application/javascript',
+            'json': 'application/json',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'svg': 'image/svg+xml',
+        };
+        return mimeTypes[extension] || 'application/octet-stream';
+    }
+
+    function injectEditorScript() {
+        const iframe = DOMElements.previewFrame;
+        if (!iframe.contentDocument) return;
+
+        const script = iframe.contentDocument.createElement('script');
+        script.textContent = `
+            let isEditModeActive = false;
+            let currentSelected = null;
+            let selectionBox = null;
+
+            function createSelectionBox() {
+                if (!selectionBox) {
+                    selectionBox = document.createElement('div');
+                    selectionBox.id = 'selection-box-in-iframe';
+                    selectionBox.style.position = 'absolute';
+                    selectionBox.style.outline = '2px dashed #007acc';
+                    selectionBox.style.pointerEvents = 'none';
+                    selectionBox.style.zIndex = '9999';
+                    document.body.appendChild(selectionBox);
+                }
+            }
+
+            function updateSelectionBox(target) {
+                if (!target || target === document.body || target === document.documentElement) {
+                    selectionBox.style.display = 'none';
+                    return;
+                }
+                const rect = target.getBoundingClientRect();
+                selectionBox.style.display = 'block';
+                selectionBox.style.top = (rect.top + window.scrollY) + 'px';
+                selectionBox.style.left = (rect.left + window.scrollX) + 'px';
+                selectionBox.style.width = rect.width + 'px';
+                selectionBox.style.height = rect.height + 'px';
+            }
+
+            document.addEventListener('click', (e) => {
+                if (isEditModeActive) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const target = e.target;
+                    currentSelected = target;
+                    updateSelectionBox(target);
+                    window.parent.postMessage({ type: 'elementSelected', tagName: target.tagName, id: target.id }, '*');
+                }
+            }, true);
+
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'toggleEditMode') {
+                    isEditModeActive = event.data.enabled;
+                    if (isEditModeActive) {
+                        createSelectionBox();
+                    } else if (selectionBox) {
+                         selectionBox.style.display = 'none';
+                    }
+                }
+                 if(event.data.type === 'clearSelection') {
+                    if (selectionBox) selectionBox.style.display = 'none';
+                    currentSelected = null;
+                }
+            });
+        `;
+        iframe.contentDocument.body.appendChild(script);
+        // Resend edit mode state in case of iframe reload
+        iframe.contentWindow.postMessage({ type: 'toggleEditMode', enabled: isEditMode }, '*');
+    }
+    
+    // --- Live Editing & Element Tools ---
+    window.addEventListener('message', (event) => {
+        if (event.source !== DOMElements.previewFrame.contentWindow) return;
+        
+        if (event.data.type === 'elementSelected') {
+            // A simplified selection model. A real one would need a unique selector.
+            // For this demo, we'll just select the first element of that tag.
+            const tagName = event.data.tagName;
+            const element = DOMElements.previewFrame.contentDocument.getElementsByTagName(tagName)[0];
+            if (element) {
+                selectElement(element);
+            }
+        }
+    });
+
+    function selectElement(element) {
+        if (selectedElement === element) return;
+        clearSelection();
+        selectedElement = element;
+        populateElementTools(element);
+    }
+    
+    function clearSelection() {
+        selectedElement = null;
+        DOMElements.elementTools.setAttribute('disabled', true);
+        DOMElements.previewFrame.contentWindow.postMessage({ type: 'clearSelection' }, '*');
+    }
+
+    function populateElementTools(el) {
+        DOMElements.elementTools.removeAttribute('disabled');
+        
+        // Simplified property setting
+        const style = window.getComputedStyle(el);
+        document.getElementById('tool-text-content').value = el.textContent.trim();
+        document.getElementById('tool-width').value = style.width;
+        document.getElementById('tool-height').value = style.height;
+        document.getElementById('tool-color').value = rgbToHex(style.color);
+        document.getElementById('tool-bgcolor').value = rgbToHex(style.backgroundColor);
+        document.getElementById('tool-font-size').value = style.fontSize;
+
+        // Context-aware tools
+        const contextTools = document.getElementById('context-aware-tools');
+        contextTools.innerHTML = '';
+        if (el.tagName === 'A') {
+            contextTools.innerHTML = `
+                <div class="tool-group">
+                    <label>Link (href)</label><input type="text" value="${el.getAttribute('href') || ''}">
+                </div>`;
+        } else if (el.tagName === 'IMG') {
+            contextTools.innerHTML = `
+                <div class="tool-group">
+                    <label>Image Source (src)</label><input type="text" value="${el.getAttribute('src') || ''}">
+                    <label>Alt Text</label><input type="text" value="${el.getAttribute('alt') || ''}">
+                </div>`;
+        }
+    }
+    
+    // Helper to convert rgb() to hex for color inputs
+    function rgbToHex(rgb) {
+        if (!rgb || !rgb.startsWith('rgb')) return '#000000';
+        let [r, g, b] = rgb.match(/\d+/g).map(Number);
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    
+    // Add listeners to tools to update the element in real-time
+    // This is a simplified example for one property
+    document.getElementById('tool-font-size').addEventListener('input', (e) => {
+        if (selectedElement) {
+            selectedElement.style.fontSize = e.target.value;
+        }
+    });
+
+
+    // --- Component Library ---
+    function initComponentLibrary() {
+        document.querySelectorAll('.component-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.component-tab, .component-panel').forEach(el => el.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('components-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('.component-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.dataset.type);
+            });
+        });
+
+        // Add drop listeners to the iframe
+        DOMElements.previewFrame.addEventListener('load', () => {
+            const iDoc = DOMElements.previewFrame.contentDocument;
+            iDoc.body.addEventListener('dragover', preventDefaults);
+            iDoc.body.addEventListener('drop', (e) => {
+                preventDefaults(e);
+                if (!isEditMode) return;
+                
+                const type = e.dataTransfer.getData('text/plain');
+                let newEl;
+                switch(type) {
+                    case 'h1': newEl = iDoc.createElement('h1'); newEl.textContent = 'New Heading'; break;
+                    case 'p': newEl = iDoc.createElement('p'); newEl.textContent = 'New paragraph text.'; break;
+                    case 'button': newEl = iDoc.createElement('button'); newEl.textContent = 'Click Me'; break;
+                    // Add more cases here
+                    default: newEl = iDoc.createElement('div'); newEl.textContent = 'New Div'; break;
+                }
+                iDoc.body.appendChild(newEl);
+                logToConsole(`Added new ${type} element.`);
+            });
+        });
+    }
+
+    // --- Code Review & Download ---
+    function initCodeReviewModal() {
+        codeReviewEditor = ace.edit("code-review-editor");
+        codeReviewEditor.setTheme("ace/theme/monokai");
+        codeReviewEditor.session.setMode("ace/mode/html");
+        
+        document.getElementById('remove-slashes-btn').addEventListener('click', removeLeadingSlashes);
+        document.getElementById('confirm-download-btn').addEventListener('click', downloadProject);
+    }
+    
+    function showCodeReviewModal() {
+        if (!projectFiles[mainHtmlFile]) {
+            alert("No project is loaded to download.");
+            return;
+        }
+        // Get the latest HTML from the live iframe
+        const liveHtml = DOMElements.previewFrame.contentDocument.documentElement.outerHTML;
+        codeReviewEditor.setValue(liveHtml, -1);
+        openModal('code-review-modal');
+    }
+    
+    function removeLeadingSlashes() {
+        let code = codeReviewEditor.getValue();
+        // Regex to find src="/..." or href="/..." and remove the leading slash
+        code = code.replace(/(src|href)=["']\/([^"']+)["']/g, '$1="$2"');
+        codeReviewEditor.setValue(code, -1);
+        logToConsole("Attempted to fix leading slashes in paths.");
+    }
+    
+    function downloadProject() {
+        const fileCount = Object.keys(projectFiles).length;
+        if (fileCount === 0) return;
+        
+        const modifiedHtml = codeReviewEditor.getValue();
+        
+        if (fileCount === 1) {
+            // Download single HTML file
+            const blob = new Blob([modifiedHtml], { type: 'text/html' });
+            triggerDownload(blob, mainHtmlFile);
+        } else {
+            // Create and download a zip
+            const zip = new JSZip();
+            Object.keys(projectFiles).forEach(path => {
+                if (path === mainHtmlFile) {
+                    zip.file(path, modifiedHtml);
+                } else {
+                    zip.file(path, projectFiles[path]);
+                }
+            });
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                triggerDownload(content, 'project.zip');
+            });
+        }
+        closeModal('code-review-modal');
+    }
+    
+    function triggerDownload(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // --- Cloud Save/Load (using WebAppAPI) ---
+    function saveProjectToCloud() {
+        if (Object.keys(projectFiles).length === 0) {
+            alert("No project to save.");
+            return;
+        }
+        if (!currentUser || !currentUser.id || !currentUser.projectId) {
+            alert("User or Project ID is not set. Cannot save to the cloud.");
+            return;
+        }
+
+        // Update the main HTML file with the latest content from the iframe
+        projectFiles[mainHtmlFile] = DOMElements.previewFrame.contentDocument.documentElement.outerHTML;
+
+        // Use a generic project name for this demo
+        const projectDataWithMeta = {
+            projectName: `Project ${currentUser.projectId.slice(-6)}`,
+            files: projectFiles
+        };
+
+        WebAppAPI.saveProject(currentUser.id, currentUser.projectId, projectDataWithMeta)
+            .catch(err => {
+                console.error("Save failed:", err);
+                alert("Could not save to cloud: " + err.message);
+            });
+    }
+
+    async function fetchAndDisplayProjects() {
+        if (!currentUser || !currentUser.id) {
+            alert("Mock user not set. Cannot fetch projects.");
+            return;
+        }
+
+        const listElement = DOMElements.cloudProjectsList;
+        listElement.innerHTML = '<li>Loading...</li>';
+
+        try {
+            const projects = await WebAppAPI.listProjects(currentUser.id);
+            listElement.innerHTML = ''; // Clear loading message
+
+            if (projects && projects.length > 0) {
+                projects.forEach(project => {
+                    const li = document.createElement('li');
+                    li.textContent = project.projectName || project.projectId;
+                    li.dataset.projectId = project.projectId;
+                    listElement.appendChild(li);
+                });
+            } else {
+                listElement.innerHTML = '<li>No projects found.</li>';
+            }
+        } catch (error) {
+            console.error("Failed to list projects:", error);
+            listElement.innerHTML = `<li>Error: ${error.message}</li>`;
+            listElement.querySelector('li').style.color = 'var(--danger-color)';
+        }
+    }
+
+    function handleCloudProjectClick(e) {
+        if (e.target.tagName === 'LI' && e.target.dataset.projectId) {
+            const projectId = e.target.dataset.projectId;
+            if (confirm(`Load project "${e.target.textContent}"? Any unsaved changes will be lost.`)) {
+                loadProjectFromCloud(projectId);
+            }
+        }
+    }
+
+    async function loadProjectFromCloud(projectId) {
+        logToConsole(`Loading project ${projectId} from cloud...`);
+        try {
+            const loadedData = await WebAppAPI.loadProject(currentUser.id, projectId);
+            
+            let projectData;
+            // The API returns the data as a JSON string within the 'projectData' field.
+            if (typeof loadedData.projectData === 'string') {
+                projectData = JSON.parse(loadedData.projectData);
+            } else {
+                projectData = loadedData.projectData;
+            }
+
+            if (!projectData || !projectData.files) {
+                throw new Error("Loaded data is not in the expected format (missing 'files' property).");
+            }
+            
+            projectFiles = projectData.files;
+
+            // Update current project ID for future saves
+            currentUser.projectId = projectId;
+
+            // Find the main HTML file to display
+            mainHtmlFile = Object.keys(projectFiles).find(path => path.toLowerCase() === 'index.html') || Object.keys(projectFiles).find(path => path.endsWith('.html'));
+
+            if (!mainHtmlFile) {
+                throw new Error("No HTML file found in the loaded project data.");
+            }
+
+            updateFileTree();
+            loadProjectIntoIframe();
+            logToConsole(`Successfully loaded project ${projectId}.`);
+            alert(`Project loaded successfully!`);
+
+        } catch (error) {
+            console.error("Failed to load project:", error);
+            logToConsole(`Error loading project: ${error.message}`, 'error');
+            alert(`Failed to load project: ${error.message}`);
+        }
+    }
+
+    // --- Helpers ---
+    function logToConsole(message, type = 'log') {
+        const line = document.createElement('div');
+        line.textContent = `> ${message}`;
+        if (type === 'error') line.style.color = 'var(--danger-color)';
+        DOMElements.consoleOutput.appendChild(line);
+        DOMElements.consoleOutput.scrollTop = DOMElements.consoleOutput.scrollHeight;
+    }
+    
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'flex';
+    }
+    
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+})();
+</script>
+
+</body>
+</html>
