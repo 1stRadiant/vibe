@@ -1,0 +1,1675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background-color: #2d2d2d;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid #3e3e3e;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #007acc;
+            margin-left: 50px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: -350px;
+            top: 50px;
+            bottom: 0;
+            width: 350px;
+            background-color: #252526;
+            transition: left 0.3s ease;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 20px;
+            border-right: 1px solid #3e3e3e;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .sidebar-toggle:hover {
+            background-color: #005a9e;
+        }
+
+        /* Sidebar Sections */
+        .sidebar-section {
+            margin-bottom: 25px;
+            background-color: #2d2d2d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #3e3e3e;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .section-header:hover {
+            background-color: #4e4e4e;
+        }
+
+        .section-content {
+            display: none;
+            padding: 10px 0;
+        }
+
+        .section-content.active {
+            display: block;
+        }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed #007acc;
+            border-radius: 6px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: #1e1e1e;
+        }
+
+        .upload-zone.dragover {
+            background-color: #007acc20;
+            border-color: #005a9e;
+        }
+
+        .upload-zone p {
+            margin: 10px 0;
+        }
+
+        .browse-btn {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .browse-btn:hover {
+            background-color: #005a9e;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* File Tree */
+        .file-tree {
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .tree-item {
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tree-item:hover {
+            background-color: #3e3e3e;
+        }
+
+        .tree-item.selected {
+            background-color: #007acc;
+        }
+
+        /* Component Library */
+        .component-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background-color: #3e3e3e;
+            border: none;
+            color: #d4d4d4;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .tab-btn.active {
+            background-color: #007acc;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .component-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #3e3e3e;
+            border-radius: 4px;
+            cursor: grab;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        .component-item:hover {
+            background-color: #4e4e4e;
+        }
+
+        .component-item:active {
+            cursor: grabbing;
+        }
+
+        /* Element Tools */
+        .tool-group {
+            margin-bottom: 15px;
+        }
+
+        .tool-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #9d9d9d;
+        }
+
+        .tool-group input,
+        .tool-group select {
+            width: 100%;
+            padding: 8px;
+            background-color: #3e3e3e;
+            border: 1px solid #4e4e4e;
+            color: #d4d4d4;
+            border-radius: 4px;
+        }
+
+        .color-picker {
+            height: 40px;
+            cursor: pointer;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 0;
+            margin-top: 50px;
+            transition: margin-left 0.3s ease;
+        }
+
+        .sidebar.open ~ .main-content {
+            margin-left: 350px;
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            z-index: 998;
+            font-weight: 600;
+        }
+
+        .view-toggle:hover {
+            background-color: #005a9e;
+        }
+
+        /* Edit Mode Toggle */
+        .edit-mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #2d2d2d;
+            color: #d4d4d4;
+            border: 2px solid #007acc;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 998;
+            font-weight: 600;
+        }
+
+        .edit-mode-toggle.active {
+            background-color: #007acc;
+            color: white;
+        }
+
+        /* Help Button */
+        .help-btn {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            z-index: 1001;
+        }
+
+        .help-btn:hover {
+            background-color: #005a9e;
+        }
+
+        /* Playground View */
+        .playground-view {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 50px);
+        }
+
+        .iframe-container {
+            flex: 1;
+            position: relative;
+            background-color: #2d2d2d;
+        }
+
+        #preview-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: white;
+        }
+
+        .console-output {
+            height: 200px;
+            background-color: #1e1e1e;
+            border-top: 1px solid #3e3e3e;
+            padding: 15px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .console-line {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #007acc;
+            padding-left: 10px;
+        }
+
+        .console-error {
+            border-left-color: #f44336;
+            color: #ff6b6b;
+        }
+
+        .console-log {
+            border-left-color: #4caf50;
+            color: #81c784;
+        }
+
+        /* Code Explorer View */
+        .code-explorer-view {
+            display: none;
+            height: calc(100vh - 50px);
+            padding: 20px;
+        }
+
+        .code-explorer-view.active {
+            display: block;
+        }
+
+        /* AI Chat */
+        .ai-chat-bubble {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: #007acc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 998;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .ai-chat-bubble:hover {
+            background-color: #005a9e;
+        }
+
+        .ai-chat-window {
+            position: fixed;
+            bottom: 150px;
+            right: 20px;
+            width: 400px;
+            height: 500px;
+            background-color: #2d2d2d;
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            display: none;
+            flex-direction: column;
+            z-index: 997;
+        }
+
+        .ai-chat-window.active {
+            display: flex;
+        }
+
+        .chat-header {
+            padding: 15px;
+            background-color: #007acc;
+            border-radius: 10px 10px 0 0;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+        }
+
+        .chat-input-container {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #3e3e3e;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            background-color: #3e3e3e;
+            border: 1px solid #4e4e4e;
+            color: #d4d4d4;
+            border-radius: 4px;
+        }
+
+        .chat-send-btn {
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: #2d2d2d;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #3e3e3e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #d4d4d4;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #007acc;
+        }
+
+        /* Code Review Modal */
+        #code-editor {
+            width: 100%;
+            height: 400px;
+            border: 1px solid #3e3e3e;
+            border-radius: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background-color: #007acc;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #005a9e;
+        }
+
+        .btn-secondary {
+            background-color: #3e3e3e;
+            color: #d4d4d4;
+        }
+
+        .btn-secondary:hover {
+            background-color: #4e4e4e;
+        }
+
+        /* AI Edit Modal */
+        .ai-prompt-textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e3e;
+            color: #d4d4d4;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3e3e3e;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #3e3e3e;
+            border-top: 3px solid #007acc;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="logo">Web Code Explorer</div>
+            <button class="help-btn" onclick="openHelpModal()">?</button>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <!-- Upload Project -->
+            <div class="sidebar-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>📁 Upload Project</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content active">
+                    <div class="upload-zone" id="upload-zone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                        <p>Drop HTML or ZIP files here</p>
+                        <p>or</p>
+                        <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                        <input type="file" id="file-input" accept=".html,.zip" onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project Files -->
+            <div class="sidebar-section" id="project-files-section" style="display: none;">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>📂 Project Files</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content">
+                    <div class="file-tree" id="file-tree"></div>
+                </div>
+            </div>
+
+            <!-- Component Library -->
+            <div class="sidebar-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>🧩 Component Library</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content">
+                    <div class="component-tabs">
+                        <button class="tab-btn active" onclick="switchTab(this, 'basic')">Basic</button>
+                        <button class="tab-btn" onclick="switchTab(this, 'forms')">Forms</button>
+                        <button class="tab-btn" onclick="switchTab(this, 'media')">Media</button>
+                        <button class="tab-btn" onclick="switchTab(this, 'layout')">Layout</button>
+                    </div>
+                    <div id="basic-tab" class="tab-content active">
+                        <div class="component-item" draggable="true" data-component="heading">Heading</div>
+                        <div class="component-item" draggable="true" data-component="paragraph">Paragraph</div>
+                        <div class="component-item" draggable="true" data-component="button">Button</div>
+                        <div class="component-item" draggable="true" data-component="link">Link</div>
+                    </div>
+                    <div id="forms-tab" class="tab-content">
+                        <div class="component-item" draggable="true" data-component="input">Input Field</div>
+                        <div class="component-item" draggable="true" data-component="textarea">Textarea</div>
+                        <div class="component-item" draggable="true" data-component="select">Select Dropdown</div>
+                    </div>
+                    <div id="media-tab" class="tab-content">
+                        <div class="component-item" draggable="true" data-component="image">Image</div>
+                        <div class="component-item" draggable="true" data-component="video">Video</div>
+                    </div>
+                    <div id="layout-tab" class="tab-content">
+                        <div class="component-item" draggable="true" data-component="container">Container</div>
+                        <div class="component-item" draggable="true" data-component="row">Row</div>
+                        <div class="component-item" draggable="true" data-component="column">Column</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Element Tools -->
+            <div class="sidebar-section" id="element-tools-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>✏️ Element Tools</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content">
+                    <div id="no-selection" style="text-align: center; color: #9d9d9d; padding: 20px;">
+                        Select an element to edit
+                    </div>
+                    <div id="element-controls" style="display: none;">
+                        <div class="tool-group">
+                            <label>Width</label>
+                            <input type="text" id="elem-width" placeholder="auto" onchange="applyStyleChange('width', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Height</label>
+                            <input type="text" id="elem-height" placeholder="auto" onchange="applyStyleChange('height', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Background Color</label>
+                            <input type="color" class="color-picker" id="elem-bg-color" onchange="applyStyleChange('backgroundColor', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Text Color</label>
+                            <input type="color" class="color-picker" id="elem-text-color" onchange="applyStyleChange('color', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Opacity</label>
+                            <input type="range" class="slider" id="elem-opacity" min="0" max="1" step="0.1" onchange="applyStyleChange('opacity', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Font Size</label>
+                            <input type="text" id="elem-font-size" placeholder="16px" onchange="applyStyleChange('fontSize', this.value)">
+                        </div>
+                        <div class="tool-group">
+                            <label>Content</label>
+                            <input type="text" id="elem-content" onchange="applyContentChange(this.value)">
+                        </div>
+                        <div class="tool-group" id="elem-specific-controls"></div>
+                        <div class="tool-group">
+                            <label>
+                                <input type="checkbox" id="enable-movement" onchange="toggleElementMovement(this.checked)">
+                                Enable Element Movement
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Configuration -->
+            <div class="sidebar-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>🔑 API Configuration</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content">
+                    <div class="tool-group">
+                        <label>Gemini API Key</label>
+                        <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key">
+                    </div>
+                    <div class="tool-group">
+                        <label>Apps Script URL (Optional)</label>
+                        <input type="text" id="apps-script-url" placeholder="https://script.google.com/...">
+                        <small style="color: #9d9d9d;">For cloud save/load features</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Website Generation -->
+            <div class="sidebar-section">
+                <div class="section-header" onclick="toggleSection(this)">
+                    <span>🤖 Create New Website</span>
+                    <span>▼</span>
+                </div>
+                <div class="section-content">
+                    <div class="tool-group">
+                        <label>Describe your website</label>
+                        <textarea id="website-prompt" rows="4" placeholder="e.g., A portfolio page with dark theme and contact form" style="width: 100%; padding: 10px; background-color: #3e3e3e; border: 1px solid #4e4e4e; color: #d4d4d4; border-radius: 4px; resize: vertical;"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="generateWebsite()">Generate Website</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Playground View -->
+            <div class="playground-view" id="playground-view">
+                <div class="iframe-container" id="iframe-container">
+                    <iframe id="preview-iframe" srcdoc="<!DOCTYPE html><html><head><title>Welcome</title><style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;text-align:center}h1{font-size:3em}p{font-size:1.2em}</style></head><body><div><h1>Web Code Explorer</h1><p>Upload an HTML or ZIP file to get started</p><p style='margin-top:20px;font-size:0.9em;color:#ccc'>Or use AI to generate a website from scratch</p></div></body></html>"></iframe>
+                </div>
+                <div class="console-output" id="console-output">
+                    <div class="console-log console-line">Console ready. Waiting for project...</div>
+                </div>
+            </div>
+
+            <!-- Code Explorer View -->
+            <div class="code-explorer-view" id="code-explorer-view">
+                <h2>Code Explorer</h2>
+                <p style="color: #9d9d9d; margin-top: 10px;">This view is under development. For now, use the Code Review modal to view and edit code.</p>
+            </div>
+        </div>
+
+        <!-- View Toggle Button -->
+        <button class="view-toggle" onclick="toggleView()">Switch to Code Explorer</button>
+
+        <!-- Edit Mode Toggle -->
+        <button class="edit-mode-toggle" id="edit-mode-toggle" onclick="toggleEditMode()">Edit Mode: OFF</button>
+
+        <!-- AI Chat -->
+        <div class="ai-chat-bubble" onclick="toggleChat()">🤖</div>
+        <div class="ai-chat-window" id="ai-chat-window">
+            <div class="chat-header">AI Assistant</div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" class="chat-input" id="chat-input" placeholder="Ask about your code..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                <button class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+
+        <!-- AI Edit Modal -->
+        <div class="modal" id="ai-edit-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>AI Edit Website</h2>
+                    <button class="modal-close" onclick="closeModal('ai-edit-modal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 15px;">Describe the changes you want to make to your website:</p>
+                    <textarea class="ai-prompt-textarea" id="ai-edit-prompt" placeholder="e.g., Change the color scheme to a light theme with blue accents"></textarea>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" onclick="executeGlobalEdit()">Apply Changes</button>
+                        <button class="btn btn-secondary" onclick="closeModal('ai-edit-modal')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Review Modal -->
+        <div class="modal" id="code-review-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Code Review</h2>
+                    <button class="modal-close" onclick="closeModal('code-review-modal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="code-editor"></div>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="removeLeadingSlashes()">Remove Leading Slashes</button>
+                        <button class="btn btn-primary" onclick="downloadProject()">Confirm & Download</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div class="modal" id="help-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Web Code Explorer - User Guide</h2>
+                    <button class="modal-close" onclick="closeModal('help-modal')">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <h3>Getting Started</h3>
+                    <p>1. <strong>Upload Project:</strong> Drag and drop an HTML or ZIP file, or use the Browse button.</p>
+                    <p>2. <strong>AI Generation:</strong> Use the "Create New Website" section to generate a site from a description.</p>
+                    <p>3. <strong>Edit Mode:</strong> Toggle edit mode to select and modify elements in the iframe.</p>
+                    
+                    <h3>Features</h3>
+                    <p><strong>Component Library:</strong> Drag components from the sidebar into your preview.</p>
+                    <p><strong>Element Tools:</strong> Select an element to edit its styles, dimensions, and content.</p>
+                    <p><strong>AI Assistant:</strong> Chat with AI about your code using the floating bubble.</p>
+                    <p><strong>AI Edit:</strong> Use the "AI Edit Website" button for site-wide changes.</p>
+                    
+                    <h3>Keyboard Shortcuts</h3>
+                    <p><strong>Delete:</strong> Press Delete key when element is selected to remove it.</p>
+                    
+                    <h3>Download</h3>
+                    <p>Click "Download" in the Code Review modal to save your project as ZIP or HTML.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global State
+        const state = {
+            projectFiles: {},
+            currentFile: null,
+            isEditMode: false,
+            isSidebarOpen: false,
+            viewMode: 'playground',
+            selectedElement: null,
+            iframeDoc: null,
+            aiChatHistory: [],
+            aceEditor: null
+        };
+
+        // Component Templates
+        const components = {
+            heading: '<h1>Heading</h1>',
+            paragraph: '<p>Paragraph text</p>',
+            button: '<button>Click Me</button>',
+            link: '<a href="#">Link</a>',
+            input: '<input type="text" placeholder="Input">',
+            textarea: '<textarea placeholder="Textarea"></textarea>',
+            select: '<select><option>Option 1</option><option>Option 2</option></select>',
+            image: '<img src="https://via.placeholder.com/150" alt="Image">',
+            video: '<video controls><source src="movie.mp4" type="video/mp4"></video>',
+            container: '<div style="padding:20px;border:1px solid #ccc;">Container</div>',
+            row: '<div style="display:flex;gap:10px;"><div>Column 1</div><div>Column 2</div></div>',
+            column: '<div style="display:flex;flex-direction:column;gap:10px;"><div>Item 1</div><div>Item 2</div></div>'
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAceEditor();
+            setupDragAndDrop();
+            setupMessageListener();
+            loadApiConfig();
+        });
+
+        // Sidebar Functions
+        function toggleSidebar() {
+            state.isSidebarOpen = !state.isSidebarOpen;
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            content.classList.toggle('active');
+            const arrow = header.querySelector('span:last-child');
+            arrow.textContent = content.classList.contains('active') ? '▼' : '▶';
+        }
+
+        function switchTab(button, tabName) {
+            const tabs = button.parentElement.querySelectorAll('.tab-btn');
+            tabs.forEach(t => t.classList.remove('active'));
+            button.classList.add('active');
+            
+            const contents = button.parentElement.nextElementSibling.parentElement.querySelectorAll('.tab-content');
+            contents.forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // File Upload
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        function processFile(file) {
+            logToConsole(`Processing file: ${file.name}`, 'log');
+            if (file.name.endsWith('.zip')) {
+                processZipFile(file);
+            } else if (file.name.endsWith('.html')) {
+                processHtmlFile(file);
+            } else {
+                logToConsole('Please upload a valid HTML or ZIP file', 'error');
+            }
+        }
+
+        async function processZipFile(file) {
+            try {
+                const zip = await JSZip.loadAsync(file);
+                state.projectFiles = {};
+                
+                const filePromises = [];
+                zip.forEach((relativePath, zipEntry) => {
+                    if (!zipEntry.dir) {
+                        filePromises.push(
+                            zipEntry.async('string').then(content => {
+                                state.projectFiles[relativePath] = content;
+                            })
+                        );
+                    }
+                });
+                
+                await Promise.all(filePromises);
+                logToConsole(`Loaded ${Object.keys(state.projectFiles).length} files from ZIP`, 'log');
+                displayFileTree();
+                
+                // Load index.html or first HTML file
+                const htmlFiles = Object.keys(state.projectFiles).filter(f => f.endsWith('.html'));
+                if (htmlFiles.includes('index.html')) {
+                    loadFileInIframe('index.html');
+                } else if (htmlFiles.length > 0) {
+                    loadFileInIframe(htmlFiles[0]);
+                }
+            } catch (error) {
+                logToConsole(`Error processing ZIP: ${error.message}`, 'error');
+            }
+        }
+
+        function processHtmlFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                state.projectFiles = {
+                    [file.name]: e.target.result
+                };
+                displayFileTree();
+                loadFileInIframe(file.name);
+                logToConsole(`Loaded HTML file: ${file.name}`, 'log');
+            };
+            reader.readAsText(file);
+        }
+
+        function displayFileTree() {
+            const fileTree = document.getElementById('file-tree');
+            fileTree.innerHTML = '';
+            document.getElementById('project-files-section').style.display = 'block';
+            
+            Object.keys(state.projectFiles).sort().forEach(filename => {
+                const item = document.createElement('div');
+                item.className = 'tree-item';
+                item.textContent = filename;
+                item.onclick = () => {
+                    document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+                    loadFileInIframe(filename);
+                };
+                fileTree.appendChild(item);
+            });
+        }
+
+        function loadFileInIframe(filename) {
+            const content = state.projectFiles[filename];
+            if (content) {
+                state.currentFile = filename;
+                const iframe = document.getElementById('preview-iframe');
+                iframe.srcdoc = content;
+                
+                // Inject edit mode scripts after load
+                iframe.onload = () => {
+                    state.iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (state.isEditMode) {
+                        injectEditModeScripts();
+                    }
+                };
+            }
+        }
+
+        // Edit Mode
+        function toggleEditMode() {
+            state.isEditMode = !state.isEditMode;
+            const btn = document.getElementById('edit-mode-toggle');
+            btn.textContent = `Edit Mode: ${state.isEditMode ? 'ON' : 'OFF'}`;
+            btn.classList.toggle('active');
+            
+            if (state.isEditMode) {
+                injectEditModeScripts();
+            } else {
+                removeEditModeScripts();
+            }
+        }
+
+        function injectEditModeScripts() {
+            if (!state.iframeDoc) return;
+            
+            // Add selection styles
+            if (!state.iframeDoc.getElementById('edit-mode-styles')) {
+                const style = state.iframeDoc.createElement('style');
+                style.id = 'edit-mode-styles';
+                style.textContent = `
+                    .wce-selected {
+                        outline: 2px dashed #007acc !important;
+                        outline-offset: 2px;
+                        cursor: pointer;
+                    }
+                    .wce-resize-handle {
+                        position: absolute;
+                        width: 10px;
+                        height: 10px;
+                        background: #007acc;
+                        border: 1px solid white;
+                        z-index: 10000;
+                    }
+                    .wce-delete-icon {
+                        position: absolute;
+                        background: #f44336;
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 20px;
+                        height: 20px;
+                        font-size: 12px;
+                        cursor: pointer;
+                        z-index: 10000;
+                    }
+                `;
+                state.iframeDoc.head.appendChild(style);
+            }
+
+            // Add click handler
+            state.iframeDoc.body.onclick = (e) => {
+                if (e.target === state.iframeDoc.body) return;
+                e.preventDefault();
+                e.stopPropagation();
+                selectElement(e.target);
+            };
+        }
+
+        function removeEditModeScripts() {
+            if (!state.iframeDoc) return;
+            state.iframeDoc.body.onclick = null;
+            document.querySelectorAll('.wce-delete-icon').forEach(icon => icon.remove());
+            document.querySelectorAll('.wce-resize-handle').forEach(handle => handle.remove());
+            if (state.selectedElement) {
+                state.selectedElement.classList.remove('wce-selected');
+                state.selectedElement = null;
+            }
+        }
+
+        function selectElement(element) {
+            // Remove previous selection
+            if (state.selectedElement) {
+                state.selectedElement.classList.remove('wce-selected');
+            }
+            
+            state.selectedElement = element;
+            element.classList.add('wce-selected');
+            
+            // Populate element tools
+            populateElementTools(element);
+            
+            // Add delete icon
+            const deleteIcon = state.iframeDoc.createElement('button');
+            deleteIcon.className = 'wce-delete-icon';
+            deleteIcon.textContent = '×';
+            deleteIcon.style.top = '-25px';
+            deleteIcon.style.right = '0';
+            deleteIcon.onclick = (e) => {
+                e.stopPropagation();
+                deleteElement(element);
+            };
+            element.style.position = 'relative';
+            element.appendChild(deleteIcon);
+        }
+
+        function deleteElement(element) {
+            if (confirm('Delete this element?')) {
+                element.remove();
+                document.getElementById('element-controls').style.display = 'none';
+                document.getElementById('no-selection').style.display = 'block';
+                logToConsole('Element deleted', 'log');
+            }
+        }
+
+        function populateElementTools(element) {
+            document.getElementById('no-selection').style.display = 'none';
+            document.getElementById('element-controls').style.display = 'block';
+            
+            // Get computed styles
+            const styles = state.iframeDoc.defaultView.getComputedStyle(element);
+            
+            // Populate basic fields
+            document.getElementById('elem-width').value = styles.width || '';
+            document.getElementById('elem-height').value = styles.height || '';
+            document.getElementById('elem-bg-color').value = rgbToHex(styles.backgroundColor) || '#ffffff';
+            document.getElementById('elem-text-color').value = rgbToHex(styles.color) || '#000000';
+            document.getElementById('elem-opacity').value = styles.opacity || '1';
+            document.getElementById('elem-font-size').value = styles.fontSize || '16px';
+            document.getElementById('elem-content').value = element.textContent || '';
+            
+            // Specific controls based on tag
+            const specificControls = document.getElementById('elem-specific-controls');
+            specificControls.innerHTML = '';
+            
+            if (element.tagName === 'IMG') {
+                specificControls.innerHTML = `
+                    <div class="tool-group">
+                        <label>Image Src</label>
+                        <input type="text" value="${element.src || ''}" onchange="element.src=this.value">
+                    </div>
+                    <div class="tool-group">
+                        <label>Alt Text</label>
+                        <input type="text" value="${element.alt || ''}" onchange="element.alt=this.value">
+                    </div>
+                `;
+            } else if (element.tagName === 'A') {
+                specificControls.innerHTML = `
+                    <div class="tool-group">
+                        <label>Href</label>
+                        <input type="text" value="${element.href || ''}" onchange="element.href=this.value">
+                    </div>
+                    <div class="tool-group">
+                        <label>Target</label>
+                        <select onchange="element.target=this.value">
+                            <option value="_self"${element.target === '_self' ? ' selected' : ''}>_self</option>
+                            <option value="_blank"${element.target === '_blank' ? ' selected' : ''}>_blank</option>
+                        </select>
+                    </div>
+                `;
+            }
+        }
+
+        function applyStyleChange(property, value) {
+            if (state.selectedElement) {
+                state.selectedElement.style[property] = value;
+            }
+        }
+
+        function applyContentChange(value) {
+            if (state.selectedElement) {
+                state.selectedElement.textContent = value;
+            }
+        }
+
+        function toggleElementMovement(enabled) {
+            if (!state.iframeDoc) return;
+            state.iframeDoc.body.style.userSelect = enabled ? 'none' : 'auto';
+            
+            if (enabled) {
+                let isDragging = false;
+                let dragElement = null;
+                let offset = { x: 0, y: 0 };
+                
+                state.iframeDoc.onmousedown = (e) => {
+                    if (e.target.classList.contains('wce-delete-icon') || e.target.classList.contains('wce-resize-handle')) return;
+                    if (e.target !== state.iframeDoc.body && e.target !== state.selectedElement) {
+                        selectElement(e.target);
+                    }
+                    if (state.selectedElement) {
+                        isDragging = true;
+                        dragElement = state.selectedElement;
+                        const rect = dragElement.getBoundingClientRect();
+                        offset.x = e.clientX - rect.left;
+                        offset.y = e.clientY - rect.top;
+                        dragElement.style.position = 'absolute';
+                        dragElement.style.cursor = 'grabbing';
+                    }
+                };
+                
+                state.iframeDoc.onmousemove = (e) => {
+                    if (isDragging && dragElement) {
+                        const container = dragElement.parentElement.getBoundingClientRect();
+                        dragElement.style.left = (e.clientX - container.left - offset.x) + 'px';
+                        dragElement.style.top = (e.clientY - container.top - offset.y) + 'px';
+                    }
+                };
+                
+                state.iframeDoc.onmouseup = () => {
+                    if (dragElement) {
+                        dragElement.style.cursor = 'pointer';
+                    }
+                    isDragging = false;
+                    dragElement = null;
+                };
+            } else {
+                state.iframeDoc.onmousedown = null;
+                state.iframeDoc.onmousemove = null;
+                state.iframeDoc.onmouseup = null;
+            }
+        }
+
+        // Drag and Drop Components
+        function setupDragAndDrop() {
+            document.querySelectorAll('.component-item').forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('component', e.target.dataset.component);
+                });
+            });
+            
+            const iframeContainer = document.getElementById('iframe-container');
+            iframeContainer.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+            
+            iframeContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const componentType = e.dataTransfer.getData('component');
+                if (componentType) {
+                    handleComponentDrop(componentType, e);
+                }
+            });
+        }
+
+        function handleComponentDrop(componentType, event) {
+            if (!state.iframeDoc) return;
+            
+            const iframeRect = document.getElementById('preview-iframe').getBoundingClientRect();
+            const x = event.clientX - iframeRect.left;
+            const y = event.clientY - iframeRect.top;
+            
+            const template = components[componentType];
+            const tempDiv = state.iframeDoc.createElement('div');
+            tempDiv.innerHTML = template;
+            const newElement = tempDiv.firstChild;
+            
+            newElement.style.position = 'absolute';
+            newElement.style.left = x + 'px';
+            newElement.style.top = y + 'px';
+            newElement.style.zIndex = '1000';
+            
+            state.iframeDoc.body.appendChild(newElement);
+            selectElement(newElement);
+            logToConsole(`Added ${componentType} component`, 'log');
+        }
+
+        // View Toggle
+        function toggleView() {
+            const playground = document.getElementById('playground-view');
+            const explorer = document.getElementById('code-explorer-view');
+            const btn = document.querySelector('.view-toggle');
+            
+            if (state.viewMode === 'playground') {
+                playground.style.display = 'none';
+                explorer.classList.add('active');
+                state.viewMode = 'explorer';
+                btn.textContent = 'Switch to Playground';
+            } else {
+                playground.style.display = 'flex';
+                explorer.classList.remove('active');
+                state.viewMode = 'playground';
+                btn.textContent = 'Switch to Code Explorer';
+            }
+        }
+
+        // Console
+        function logToConsole(message, type = 'log') {
+            const console = document.getElementById('console-output');
+            const line = document.createElement('div');
+            line.className = `console-line console-${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        // AI Features
+        function toggleChat() {
+            document.getElementById('ai-chat-window').classList.toggle('active');
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            const apiKey = document.getElementById('gemini-api-key').value;
+            if (!apiKey) {
+                alert('Please add your Gemini API key in the API Configuration section');
+                return;
+            }
+            
+            addChatMessage(message, 'user');
+            input.value = '';
+            
+            const context = state.currentFile ? state.projectFiles[state.currentFile] : 'No file loaded';
+            const prompt = `You are a web development assistant. The user is working on this code:\n\n${context}\n\nUser question: ${message}\n\nProvide helpful, specific advice.`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                
+                const data = await response.json();
+                const aiResponse = data.candidates[0].content.parts[0].text;
+                addChatMessage(aiResponse, 'ai');
+            } catch (error) {
+                addChatMessage(`Error: ${error.message}`, 'ai');
+            }
+        }
+
+        function addChatMessage(text, sender) {
+            const messages = document.getElementById('chat-messages');
+            const message = document.createElement('div');
+            message.style.marginBottom = '10px';
+            message.style.padding = '10px';
+            message.style.borderRadius = '4px';
+            message.style.backgroundColor = sender === 'user' ? '#007acc' : '#3e3e3e';
+            message.style.textAlign = sender === 'user' ? 'right' : 'left';
+            message.textContent = text;
+            messages.appendChild(message);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function openAIEditModal() {
+            if (!state.currentFile) {
+                alert('Please load a project first');
+                return;
+            }
+            document.getElementById('ai-edit-modal').classList.add('active');
+        }
+
+        async function executeGlobalEdit() {
+            const prompt = document.getElementById('ai-edit-prompt').value;
+            const apiKey = document.getElementById('gemini-api-key').value;
+            
+            if (!prompt) return;
+            if (!apiKey) {
+                alert('Please add your Gemini API key');
+                return;
+            }
+            
+            logToConsole('Applying AI changes...', 'log');
+            
+            const allFiles = Object.entries(state.projectFiles).map(([name, content]) => 
+                `File: ${name}\n\`\`\`\n${content}\n\`\`\``
+            ).join('\n\n');
+            
+            const aiPrompt = `You are a web developer. Modify these files according to: "${prompt}". Return ONLY the complete modified files in this format:\n\nFILE: filename.html\n\`\`\`\ncontent\n\`\`\`\n\n${allFiles}\n\nImportant: Return ALL files, even unchanged ones.`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: aiPrompt }] }]
+                    })
+                });
+                
+                const data = await response.json();
+                const aiResponse = data.candidates[0].content.parts[0].text;
+                
+                // Parse response and update files
+                const fileRegex = /FILE:\s*(\S+)[\s\n]*```[\s\n]*([\s\S]*?)[\s\n]*```/g;
+                let match;
+                const newFiles = {};
+                
+                while ((match = fileRegex.exec(aiResponse)) !== null) {
+                    const [, filename, content] = match;
+                    newFiles[filename] = content.trim();
+                }
+                
+                if (Object.keys(newFiles).length > 0) {
+                    state.projectFiles = newFiles;
+                    displayFileTree();
+                    loadFileInIframe(state.currentFile || Object.keys(newFiles)[0]);
+                    logToConsole('AI changes applied successfully', 'log');
+                } else {
+                    logToConsole('No valid file changes returned by AI', 'error');
+                }
+                
+                closeModal('ai-edit-modal');
+            } catch (error) {
+                logToConsole(`AI Edit Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function generateWebsite() {
+            const prompt = document.getElementById('website-prompt').value;
+            const apiKey = document.getElementById('gemini-api-key').value;
+            
+            if (!prompt) {
+                alert('Please describe your website');
+                return;
+            }
+            if (!apiKey) {
+                alert('Please add your Gemini API key');
+                return;
+            }
+            
+            logToConsole('Generating website with AI...', 'log');
+            
+            const aiPrompt = `Create a complete, modern website based on: "${prompt}". Include HTML, CSS, and JavaScript in separate files. Use best practices and make it visually appealing. Return files in this format:\n\nFILE: index.html\n\`\`\`\ncontent\n\`\`\`\n\nFILE: style.css\n\`\`\`\ncontent\n\`\`\`\n\nFILE: script.js (if needed)\n\`\`\`\ncontent\n\`\`\`\n\nImportant: Make the site responsive and professional.`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: aiPrompt }] }]
+                    })
+                });
+                
+                const data = await response.json();
+                const aiResponse = data.candidates[0].content.parts[0].text;
+                
+                // Parse generated files
+                const fileRegex = /FILE:\s*(\S+)[\s\n]*```[\s\n]*([\s\S]*?)[\s\n]*```/g;
+                let match;
+                state.projectFiles = {};
+                
+                while ((match = fileRegex.exec(aiResponse)) !== null) {
+                    const [, filename, content] = match;
+                    state.projectFiles[filename] = content.trim();
+                }
+                
+                if (Object.keys(state.projectFiles).length > 0) {
+                    displayFileTree();
+                    loadFileInIframe('index.html');
+                    logToConsole('Website generated successfully!', 'log');
+                } else {
+                    logToConsole('No files generated by AI', 'error');
+                }
+            } catch (error) {
+                logToConsole(`Generation Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Code Review
+        function initializeAceEditor() {
+            const editorDiv = document.getElementById('code-editor');
+            if (editorDiv) {
+                state.aceEditor = ace.edit(editorDiv);
+                state.aceEditor.setTheme('ace/theme/monokai');
+                state.aceEditor.session.setMode('ace/mode/html');
+            }
+        }
+
+        function openCodeReview() {
+            if (!state.currentFile || !state.projectFiles[state.currentFile]) {
+                alert('No file loaded to review');
+                return;
+            }
+            
+            const code = state.projectFiles[state.currentFile];
+            state.aceEditor.setValue(code, -1);
+            
+            // Set mode based on file extension
+            const ext = state.currentFile.split('.').pop().toLowerCase();
+            const modeMap = {
+                html: 'html',
+                css: 'css',
+                js: 'javascript',
+                json: 'json',
+                php: 'php',
+                py: 'python'
+            };
+            state.aceEditor.session.setMode(`ace/mode/${modeMap[ext] || 'text'}`);
+            
+            document.getElementById('code-review-modal').classList.add('active');
+        }
+
+        function removeLeadingSlashes() {
+            let code = state.aceEditor.getValue();
+            let modified = false;
+            
+            // Remove leading slashes from paths (e.g., /images/ -> images/)
+            code = code.replace(/(src|href|url)\s*=\s*["'](\/[^"']+)["']/g, (match, attr, path) => {
+                modified = true;
+                return `${attr}="${path.substring(1)}"`;
+            });
+            
+            // Also handle CSS url()
+            code = code.replace(/url\(\/([^)]+)\)/g, (match, path) => {
+                modified = true;
+                return `url(${path})`;
+            });
+            
+            if (modified) {
+                state.aceEditor.setValue(code, -1);
+                logToConsole('Removed leading slashes from paths', 'log');
+            } else {
+                logToConsole('No leading slashes found', 'log');
+            }
+        }
+
+        function downloadProject() {
+            const code = state.aceEditor.getValue();
+            state.projectFiles[state.currentFile] = code;
+            
+            if (Object.keys(state.projectFiles).length > 1) {
+                // Download as ZIP
+                const zip = new JSZip();
+                Object.entries(state.projectFiles).forEach(([name, content]) => {
+                    zip.file(name, content);
+                });
+                
+                zip.generateAsync({ type: 'blob' }).then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'project.zip';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+            } else {
+                // Download as HTML
+                const blob = new Blob([code], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = state.currentFile || 'index.html';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            closeModal('code-review-modal');
+            logToConsole('Project downloaded', 'log');
+        }
+
+        // Modal Functions
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function openHelpModal() {
+            document.getElementById('help-modal').classList.add('active');
+        }
+
+        // API Configuration
+        function loadApiConfig() {
+            // Optional: Load from external api.js
+            // Uncomment this section if you have an api.js file
+            /*
+            fetch('api.js')
+                .then(r => r.text())
+                .then(text => {
+                    const urlMatch = text.match(/APPS_SCRIPT_URL\s*=\s*['"]([^'"]+)['"]/);
+                    if (urlMatch) {
+                        document.getElementById('apps-script-url').value = urlMatch[1];
+                        logToConsole('Loaded Apps Script URL from api.js', 'log');
+                    }
+                })
+                .catch(() => logToConsole('No api.js file found', 'log'));
+            */
+        }
+
+        // Utility Functions
+        function rgbToHex(rgb) {
+            if (!rgb || rgb === 'transparent') return null;
+            const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (!match) return rgb;
+            const [, r, g, b] = match;
+            return '#' + [r, g, b].map(x => {
+                const hex = parseInt(x).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function setupMessageListener() {
+            window.addEventListener('message', (e) => {
+                if (e.data.type === 'console') {
+                    logToConsole(e.data.message, e.data.level);
+                }
+            });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' && state.selectedElement && state.isEditMode) {
+                deleteElement(state.selectedElement);
+            }
+        });
+
+        // Add Download button to header
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'btn btn-primary';
+        downloadBtn.style.position = 'fixed';
+        downloadBtn.style.top = '10px';
+        downloadBtn.style.right = '70px';
+        downloadBtn.textContent = 'Download';
+        downloadBtn.onclick = openCodeReview;
+        document.body.appendChild(downloadBtn);
+
+        // Add AI Edit button to header
+        const aiEditBtn = document.createElement('button');
+        aiEditBtn.className = 'btn btn-secondary';
+        aiEditBtn.style.position = 'fixed';
+        aiEditBtn.style.top = '10px';
+        aiEditBtn.style.right = '160px';
+        aiEditBtn.textContent = 'AI Edit Website';
+        aiEditBtn.onclick = openAIEditModal;
+        document.body.appendChild(aiEditBtn);
+    </script>
+</body>
+  </html>
