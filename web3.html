@@ -1,0 +1,1658 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Explorer</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #1e2127;
+            --sidebar-bg: #282c34;
+            --content-bg: #21252b;
+            --text-color: #abb2bf;
+            --accent-color: #61afef;
+            --accent-hover: #7bc0ff;
+            --border-color: #3b4048;
+            --success-color: #98c379;
+            --error-color: #e06c75;
+            --warning-color: #e5c07b;
+        }
+
+        /* Basic Setup */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        /* Layout: Sidebar and Main Content */
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100vh;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
+        }
+
+        #sidebar-toggle {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #sidebar-content {
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        #main-content-area {
+            flex-grow: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view {
+            display: none;
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        .view.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Sidebar Sections */
+        .sidebar-section {
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .sidebar-section summary {
+            padding: 10px;
+            background-color: var(--content-bg);
+            cursor: pointer;
+            font-weight: bold;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .sidebar-section summary::-webkit-details-marker {
+           display:none;
+        }
+
+        .sidebar-section summary::after {
+            content: '▼';
+            transition: transform 0.2s;
+        }
+
+        .sidebar-section[open] summary::after {
+            transform: rotate(180deg);
+        }
+
+        .sidebar-section-content {
+            padding: 10px;
+        }
+        
+        /* Common UI Elements */
+        button, input[type="submit"] {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover, input[type="submit"]:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            background-color: var(--content-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        /* Upload Zone */
+        #drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 10px;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        #drop-zone.drag-over {
+            border-color: var(--accent-color);
+            background-color: rgba(97, 175, 239, 0.1);
+        }
+        #browse-button {
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        /* File Tree */
+        #file-tree ul {
+            list-style-type: none;
+            padding-left: 15px;
+        }
+        #file-tree li {
+            cursor: pointer;
+            padding: 3px 0;
+        }
+        #file-tree li:hover {
+            color: var(--accent-color);
+        }
+        #file-tree .file::before { content: '📄 '; }
+        #file-tree .folder::before { content: '📁 '; }
+        
+        /* Component Library */
+        #component-library-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+        .comp-tab {
+            padding: 8px 12px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .comp-tab.active {
+            border-color: var(--border-color);
+            border-bottom-color: var(--sidebar-bg);
+            background-color: var(--sidebar-bg);
+            position: relative;
+            top: 1px;
+        }
+        .comp-panel {
+            display: none;
+        }
+        .comp-panel.active {
+            display: block;
+        }
+        .component-item {
+            padding: 8px;
+            background-color: var(--content-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 5px;
+            cursor: grab;
+        }
+        .component-item:active {
+            cursor: grabbing;
+        }
+        
+        /* Element Tools */
+        .tool-group {
+            margin-bottom: 15px;
+        }
+        .tool-group-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+        }
+        .tool-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .tool-row label {
+            flex-shrink: 0;
+            width: 80px;
+            margin-bottom: 0;
+        }
+        .tool-row input[type="color"] {
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Playground View */
+        #website-preview-container {
+            flex-grow: 1;
+            position: relative;
+        }
+        #website-preview {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: white;
+        }
+        #console-output-container {
+            height: 150px;
+            background-color: var(--sidebar-bg);
+            border-top: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        /* Floating Buttons */
+        #view-toggle {
+            position: fixed;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+        }
+        #edit-mode-toggle {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 999;
+        }
+        #edit-mode-toggle.active {
+            background-color: var(--success-color);
+        }
+
+        /* AI Chat */
+        #ai-chat-bubble {
+            position: fixed;
+            bottom: 15px;
+            right: 180px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1002;
+        }
+        #ai-chat-window {
+            position: fixed;
+            bottom: 75px;
+            right: 15px;
+            width: 350px;
+            height: 450px;
+            background: var(--sidebar-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            z-index: 1001;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #ai-chat-window.open {
+            display: flex;
+        }
+        #ai-chat-messages {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 85%;
+        }
+        .chat-message.user {
+            background-color: var(--accent-color);
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .chat-message.ai {
+            background-color: var(--content-bg);
+        }
+        #ai-chat-input-area {
+            padding: 10px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+        }
+        #ai-chat-input {
+            flex-grow: 1;
+            margin-bottom: 0;
+            margin-right: 10px;
+        }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+        }
+        .modal-content {
+            background-color: var(--sidebar-bg);
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .modal-close {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #code-review-editor {
+            height: 400px;
+            width: 100%;
+        }
+        .modal-actions {
+            margin-top: 20px;
+            text-align: right;
+        }
+        .modal-actions button {
+            margin-left: 10px;
+        }
+        .secondary-button {
+            background-color: var(--content-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar Toggle -->
+    <button id="sidebar-toggle">☰</button>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div id="sidebar-content">
+            <h3 style="text-align: center; margin-bottom: 20px;">Web Code Explorer</h3>
+
+            <!-- AI Website Generation -->
+            <details class="sidebar-section" id="create-new-website-section" open>
+                <summary>Create New Website</summary>
+                <div class="sidebar-section-content">
+                    <label for="ai-generate-prompt">Describe the website you want to build:</label>
+                    <textarea id="ai-generate-prompt" rows="4"></textarea>
+                    <button id="ai-generate-button">Generate with AI</button>
+                    <hr style="margin: 15px 0;">
+                    <button id="ai-edit-website-button">Global AI Edit</button>
+                </div>
+            </details>
+
+            <!-- Projects Section -->
+            <details class="sidebar-section">
+                <summary>Projects</summary>
+                <div class="sidebar-section-content" id="project-list">
+                    <!-- Project list will be populated by JS -->
+                </div>
+                 <div class="sidebar-section-content">
+                    <button id="save-to-cloud-button">Save to Cloud</button>
+                    <button id="save-to-local-button">Save Locally</button>
+                </div>
+            </details>
+            
+            <!-- Upload Project -->
+            <details class="sidebar-section">
+                <summary>Upload Project</summary>
+                <div class="sidebar-section-content">
+                    <div id="drop-zone">
+                        <p>Drop a .html or .zip file here</p>
+                        <input type="file" id="html-file-input" class="hidden" accept=".html">
+                        <input type="file" id="zip-file-input" class="hidden" accept=".zip">
+                        <button id="browse-button" class="secondary-button">Browse Files</button>
+                    </div>
+                </div>
+            </details>
+            
+            <!-- Project Files -->
+            <details class="sidebar-section">
+                <summary>Project Files</summary>
+                <div class="sidebar-section-content" id="file-tree">
+                    <p>Upload a ZIP to see the file tree.</p>
+                </div>
+            </details>
+
+            <!-- Component Library -->
+            <details class="sidebar-section">
+                <summary>Component Library</summary>
+                <div class="sidebar-section-content">
+                    <div id="component-library-tabs">
+                        <div class="comp-tab active" data-tab="basic">Basic</div>
+                        <div class="comp-tab" data-tab="forms">Forms</div>
+                        <div class="comp-tab" data-tab="layout">Layout</div>
+                    </div>
+                    <div id="component-library-panels">
+                        <div class="comp-panel active" data-panel="basic">
+                            <div class="component-item" draggable="true" data-type="h1">Heading</div>
+                            <div class="component-item" draggable="true" data-type="p">Paragraph</div>
+                            <div class="component-item" draggable="true" data-type="button">Button</div>
+                            <div class="component-item" draggable="true" data-type="a">Link</div>
+                            <div class="component-item" draggable="true" data-type="img">Image</div>
+                        </div>
+                        <div class="comp-panel" data-panel="forms">
+                            <div class="component-item" draggable="true" data-type="form">Form</div>
+                            <div class="component-item" draggable="true" data-type="input">Text Input</div>
+                            <div class="component-item" draggable="true" data-type="textarea">Text Area</div>
+                        </div>
+                        <div class="comp-panel" data-panel="layout">
+                            <div class="component-item" draggable="true" data-type="div">Container (div)</div>
+                            <div class="component-item" draggable="true" data-type="section">Section</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Element Tools -->
+            <details class="sidebar-section" id="element-tools-section" open>
+                <summary>Element Tools</summary>
+                <div class="sidebar-section-content" id="element-tools-content">
+                    <p id="element-tools-placeholder">Select an element in Edit Mode.</p>
+                    <div id="element-tools-controls" class="hidden">
+                         <div class="tool-group">
+                            <div class="tool-group-title">Content</div>
+                            <label for="tool-text-content">Text</label>
+                            <textarea id="tool-text-content" rows="2"></textarea>
+                        </div>
+                        <div class="tool-group">
+                            <div class="tool-group-title">Dimensions</div>
+                            <div class="tool-row">
+                                <label for="tool-width">Width</label>
+                                <input type="text" id="tool-width">
+                            </div>
+                            <div class="tool-row">
+                                <label for="tool-height">Height</label>
+                                <input type="text" id="tool-height">
+                            </div>
+                        </div>
+                        <div class="tool-group">
+                            <div class="tool-group-title">Styling</div>
+                             <div class="tool-row">
+                                <label for="tool-bg-color">Background</label>
+                                <input type="color" id="tool-bg-color">
+                            </div>
+                             <div class="tool-row">
+                                <label for="tool-text-color">Text Color</label>
+                                <input type="color" id="tool-text-color">
+                            </div>
+                             <div class="tool-row">
+                                <label for="tool-font-size">Font Size</label>
+                                <input type="text" id="tool-font-size">
+                            </div>
+                        </div>
+                        <div class="tool-group" id="context-tools">
+                            <!-- Context-aware controls will be added here -->
+                        </div>
+                         <button id="delete-element-button" style="background-color: var(--error-color);">Delete Element</button>
+                    </div>
+                </div>
+            </details>
+            
+            <!-- Settings -->
+            <details class="sidebar-section">
+                <summary>API Configuration</summary>
+                <div class="sidebar-section-content">
+                    <label for="api-key-input">Gemini API Key</label>
+                    <input type="password" id="api-key-input">
+                    <button id="save-api-key-button">Save Key</button>
+                    <p id="api-key-status" style="font-size: 12px; margin-top: 5px;"></p>
+                </div>
+            </details>
+
+            <button id="download-project-button">Download Project</button>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main id="main-content-area">
+        <!-- Playground View -->
+        <div id="playground-view" class="view active">
+            <div id="website-preview-container">
+                <iframe id="website-preview" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+            </div>
+            <div id="console-output-container">
+                <pre id="console-output"></pre>
+            </div>
+        </div>
+        <!-- Code Explorer View (Placeholder) -->
+        <div id="code-explorer-view" class="view">
+            <h2 style="padding: 20px;">Code Explorer (Coming Soon)</h2>
+            <p style="padding: 0 20px;">This view will show a more detailed code breakdown.</p>
+        </div>
+    </main>
+    
+    <!-- Floating Buttons -->
+    <button id="view-toggle">Toggle View</button>
+    <button id="edit-mode-toggle">Edit Mode: OFF</button>
+    <div id="ai-chat-bubble">💬</div>
+    <div id="ai-chat-window">
+        <div id="ai-chat-messages"></div>
+        <div id="ai-chat-input-area">
+            <input type="text" id="ai-chat-input" placeholder="Ask AI about your code...">
+            <button id="ai-chat-send">Send</button>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="ai-edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" data-modal="ai-edit-modal">&times;</span>
+            <h2>Global AI Edit</h2>
+            <p>Describe the changes you want to make to the entire website.</p>
+            <textarea id="ai-edit-prompt" rows="6" placeholder="e.g., Change the color scheme to a light theme with blue accents."></textarea>
+            <div class="modal-actions">
+                <button id="ai-edit-execute" class="ai-powered-button">Execute Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="code-review-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" data-modal="code-review-modal">&times;</span>
+            <h2>Code Review & Download</h2>
+            <p>Review the final code before downloading.</p>
+            <div id="code-review-editor"></div>
+            <div class="modal-actions">
+                 <button id="fix-paths-button" class="secondary-button">Remove Leading Slashes from Paths</button>
+                 <button id="download-confirm-button">Confirm & Download</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" data-modal="help-modal">&times;</span>
+            <h2>Help Guide</h2>
+            <p>Welcome to the Web Code Explorer! This is a placeholder for the help guide.</p>
+        </div>
+    </div>
+
+    <div id="auth-modal" style="display: none;">
+      <!-- This is a placeholder for the authentication modal if needed from app3.js logic -->
+    </div>
+    <div id="main-app-container" style="display: none;">
+      <!-- This is a placeholder container for app3.js logic -->
+    </div>
+
+
+<script type="module">
+// --- START OF api.js ---
+// This code is pasted directly from the provided api.js file.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwLALiL0f_vjXqw2_Y-i89k2vQ9mTJ5G9T9j-vV96t3Oh_nE3L7kG8uIq1_3bN8-3eQ/exec';
+const CHUNK_SIZE = 1500; // Keep this relatively small for URL length limits
+
+function jsonpRequest(action, params = {}) {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'vibe_jsonp_callback_' + Math.round(100000 * Math.random());
+        const script = document.createElement('script');
+        let url = `${APPS_SCRIPT_URL}?action=${action}&callback=${callbackName}`;
+
+        for (const key in params) {
+            url += `&${key}=${encodeURIComponent(params[key])}`;
+        }
+        script.src = url;
+
+        window[callbackName] = (data) => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            if (data.status === 'success') {
+                resolve(data.data);
+            } else {
+                reject(new Error(data.message || 'API Error'));
+            }
+        };
+
+        script.onerror = () => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            reject(new Error('API request failed. Check network connection or script URL.'));
+        };
+
+        document.body.appendChild(script);
+    });
+}
+
+async function signup(username, password) {
+    return jsonpRequest('signup', { username, password });
+}
+
+async function login(username, password) {
+    return jsonpRequest('login', { username, password });
+}
+
+async function listProjects(userId) {
+    return jsonpRequest('listProjects', { userId });
+}
+
+async function saveProjectInChunks(userId, projectId, dataString) {
+    const chunks = [];
+    for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+        chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+    }
+    
+    console.log(`Saving project '${projectId}' in ${chunks.length} chunks.`);
+
+    for (let i = 0; i < chunks.length; i++) {
+        await jsonpRequest('saveProjectChunk', {
+            userId: userId,
+            projectId: projectId,
+            chunkData: chunks[i],
+            chunkIndex: i,
+            totalChunks: chunks.length
+        });
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.log(`Finished saving project '${projectId}'.`);
+}
+
+async function saveProject(userId, projectId, projectData) {
+     const jsonString = JSON.stringify(projectData);
+     const uint8Array = new TextEncoder().encode(jsonString);
+     let binaryString = '';
+     uint8Array.forEach(byte => {
+         binaryString += String.fromCharCode(byte);
+     });
+     const dataString = btoa(binaryString);
+     
+     await saveProjectInChunks(userId, projectId, dataString);
+}
+
+
+async function loadProject(userId, projectId) {
+    return jsonpRequest('loadProject', { userId, projectId });
+}
+
+async function deleteProject(userId, projectId) {
+    return jsonpRequest('deleteProject', { userId, projectId });
+}
+// --- END OF api.js ---
+
+
+// --- START OF app3.js LOGIC ---
+// This is the logic from app3.js, adapted to work within this single file
+// and connected to the new UI elements.
+
+// NOTE: The `import * as api from './api.js'` is removed because the `api`
+// functions are now in the same scope.
+
+// --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
+(function() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view') === 'live') {
+            document.title = 'Loading Project...';
+            const style = document.createElement('style');
+            style.textContent = `body { background-color: #282c34; } #auth-modal, #main-app-container { display: none !important; }`;
+            requestAnimationFrame(() => document.head.appendChild(style));
+        }
+    } catch (e) {
+        console.error('Live view pre-bootstrapper failed:', e);
+    }
+})();
+
+// --- DATA COMPRESSION/DECOMPRESSION ---
+function compressProjectData(projectData) {
+    try {
+        const jsonString = JSON.stringify(projectData);
+        const uint8Array = new TextEncoder().encode(jsonString);
+        let binaryString = '';
+        uint8Array.forEach(byte => { binaryString += String.fromCharCode(byte); });
+        return btoa(binaryString);
+    } catch (e) {
+        console.error("Failed to encode project data:", e);
+        throw new Error("Failed to encode project data for saving.");
+    }
+}
+
+function decompressProjectData(dataString) {
+    try {
+        const binaryString = atob(dataString);
+        const uint8Array = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i);
+        }
+        const jsonString = new TextDecoder().decode(uint8Array);
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error("Failed to decode or parse project data:", e);
+        throw new Error("Failed to decode or parse project data. It may be corrupt.");
+    }
+}
+
+function generateFullCodeString(tree, userId, projectId) {
+    let cssContent = '';
+    let jsContent = '';
+    let htmlContent = '';
+    let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
+
+    const buildHtmlRecursive = (nodes) => {
+        let currentHtml = '';
+        if (!nodes) return currentHtml;
+        const htmlNodes = nodes.filter(n => n.type === 'html');
+        htmlNodes.forEach(node => {
+            let finalCode = node.code;
+            if (finalCode && finalCode.trim().startsWith('<')) {
+                finalCode = finalCode.replace(/<([a-zA-Z0-9\-]+)/, `<$1 data-vibe-node-id="${node.id}"`);
+            }
+            if (node.children && node.children.length > 0) {
+                const innerHtml = buildHtmlRecursive(node.children);
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = finalCode;
+                if (wrapper.firstElementChild) {
+                    wrapper.firstElementChild.innerHTML = innerHtml;
+                    currentHtml += wrapper.innerHTML + '\n';
+                } else {
+                    currentHtml += finalCode + '\n';
+                }
+            } else {
+                currentHtml += finalCode + '\n';
+            }
+        });
+        return currentHtml;
+    };
+
+    function traverse(node) {
+        if(!node) return;
+        switch (node.type) {
+            case 'head':
+                if (node.code) headContent = node.code;
+                break;
+            case 'css':
+                cssContent += node.code + '\n\n';
+                break;
+            case 'javascript':
+            case 'js-function':
+            case 'declaration':
+                jsContent += node.code + '\n\n';
+                break;
+        }
+        if (node.children) {
+            node.children.forEach(traverse);
+        }
+    }
+
+    traverse(tree);
+    if (tree && tree.children) {
+        htmlContent = buildHtmlRecursive(tree.children);
+    }
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    ${headContent.trim()}
+    <style>${cssContent.trim()}</style>
+</head>
+<body>
+${htmlContent.trim()}
+    <script>(function() {${jsContent.trim()}})();<\/script>
+</body>
+</html>`;
+}
+
+// --- Application State ---
+let currentUser = null;
+let currentProjectId = null;
+let currentProjectStorageType = 'cloud';
+let geminiApiKey = '';
+let nscaleApiKey = ''; // Not used in this UI, but keeping the logic
+let vibeTree = {};
+const initialVibeTree = {
+  id: "whole-page",
+  description: "A new, empty website.",
+  type: "container",
+  children: [
+    {
+      id: "head-content",
+      type: "head",
+      description: "Content for the <head> tag.",
+      code: `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>New Project</title>`
+    }
+  ]
+};
+vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
+
+// --- NEW UI ELEMENT REFERENCES ---
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const mainContentArea = document.getElementById('main-content-area');
+const playgroundView = document.getElementById('playground-view');
+const codeExplorerView = document.getElementById('code-explorer-view');
+const viewToggle = document.getElementById('view-toggle');
+const previewContainer = document.getElementById('website-preview');
+const consoleOutput = document.getElementById('console-output');
+
+// Sidebar elements
+const aiGeneratePrompt = document.getElementById('ai-generate-prompt');
+const aiGenerateButton = document.getElementById('ai-generate-button');
+const aiEditWebsiteButton = document.getElementById('ai-edit-website-button');
+const dropZone = document.getElementById('drop-zone');
+const browseButton = document.getElementById('browse-button');
+const htmlFileInput = document.getElementById('html-file-input');
+const zipFileInput = document.getElementById('zip-file-input');
+const fileTreeContainer = document.getElementById('file-tree');
+const componentTabs = document.querySelectorAll('.comp-tab');
+const componentPanels = document.querySelectorAll('.comp-panel');
+const componentItems = document.querySelectorAll('.component-item');
+const elementToolsPlaceholder = document.getElementById('element-tools-placeholder');
+const elementToolsControls = document.getElementById('element-tools-controls');
+const toolTextContent = document.getElementById('tool-text-content');
+const toolWidth = document.getElementById('tool-width');
+const toolHeight = document.getElementById('tool-height');
+const toolBgColor = document.getElementById('tool-bg-color');
+const toolTextColor = document.getElementById('tool-text-color');
+const toolFontSize = document.getElementById('tool-font-size');
+const contextToolsContainer = document.getElementById('context-tools');
+const deleteElementButton = document.getElementById('delete-element-button');
+const saveToCloudButton = document.getElementById('save-to-cloud-button');
+const saveToLocalButton = document.getElementById('save-to-local-button');
+const projectListContainer = document.getElementById('project-list');
+const downloadProjectButton = document.getElementById('download-project-button');
+const apiKeyInput = document.getElementById('api-key-input');
+const saveApiKeyButton = document.getElementById('save-api-key-button');
+const apiKeyStatus = document.getElementById('api-key-status');
+
+// Floating elements
+const editModeToggle = document.getElementById('edit-mode-toggle');
+const aiChatBubble = document.getElementById('ai-chat-bubble');
+const aiChatWindow = document.getElementById('ai-chat-window');
+const aiChatMessages = document.getElementById('ai-chat-messages');
+const aiChatInput = document.getElementById('ai-chat-input');
+const aiChatSend = document.getElementById('ai-chat-send');
+
+// Modals
+const aiEditModal = document.getElementById('ai-edit-modal');
+const aiEditPrompt = document.getElementById('ai-edit-prompt');
+const aiEditExecute = document.getElementById('ai-edit-execute');
+const codeReviewModal = document.getElementById('code-review-modal');
+const fixPathsButton = document.getElementById('fix-paths-button');
+const downloadConfirmButton = document.getElementById('download-confirm-button');
+const modalCloses = document.querySelectorAll('.modal-close');
+
+let codeEditor; // For Ace Editor
+
+// --- NEW APP STATE ---
+let isEditMode = false;
+let selectedIframeElement = null;
+let currentZip = null; // To hold the JSZip instance
+let currentFileTree = {}; // To hold the parsed file tree
+let currentProjectFiles = new Map(); // path -> content
+
+// --- CORE APP LOGIC ---
+
+function applyVibes() {
+    try {
+        const doc = previewContainer.contentWindow.document;
+        const html = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        
+        const commsScriptText = `
+<script>
+(function(){
+    let inspectEnabled = false;
+    let hoverEl = null;
+    const inspectorStyles = \`
+        [data-vibe-selected] { outline: 2px dashed #61afef !important; outline-offset: 2px; }
+        [data-vibe-hover] { outline: 2px solid #e5c07b !important; }
+    \`;
+    function ensureStyles(){ if(document.getElementById('vibe-inspector-styles'))return; const s=document.createElement('style');s.id='vibe-inspector-styles';s.textContent=inspectorStyles;document.head.appendChild(s)}
+    
+    document.addEventListener('mouseover', e => {
+        if(!inspectEnabled) return;
+        if (hoverEl) hoverEl.removeAttribute('data-vibe-hover');
+        hoverEl = e.target.closest('[data-vibe-node-id]');
+        if (hoverEl) hoverEl.setAttribute('data-vibe-hover', true);
+    });
+
+    document.addEventListener('click', e => {
+        if(!inspectEnabled) return;
+        const target = e.target.closest('[data-vibe-node-id]');
+        if(target) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.parent.postMessage({type:'vibe-element-select', nodeId: target.dataset.vibeNodeId}, '*');
+        }
+    }, true);
+    
+    // Console Proxy
+    const oConsole = {...window.console};
+    Object.keys(oConsole).forEach(level => {
+        window.console[level] = (...args) => {
+            oConsole[level](...args);
+            try {
+                const serialized = args.map(arg => {
+                   try { return JSON.parse(JSON.stringify(arg)); }
+                   catch(e) { return String(arg); }
+                });
+                window.parent.postMessage({ type: 'iframe-console', level, payload: serialized }, '*');
+            } catch(e) { /* ignore */ }
+        }
+    });
+
+    window.addEventListener('message', e => {
+        if(e.data.type === 'toggle-inspect'){
+            inspectEnabled = e.data.enabled;
+            if(inspectEnabled) ensureStyles();
+            else {
+                 document.querySelectorAll('[data-vibe-selected]').forEach(el => el.removeAttribute('data-vibe-selected'));
+                 document.querySelectorAll('[data-vibe-hover]').forEach(el => el.removeAttribute('data-vibe-hover'));
+            }
+        }
+        if(e.data.type === 'highlight-node') {
+            document.querySelectorAll('[data-vibe-selected]').forEach(el => el.removeAttribute('data-vibe-selected'));
+            const el = document.querySelector(\`[data-vibe-node-id="\${e.data.nodeId}"]\`);
+            if (el) el.setAttribute('data-vibe-selected', true);
+        }
+    });
+})();
+<\/script>`;
+        
+        let finalHtml = html;
+        if (finalHtml.includes('</head>')) {
+            finalHtml = finalHtml.replace('</head>', `${commsScriptText}\n</head>`);
+        } else {
+            finalHtml = commsScriptText + finalHtml;
+        }
+
+        doc.open();
+        doc.write(finalHtml);
+        doc.close();
+
+    } catch (e) {
+        console.error('applyVibes failed:', e);
+    }
+}
+
+
+// --- API/SETTINGS LOGIC (from app3) ---
+function initializeApiSettings() {
+    geminiApiKey = localStorage.getItem('geminiApiKey');
+    if (geminiApiKey) {
+        apiKeyInput.value = geminiApiKey;
+        apiKeyStatus.textContent = 'Gemini API Key loaded.';
+        apiKeyStatus.style.color = 'var(--success-color)';
+    } else {
+        apiKeyStatus.textContent = 'No Gemini API Key found.';
+        apiKeyStatus.style.color = 'var(--warning-color)';
+    }
+    updateFeatureAvailability();
+}
+
+function saveGeminiApiKey() {
+    const key = apiKeyInput.value.trim();
+    if (key) {
+        localStorage.setItem('geminiApiKey', key);
+        geminiApiKey = key;
+        apiKeyStatus.textContent = 'Gemini API Key saved!';
+    } else {
+        localStorage.removeItem('geminiApiKey');
+        geminiApiKey = '';
+        apiKeyStatus.textContent = 'Gemini API Key cleared.';
+    }
+    updateFeatureAvailability();
+}
+
+function updateFeatureAvailability() {
+    const keyIsAvailable = !!geminiApiKey;
+    document.querySelectorAll('.ai-powered-button, #ai-generate-button, #ai-edit-website-button, #ai-chat-bubble').forEach(button => {
+        button.disabled = !keyIsAvailable;
+        if (!keyIsAvailable) {
+            button.title = 'Add an API key in Settings to use AI features.';
+        }
+    });
+}
+
+async function callAI(systemPrompt, userPrompt) {
+    if (!geminiApiKey) throw new Error("Gemini API key is not set.");
+    const model = 'gemini-1.5-flash-latest';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+    const requestBody = {
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+    };
+    
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API Error: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('Invalid response from Gemini API.');
+    }
+    return data.candidates[0].content.parts[0].text;
+}
+
+// --- PROJECT HANDLING (from app3) ---
+const localApi = {
+    async listProjects() {
+        const keys = Object.keys(localStorage);
+        return keys.filter(k => k.startsWith('_vibe_local_')).map(k => k.replace('_vibe_local_', ''));
+    },
+    async saveProject(projectId, projectData) {
+        const compressed = compressProjectData(projectData);
+        localStorage.setItem(`_vibe_local_${projectId}`, compressed);
+    },
+    async loadProject(projectId) {
+        const data = localStorage.getItem(`_vibe_local_${projectId}`);
+        if (!data) throw new Error("Local project not found.");
+        return data;
+    },
+    async deleteProject(projectId) {
+        localStorage.removeItem(`_vibe_local_${projectId}`);
+    }
+};
+
+async function populateProjectList() {
+    try {
+        const projects = await localApi.listProjects();
+        projectListContainer.innerHTML = '';
+        if (projects.length === 0) {
+            projectListContainer.innerHTML = '<p>No local projects found.</p>';
+            return;
+        }
+        projects.forEach(projectId => {
+            const item = document.createElement('div');
+            item.innerHTML = `<span>${projectId}</span> <button data-id="${projectId}">Load</button>`;
+            item.querySelector('button').onclick = () => handleLoadProject(projectId);
+            projectListContainer.appendChild(item);
+        });
+    } catch (e) {
+        projectListContainer.innerHTML = '<p>Error loading projects.</p>';
+    }
+}
+
+async function handleLoadProject(projectId) {
+    try {
+        const data = await localApi.loadProject(projectId);
+        vibeTree = decompressProjectData(data);
+        currentProjectId = projectId;
+        applyVibes();
+        sidebar.classList.remove('open');
+        console.log(`Project '${projectId}' loaded.`);
+    } catch(e) {
+        alert(`Failed to load project: ${e.message}`);
+    }
+}
+
+function updateSaveButtonStates() {
+    saveToLocalButton.disabled = !currentProjectId;
+    saveToCloudButton.disabled = true; // Cloud not implemented in this UI
+}
+
+function handleSaveToLocal() {
+    if (!currentProjectId) {
+        const newId = prompt("Enter a name for this new local project:", "my-website");
+        if (!newId) return;
+        currentProjectId = newId;
+    }
+    localApi.saveProject(currentProjectId, vibeTree);
+    alert(`Project '${currentProjectId}' saved locally.`);
+    populateProjectList();
+    updateSaveButtonStates();
+}
+
+// --- FILE UPLOAD LOGIC ---
+async function handleFileUpload(file) {
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const content = event.target.result;
+        vibeTree = await decomposeCodeIntoVibeTree(content);
+        currentProjectId = file.name.replace(/\.html$/, '');
+        applyVibes();
+        updateSaveButtonStates();
+        console.log("HTML file processed and rendered.");
+    };
+    reader.readAsText(file);
+}
+
+async function handleZipUpload(file) {
+    try {
+        currentZip = await JSZip.loadAsync(file);
+        currentProjectFiles.clear();
+        const readPromises = [];
+
+        currentZip.forEach((relativePath, zipEntry) => {
+            if (!zipEntry.dir) {
+                const promise = zipEntry.async('string').then(content => {
+                    currentProjectFiles.set(relativePath, content);
+                });
+                readPromises.push(promise);
+            }
+        });
+        await Promise.all(readPromises);
+        
+        const indexPath = ['index.html', 'index.htm'].find(name => currentProjectFiles.has(name));
+        if(!indexPath) {
+            alert('No index.html found in the ZIP file.');
+            return;
+        }
+
+        const indexContent = currentProjectFiles.get(indexPath);
+        vibeTree = await decomposeCodeIntoVibeTree(indexContent);
+        currentProjectId = file.name.replace(/\.zip$/, '');
+        applyVibes();
+        updateSaveButtonStates();
+        renderFileTree();
+        console.log("ZIP file processed and rendered.");
+
+    } catch (e) {
+        console.error("ZIP processing failed:", e);
+        alert("Failed to read the ZIP file. It may be corrupt.");
+    }
+}
+
+function renderFileTree() {
+    fileTreeContainer.innerHTML = '';
+    const ul = document.createElement('ul');
+    currentProjectFiles.forEach((content, path) => {
+        const li = document.createElement('li');
+        li.className = 'file';
+        li.textContent = path;
+        li.onclick = () => {
+             if (path.endsWith('.html')) {
+                 vibeTree = decomposeCodeIntoVibeTree(content);
+                 applyVibes();
+             } else {
+                 alert(`Previewing non-HTML files is not yet implemented. Content logged to console.`);
+                 console.log(`--- Content of ${path} ---\n`, content);
+             }
+        };
+        ul.appendChild(li);
+    });
+    fileTreeContainer.appendChild(ul);
+}
+
+
+async function decomposeCodeIntoVibeTree(fullCode) {
+    const systemPrompt = `You are an expert system that deconstructs a complete HTML file into a specific hierarchical JSON structure called a "vibe tree". Your task is to accurately parse the provided code and represent it as a nested hierarchy of components. Your output MUST be ONLY the raw JSON object.
+    The root object must be a "container" node with id "whole-page". Children can be 'head', 'html', 'css', 'javascript'. HTML nodes can have nested children. Each node must have id, type, description, and code.`;
+    const userPrompt = `Decompose the following code into the vibe tree JSON structure:\n\n\`\`\`html\n${fullCode}\n\`\`\``;
+    const rawResponse = await callAI(systemPrompt, userPrompt);
+    try {
+        const jsonText = rawResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)[1];
+        return JSON.parse(jsonText);
+    } catch (e) {
+        return JSON.parse(rawResponse); // Fallback for raw JSON
+    }
+}
+
+// --- VISUAL EDITOR LOGIC (NEW) ---
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    editModeToggle.textContent = `Edit Mode: ${isEditMode ? 'ON' : 'OFF'}`;
+    editModeToggle.classList.toggle('active', isEditMode);
+    previewContainer.contentWindow.postMessage({ type: 'toggle-inspect', enabled: isEditMode }, '*');
+    if (!isEditMode) {
+        elementToolsPlaceholder.classList.remove('hidden');
+        elementToolsControls.classList.add('hidden');
+        selectedIframeElement = null;
+    }
+}
+
+function handleIframeMessage(event) {
+    // Note: ensure the message is from your iframe, not a third-party script
+    if (event.source !== previewContainer.contentWindow) return;
+
+    const { type, payload, nodeId, level } = event.data;
+
+    switch (type) {
+        case 'vibe-element-select':
+            if (nodeId) {
+                const node = findNodeById(nodeId);
+                if (node) {
+                    selectedIframeElement = nodeId;
+                    populateElementTools(node);
+                    previewContainer.contentWindow.postMessage({type: 'highlight-node', nodeId}, '*');
+                }
+            }
+            break;
+        case 'iframe-console':
+            const msg = payload.map(p => typeof p === 'object' ? JSON.stringify(p) : p).join(' ');
+            consoleOutput.textContent += `[${level}] ${msg}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            break;
+    }
+}
+
+function findNodeById(id, node = vibeTree) {
+    if (!node) return null;
+    if (node.id === id) return node;
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findNodeById(id, child);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function updateNodeCode(nodeId, newCode) {
+    const node = findNodeById(nodeId);
+    if (node) {
+        node.code = newCode;
+        applyVibes(); // Re-render to reflect changes
+    }
+}
+
+function populateElementTools(node) {
+    elementToolsPlaceholder.classList.add('hidden');
+    elementToolsControls.classList.remove('hidden');
+
+    // Create a temporary element to parse the node's code
+    const tempEl = document.createElement('div');
+    tempEl.innerHTML = node.code;
+    const el = tempEl.firstElementChild;
+    if (!el) return;
+
+    toolTextContent.value = el.textContent;
+    toolWidth.value = el.style.width || '';
+    toolHeight.value = el.style.height || '';
+    toolBgColor.value = rgbToHex(el.style.backgroundColor) || '#ffffff';
+    toolTextColor.value = rgbToHex(el.style.color) || '#000000';
+    toolFontSize.value = el.style.fontSize || '';
+
+    // Contextual tools
+    contextToolsContainer.innerHTML = '';
+    const tagName = el.tagName.toLowerCase();
+    if (tagName === 'img') {
+        contextToolsContainer.innerHTML = `
+            <div class="tool-group-title">Image</div>
+            <label for="tool-src">Source (src)</label><input type="text" id="tool-src" value="${el.getAttribute('src') || ''}">
+            <label for="tool-alt">Alt Text</label><input type="text" id="tool-alt" value="${el.getAttribute('alt') || ''}">
+        `;
+    } else if (tagName === 'a') {
+        contextToolsContainer.innerHTML = `
+            <div class="tool-group-title">Link</div>
+            <label for="tool-href">URL (href)</label><input type="text" id="tool-href" value="${el.getAttribute('href') || ''}">
+        `;
+    }
+}
+
+function applyToolChanges() {
+    if (!selectedIframeElement) return;
+    const node = findNodeById(selectedIframeElement);
+    if (!node) return;
+
+    const tempEl = document.createElement('div');
+    tempEl.innerHTML = node.code;
+    const el = tempEl.firstElementChild;
+    if (!el) return;
+    
+    // Apply changes
+    el.textContent = toolTextContent.value;
+    el.style.width = toolWidth.value;
+    el.style.height = toolHeight.value;
+    el.style.backgroundColor = toolBgColor.value;
+    el.style.color = toolTextColor.value;
+    el.style.fontSize = toolFontSize.value;
+
+    const tagName = el.tagName.toLowerCase();
+    if (tagName === 'img') {
+        const srcInput = document.getElementById('tool-src');
+        const altInput = document.getElementById('tool-alt');
+        if (srcInput) el.setAttribute('src', srcInput.value);
+        if (altInput) el.setAttribute('alt', altInput.value);
+    } else if (tagName === 'a') {
+        const hrefInput = document.getElementById('tool-href');
+        if (hrefInput) el.setAttribute('href', hrefInput.value);
+    }
+
+    updateNodeCode(selectedIframeElement, el.outerHTML);
+}
+
+function handleDeleteElement() {
+    if (!selectedIframeElement) return;
+    if (!confirm('Are you sure you want to delete this element?')) return;
+    
+    function findAndRemoveNode(id, parent) {
+        if (!parent || !parent.children) return false;
+        const index = parent.children.findIndex(child => child.id === id);
+        if (index > -1) {
+            parent.children.splice(index, 1);
+            return true;
+        }
+        for (const child of parent.children) {
+            if (findAndRemoveNode(id, child)) return true;
+        }
+        return false;
+    }
+
+    if (findAndRemoveNode(selectedIframeElement, vibeTree)) {
+        applyVibes();
+        elementToolsPlaceholder.classList.remove('hidden');
+        elementToolsControls.classList.add('hidden');
+        selectedIframeElement = null;
+    }
+}
+
+// Helper to convert rgb() to hex
+function rgbToHex(rgb) {
+    if (!rgb || !rgb.startsWith('rgb')) return rgb;
+    const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+    return result ? "#" +
+      ("0" + parseInt(result[1], 10).toString(16)).slice(-2) +
+      ("0" + parseInt(result[2], 10).toString(16)).slice(-2) +
+      ("0" + parseInt(result[3], 10).toString(16)).slice(-2) : rgb;
+}
+
+// --- AI FEATURES LOGIC ---
+async function handleAiGenerate() {
+    const prompt = aiGeneratePrompt.value.trim();
+    if (!prompt) {
+        alert("Please enter a description for your website.");
+        return;
+    }
+    aiGenerateButton.disabled = true;
+    aiGenerateButton.textContent = 'Generating...';
+    try {
+        const systemPrompt = `You are an expert system that designs a complete website component hierarchy based on a high-level description. Your task is to generate a valid JSON "vibe tree" that represents the entire website structure.
+        The root object must be a "container" node with id "whole-page". Children can be 'head', 'html', 'css', 'javascript'. HTML nodes can have nested children. Each node must have id, type, description, and code. Your output MUST be ONLY the raw JSON object.`;
+        const userPrompt = `Generate the vibe tree for the following website: ${prompt}`;
+        
+        const rawResponse = await callAI(systemPrompt, userPrompt);
+        let parsedResponse;
+        try {
+            const jsonText = rawResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)[1];
+            parsedResponse = JSON.parse(jsonText);
+        } catch (e) {
+            parsedResponse = JSON.parse(rawResponse);
+        }
+
+        vibeTree = parsedResponse;
+        currentProjectId = prompt.toLowerCase().replace(/\s+/g, '-').slice(0, 20);
+        applyVibes();
+        updateSaveButtonStates();
+        
+    } catch (e) {
+        console.error("AI Generation failed:", e);
+        alert(`AI Generation failed: ${e.message}`);
+    } finally {
+        aiGenerateButton.disabled = false;
+        aiGenerateButton.textContent = 'Generate with AI';
+    }
+}
+
+function openAiEditModal() {
+    aiEditModal.style.display = 'block';
+    aiEditPrompt.focus();
+}
+
+async function handleAiGlobalEdit() {
+    const prompt = aiEditPrompt.value.trim();
+    if(!prompt) return;
+    aiEditExecute.disabled = true;
+    aiEditExecute.textContent = 'Executing...';
+    try {
+        const systemPrompt = `You are an AI developer modifying a website's structure. You will receive the current "vibe tree" JSON and a user request. Return the NEW, COMPLETE vibe tree JSON that incorporates the changes. Your output MUST be ONLY the raw JSON object.`;
+        const userPrompt = `Request: "${prompt}"\n\nCurrent Vibe Tree:\n${JSON.stringify(vibeTree)}`;
+        
+        const rawResponse = await callAI(systemPrompt, userPrompt);
+        let parsedResponse;
+        try {
+            const jsonText = rawResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/)[1];
+            parsedResponse = JSON.parse(jsonText);
+        } catch (e) {
+            parsedResponse = JSON.parse(rawResponse);
+        }
+
+        vibeTree = parsedResponse;
+        applyVibes();
+        aiEditModal.style.display = 'none';
+        
+    } catch(e) {
+        alert(`AI Edit Failed: ${e.message}`);
+    } finally {
+        aiEditExecute.disabled = false;
+        aiEditExecute.textContent = 'Execute Changes';
+    }
+}
+
+async function handleAiChat() {
+    const userMessage = aiChatInput.value.trim();
+    if(!userMessage) return;
+    
+    aiChatInput.value = '';
+    appendChatMessage(userMessage, 'user');
+    
+    try {
+        const systemPrompt = "You are a helpful AI pair programmer. The user will ask you questions about their website code. Use the provided code context to give accurate answers.";
+        const codeContext = generateFullCodeString(vibeTree);
+        const userPrompt = `User question: "${userMessage}"\n\nFull website code for context:\n\`\`\`html\n${codeContext}\n\`\`\``;
+
+        const aiResponse = await callAI(systemPrompt, userPrompt);
+        appendChatMessage(aiResponse, 'ai');
+    } catch (e) {
+        appendChatMessage(`Sorry, I encountered an error: ${e.message}`, 'ai');
+    }
+}
+
+function appendChatMessage(message, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-message ${sender}`;
+    msgDiv.textContent = message;
+    aiChatMessages.appendChild(msgDiv);
+    aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+}
+
+// --- DOWNLOAD AND CODE REVIEW ---
+function handleDownloadProject() {
+    codeReviewModal.style.display = 'block';
+    const fullCode = generateFullCodeString(vibeTree);
+    if (!codeEditor) {
+        codeEditor = ace.edit("code-review-editor");
+        codeEditor.setTheme("ace/theme/tomorrow_night");
+        codeEditor.session.setMode("ace/mode/html");
+    }
+    codeEditor.setValue(fullCode, -1);
+}
+
+function handleFixPaths() {
+    let code = codeEditor.getValue();
+    // This regex looks for src="/..." or href="/..." and removes the leading slash
+    const updatedCode = code.replace(/(src|href)=["']\/([^"']+)["']/g, '$1="$2"');
+    codeEditor.setValue(updatedCode, -1);
+    alert('Leading slashes removed from paths.');
+}
+
+function handleConfirmDownload() {
+    const code = codeEditor.getValue();
+    if (currentZip) {
+        // Multi-file project, download as zip
+        const zip = new JSZip();
+        currentProjectFiles.forEach((content, path) => {
+            // Update index.html with the potentially modified version
+            if(path.endsWith('index.html') || path.endsWith('index.htm')) {
+                zip.file(path, code);
+            } else {
+                zip.file(path, content);
+            }
+        });
+        zip.generateAsync({type:"blob"}).then(function(content) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `${currentProjectId || 'project'}.zip`;
+            link.click();
+        });
+    } else {
+        // Single file project
+        const blob = new Blob([code], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${currentProjectId || 'page'}.html`;
+        link.click();
+    }
+}
+
+
+// --- EVENT LISTENERS ---
+function setupEventListeners() {
+    // Layout
+    sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    mainContentArea.addEventListener('click', () => sidebar.classList.remove('open'));
+    viewToggle.addEventListener('click', () => {
+        playgroundView.classList.toggle('active');
+        codeExplorerView.classList.toggle('active');
+    });
+
+    // Sidebar
+    aiGenerateButton.addEventListener('click', handleAiGenerate);
+    aiEditWebsiteButton.addEventListener('click', openAiEditModal);
+    browseButton.addEventListener('click', () => {
+        // A bit of a hack to allow selecting either file type
+        htmlFileInput.value = '';
+        zipFileInput.value = '';
+        htmlFileInput.click();
+    });
+    htmlFileInput.addEventListener('change', (e) => e.target.files[0] && handleFileUpload(e.target.files[0]));
+    zipFileInput.addEventListener('change', (e) => e.target.files[0] && handleZipUpload(e.target.files[0]));
+    
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file.name.endsWith('.html')) handleFileUpload(file);
+        else if (file.name.endsWith('.zip')) handleZipUpload(file);
+        else alert('Please drop a .html or .zip file.');
+    });
+
+    componentTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            componentTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const targetPanel = tab.dataset.tab;
+            componentPanels.forEach(p => p.classList.toggle('active', p.dataset.panel === targetPanel));
+        });
+    });
+
+    // Element Tools listeners
+    [toolTextContent, toolWidth, toolHeight, toolFontSize].forEach(input => {
+        input.addEventListener('change', applyToolChanges);
+    });
+    [toolBgColor, toolTextColor].forEach(input => {
+        input.addEventListener('input', applyToolChanges);
+    });
+    contextToolsContainer.addEventListener('change', applyToolChanges);
+    deleteElementButton.addEventListener('click', handleDeleteElement);
+
+    // Project Saving
+    saveToLocalButton.addEventListener('click', handleSaveToLocal);
+    
+    // Settings
+    saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
+
+    // Floating buttons
+    editModeToggle.addEventListener('click', toggleEditMode);
+    aiChatBubble.addEventListener('click', () => aiChatWindow.classList.toggle('open'));
+    aiChatSend.addEventListener('click', handleAiChat);
+    aiChatInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleAiChat());
+
+    // Modals
+    modalCloses.forEach(btn => btn.addEventListener('click', () => {
+        document.getElementById(btn.dataset.modal).style.display = 'none';
+    }));
+    aiEditExecute.addEventListener('click', handleAiGlobalEdit);
+    downloadProjectButton.addEventListener('click', handleDownloadProject);
+    fixPathsButton.addEventListener('click', handleFixPaths);
+    downloadConfirmButton.addEventListener('click', handleConfirmDownload);
+    
+    // Window-level listeners
+    window.addEventListener('message', handleIframeMessage);
+}
+
+// --- INITIALIZATION ---
+function init() {
+    console.log("Web Code Explorer Initializing...");
+    initializeApiSettings();
+    setupEventListeners();
+    populateProjectList();
+    applyVibes(); // Render initial empty project
+    updateSaveButtonStates();
+    console.log("Initialization Complete.");
+}
+
+init();
+
+</script>
+</body>
+</html>
