@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -435,16 +436,16 @@
                         <div id="code" class="tab-content">
                             <div class="full-code-container">
                                 <h2>Vibe</h2>
-                                <p>Edit the code below and click "Process Code" to have the AI analyze it and update the Vibe Editor nodes.</p>
+                                <p>Edit the code below and click "Update Vibe Tree from Code" to have the AI analyze it and generate the visual editor nodes.</p>
                                 <div class="file-upload-container">
-                                    <p>Or, upload an HTML file to start a new project:</p>
+                                    <p>Or, upload an HTML file to load it into the editor.</p>
                                     <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
-                                    <button id="upload-html-button" class="action-button">Upload & Process File</button>
+                                    <button id="upload-html-button" class="action-button">Upload HTML File</button>
                                 </div>
                                 <div class="file-upload-container">
-                                    <p>Upload a ZIP of a multi-file website (HTML, CSS, JS, images). We'll inline CSS/JS and re-link assets automatically.</p>
+                                    <p>Upload a ZIP of a multi-file website. We'll combine and load the code into the editor below.</p>
                                     <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
-                                    <button id="upload-zip-button" class="action-button">Upload ZIP & Import Project</button>
+                                    <button id="upload-zip-button" class="action-button">Upload ZIP Project</button>
                                 </div>
                                 <div class="file-upload-container">
                                     <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
@@ -457,7 +458,7 @@
                                     <span id="search-results-count"></span>
                                 </div>
                                 <textarea id="full-code-editor"></textarea>
-                                <button id="update-tree-from-code-button" class="action-button">Process Code and Update Nodes</button>
+                                <button id="update-tree-from-code-button" class="action-button">Update Vibe Tree from Code</button>
                             </div>
                         </div>
                         <!-- END OF CHANGE -->
