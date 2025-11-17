@@ -125,7 +125,6 @@
                 <!-- Content Area -->
                 <div class="col py-3">
                     <div class="main-toolbar d-flex justify-content-end align-items-start">
-                        <!-- START OF CHANGE: Replaced single Save button with two specific buttons -->
                         <div class="btn-group me-2" role="group" aria-label="Save actions">
                             <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
                                 <i class="bi bi-cloud-arrow-up"></i>
@@ -133,8 +132,12 @@
                             <button class="btn btn-secondary" type="button" id="save-to-local-button" disabled title="Save to Local Storage">
                                 <i class="bi bi-hdd"></i>
                             </button>
+                            <!-- START GITHUB CHANGE -->
+                            <button class="btn btn-dark" type="button" id="save-to-github-button" disabled title="Save to GitHub">
+                                <i class="bi bi-github"></i>
+                            </button>
+                            <!-- END GITHUB CHANGE -->
                         </div>
-                        <!-- END OF CHANGE -->
                         <div class="dropdown">
                             <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
                                 <i class="bi bi-three-dots-vertical"></i>
@@ -167,7 +170,6 @@
                     </div>
 
                     <div class="tab-content-area">
-                        <!-- START OF CHANGE: Added "Vibe" title to all tabs -->
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
                                 <div class="start-header d-flex justify-content-between align-items-center">
@@ -175,9 +177,7 @@
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
                                 </div>
                                 
-                                <!-- Replaced static sections with a collapsible accordion -->
                                 <div class="accordion" id="start-page-accordion">
-                                    <!-- Your Projects Section -->
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="headingProjects">
                                             <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProjects" aria-expanded="true" aria-controls="collapseProjects">
@@ -199,8 +199,32 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <!-- Create New Project Section -->
+                                    <!-- START GITHUB CHANGE: Add GitHub Load Section -->
+                                    <div class="accordion-item" id="github-load-container" style="display: none;">
+                                        <h2 class="accordion-header" id="headingGithub">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGithub" aria-expanded="false" aria-controls="collapseGithub">
+                                                Load from GitHub
+                                            </button>
+                                        </h2>
+                                        <div id="collapseGithub" class="accordion-collapse collapse" aria-labelledby="headingGithub" data-bs-parent="#start-page-accordion">
+                                            <div class="accordion-body">
+                                                <div class="form-group">
+                                                    <label for="github-repo-select">Repository</label>
+                                                    <select id="github-repo-select" class="form-select">
+                                                        <option>-- Connect to GitHub in Settings --</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="github-branch-select">Branch</label>
+                                                    <select id="github-branch-select" class="form-select">
+                                                        <option>-- Select a Repo First --</option>
+                                                    </select>
+                                                </div>
+                                                <button id="load-from-github-button" class="action-button primary"><i class="bi bi-github me-2"></i>Load Project</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- END GITHUB CHANGE -->
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="headingNewProject">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewProject" aria-expanded="false" aria-controls="collapseNewProject">
@@ -209,7 +233,6 @@
                                         </h2>
                                         <div id="collapseNewProject" class="accordion-collapse collapse" aria-labelledby="headingNewProject" data-bs-parent="#start-page-accordion">
                                             <div class="accordion-body">
-                                                <!-- START OF CHANGE: Simplified and cleaned up the new project form -->
                                                 <div class="new-project-form">
                                                     <div class="form-group">
                                                         <label for="new-project-id-input">Project Name</label>
@@ -247,7 +270,6 @@
                                                         <button id="generate-from-instructions-button" class="action-button primary"><i class="bi bi-diagram-2 me-2"></i>Generate from Instructions</button>
                                                     </div>
                                                 </div>
-                                                <!-- END OF CHANGE -->
                                             </div>
                                         </div>
                                     </div>
@@ -289,43 +311,7 @@
                                         <button id="open-settings-modal-button" class="action-button">API Settings</button>
                                     </div>
                                 </div>
-                                <div id="vibe-editor">
-                                <!-- Example of the new Vibe Node structure with an options dropdown menu. -->
-                                <!-- Your JavaScript should generate nodes based on this template. -->
-                                <!--
-                                <div class="vibe-node" data-node-id="example-node">
-                                    <div class="vibe-node-header">
-                                        <span class="drag-handle bi bi-grip-vertical"></span>
-                                        <span class="id">example-node</span>
-                                        <span class="type">HTML</span>
-                                        <button class="collapse-toggle" aria-expanded="true" title="Collapse/Expand">
-                                            <i class="bi bi-chevron-down"></i>
-                                        </button>
-                                        
-                                        <div class="vibe-node-options dropdown ms-auto">
-                                            <button class="btn btn-sm btn-ghost" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Options">
-                                                <i class="bi bi-three-dots-vertical"></i>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-dark">
-                                                <li><button class="dropdown-item" type="button" data-action="edit"><i class="bi bi-pencil me-2"></i>Edit Details & Code</button></li>
-                                                <li><button class="dropdown-item" type="button" data-action="ai-command"><i class="bi bi-robot me-2"></i>AI Command...</button></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><button class="dropdown-item" type="button" data-action="add-child-inside"><i class="bi bi-plus-lg me-2"></i>Add Child Inside</button></li>
-                                                <li><button class="dropdown-item" type="button" data-action="add-sibling-above"><i class="bi bi-arrow-up me-2"></i>Add Sibling Above</button></li>
-                                                <li><button class="dropdown-item" type="button" data-action="add-sibling-below"><i class="bi bi-arrow-down me-2"></i>Add Sibling Below</button></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><button class="dropdown-item text-danger" type="button" data-action="delete"><i class="bi bi-trash me-2"></i>Delete Node</button></li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    <div class="vibe-node-content">
-                                        <textarea class="description-input" placeholder="A concise description of this component..."></textarea>
-                                        <div class="children">
-                                        </div>
-                                    </div>
-                                </div>
-                                -->
-                                </div>
+                                <div id="vibe-editor"></div>
                             </div>
                         </div>
                         <div id="agent" class="tab-content">
@@ -436,21 +422,23 @@
                         <div id="code" class="tab-content">
                             <div class="full-code-container">
                                 <h2>Vibe</h2>
-                                <p>Edit the code below and click "Update Vibe Tree from Code" to have the AI analyze it and generate the visual editor nodes.</p>
-                                <div class="file-upload-container">
-                                    <p>Or, upload an HTML file to load it into the editor.</p>
-                                    <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
-                                    <button id="upload-html-button" class="action-button">Upload HTML File</button>
+                                <div class="file-io-section">
+                                    <div class="file-upload-container">
+                                        <p>Load a single HTML file into the editor.</p>
+                                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
+                                        <button id="upload-html-button" class="action-button"><i class="bi bi-file-earmark-code"></i> Upload HTML</button>
+                                    </div>
+                                    <div class="file-upload-container">
+                                        <p>Load a full website from a ZIP file.</p>
+                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
+                                        <button id="upload-zip-button" class="action-button"><i class="bi bi-file-earmark-zip"></i> Upload ZIP</button>
+                                    </div>
+                                    <div class="file-upload-container">
+                                        <p>Download your current project as a ZIP.</p>
+                                        <button id="download-zip-button" class="action-button"><i class="bi bi-download"></i> Download ZIP</button>
+                                    </div>
                                 </div>
-                                <div class="file-upload-container">
-                                    <p>Upload a ZIP of a multi-file website. We'll combine and load the code into the editor below.</p>
-                                    <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
-                                    <button id="upload-zip-button" class="action-button">Upload ZIP Project</button>
-                                </div>
-                                <div class="file-upload-container">
-                                    <p>Download your current project as a multi-file ZIP (including a self-contained bundle.html).</p>
-                                    <button id="download-zip-button" class="action-button">Download Project ZIP</button>
-                                </div>
+                                <hr/>
                                 <div class="search-container">
                                     <input type="text" id="search-input" placeholder="Find in code...">
                                     <button id="find-prev-button" class="action-button">&lt; Prev</button>
@@ -458,10 +446,19 @@
                                     <span id="search-results-count"></span>
                                 </div>
                                 <textarea id="full-code-editor"></textarea>
-                                <button id="update-tree-from-code-button" class="action-button">Update Vibe Tree from Code</button>
+                                <div class="full-code-actions">
+                                    <button id="update-tree-from-code-button" class="action-button">
+                                        <i class="bi bi-arrow-clockwise"></i> Update from Code
+                                    </button>
+                                    <div class="ai-prompt-container">
+                                        <input type="text" id="full-code-ai-prompt" placeholder="Select code and describe your change..."/>
+                                        <button id="run-full-code-ai-button" class="action-button primary ai-powered-button">
+                                            <i class="bi bi-stars"></i> Update with AI
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- END OF CHANGE -->
                     </div>
                 </div>
             </div>
@@ -519,7 +516,7 @@
     <div id="settings-modal" class="modal">
         <div class="modal-content">
             <span class="close-button" id="close-settings-modal-button">&times;</span>
-            <h2>API Settings</h2>
+            <h2>Settings</h2>
             <div class="ai-provider-container">
                 <h3>AI Provider</h3>
                 <select id="ai-provider-select">
@@ -533,12 +530,6 @@
                     <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Fast, Default)</option>
                     <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Advanced)</option>
                     <option value="gemini-1.0-pro">Gemini 1.0 Pro (Legacy)</option>
-                    <optgroup label="Advanced & Experimental Models">
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                    </optgroup>
                  </select>
                 <div id="gemini-api-key-container" class="api-key-container">
                     <h3>Gemini API Key</h3>
@@ -553,6 +544,19 @@
                 <button id="save-nscale-api-key-button">Save Key</button>
                 <div id="nscale-api-key-status"></div>
             </div>
+            <!-- START GITHUB CHANGE: Add GitHub Settings -->
+            <hr>
+            <div id="github-settings-container" class="api-key-container">
+                <h3>GitHub Integration</h3>
+                <div id="github-pat-form">
+                    <label for="github-pat-input">Personal Access Token (repo scope)</label>
+                    <input type="password" id="github-pat-input" placeholder="ghp_...">
+                    <button id="save-github-pat-button">Connect to GitHub</button>
+                </div>
+                <div id="github-status"></div>
+                <button id="logout-github-button" style="display:none;">Disconnect from GitHub</button>
+            </div>
+            <!-- END GITHUB CHANGE -->
         </div>
     </div>
 
@@ -664,7 +668,6 @@
         </div>
     </div>
 
-    <!-- START OF FIX: Added missing AI-Generated Controls Modal -->
     <div id="ai-controls-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -682,7 +685,6 @@
             </div>
         </div>
     </div>
-    <!-- END OF FIX -->
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
