@@ -1,410 +1,304 @@
 
 :root {
-    /* --- Color Palette: Deep Slate & Violet --- */
-    --bg-app: #0f172a;       /* Main background (very dark slate) */
-    --bg-panel: #1e293b;     /* Sidebar/Panel background */
-    --bg-card: #1e293b;      /* Card background */
-    --bg-input: #334155;     /* Input field background */
-    --bg-hover: #334155;     /* Hover state */
-    
-    --border-color: #334155; /* Subtle border */
+    /* --- Color Palette --- */
+    --bg-app: #0f172a;       
+    --bg-panel: #1e293b;     
+    --bg-input: #334155;     
+    --border-color: #334155; 
     --border-active: #64748b;
-    
-    --accent-primary: #8b5cf6;   /* Violet */
-    --accent-hover: #7c3aed;     /* Darker Violet */
-    --accent-secondary: #6366f1; /* Indigo */
-    
-    --text-main: #f1f5f9;        /* White-ish */
-    --text-muted: #94a3b8;       /* Gray text */
-    
-    --success: #10b981;
+    --accent-primary: #8b5cf6;   
+    --accent-hover: #7c3aed;     
+    --accent-secondary: #6366f1; 
+    --text-main: #f1f5f9;        
+    --text-muted: #94a3b8;       
     --danger: #ef4444;
-    --warning: #f59e0b;
-    
-    /* --- Typography --- */
-    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-code: 'JetBrains Mono', 'Roboto Mono', monospace;
-    
-    /* --- Spacing & Radius --- */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
+    
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-code: 'JetBrains Mono', 'Roboto Mono', monospace;
 }
 
-/* --- Global Reset & Base --- */
+/* --- Global Layout --- */
 body {
     background-color: var(--bg-app);
     color: var(--text-main);
     font-family: var(--font-ui);
-    overflow: hidden; /* App-like feel, prevent body scroll */
+    overflow: hidden; /* Prevent body scroll, use tab-content-area instead */
 }
 
-a { text-decoration: none; color: var(--accent-secondary); }
-a:hover { color: var(--accent-primary); }
-
-/* --- Custom Scrollbar --- */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: var(--bg-app); }
-::-webkit-scrollbar-thumb {
-    background: #475569;
-    border-radius: 5px;
-    border: 2px solid var(--bg-app);
-}
-::-webkit-scrollbar-thumb:hover { background: #64748b; }
-
-/* --- Sidebar Overrides (Bootstrap corrections) --- */
-.bg-dark {
-    background-color: var(--bg-panel) !important;
+/* --- Sidebar --- */
+.sidebar-container {
+    background-color: var(--bg-panel);
     border-right: 1px solid var(--border-color);
+    height: 100vh;
+    z-index: 10;
 }
-
 .nav-link.tab-button {
     color: var(--text-muted);
     border-radius: var(--radius-md);
     margin-bottom: 8px;
-    transition: all 0.2s ease;
+    transition: 0.2s;
 }
-
-.nav-link.tab-button:hover {
-    background-color: rgba(255,255,255,0.05);
-    color: var(--text-main);
-}
-
+.nav-link.tab-button:hover { background: rgba(255,255,255,0.05); color: white; }
 .nav-link.tab-button.active {
     background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
     color: white;
     box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
 }
 
-/* --- Main Content Area --- */
+/* --- Content Area & Scrolling Fix --- */
 .tab-content-area {
-    height: calc(100vh - 60px); /* Adjust based on header/toolbar */
-    overflow-y: auto;
+    /* Occupy remaining height below toolbar */
+    height: calc(100vh - 60px); 
     position: relative;
-    padding: 0;
+    background-color: var(--bg-app);
+    overflow: hidden; /* Inner tabs handle scrolling */
 }
 
 .tab-content {
     display: none;
     height: 100%;
     padding: 20px;
-    animation: fadeEffect 0.2s ease;
+    overflow-y: auto; /* CRITICAL: Allows scrolling within each tab */
+    box-sizing: border-box;
 }
-
 .tab-content.active { display: block; }
 
-@keyframes fadeEffect {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+/* --- Start Page Specifics --- */
+.start-page-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding-bottom: 50px; /* Extra space at bottom for scrolling */
 }
 
-/* --- Typography Headers --- */
-h1, h2, h3, h4, h5 {
-    font-weight: 600;
-    color: var(--text-main);
-    letter-spacing: -0.02em;
-}
-
-/* --- Buttons --- */
-.action-button, .btn-primary, .btn-secondary, .btn-dark {
-    border: 1px solid var(--border-color);
-    background-color: var(--bg-input);
-    color: var(--text-main);
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.action-button:hover {
-    background-color: var(--border-active);
-    border-color: var(--border-active);
-    color: white;
-}
-
-.action-button.primary, .btn-primary {
-    background-color: var(--accent-primary);
-    border-color: var(--accent-primary);
-    color: white;
-}
-
-.action-button.primary:hover, .btn-primary:hover {
-    background-color: var(--accent-hover);
-    box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
-}
-
-.action-button.danger {
-    color: var(--danger);
-    border-color: rgba(239, 68, 68, 0.3);
-    background: rgba(239, 68, 68, 0.1);
-}
-.action-button.danger:hover {
-    background: var(--danger);
-    color: white;
-}
-
-/* --- Inputs & Textareas --- */
-input, textarea, select, .form-control, .form-select {
-    background-color: var(--bg-app) !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-main) !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 10px;
-    font-family: var(--font-ui);
-}
-
-input:focus, textarea:focus, select:focus {
-    outline: none;
-    border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
-}
-
-textarea {
-    font-family: var(--font-code);
-    font-size: 0.9rem;
-}
-
-/* --- Start Page Styling --- */
 .accordion-item {
     background-color: var(--bg-panel);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
-
 .accordion-button {
     background-color: var(--bg-panel);
     color: var(--text-main);
     font-weight: 600;
     box-shadow: none !important;
 }
-
 .accordion-button:not(.collapsed) {
-    background-color: rgba(139, 92, 246, 0.1);
     color: var(--accent-primary);
+    background-color: rgba(139, 92, 246, 0.1);
 }
-
 .accordion-body {
-    background-color: rgba(15, 23, 42, 0.5); /* Darker inner */
-    border-top: 1px solid var(--border-color);
+    background-color: rgba(15, 23, 42, 0.5);
 }
 
-.project-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--bg-input);
-    padding: 12px;
-    border-radius: var(--radius-sm);
-    margin-bottom: 8px;
-    border-left: 3px solid var(--accent-primary);
+/* --- VIBE EDITOR STYLING (Fixed) --- */
+#vibe-editor {
+    padding-bottom: 100px;
 }
 
-/* --- Vibe Editor Nodes (The Tree) --- */
 .vibe-node {
     background-color: var(--bg-panel);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
-    padding: 0; /* Header handles padding */
+    overflow: hidden; /* Keep children contained */
     transition: border-color 0.2s;
-    overflow: hidden;
 }
 
 .vibe-node:hover {
     border-color: var(--border-active);
 }
 
-.vibe-node.ai-search-highlight {
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
-}
-
+/* Header: The bar you click to open the node details */
 .vibe-node-header {
     padding: 10px 15px;
-    background: rgba(255,255,255,0.02);
+    background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid transparent;
     display: flex;
     align-items: center;
     cursor: pointer;
+    user-select: none;
 }
 
-.vibe-node:not(.collapsed) .vibe-node-header {
+/* If node is NOT collapsed (details visible), show border separator */
+.vibe-node:not(.collapsed) > .vibe-node-header {
     border-bottom-color: var(--border-color);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.vibe-node-header .id {
+    font-family: var(--font-code);
+    font-weight: 600;
+    color: var(--accent-secondary);
+    margin-left: 8px;
 }
 
 .vibe-node-header .type {
-    font-family: var(--font-code);
+    margin-left: auto;
     font-size: 0.75rem;
+    text-transform: uppercase;
     background: var(--bg-app);
     padding: 2px 6px;
     border-radius: 4px;
-    color: var(--accent-secondary);
     border: 1px solid var(--border-color);
-    text-transform: uppercase;
-    margin-left: auto;
-}
-
-.vibe-node-content {
-    padding: 15px;
-}
-
-.vibe-node .children {
-    padding: 10px 10px 10px 25px;
-    border-left: 2px solid var(--border-color);
-    background: rgba(0,0,0,0.1);
-}
-
-/* --- Code Editor Areas --- */
-#full-code-editor, #live-code-output {
-    font-family: var(--font-code);
-    background-color: #0d1117; /* GitHub Dark Dimmed bg */
-    color: #c9d1d9;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    line-height: 1.5;
-}
-
-/* --- Modals (Glassmorphism) --- */
-.modal {
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(5px);
-}
-
-.modal-content {
-    background-color: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    color: var(--text-main);
-}
-
-.close-button {
     color: var(--text-muted);
-    opacity: 0.7;
-    transition: 0.2s;
-}
-.close-button:hover { opacity: 1; color: var(--text-main); }
-
-/* --- Chat & Agent Interface --- */
-.chat-container, .agent-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
 }
 
-#chat-output, #agent-output {
-    flex-grow: 1;
-    background: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 20px;
-    margin-bottom: 15px;
-    overflow-y: auto;
+/* Drag Handle */
+.drag-handle {
+    color: var(--text-muted);
+    cursor: grab;
+    margin-right: 5px;
 }
 
-.chat-message, .agent-message {
-    padding: 12px;
-    border-radius: var(--radius-md);
-    margin-bottom: 10px;
-    max-width: 85%;
-    line-height: 1.5;
-}
-
-.log-type-user {
-    background-color: var(--accent-primary);
-    color: white;
-    align-self: flex-end;
-    margin-left: auto;
-    border-bottom-right-radius: 2px;
-}
-
-.log-type-model, .log-type-info, .log-type-plan {
-    background-color: var(--bg-input);
-    color: var(--text-main);
-    align-self: flex-start;
-    border-bottom-left-radius: 2px;
-}
-
-.log-type-error {
-    background-color: rgba(239, 68, 68, 0.1);
-    color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-/* --- Console --- */
-#console-output {
-    background-color: #0d1117;
-    font-family: var(--font-code);
-    font-size: 0.85rem;
-    color: #c9d1d9;
-    padding: 10px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-}
-
-.console-message {
-    border-bottom: 1px solid #21262d;
-    padding: 4px 0;
-}
-.console-string { color: #a5d6ff; }
-.console-number { color: #79c0ff; }
-.console-boolean { color: #ff7b72; }
-.console-key { color: #d2a8ff; }
-
-/* --- Preview Iframe --- */
-#website-preview {
-    width: 100%;
-    height: 100%;
+/* Collapse Toggle Button (The Arrow) */
+.collapse-toggle {
+    background: none;
     border: none;
-    background: white;
-    border-radius: var(--radius-sm);
-}
-
-/* --- Files Tree --- */
-.files-tree {
-    background: var(--bg-panel);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 10px;
-    font-family: var(--font-code);
-    font-size: 0.9rem;
-}
-
-.files-preview {
-    background: #0d1117;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.collapse-toggle:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
 }
 
-/* --- Loading Spinner --- */
-.loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: white;
-    animation: spin 0.8s linear infinite;
-    display: inline-block;
-    vertical-align: middle;
+/* Node Content: The description box and buttons */
+.vibe-node-content {
+    padding: 15px;
+    background-color: var(--bg-panel);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 
-/* --- Utility Classes --- */
-.d-none { display: none !important; }
-.text-muted { color: var(--text-muted) !important; }
-.text-info { color: var(--accent-secondary) !important; }
+/* CRITICAL: Hide content when node is collapsed */
+.vibe-node.collapsed > .vibe-node-content {
+    display: none;
+}
 
-/* Toolbar Fixes */
+.description-input {
+    width: 100%;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    margin-bottom: 10px;
+    font-family: var(--font-ui);
+}
+.description-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* Button Group in Editor */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.button-group button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: 0.2s;
+}
+.button-group button:hover {
+    border-color: var(--accent-primary);
+    color: white;
+}
+.button-group .update-button {
+    background: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+    color: white;
+}
+.button-group .update-button:hover {
+    background: var(--accent-hover);
+}
+
+/* Child Nodes Container */
+.vibe-node .children {
+    padding: 10px;
+    margin-left: 20px; /* Indentation */
+    border-left: 2px solid var(--border-color);
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* CRITICAL: Hide children when toggle is clicked */
+.children.collapsed {
+    display: none;
+}
+
+/* --- Code Blocks --- */
+#full-code-editor, #live-code-output {
+    font-family: var(--font-code);
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    line-height: 1.5;
+    width: 100%;
+}
+
+/* --- Modals --- */
+.modal {
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 2000;
+}
+.modal-content {
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    color: var(--text-main);
+}
+
+/* --- Scrollbars --- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-app); }
+::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* --- Toolbar --- */
 .main-toolbar {
     background-color: var(--bg-app);
     border-bottom: 1px solid var(--border-color);
     padding: 10px 20px;
+}
+
+/* --- Inputs --- */
+input, select {
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+/* Controls Wrapper (generated controls) */
+.control-wrapper {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(0,0,0,0.2);
+    border-radius: var(--radius-sm);
+}
+.control-wrapper label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 5px;
 }
