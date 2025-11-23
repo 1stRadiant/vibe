@@ -1,0 +1,238 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen Image Edit - Full Demo</title>
+    <style>
+        /* CSS STYLES */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+            color: #1f2937;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 { margin-top: 0; color: #111827; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #374151; }
+        
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        
+        button {
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        button:hover { background-color: #4338ca; }
+        button:disabled { background-color: #a5b4fc; cursor: wait; }
+
+        /* STATUS LOGS */
+        .status-area {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            font-family: monospace;
+            font-size: 13px;
+            color: #4b5563;
+            min-height: 40px;
+        }
+
+        /* ERROR BOX */
+        .error-box {
+            background-color: #fef2f2;
+            border: 1px solid #f87171;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .error-title { font-weight: bold; display: block; margin-bottom: 5px; }
+
+        /* RESULT IMAGE */
+        .result-area {
+            margin-top: 30px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+            display: none;
+            text-align: center;
+        }
+        .result-area img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Qwen Image Edit</h1>
+    
+    <!-- INPUTS -->
+    <div class="form-group">
+        <label for="imageInput">1. Upload Input Image</label>
+        <input type="file" id="imageInput" accept="image/*">
+    </div>
+
+    <div class="form-group">
+        <label for="promptInput">2. Edit Instruction</label>
+        <input type="text" id="promptInput" placeholder="e.g., Change the cat to a tiger">
+    </div>
+
+    <button id="generateBtn">Generate Edit</button>
+    
+    <!-- STATUS & LOGS -->
+    <div class="status-area" id="statusLog">Status: Ready</div>
+
+    <!-- ERROR DISPLAY -->
+    <div id="errorBox" class="error-box">
+        <span class="error-title">Error:</span>
+        <span id="errorMessage"></span>
+    </div>
+
+    <!-- RESULT DISPLAY -->
+    <div class="result-area" id="resultArea">
+        <label>Generated Result:</label><br><br>
+        <img id="outputImage" src="" alt="Generated Image">
+    </div>
+</div>
+
+<script type="module">
+    import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
+
+    // DOM Elements
+    const generateBtn = document.getElementById('generateBtn');
+    const errorBox = document.getElementById('errorBox');
+    const errorMessage = document.getElementById('errorMessage');
+    const resultArea = document.getElementById('resultArea');
+    const outputImage = document.getElementById('outputImage');
+    const statusLog = document.getElementById('statusLog');
+
+    // Helper functions for UI updates
+    function updateStatus(msg) {
+        statusLog.innerText = `> ${msg}`;
+        console.log(`[App Status] ${msg}`);
+    }
+
+    function showError(title, details) {
+        errorBox.style.display = "block";
+        errorMessage.innerHTML = `<strong>${title}</strong><br>${details}`;
+        updateStatus("Process failed.");
+    }
+
+    function clearUI() {
+        errorBox.style.display = "none";
+        errorMessage.innerText = "";
+        resultArea.style.display = "none";
+    }
+
+    generateBtn.addEventListener('click', async () => {
+        const fileInput = document.getElementById('imageInput').files[0];
+        const prompt = document.getElementById('promptInput').value;
+
+        // 1. Validation
+        clearUI();
+        if (!fileInput) { showError("Missing File", "Please select an image first."); return; }
+        if (!prompt) { showError("Missing Prompt", "Please enter an instruction."); return; }
+
+        try {
+            generateBtn.disabled = true;
+            
+            // 2. Connect to Space
+            // We use the specific URL provided
+            updateStatus("Connecting to Space (this may take 30s if sleeping)...");
+            
+            const app = await Client.connect("https://qwen-qwen-image-edit.hf.space/");
+
+            // 3. Inspect API (Optional Debugging)
+            // Use this to check if connection worked before uploading
+            const apiInfo = await app.view_api();
+            console.log("API Info:", apiInfo);
+
+            // 4. Send Prediction Request
+            updateStatus("Uploading image & Processing...");
+            
+            // Qwen-Image-Edit parameters: [image_blob, prompt, seed(opt), box(opt)]
+            const result = await app.predict("/predict", [
+                fileInput, 
+                prompt,
+                1234, // Optional Seed
+                0.6   // Optional Threshold
+            ]);
+
+            // 5. Handle Result
+            updateStatus("Processing response...");
+            
+            if (result.data && result.data[0]) {
+                // The API returns a file object, usually with a .url property
+                const imgData = result.data[0];
+                
+                if (imgData.url) {
+                    outputImage.src = imgData.url;
+                    resultArea.style.display = "block";
+                    updateStatus("Success! Image generated.");
+                } else {
+                    throw new Error("API returned data, but no image URL found.");
+                }
+            } else {
+                throw new Error("API returned empty data.");
+            }
+
+        } catch (error) {
+            console.error("Full Error Object:", error);
+            
+            let displayMsg = error.message;
+            
+            // Custom friendly error messages
+            if (displayMsg.includes("Failed to fetch")) {
+                displayMsg = "Connection refused. <br>1. Ensure you are running on localhost (not file://).<br>2. The Space might be restarting.";
+            }
+            else if (displayMsg.includes("GPU")) {
+                displayMsg = "The Space is currently busy or out of GPU quota.";
+            }
+
+            showError("An error occurred", displayMsg);
+        } finally {
+            generateBtn.disabled = false;
+            if(statusLog.innerText.includes("Success")) {
+                generateBtn.innerText = "Generate Another";
+            } else {
+                generateBtn.innerText = "Retry";
+            }
+        }
+    });
+</script>
+
+</body>
+  </html>
