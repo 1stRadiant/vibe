@@ -24,6 +24,8 @@
             padding: 0 !important; /* Override default tab padding for full height */
             height: 100vh;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .preview-layout-wrapper {
@@ -39,6 +41,7 @@
             flex-direction: column;
             overflow: hidden;
             min-height: 200px;
+            position: relative;
         }
 
         #preview-resizer {
@@ -49,7 +52,7 @@
             border-top: 1px solid #444;
             border-bottom: 1px solid #444;
             display: none; /* Hidden by default */
-            z-index: 10;
+            z-index: 100;
             position: relative;
             align-items: center;
             justify-content: center;
@@ -75,6 +78,7 @@
             display: flex;
             flex-direction: column;
             border-top: 1px solid #333;
+            transition: height 0.1s ease-out;
         }
         
         #explorer-panel.active {
@@ -301,7 +305,7 @@
                 </div>
 
                 <!-- Content Area -->
-                <div class="col py-3" style="height: 100vh; overflow: hidden;">
+                <div class="col py-3" style="height: 100vh; overflow: hidden; position: relative;">
                     <div class="main-toolbar d-flex justify-content-end align-items-start" style="position: absolute; right: 20px; top: 10px; z-index: 1000;">
                         <div class="btn-group me-2" role="group" aria-label="Save actions">
                             <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
@@ -472,7 +476,7 @@
                                             <i class="bi bi-bug me-1"></i> Enable Inspect
                                         </button>
                                     </div>
-                                    <iframe id="website-preview" title="Live Website Preview" style="width:100%; height: 100%; border:none; flex: 1;"></iframe>
+                                    <iframe id="website-preview" title="Live Website Preview" style="width:100%; height: 100%; border:none; flex: 1; background: #fff;"></iframe>
                                 </div>
                                 
                                 <!-- Resizer Handle -->
@@ -1148,6 +1152,7 @@
             _escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
         }
 
+        /* --- INTEGRATION LOGIC --- */
         document.addEventListener('DOMContentLoaded', () => {
             const previewIframe = document.getElementById('website-preview');
             const inspectBtn = document.getElementById('toggle-inspect-button');
@@ -1165,85 +1170,119 @@
                 }
             });
 
-            // 2. Toggle Logic
-            inspectBtn.addEventListener('click', () => {
-                isInspectActive = !isInspectActive;
+            // 2. Setup Interaction Logic (reusable)
+            const setupIframeInteraction = (iframe) => {
+                if (!isInspectActive) return;
                 
-                if (isInspectActive) {
-                    inspectBtn.classList.remove('btn-outline-info');
-                    inspectBtn.classList.add('btn-info');
-                    inspectBtn.innerHTML = '<i class="bi bi-bug-fill me-1"></i> Disable Inspect';
+                try {
+                    const doc = iframe.contentDocument;
+                    if (!doc) return;
                     
-                    resizer.style.display = 'flex';
-                    explorerPanel.classList.add('active');
-                    explorerPanel.style.height = '350px';
+                    // Prevent multiple attachments if possible, though robustness > speed here
+                    if (doc.hasAttachedVibeInspect) return;
+                    doc.hasAttachedVibeInspect = true;
 
-                    if (previewIframe.contentDocument) {
-                        injectInspectStyles(previewIframe.contentDocument);
-                        explorer.analyze(previewIframe.contentDocument);
+                    // Inject Styles
+                    if(!doc.getElementById('ce-injected-styles')) {
+                        const style = doc.createElement('style');
+                        style.id = 'ce-injected-styles';
+                        style.textContent = `
+                            .ce-highlight { 
+                                outline: 3px solid #0d6efd !important; 
+                                cursor: pointer !important;
+                                box-shadow: 0 0 10px rgba(13, 110, 253, 0.5);
+                                z-index: 2147483647;
+                            }
+                            body { cursor: default; }
+                        `;
+                        doc.head.appendChild(style);
                     }
-                } else {
-                    inspectBtn.classList.add('btn-outline-info');
-                    inspectBtn.classList.remove('btn-info');
-                    inspectBtn.innerHTML = '<i class="bi bi-bug me-1"></i> Enable Inspect';
-                    
-                    resizer.style.display = 'none';
-                    explorerPanel.classList.remove('active');
-                    explorerPanel.style.height = '0px';
-                    
-                    if (previewIframe.contentDocument) {
-                        const prev = previewIframe.contentDocument.querySelector('.ce-highlight');
-                        if(prev) prev.classList.remove('ce-highlight');
-                    }
-                }
-            });
 
-            // 3. Iframe Interaction
-            previewIframe.onload = () => {
-                if (isInspectActive) {
-                    injectInspectStyles(previewIframe.contentDocument);
-                    explorer.analyze(previewIframe.contentDocument);
-                }
-                
-                const doc = previewIframe.contentDocument;
-                if(doc) {
-                    doc.body.addEventListener('click', (e) => {
+                    // Run analysis
+                    explorer.analyze(doc);
+
+                    // Attach Listener to Document (captures everything)
+                    doc.addEventListener('click', (e) => {
                         if (!isInspectActive) return;
                         e.preventDefault();
                         e.stopPropagation();
 
+                        // Visual Highlight
                         const prev = doc.querySelector('.ce-highlight');
                         if(prev) prev.classList.remove('ce-highlight');
-                        e.target.classList.add('ce-highlight');
+                        
+                        let target = e.target;
+                        // Don't inspect the full body/html tags if clicked on empty space, annoying
+                        if (target.tagName === 'HTML') target = doc.body;
+                        
+                        target.classList.add('ce-highlight');
 
-                        explorer.inspectElement(e.target);
+                        // Send to Explorer
+                        explorer.inspectElement(target);
                     }, true);
+
+                    // Optional: Hover effect
+                     doc.addEventListener('mouseover', (e) => {
+                        if (!isInspectActive) return;
+                        e.stopPropagation();
+                        // Just change cursor, CSS handles the rest usually
+                        e.target.style.cursor = 'crosshair';
+                    }, true);
+
+                } catch (err) {
+                    console.warn("Vibe Code Explorer: Cannot access iframe content (likely cross-origin restriction).", err);
                 }
             };
 
-            function injectInspectStyles(doc) {
-                if(!doc.getElementById('ce-injected-styles')) {
-                    const style = doc.createElement('style');
-                    style.id = 'ce-injected-styles';
-                    style.textContent = `
-                        .ce-highlight { 
-                            outline: 3px solid #0d6efd !important; 
-                            cursor: pointer !important;
-                            position: relative;
-                            z-index: 9999;
-                        }
-                        body:hover * { cursor: crosshair; }
-                    `;
-                    doc.head.appendChild(style);
-                }
-            }
+            // 3. Toggle Logic
+            inspectBtn.addEventListener('click', () => {
+                isInspectActive = !isInspectActive;
+                
+                if (isInspectActive) {
+                    // Activate UI
+                    inspectBtn.classList.remove('btn-outline-info');
+                    inspectBtn.classList.add('btn-info');
+                    inspectBtn.innerHTML = '<i class="bi bi-bug-fill me-1"></i> Disable Inspect';
+                    resizer.style.display = 'flex';
+                    explorerPanel.classList.add('active');
+                    explorerPanel.style.height = '350px';
 
-            // 4. Resizer Logic
+                    // Attempt attachment immediately
+                    setupIframeInteraction(previewIframe);
+                } else {
+                    // Deactivate UI
+                    inspectBtn.classList.add('btn-outline-info');
+                    inspectBtn.classList.remove('btn-info');
+                    inspectBtn.innerHTML = '<i class="bi bi-bug me-1"></i> Enable Inspect';
+                    resizer.style.display = 'none';
+                    explorerPanel.classList.remove('active');
+                    explorerPanel.style.height = '0px';
+                    
+                    // Cleanup visual artifacts
+                    try {
+                        const doc = previewIframe.contentDocument;
+                        if(doc) {
+                            const prev = doc.querySelector('.ce-highlight');
+                            if(prev) prev.classList.remove('ce-highlight');
+                            doc.hasAttachedVibeInspect = false; // Allow re-attach later
+                        }
+                    } catch(e) {}
+                }
+            });
+
+            // 4. Iframe Load Handler (Crucial for when app regenerates)
+            previewIframe.addEventListener('load', () => {
+                if (isInspectActive) {
+                    setupIframeInteraction(previewIframe);
+                }
+            });
+
+            // 5. Resizer Logic
             let isResizing = false;
 
             resizer.addEventListener('mousedown', (e) => {
                 isResizing = true;
-                topPane.style.pointerEvents = 'none'; 
+                topPane.style.pointerEvents = 'none'; // Prevent iframe capturing mouse
                 document.body.style.cursor = 'row-resize';
             });
 
@@ -1253,6 +1292,7 @@
                 const containerRect = document.querySelector('.preview-layout-wrapper').getBoundingClientRect();
                 const newHeight = containerRect.bottom - e.clientY;
                 
+                // Constraints
                 if (newHeight > 50 && newHeight < containerRect.height - 100) {
                     explorerPanel.style.height = `${newHeight}px`;
                 }
