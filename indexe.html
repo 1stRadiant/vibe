@@ -20,12 +20,18 @@
 
     <style>
         /* --- CODE EXPLORER & PREVIEW LAYOUT STYLES --- */
-        #preview {
-            padding: 0 !important; /* Override default tab padding for full height */
-            height: 100vh;
+        
+        /* FIX: Only apply flex layout when the tab is ACTIVE */
+        .tab-content#preview {
+            display: none; /* Default hidden */
+            padding: 0 !important; 
+            height: 100%;
             overflow: hidden;
-            display: flex;
             flex-direction: column;
+        }
+        
+        .tab-content#preview.active {
+            display: flex !important; /* Only flex when active */
         }
 
         .preview-layout-wrapper {
@@ -89,7 +95,7 @@
         .ce-container {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #ccc;
-            padding: 10px;
+            padding: 15px;
             height: 100%;
             box-sizing: border-box;
             display: flex;
@@ -101,46 +107,47 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             padding-bottom: 8px;
             border-bottom: 1px solid #333;
         }
 
-        .ce-header h4 { margin: 0; font-size: 14px; color: #fff; }
+        .ce-header h4 { margin: 0; font-size: 15px; color: #fff; font-weight: 600; }
 
         .ce-search-section {
             display: flex;
-            gap: 5px;
+            gap: 8px;
             flex-shrink: 0;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .ce-search-input {
             flex: 1;
-            padding: 4px 8px;
+            padding: 6px 10px;
             border: 1px solid #3c3c3c;
-            border-radius: 2px;
+            border-radius: 4px;
             background: #252526;
             color: #fff;
             font-family: inherit;
         }
 
         .ce-btn {
-            padding: 4px 10px;
+            padding: 6px 14px;
             border: none;
-            border-radius: 2px;
-            background: #0e639c;
+            border-radius: 4px;
+            background: #0d6efd;
             color: #fff;
             cursor: pointer;
+            font-weight: 500;
         }
-        .ce-btn:hover { background: #1177bb; }
+        .ce-btn:hover { background: #0b5ed7; }
 
         .ce-results {
             max-height: 100px;
             overflow-y: auto;
             flex-shrink: 0;
             border-bottom: 1px solid #333;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .ce-output {
@@ -153,14 +160,14 @@
         .ce-code-block {
             background: #1e1e1e;
             padding: 0;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             font-family: 'Consolas', 'Courier New', monospace;
         }
         
         .ce-code-block h3, .ce-code-block h4 {
-            font-size: 12px;
+            font-size: 13px;
             color: #9cdcfe;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: normal;
         }
 
@@ -169,35 +176,38 @@
             white-space: pre-wrap;
             word-break: break-all;
             margin: 0;
-            max-height: 250px;
+            max-height: 300px;
             overflow-y: auto;
             background: #1e1e1e;
-            padding: 8px;
+            padding: 12px;
             border: 1px solid #333;
-            border-radius: 3px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.5;
         }
         
-        /* Syntax Colors (Simple) */
+        /* Syntax Colors */
         .ce-function-name { color: #dcdcaa; font-weight: bold; font-size: 1.1em; display: block; margin-bottom: 5px; }
         .ce-css-rules { color: #ce9178; }
         .ce-function-link { color: #4fc1ff; text-decoration: none; cursor: pointer; margin-right: 8px; }
         .ce-function-link:hover { text-decoration: underline; }
-        .ce-search-result { padding: 4px; margin: 2px 0; cursor: pointer; }
+        .ce-search-result { padding: 6px; margin: 2px 0; cursor: pointer; border-radius: 3px; }
         .ce-search-result:hover { background: #2a2d2e; }
         .ce-result-type { color: #569cd6; font-weight: bold; margin-right: 8px; font-size: 0.9em; }
 
-        .ce-navigation { margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .ce-navigation { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
         
         .ce-btn-small {
-            padding: 2px 8px;
-            font-size: 11px;
+            padding: 4px 12px;
+            font-size: 12px;
             background: #3c3c3c;
-            border: none;
+            border: 1px solid #555;
             color: white;
-            border-radius: 2px;
+            border-radius: 3px;
             cursor: pointer;
+            transition: background 0.2s;
         }
-        .ce-btn-small:hover { background: #4c4c4c; }
+        .ce-btn-small:hover { background: #4c4c4c; border-color: #777; }
     </style>
 </head>
 <body>
@@ -306,6 +316,7 @@
 
                 <!-- Content Area -->
                 <div class="col py-3" style="height: 100vh; overflow: hidden; position: relative;">
+                    <!-- Main Toolbar: Absolute positioned to stay on top -->
                     <div class="main-toolbar d-flex justify-content-end align-items-start" style="position: absolute; right: 20px; top: 10px; z-index: 1000;">
                         <div class="btn-group me-2" role="group" aria-label="Save actions">
                             <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
@@ -466,14 +477,16 @@
                         </div>
                         
                          <!-- MODIFIED PREVIEW TAB WITH SPLIT PANE -->
+                         <!-- CSS Logic: #preview is hidden by default via .tab-content. 
+                              When .active is added, display: flex is applied by the #preview.active rule above. -->
                          <div id="preview" class="tab-content">
                             <div class="preview-layout-wrapper">
                                 <!-- Top Pane: Preview Header + Iframe -->
                                 <div id="preview-top-pane">
-                                    <div class="preview-header d-flex justify-content-between align-items-center" style="padding: 10px; background: #212529; color: white;">
-                                        <h2 style="margin: 0; font-size: 1.25rem;">Live Preview</h2>
-                                        <button id="toggle-inspect-button" class="btn btn-sm btn-outline-info" title="Click to inspect elements in the preview">
-                                            <i class="bi bi-bug me-1"></i> Enable Inspect
+                                    <div class="preview-header d-flex justify-content-between align-items-center" style="padding: 12px 16px; background: #212529; color: white; border-bottom: 1px solid #444;">
+                                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 500;">Live Preview</h2>
+                                        <button id="toggle-inspect-button" class="btn btn-outline-info" style="padding: 4px 12px; font-size: 0.9rem;">
+                                            <i class="bi bi-bug me-2"></i>Enable Inspect
                                         </button>
                                     </div>
                                     <iframe id="website-preview" title="Live Website Preview" style="width:100%; height: 100%; border:none; flex: 1; background: #fff;"></iframe>
@@ -1178,7 +1191,6 @@
                     const doc = iframe.contentDocument;
                     if (!doc) return;
                     
-                    // Prevent multiple attachments if possible, though robustness > speed here
                     if (doc.hasAttachedVibeInspect) return;
                     doc.hasAttachedVibeInspect = true;
 
@@ -1212,7 +1224,6 @@
                         if(prev) prev.classList.remove('ce-highlight');
                         
                         let target = e.target;
-                        // Don't inspect the full body/html tags if clicked on empty space, annoying
                         if (target.tagName === 'HTML') target = doc.body;
                         
                         target.classList.add('ce-highlight');
@@ -1225,7 +1236,6 @@
                      doc.addEventListener('mouseover', (e) => {
                         if (!isInspectActive) return;
                         e.stopPropagation();
-                        // Just change cursor, CSS handles the rest usually
                         e.target.style.cursor = 'crosshair';
                     }, true);
 
@@ -1264,7 +1274,7 @@
                         if(doc) {
                             const prev = doc.querySelector('.ce-highlight');
                             if(prev) prev.classList.remove('ce-highlight');
-                            doc.hasAttachedVibeInspect = false; // Allow re-attach later
+                            doc.hasAttachedVibeInspect = false;
                         }
                     } catch(e) {}
                 }
