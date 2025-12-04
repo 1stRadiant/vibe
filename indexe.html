@@ -477,15 +477,15 @@
                         </div>
                         
                          <!-- MODIFIED PREVIEW TAB WITH SPLIT PANE -->
-                         <!-- CSS Logic: #preview is hidden by default via .tab-content. 
-                              When .active is added, display: flex is applied by the #preview.active rule above. -->
                          <div id="preview" class="tab-content">
                             <div class="preview-layout-wrapper">
                                 <!-- Top Pane: Preview Header + Iframe -->
                                 <div id="preview-top-pane">
-                                    <div class="preview-header d-flex justify-content-between align-items-center" style="padding: 12px 16px; background: #212529; color: white; border-bottom: 1px solid #444;">
-                                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 500;">Live Preview</h2>
-                                        <button id="toggle-inspect-button" class="btn btn-outline-info" style="padding: 4px 12px; font-size: 0.9rem;">
+                                    <!-- Updated Header: Buttons on LEFT to avoid overlap with global toolbar -->
+                                    <div class="preview-header d-flex align-items-center" style="padding: 12px 16px; background: #212529; color: white; border-bottom: 1px solid #444; height: 60px;">
+                                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 500; margin-right: 15px;">Live Preview</h2>
+                                        <!-- Renamed ID to avoid conflicts -->
+                                        <button id="code-explorer-toggle-btn" class="btn btn-outline-info" style="padding: 4px 12px; font-size: 0.9rem;">
                                             <i class="bi bi-bug me-2"></i>Enable Inspect
                                         </button>
                                     </div>
@@ -1002,7 +1002,8 @@
                 this.searchInput.onkeyup = (e) => { if(e.key === 'Enter') this._performSearch(); };
                 
                 this.container.querySelector('#ce-close-btn').onclick = () => {
-                    document.getElementById('toggle-inspect-button').click();
+                    // Update ID to new isolated ID
+                    document.getElementById('code-explorer-toggle-btn').click();
                 };
             }
 
@@ -1168,7 +1169,8 @@
         /* --- INTEGRATION LOGIC --- */
         document.addEventListener('DOMContentLoaded', () => {
             const previewIframe = document.getElementById('website-preview');
-            const inspectBtn = document.getElementById('toggle-inspect-button');
+            // UPDATED ID HERE
+            const inspectBtn = document.getElementById('code-explorer-toggle-btn');
             const explorerPanel = document.getElementById('explorer-panel');
             const resizer = document.getElementById('preview-resizer');
             const topPane = document.getElementById('preview-top-pane');
