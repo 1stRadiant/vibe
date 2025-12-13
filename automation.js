@@ -1,289 +1,278 @@
 
-// --- Expose for Automation System ---
-window.vibeAPI = {
-    // Expose the AI caller so automation can generate scripts using your API keys
-    callAI: callAI, 
-    // Expose tab switching
-    switchToTab: switchToTab,
-    // Expose internals for state checks
-    getCurrentProject: () => ({ id: currentProjectId, tree: vibeTree }),
-    refreshUI: refreshAllUI
-};
-
-console.log("Vibe Automation API exposed as window.vibeAPI");
-```
-
-### Step 2: Create `automation.js`
-
-Save this code as `automation.js`. This system includes a UI Map (mapping human names to DOM IDs), an Execution Engine (simulates clicks/typing), and an AI Prompt generator.
-
-```javascript
 /**
  * Vibe Web Builder - Automation System (Auto-Pilot)
- * Allows natural language control of the editor interface.
+ * Integration: Adds a Floating Icon to access the AI Automation Interface.
  */
 
 (function() {
-    // --- 1. The UI Map ---
-    // Maps logical names to CSS selectors so the AI knows how to interact with the DOM.
+    // 1. UI MAP: Connects human terms to the specific IDs in your index.html
     const UI_MAP = {
-        // Tabs
+        // Navigation Tabs
         "Start Tab": ".tab-button[data-tab='start']",
         "Preview Tab": ".tab-button[data-tab='preview']",
-        "Code Tab": ".tab-button[data-tab='code']",
+        "Editor Tab": ".tab-button[data-tab='editor']",
         "Agent Tab": ".tab-button[data-tab='agent']",
+        "Chat Tab": ".tab-button[data-tab='chat']",
         "Files Tab": ".tab-button[data-tab='files']",
+        "Code Tab": ".tab-button[data-tab='code']",
         "Settings Tab": "#open-settings-modal-button",
 
-        // Start Page
+        // Start Page Actions
+        "Project Name Input": "#new-project-id-input",
         "Project Prompt Input": "#project-prompt-input",
-        "Generate Project Button": "#generate-project-button",
-        "New Project ID Input": "#new-project-id-input",
-        "Cloud Storage Option": "button[data-storage='cloud']",
-        "Local Storage Option": "button[data-storage='local']",
-        "Load Project Button": ".load-project-button", // Gets the first one usually
-
-        // Toolbar / Main Actions
+        "Build Project Button": "#start-iterative-build-button", 
+        "Generate From Instructions": "#generate-from-instructions-button",
+        "Load GitHub Button": "#load-from-github-button",
+        
+        // Toolbar
         "Save Cloud": "#save-to-cloud-button",
         "Save Local": "#save-to-local-button",
-        "Share Project": "#share-project-button",
         "Undo": "#undo-button",
         "Redo": "#redo-button",
-        "Toggle Inspect": "#toggle-inspect-button",
+        "Inspect": "#toggle-inspect-button",
 
         // Agent / Chat
         "Agent Input": "#agent-prompt-input",
-        "Add Task Button": "#run-agent-single-task-button",
-        "Start Queue": "#start-iterative-session-button",
+        "Add Task": "#run-agent-single-task-button",
+        "Process Queue": "#start-iterative-session-button",
         "Chat Input": "#chat-prompt-input",
         "Send Chat": "#send-chat-button",
 
-        // Code / Editor
-        "Full Code Editor": "#full-code-editor",
-        "Update From Code": "#update-tree-from-code-button",
+        // Code Area
         "Upload HTML": "#upload-html-button",
+        "Update From Code": "#update-tree-from-code-button",
         
-        // Modals & Popups
-        "Auth Modal": "#auth-modal",
-        "Login Button": "#login-button",
+        // Modals
         "Close Modal": ".close-button",
-        "Add Node Modal": "#add-node-modal",
-        "Create Node Confirm": "#create-node-button"
+        "Login Button": "#login-button"
     };
 
     class VibeAutomator {
         constructor() {
             this.isRunning = false;
-            this.delay = 800; // ms between actions for visual clarity
+            this.delay = 1000; // ms delay between actions
             this.injectUI();
         }
 
-        /**
-         * Injects the Auto-Pilot button and modal into the DOM.
-         */
+        // Injects the Floating Icon and Modal
         injectUI() {
             const styles = document.createElement('style');
             styles.textContent = `
-                #automation-trigger { position: fixed; bottom: 20px; right: 20px; z-index: 9999; background: #9c27b0; color: white; border: none; padding: 12px 20px; border-radius: 30px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s; }
-                #automation-trigger:hover { transform: scale(1.05); }
-                #automation-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #282c34; border: 1px solid #444; border-radius: 8px; z-index: 10000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 20px; color: #abb2bf; font-family: sans-serif; }
-                #automation-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; }
-                .auto-input { width: 100%; padding: 10px; margin: 10px 0; background: #1e2227; border: 1px solid #444; color: white; border-radius: 4px; }
-                .auto-btn { background: #9c27b0; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; float: right; margin-left: 10px; }
-                .auto-btn.cancel { background: #e06c75; }
-                .auto-highlight { outline: 3px solid #ff00ff !important; outline-offset: 2px; transition: all 0.3s; box-shadow: 0 0 15px #ff00ff; }
-                #automation-logs { max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 12px; margin-top: 10px; padding: 5px; background: #000; color: #0f0; border-radius: 4px; }
+                /* Floating Action Button */
+                #auto-pilot-btn { 
+                    position: fixed; 
+                    bottom: 25px; 
+                    right: 25px; 
+                    width: 60px; 
+                    height: 60px; 
+                    border-radius: 50%; 
+                    background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%); 
+                    color: white; 
+                    border: none; 
+                    cursor: pointer; 
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
+                    z-index: 9999; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    font-size: 28px; 
+                    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+                }
+                #auto-pilot-btn:hover { 
+                    transform: scale(1.1) rotate(5deg); 
+                    box-shadow: 0 8px 25px rgba(74, 0, 224, 0.6); 
+                }
+                #auto-pilot-btn::after {
+                    content: 'Auto-Pilot';
+                    position: absolute;
+                    right: 70px;
+                    background: #333;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.2s;
+                    white-space: nowrap;
+                }
+                #auto-pilot-btn:hover::after {
+                    opacity: 1;
+                }
+
+                /* Modal & Overlay */
+                #auto-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; background: #1a1d21; border: 1px solid #333; border-radius: 12px; z-index: 10000; box-shadow: 0 20px 50px rgba(0,0,0,0.7); padding: 25px; color: #e0e0e0; font-family: 'Inter', sans-serif; }
+                #auto-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; backdrop-filter: blur(2px); }
+                
+                /* Modal Inputs */
+                .auto-input { width: 100%; padding: 12px; margin: 15px 0; background: #0f1115; border: 1px solid #444; color: white; border-radius: 6px; resize: vertical; font-size: 14px; }
+                .auto-input:focus { outline: 1px solid #8E2DE2; border-color: #8E2DE2; }
+                
+                /* Buttons */
+                .auto-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+                .auto-btn { padding: 8px 20px; border-radius: 6px; cursor: pointer; border: none; font-weight: 600; transition: background 0.2s; }
+                .auto-btn-run { background: #4A00E0; color: white; }
+                .auto-btn-run:hover { background: #5d1be8; }
+                .auto-btn-close { background: #333; color: #ccc; }
+                .auto-btn-close:hover { background: #444; }
+                
+                /* Logs */
+                .auto-log-box { max-height: 150px; overflow-y: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 12px; color: #00ff00; margin-top: 10px; border-radius: 4px; display: none; }
+                
+                /* Highlights */
+                .target-highlight { outline: 4px solid #d946ef !important; outline-offset: 2px; transition: all 0.3s; box-shadow: 0 0 20px rgba(217, 70, 239, 0.6); }
             `;
             document.head.appendChild(styles);
 
-            // Trigger Button
+            // Floating Button
             const btn = document.createElement('button');
-            btn.id = 'automation-trigger';
-            btn.innerHTML = '🤖 Auto-Pilot';
+            btn.id = 'auto-pilot-btn';
+            // Using Bootstrap Icon class if available, else emoji fallback
+            btn.innerHTML = '<i class="bi bi-robot"></i>'; 
             btn.onclick = () => this.openModal();
             document.body.appendChild(btn);
 
-            // Overlay
+            // Modal Structures
             const overlay = document.createElement('div');
-            overlay.id = 'automation-overlay';
-            document.body.appendChild(overlay);
-
-            // Modal
+            overlay.id = 'auto-overlay';
+            
             const modal = document.createElement('div');
-            modal.id = 'automation-modal';
+            modal.id = 'auto-modal';
             modal.innerHTML = `
-                <h3 style="margin-top:0">🤖 Vibe Auto-Pilot</h3>
-                <p>Describe what you want to do (e.g., "Create a project named 'My Portfolio', generate it, then go to the preview tab").</p>
-                <textarea id="auto-prompt" class="auto-input" rows="4" placeholder="Enter instructions..."></textarea>
-                <div id="automation-logs">Logs will appear here...</div>
-                <div style="margin-top: 15px; overflow: hidden;">
-                    <button id="auto-run-btn" class="auto-btn">Run</button>
-                    <button id="auto-close-btn" class="auto-btn cancel">Close</button>
+                <h3 style="margin-top:0; display:flex; align-items:center; gap:10px; color: #fff;">
+                    <i class="bi bi-robot" style="color: #8E2DE2;"></i> Auto-Pilot
+                </h3>
+                <p style="color:#aaa; font-size: 0.9em;">Describe a sequence of actions. The AI will navigate tabs, fill inputs, and click buttons for you.</p>
+                <textarea id="auto-prompt" class="auto-input" rows="3" placeholder="e.g. 'Create a project named Shop, set storage to local, and click Build.'"></textarea>
+                <div id="auto-logs" class="auto-log-box"></div>
+                <div class="auto-actions">
+                    <button id="auto-close-btn" class="auto-btn auto-btn-close">Close</button>
+                    <button id="auto-run-btn" class="auto-btn auto-btn-run"><i class="bi bi-play-fill"></i> Run</button>
                 </div>
             `;
+
+            document.body.appendChild(overlay);
             document.body.appendChild(modal);
 
+            // Event Listeners
             document.getElementById('auto-close-btn').onclick = () => this.closeModal();
-            document.getElementById('auto-run-btn').onclick = () => this.handleRun();
             overlay.onclick = () => this.closeModal();
+            document.getElementById('auto-run-btn').onclick = () => this.executeCommand();
         }
 
         openModal() {
-            document.getElementById('automation-modal').style.display = 'block';
-            document.getElementById('automation-overlay').style.display = 'block';
+            document.getElementById('auto-modal').style.display = 'block';
+            document.getElementById('auto-overlay').style.display = 'block';
             document.getElementById('auto-prompt').focus();
         }
 
         closeModal() {
-            document.getElementById('automation-modal').style.display = 'none';
-            document.getElementById('automation-overlay').style.display = 'none';
+            document.getElementById('auto-modal').style.display = 'none';
+            document.getElementById('auto-overlay').style.display = 'none';
         }
 
         log(msg) {
-            const el = document.getElementById('automation-logs');
-            const line = document.createElement('div');
-            line.textContent = `> ${msg}`;
-            el.appendChild(line);
-            el.scrollTop = el.scrollHeight;
-            console.log(`[Auto-Pilot] ${msg}`);
+            const logBox = document.getElementById('auto-logs');
+            logBox.style.display = 'block';
+            const entry = document.createElement('div');
+            entry.textContent = `> ${msg}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
         }
 
-        /**
-         * Highlights an element visually to show the user what's happening.
-         */
-        highlightElement(element) {
-            element.classList.add('auto-highlight');
-            setTimeout(() => element.classList.remove('auto-highlight'), this.delay);
-        }
-
-        /**
-         * The core function that uses AI to convert text to a script.
-         */
-        async handleRun() {
-            if (this.isRunning) return;
-            const prompt = document.getElementById('auto-prompt').value.trim();
-            if (!prompt) return;
+        async executeCommand() {
+            const prompt = document.getElementById('auto-prompt').value;
+            if(!prompt) return;
 
             if (!window.vibeAPI || !window.vibeAPI.callAI) {
-                this.log("Error: Vibe API not found. Please update app.js.");
+                this.log("Error: vibeAPI not found in app3.js");
                 return;
             }
 
-            this.isRunning = true;
+            this.log("Analyzing request...");
             document.getElementById('auto-run-btn').disabled = true;
-            this.log("Generating automation script...");
+            document.getElementById('auto-run-btn').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const systemPrompt = `You are an automation interface for a web application. 
-                Translate the user's natural language request into a JSON array of automation commands.
+                const systemPrompt = `You are a browser automation assistant. Convert user instructions into a JSON execution script.
                 
-                **AVAILABLE COMMANDS:**
-                1. { "action": "click", "target": "Name from UI Map" } -> Clicks a button or tab.
-                2. { "action": "input", "target": "Name from UI Map", "value": "string" } -> Types into an input field.
-                3. { "action": "wait", "value": 2000 } -> Waits for X milliseconds (use for loading).
-                4. { "action": "navigate", "target": "tab_id" } -> "start", "preview", "code", "agent".
+                COMMANDS:
+                - { "action": "click", "target": "UI_MAP_KEY" }
+                - { "action": "input", "target": "UI_MAP_KEY", "value": "text" }
+                - { "action": "navigate", "target": "tab_id" } (tab_ids: start, preview, editor, agent, chat, files, code)
+                - { "action": "wait", "value": 1000 }
 
-                **UI MAP (Use these keys for 'target'):**
-                ${Object.keys(UI_MAP).join(', ')}
+                UI KEYS: ${Object.keys(UI_MAP).join(', ')}
 
-                **EXAMPLE:**
-                User: "Make a new project called 'Demo' and save it."
-                Output:
-                [
-                    { "action": "navigate", "target": "start" },
-                    { "action": "input", "target": "New Project ID Input", "value": "demo-project" },
-                    { "action": "input", "target": "Project Prompt Input", "value": "A demo project" },
-                    { "action": "click", "target": "Generate Project Button" },
-                    { "action": "wait", "value": 3000 },
-                    { "action": "click", "target": "Save Cloud" }
-                ]
-
-                **OUTPUT RULE:** Return ONLY the valid JSON array. No markdown.`;
+                EXAMPLE: "Go to agent tab and ask 'Fix bugs'"
+                RESULT: [{"action":"navigate","target":"agent"}, {"action":"input","target":"Agent Input","value":"Fix bugs"}, {"action":"click","target":"Add Task"}]
+                
+                Output strictly valid JSON array.`;
 
                 const response = await window.vibeAPI.callAI(systemPrompt, prompt, true);
-                let script = [];
-                try {
-                    // Clean potential markdown wrappers
-                    const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
-                    script = JSON.parse(cleanJson);
-                } catch (e) {
-                    throw new Error("AI returned invalid JSON.");
+                let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+                const script = JSON.parse(cleanJson);
+
+                this.log(`Executing ${script.length} steps...`);
+                this.closeModal();
+                
+                for(let step of script) {
+                    await this.performStep(step);
                 }
-
-                this.log(`Script generated: ${script.length} steps.`);
-                await this.executeScript(script);
-
-            } catch (error) {
-                this.log(`Error: ${error.message}`);
+                
+                document.getElementById('auto-prompt').value = '';
+                document.getElementById('auto-logs').innerHTML = '';
+                
+            } catch (e) {
+                console.error(e);
+                this.log("Error: " + e.message);
+                alert("Automation Error: " + e.message);
             } finally {
-                this.isRunning = false;
                 document.getElementById('auto-run-btn').disabled = false;
+                document.getElementById('auto-run-btn').innerHTML = '<i class="bi bi-play-fill"></i> Run';
             }
         }
 
-        async executeScript(script) {
-            this.closeModal(); // Hide modal to see action
-            
-            for (const step of script) {
-                try {
-                    await this.performAction(step);
-                    // Global delay between steps
-                    await new Promise(r => setTimeout(r, this.delay)); 
-                } catch (e) {
-                    console.error("Step failed:", step, e);
-                    alert(`Auto-Pilot Error on step: ${step.action} - ${step.target}`);
-                    break;
-                }
-            }
-            alert("Automation Sequence Complete.");
-        }
-
-        async performAction(step) {
-            console.log("Executing:", step);
-
+        async performStep(step) {
             if (step.action === 'wait') {
-                await new Promise(r => setTimeout(r, step.value));
+                await new Promise(r => setTimeout(r, step.value || 1000));
                 return;
             }
 
             if (step.action === 'navigate') {
-                if (window.vibeAPI.switchToTab) {
+                if(window.vibeAPI.switchToTab) {
                     window.vibeAPI.switchToTab(step.target);
+                    await new Promise(r => setTimeout(r, 600)); 
                 }
                 return;
             }
 
-            // For click and input, we need to find the DOM element
-            let selector = UI_MAP[step.target];
-            if (!selector) {
-                // Fallback: assume the target IS a selector if not in map
-                selector = step.target;
-            }
+            let selector = UI_MAP[step.target] || step.target;
+            const el = document.querySelector(selector);
+            
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('target-highlight');
+                await new Promise(r => setTimeout(r, 600)); // Visual cue time
 
-            const element = document.querySelector(selector);
-            if (!element) {
-                throw new Error(`Element not found: ${step.target} (${selector})`);
-            }
+                if (step.action === 'click') {
+                    el.click();
+                } else if (step.action === 'input') {
+                    el.value = step.value;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
 
-            this.highlightElement(element);
-
-            if (step.action === 'click') {
-                element.click();
-            } else if (step.action === 'input') {
-                element.value = step.value;
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                element.dispatchEvent(new Event('change', { bubbles: true }));
+                el.classList.remove('target-highlight');
+                await new Promise(r => setTimeout(r, this.delay));
+            } else {
+                console.warn("Auto-Pilot couldn't find:", step.target);
             }
         }
     }
 
-    // Initialize on load
-    window.addEventListener('DOMContentLoaded', () => {
-        // Wait a moment for main app to load
-        setTimeout(() => {
-            window.vibeAutomator = new VibeAutomator();
-            console.log("Vibe Auto-Pilot Initialized.");
-        }, 1000);
+    window.addEventListener('load', () => {
+        setTimeout(() => new VibeAutomator(), 1000);
     });
 
 })();
