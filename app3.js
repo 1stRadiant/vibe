@@ -6646,3 +6646,16 @@ document.addEventListener('DOMContentLoaded', () => {
         initMainApp();
     }
 });
+
+
+window.vibeAPI = {
+    // Expose the AI caller so automation can generate scripts using your API keys
+    callAI: callAI, 
+    // Expose tab switching
+    switchToTab: switchToTab,
+    // Expose internals for state checks
+    getCurrentProject: () => ({ id: currentProjectId, tree: vibeTree }),
+    refreshUI: refreshAllUI
+};
+
+console.log("Vibe Automation API exposed as window.vibeAPI");
