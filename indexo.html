@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,31 +24,105 @@
             background-color: #2b3035;
             border-bottom: 1px solid #495057;
             padding: 8px 15px;
+            flex-shrink: 0;
         }
+        
+        /* Workspace Wrapper */
+        .ve-workspace {
+            display: flex;
+            flex-direction: row; /* Desktop Default */
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Canvas Area (Left/Top) */
         .ve-canvas-area {
             background-color: #212529;
             background-image: radial-gradient(#495057 1px, transparent 1px);
             background-size: 20px 20px;
-            overflow: auto;
+            overflow: hidden; /* Handle iframe scroll internally */
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            padding-top: 20px;
-            padding-bottom: 20px;
+            padding: 20px;
+            flex-grow: 1;
+            min-width: 0; /* Prevent flex overflow */
         }
+
         #website-preview {
-            transition: width 0.3s ease, height 0.3s ease;
+            transition: width 0.3s ease; /* Smooth width change, not height during resize */
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             background: white;
             border: none;
+            width: 100%;
+            height: 100%;
         }
-        .ve-sidebar {
-            width: 320px;
-            background-color: #1a1d20;
-            border-left: 1px solid #495057;
-            overflow-y: auto;
+
+        /* Resizer Handle */
+        .ve-resizer {
+            background-color: #000;
+            opacity: 0.5;
+            z-index: 100;
+            transition: background-color 0.2s;
             flex-shrink: 0;
         }
+        .ve-resizer:hover, .ve-resizer.resizing {
+            background-color: #0d6efd;
+            opacity: 1;
+        }
+
+        /* Desktop Resizer Styles */
+        @media (min-width: 769px) {
+            .ve-resizer {
+                width: 6px;
+                cursor: col-resize;
+                border-left: 1px solid #495057;
+                border-right: 1px solid #495057;
+            }
+            .ve-sidebar {
+                width: 320px; /* Default Desktop Width */
+                height: 100%;
+                border-left: 1px solid #495057;
+            }
+        }
+
+        /* Mobile Layout Overrides */
+        @media (max-width: 768px) {
+            .ve-workspace {
+                flex-direction: column;
+            }
+            .ve-resizer {
+                height: 8px;
+                width: 100%;
+                cursor: row-resize;
+                border-top: 1px solid #495057;
+                border-bottom: 1px solid #495057;
+            }
+            .ve-sidebar {
+                width: 100% !important; /* Force full width */
+                height: 40%; /* Default Mobile Height */
+                border-left: none;
+                border-top: 1px solid #495057;
+            }
+            /* Hide device toggles on mobile as space is tight */
+            .device-toggles {
+                display: none !important;
+            }
+            .ve-canvas-area {
+                padding: 5px; /* Less padding on mobile */
+            }
+        }
+
+        /* Sidebar Styling */
+        .ve-sidebar {
+            background-color: #1a1d20;
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
         .ve-sidebar .accordion-button {
             background-color: #212529;
             color: #e0e0e0;
@@ -375,7 +447,7 @@
                                 <div class="ve-toolbar d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="text-white fw-bold me-2">Vibe Visual Editor</span>
-                                        <div class="btn-group btn-group-sm" role="group">
+                                        <div class="btn-group btn-group-sm device-toggles" role="group">
                                             <button type="button" class="btn btn-outline-secondary device-btn active" id="ve-device-desktop" title="Desktop View"><i class="bi bi-pc-display"></i></button>
                                             <button type="button" class="btn btn-outline-secondary device-btn" id="ve-device-tablet" title="Tablet View"><i class="bi bi-tablet"></i></button>
                                             <button type="button" class="btn btn-outline-secondary device-btn" id="ve-device-mobile" title="Mobile View"><i class="bi bi-phone"></i></button>
@@ -394,21 +466,27 @@
                                     </div>
                                 </div>
 
-                                <!-- Visual Editor Workspace -->
-                                <div class="d-flex flex-grow-1" style="height: 0;"> <!-- height 0 lets flex grow handle it -->
+                                <!-- Visual Editor Workspace (Flex Container) -->
+                                <div class="ve-workspace" id="ve-workspace">
                                     
                                     <!-- Canvas Area -->
-                                    <div class="ve-canvas-area flex-grow-1">
-                                        <iframe id="website-preview" title="Live Website Preview" style="width: 100%; height: 95%; border: 1px solid #ccc;"></iframe>
+                                    <div class="ve-canvas-area" id="ve-canvas-area">
+                                        <iframe id="website-preview" title="Live Website Preview"></iframe>
                                     </div>
 
+                                    <!-- Resizer Handle -->
+                                    <div class="ve-resizer" id="ve-resizer"></div>
+
                                     <!-- Properties Sidebar -->
-                                    <div id="ve-properties-panel" class="ve-sidebar d-flex flex-column">
-                                        <div class="p-3 border-bottom border-secondary">
-                                            <h6 class="text-white mb-2">Selected Element</h6>
+                                    <div id="ve-properties-panel" class="ve-sidebar">
+                                        <div class="p-3 border-bottom border-secondary sticky-top bg-dark" style="z-index: 5;">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h6 class="text-white m-0">Selected Element</h6>
+                                                <span id="ve-selection-indicator" class="badge bg-secondary">None</span>
+                                            </div>
                                             <div class="input-group input-group-sm mb-2">
                                                 <span class="input-group-text bg-dark text-secondary border-secondary">Tag</span>
-                                                <input type="text" id="ve-selected-tag" class="form-control bg-dark text-white border-secondary" readonly placeholder="None">
+                                                <input type="text" id="ve-selected-tag" class="form-control bg-dark text-white border-secondary" readonly placeholder="Click element...">
                                             </div>
                                             <div class="d-flex gap-1">
                                                 <button id="ve-action-parent" class="btn btn-sm btn-outline-secondary flex-grow-1" title="Select Parent"><i class="bi bi-arrow-up"></i> Parent</button>
@@ -417,7 +495,7 @@
                                         </div>
 
                                         <!-- Properties Accordion -->
-                                        <div class="accordion accordion-flush" id="ve-accordion" style="overflow-y: auto; flex-grow: 1;">
+                                        <div class="accordion accordion-flush" id="ve-accordion" style="flex-grow: 1;">
                                             
                                             <!-- AI Edit Section -->
                                             <div class="accordion-item bg-dark border-secondary">
@@ -1060,6 +1138,64 @@
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
+    
+    <!-- Resizer Logic for Visual Editor -->
+    <script>
+        (function() {
+            const resizer = document.getElementById('ve-resizer');
+            const sidebar = document.getElementById('ve-properties-panel');
+            const workspace = document.getElementById('ve-workspace');
+            
+            if (!resizer || !sidebar || !workspace) return;
+
+            let isResizing = false;
+            let lastDownX = 0;
+            let lastDownY = 0;
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                lastDownX = e.clientX;
+                lastDownY = e.clientY;
+                resizer.classList.add('resizing');
+                document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
+                e.preventDefault(); // Prevent text selection
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+
+                if (window.innerWidth > 768) {
+                    // Desktop: Horizontal Resize (Resize Width of Sidebar)
+                    // The sidebar is on the right, so moving left increases width
+                    const dx = lastDownX - e.clientX;
+                    const newWidth = parseInt(window.getComputedStyle(sidebar).width) + dx;
+                    
+                    if (newWidth > 200 && newWidth < 600) {
+                        sidebar.style.width = newWidth + 'px';
+                        lastDownX = e.clientX;
+                    }
+                } else {
+                    // Mobile: Vertical Resize (Resize Height of Sidebar)
+                    // The sidebar is on the bottom, so moving up increases height
+                    const dy = lastDownY - e.clientY;
+                    const newHeight = parseInt(window.getComputedStyle(sidebar).height) + dy;
+                    
+                    if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
+                        sidebar.style.height = newHeight + 'px';
+                        lastDownY = e.clientY;
+                    }
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    resizer.classList.remove('resizing');
+                    document.body.style.cursor = 'default';
+                }
+            });
+        })();
+    </script>
 
 </body>
 </html>
