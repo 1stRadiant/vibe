@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,6 +49,7 @@
             padding: 20px;
             flex-grow: 1;
             min-width: 0; /* Prevent flex overflow */
+            position: relative;
         }
 
         #website-preview {
@@ -172,6 +174,13 @@
             background-color: #0d6efd;
             border-color: #0d6efd;
             color: white;
+        }
+        
+        /* Highlight outline for inspected elements */
+        .ve-inspect-outline {
+            outline: 2px solid #0d6efd !important;
+            cursor: pointer !important;
+            position: relative;
         }
     </style>
 </head>
@@ -1139,60 +1148,312 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
     
-    <!-- Resizer Logic for Visual Editor -->
+    <!-- Visual Editor Logic -->
     <script>
         (function() {
+            // --- RESIZER LOGIC ---
             const resizer = document.getElementById('ve-resizer');
             const sidebar = document.getElementById('ve-properties-panel');
             const workspace = document.getElementById('ve-workspace');
+            const iframe = document.getElementById('website-preview');
+            const inspectBtn = document.getElementById('toggle-inspect-button');
+            const refreshBtn = document.getElementById('ve-refresh-button');
             
-            if (!resizer || !sidebar || !workspace) return;
+            if (resizer && sidebar && workspace) {
+                let isResizing = false;
+                let lastDownX = 0;
+                let lastDownY = 0;
 
-            let isResizing = false;
-            let lastDownX = 0;
-            let lastDownY = 0;
+                resizer.addEventListener('mousedown', (e) => {
+                    isResizing = true;
+                    lastDownX = e.clientX;
+                    lastDownY = e.clientY;
+                    resizer.classList.add('resizing');
+                    document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
+                    e.preventDefault();
+                });
 
-            resizer.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                lastDownX = e.clientX;
-                lastDownY = e.clientY;
-                resizer.classList.add('resizing');
-                document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
-                e.preventDefault(); // Prevent text selection
+                document.addEventListener('mousemove', (e) => {
+                    if (!isResizing) return;
+                    if (window.innerWidth > 768) {
+                        const dx = lastDownX - e.clientX;
+                        const newWidth = parseInt(window.getComputedStyle(sidebar).width) + dx;
+                        if (newWidth > 200 && newWidth < 600) {
+                            sidebar.style.width = newWidth + 'px';
+                            lastDownX = e.clientX;
+                        }
+                    } else {
+                        const dy = lastDownY - e.clientY;
+                        const newHeight = parseInt(window.getComputedStyle(sidebar).height) + dy;
+                        if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
+                            sidebar.style.height = newHeight + 'px';
+                            lastDownY = e.clientY;
+                        }
+                    }
+                });
+
+                document.addEventListener('mouseup', () => {
+                    if (isResizing) {
+                        isResizing = false;
+                        resizer.classList.remove('resizing');
+                        document.body.style.cursor = 'default';
+                    }
+                });
+            }
+
+            // --- SELECTION & INSPECT LOGIC ---
+            let inspectEnabled = false;
+            let spyScriptInjected = false;
+
+            // Mapping IDs to CSS properties
+            const inputMap = {
+                've-input-text': 'textContent',
+                've-input-classes': 'className',
+                've-input-id': 'id',
+                've-input-display': 'style.display',
+                've-input-flex-dir': 'style.flexDirection',
+                've-input-justify': 'style.justifyContent',
+                've-input-align': 'style.alignItems',
+                've-input-gap': 'style.gap',
+                've-input-mt': 'style.marginTop',
+                've-input-ml': 'style.marginLeft',
+                've-input-mr': 'style.marginRight',
+                've-input-mb': 'style.marginBottom',
+                've-input-pt': 'style.paddingTop',
+                've-input-pl': 'style.paddingLeft',
+                've-input-pr': 'style.paddingRight',
+                've-input-pb': 'style.paddingBottom',
+                've-input-width': 'style.width',
+                've-input-height': 'style.height',
+                've-input-color': 'style.color',
+                've-input-bg-color': 'style.backgroundColor',
+                've-input-font-size': 'style.fontSize',
+                've-input-font-weight': 'style.fontWeight',
+                've-input-border': 'style.border',
+                've-input-radius': 'style.borderRadius'
+            };
+
+            // Toggle Inspect Mode
+            if (inspectBtn) {
+                inspectBtn.addEventListener('click', () => {
+                    inspectEnabled = !inspectEnabled;
+                    inspectBtn.classList.toggle('btn-primary', !inspectEnabled);
+                    inspectBtn.classList.toggle('btn-warning', inspectEnabled);
+                    inspectBtn.innerHTML = inspectEnabled ? '<i class="bi bi-stop-circle me-1"></i> Stop Inspect' : '<i class="bi bi-cursor-fill me-1"></i> Inspect';
+                    
+                    // Send message to iframe
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'VE_TOGGLE_INSPECT', enabled: inspectEnabled }, '*');
+                    }
+                });
+            }
+            
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                     // Force re-inject on refresh
+                    iframe.src = iframe.src; 
+                    // Wait for load to re-inject (handled by load listener below)
+                });
+            }
+
+            // Handle Input Changes in Visual Editor
+            Object.keys(inputMap).forEach(inputId => {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    const eventType = (input.type === 'text' || input.tagName === 'TEXTAREA') ? 'input' : 'change';
+                    input.addEventListener(eventType, (e) => {
+                        const prop = inputMap[inputId];
+                        const val = e.target.value;
+                        if (iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({ 
+                                type: 'VE_UPDATE_ELEMENT', 
+                                property: prop, 
+                                value: val 
+                            }, '*');
+                        }
+                    });
+                }
+            });
+            
+            // Handle Alignment Buttons
+            document.querySelectorAll('input[name="ve-align"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ 
+                            type: 'VE_UPDATE_ELEMENT', 
+                            property: 'style.textAlign', 
+                            value: e.target.value 
+                        }, '*');
+                    }
+                });
             });
 
-            document.addEventListener('mousemove', (e) => {
-                if (!isResizing) return;
+            // Receive Messages from Iframe
+            window.addEventListener('message', (e) => {
+                if (!e.data || !e.data.type) return;
 
-                if (window.innerWidth > 768) {
-                    // Desktop: Horizontal Resize (Resize Width of Sidebar)
-                    // The sidebar is on the right, so moving left increases width
-                    const dx = lastDownX - e.clientX;
-                    const newWidth = parseInt(window.getComputedStyle(sidebar).width) + dx;
+                if (e.data.type === 'VE_ELEMENT_SELECTED') {
+                    const data = e.data.payload;
+                    document.getElementById('ve-selection-indicator').textContent = data.tagName;
+                    document.getElementById('ve-selected-tag').value = `<${data.tagName}>`;
                     
-                    if (newWidth > 200 && newWidth < 600) {
-                        sidebar.style.width = newWidth + 'px';
-                        lastDownX = e.clientX;
-                    }
-                } else {
-                    // Mobile: Vertical Resize (Resize Height of Sidebar)
-                    // The sidebar is on the bottom, so moving up increases height
-                    const dy = lastDownY - e.clientY;
-                    const newHeight = parseInt(window.getComputedStyle(sidebar).height) + dy;
+                    // Populate inputs
+                    if (data.id) document.getElementById('ve-input-id').value = data.id;
+                    if (data.className) document.getElementById('ve-input-classes').value = data.className;
+                    if (data.textContent) document.getElementById('ve-input-text').value = data.textContent;
                     
-                    if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
-                        sidebar.style.height = newHeight + 'px';
-                        lastDownY = e.clientY;
+                    // Helper to safely set values
+                    const setVal = (id, val) => {
+                        const el = document.getElementById(id);
+                        if(el && val) el.value = val;
+                    };
+
+                    const s = data.style;
+                    setVal('ve-input-display', s.display);
+                    setVal('ve-input-color', s.color);
+                    setVal('ve-input-bg-color', s.backgroundColor);
+                    setVal('ve-input-width', s.width);
+                    setVal('ve-input-height', s.height);
+                    setVal('ve-input-mt', s.marginTop);
+                    setVal('ve-input-mr', s.marginRight);
+                    setVal('ve-input-mb', s.marginBottom);
+                    setVal('ve-input-ml', s.marginLeft);
+                    setVal('ve-input-pt', s.paddingTop);
+                    setVal('ve-input-pr', s.paddingRight);
+                    setVal('ve-input-pb', s.paddingBottom);
+                    setVal('ve-input-pl', s.paddingLeft);
+                    setVal('ve-input-font-size', s.fontSize);
+                    setVal('ve-input-font-weight', s.fontWeight);
+                    // Flex toggle
+                    const flexControls = document.getElementById('ve-flex-controls');
+                    if (s.display === 'flex') {
+                        flexControls.style.display = 'block';
+                        setVal('ve-input-flex-dir', s.flexDirection);
+                        setVal('ve-input-justify', s.justifyContent);
+                        setVal('ve-input-align', s.alignItems);
+                        setVal('ve-input-gap', s.gap);
+                    } else {
+                        flexControls.style.display = 'none';
                     }
                 }
             });
 
-            document.addEventListener('mouseup', () => {
-                if (isResizing) {
-                    isResizing = false;
-                    resizer.classList.remove('resizing');
-                    document.body.style.cursor = 'default';
-                }
+            // Inject Logic when Iframe Loads
+            iframe.addEventListener('load', () => {
+                const doc = iframe.contentDocument;
+                if (!doc) return;
+
+                // Script to run INSIDE the iframe
+                const scriptContent = `
+                    (function() {
+                        let selectedElement = null;
+                        let inspectMode = false;
+                        let originalOutline = '';
+
+                        // Helper: RGB to Hex
+                        function rgbToHex(col) {
+                            if(!col) return '#ffffff';
+                            if(col.charAt(0)=='#') return col;
+                            const rgb = col.match(/\\d+/g);
+                            if(!rgb) return '#ffffff'; // Fallback
+                            return "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1);
+                        }
+
+                        window.addEventListener('message', (e) => {
+                            if (e.data.type === 'VE_TOGGLE_INSPECT') {
+                                inspectMode = e.data.enabled;
+                                document.body.style.cursor = inspectMode ? 'crosshair' : 'default';
+                                if (!inspectMode && selectedElement) {
+                                    selectedElement.style.outline = originalOutline;
+                                    selectedElement = null;
+                                }
+                            }
+                            if (e.data.type === 'VE_UPDATE_ELEMENT') {
+                                if (selectedElement) {
+                                    const prop = e.data.property;
+                                    const val = e.data.value;
+                                    
+                                    if (prop.startsWith('style.')) {
+                                        selectedElement.style[prop.split('.')[1]] = val;
+                                    } else if (prop === 'textContent') {
+                                        selectedElement.textContent = val;
+                                    } else if (prop === 'className') {
+                                        selectedElement.className = val;
+                                    } else if (prop === 'id') {
+                                        selectedElement.id = val;
+                                    }
+                                }
+                            }
+                        });
+
+                        document.addEventListener('click', (e) => {
+                            if (!inspectMode) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            // Restore previous outline
+                            if (selectedElement) {
+                                selectedElement.style.outline = originalOutline;
+                            }
+
+                            selectedElement = e.target;
+                            originalOutline = selectedElement.style.outline;
+                            selectedElement.style.outline = '2px solid #0d6efd';
+
+                            const comp = window.getComputedStyle(selectedElement);
+                            
+                            const payload = {
+                                tagName: selectedElement.tagName.toLowerCase(),
+                                id: selectedElement.id,
+                                className: selectedElement.className,
+                                textContent: selectedElement.innerText.substring(0, 1000), // Cap length
+                                style: {
+                                    display: comp.display,
+                                    flexDirection: comp.flexDirection,
+                                    justifyContent: comp.justifyContent,
+                                    alignItems: comp.alignItems,
+                                    gap: comp.gap,
+                                    color: rgbToHex(comp.color),
+                                    backgroundColor: rgbToHex(comp.backgroundColor),
+                                    width: comp.width,
+                                    height: comp.height,
+                                    marginTop: comp.marginTop,
+                                    marginRight: comp.marginRight,
+                                    marginBottom: comp.marginBottom,
+                                    marginLeft: comp.marginLeft,
+                                    paddingTop: comp.paddingTop,
+                                    paddingRight: comp.paddingRight,
+                                    paddingBottom: comp.paddingBottom,
+                                    paddingLeft: comp.paddingLeft,
+                                    fontSize: comp.fontSize,
+                                    fontWeight: comp.fontWeight,
+                                    border: comp.border,
+                                    borderRadius: comp.borderRadius
+                                }
+                            };
+
+                            window.parent.postMessage({ type: 'VE_ELEMENT_SELECTED', payload: payload }, '*');
+                        }, true);
+
+                        // Highlight on hover in inspect mode
+                        document.addEventListener('mouseover', (e) => {
+                            if (!inspectMode) return;
+                            e.target.style.boxShadow = 'inset 0 0 0 2px rgba(13, 110, 253, 0.5)';
+                            e.stopPropagation();
+                        }, true);
+                        
+                        document.addEventListener('mouseout', (e) => {
+                            if (!inspectMode) return;
+                            e.target.style.boxShadow = '';
+                            e.stopPropagation();
+                        }, true);
+
+                    })();
+                `;
+
+                const scriptEl = doc.createElement('script');
+                scriptEl.textContent = scriptContent;
+                doc.body.appendChild(scriptEl);
             });
         })();
     </script>
