@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,167 +21,259 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     
     <style>
-        /* Extra styles for the Visual Editor interface */
-        .ve-toolbar {
+        /* --- VISUAL EDITOR (WIX-STYLE) --- */
+        
+        /* Top Navigation Bar */
+        .ve-top-bar {
+            height: 50px;
             background-color: #2b3035;
             border-bottom: 1px solid #495057;
-            padding: 8px 15px;
-            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            z-index: 20;
         }
-        
-        /* Workspace Wrapper */
+
+        /* Main Workspace Layout */
         .ve-workspace {
             display: flex;
-            flex-direction: row; /* Desktop Default */
-            height: 100%;
+            height: calc(100% - 50px);
+            position: relative;
+            overflow: hidden;
+            background-color: #1a1d20;
+        }
+
+        /* Left Icon Toolbar */
+        .ve-left-toolbar {
+            width: 50px;
+            background-color: #212529;
+            border-right: 1px solid #495057;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            z-index: 15;
+            flex-shrink: 0;
+        }
+
+        .ve-tool-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            background: transparent;
+            border: none;
+            color: #adb5bd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            font-size: 1.2rem;
+            position: relative;
+        }
+
+        .ve-tool-btn:hover, .ve-tool-btn.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        
+        /* Tooltip hack */
+        .ve-tool-btn:hover::after {
+            content: attr(data-title);
+            position: absolute;
+            left: 50px;
+            background: #000;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        /* Floating Drawer (Add Elements) */
+        .ve-drawer {
+            position: absolute;
+            left: 50px;
+            top: 0;
+            bottom: 0;
+            width: 250px;
+            background-color: #2b3035;
+            border-right: 1px solid #495057;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 14;
+            display: flex;
+            flex-direction: column;
+        }
+        .ve-drawer.open {
+            transform: translateX(0);
+        }
+        
+        .ve-drawer-header {
+            padding: 15px;
+            border-bottom: 1px solid #495057;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .ve-element-list {
+            padding: 10px;
+            overflow-y: auto;
+        }
+        
+        .ve-draggable-item {
+            background-color: #343a40;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid #495057;
+            color: #e0e0e0;
+            cursor: pointer; /* Simplified to click-to-add for iframe stability */
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+        .ve-draggable-item:hover {
+            background-color: #495057;
+            border-color: #0d6efd;
+        }
+
+        /* Canvas Area */
+        .ve-canvas-area {
+            flex-grow: 1;
+            background-color: #212529;
+            background-image: radial-gradient(#495057 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px;
             overflow: hidden;
             position: relative;
         }
 
-        /* Canvas Area (Left/Top) */
-        .ve-canvas-area {
-            background-color: #212529;
-            background-image: radial-gradient(#495057 1px, transparent 1px);
-            background-size: 20px 20px;
-            overflow: hidden; /* Handle iframe scroll internally */
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 20px;
-            flex-grow: 1;
-            min-width: 0; /* Prevent flex overflow */
-            position: relative;
-        }
-
         #website-preview {
-            transition: width 0.3s ease; /* Smooth width change, not height during resize */
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            background: white;
-            border: none;
             width: 100%;
             height: 100%;
+            border: none;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: width 0.3s ease;
         }
 
-        /* Resizer Handle */
-        .ve-resizer {
-            background-color: #000;
-            opacity: 0.5;
-            z-index: 100;
-            transition: background-color 0.2s;
-            flex-shrink: 0;
-        }
-        .ve-resizer:hover, .ve-resizer.resizing {
-            background-color: #0d6efd;
-            opacity: 1;
-        }
-
-        /* Desktop Resizer Styles */
-        @media (min-width: 769px) {
-            .ve-resizer {
-                width: 6px;
-                cursor: col-resize;
-                border-left: 1px solid #495057;
-                border-right: 1px solid #495057;
-            }
-            .ve-sidebar {
-                width: 320px; /* Default Desktop Width */
-                height: 100%;
-                border-left: 1px solid #495057;
-            }
-        }
-
-        /* Mobile Layout Overrides */
-        @media (max-width: 768px) {
-            .ve-workspace {
-                flex-direction: column;
-            }
-            .ve-resizer {
-                height: 8px;
-                width: 100%;
-                cursor: row-resize;
-                border-top: 1px solid #495057;
-                border-bottom: 1px solid #495057;
-            }
-            .ve-sidebar {
-                width: 100% !important; /* Force full width */
-                height: 40%; /* Default Mobile Height */
-                border-left: none;
-                border-top: 1px solid #495057;
-            }
-            /* Hide device toggles on mobile as space is tight */
-            .device-toggles {
-                display: none !important;
-            }
-            .ve-canvas-area {
-                padding: 5px; /* Less padding on mobile */
-            }
-        }
-
-        /* Sidebar Styling */
-        .ve-sidebar {
-            background-color: #1a1d20;
-            overflow-y: auto;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .ve-sidebar .accordion-button {
-            background-color: #212529;
-            color: #e0e0e0;
-            font-size: 0.9rem;
-            padding: 10px;
-        }
-        .ve-sidebar .accordion-button:not(.collapsed) {
-            background-color: #0d6efd;
-            color: white;
-        }
-        .ve-sidebar .accordion-body {
+        /* Floating Context Bar (The "Toolbar" requested) */
+        .ve-context-bar {
+            position: absolute;
+            top: 10px; /* Positioned relative to canvas area usually, but fixed here for UI stability */
+            left: 50%;
+            transform: translateX(-50%);
             background-color: #2b3035;
-            padding: 10px;
+            border: 1px solid #495057;
+            border-radius: 8px;
+            padding: 5px;
+            display: none; /* Hidden by default */
+            gap: 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 30;
         }
-        .ve-property-row {
+        .ve-context-bar.visible {
+            display: flex;
+        }
+        .ve-context-btn {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            color: white;
+            border-radius: 4px;
             display: flex;
             align-items: center;
-            margin-bottom: 8px;
-            gap: 8px;
+            justify-content: center;
         }
-        .ve-property-label {
+        .ve-context-btn:hover {
+            background-color: #495057;
+        }
+        .ve-context-btn.danger:hover {
+            background-color: #dc3545;
+        }
+
+        /* Right Inspector Panel */
+        .ve-inspector {
+            width: 300px;
+            background-color: #1a1d20;
+            border-left: 1px solid #495057;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+            z-index: 15;
+            transition: margin-right 0.3s ease;
+        }
+        .ve-inspector.closed {
+            margin-right: -300px;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .ve-left-toolbar { display: none; } /* Hide left bar on mobile to save space */
+            .ve-inspector { 
+                position: absolute; 
+                right: 0; 
+                top: 0; 
+                bottom: 0;
+                width: 80%;
+                transform: translateX(100%);
+                transition: transform 0.3s;
+                margin-right: 0;
+            }
+            .ve-inspector.mobile-open {
+                transform: translateX(0);
+            }
+            .ve-canvas-area { padding: 10px; }
+        }
+
+        /* Inspector styling re-use */
+        .ve-property-group {
+            border-bottom: 1px solid #2b3035;
+        }
+        .ve-group-header {
+            padding: 10px 15px;
+            background-color: #212529;
+            color: #e0e0e0;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+        .ve-group-body {
+            padding: 15px;
+            background-color: #2b3035;
+        }
+        .ve-input-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        .ve-label {
             font-size: 0.75rem;
             color: #adb5bd;
-            flex: 1;
+            width: 60px;
         }
-        .ve-input {
-            background-color: #212529;
+        .ve-input-control {
+            background: #1a1d20;
             border: 1px solid #495057;
-            color: #fff;
-            font-size: 0.8rem;
-            padding: 4px;
-            border-radius: 4px;
-        }
-        .ve-input:focus {
-            background-color: #212529;
-            color: #fff;
-            border-color: #0d6efd;
-            outline: none;
-        }
-        .box-model-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 4px;
-            text-align: center;
-        }
-        .device-btn.active {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
             color: white;
-        }
-        
-        /* Highlight outline for inspected elements */
-        .ve-inspect-outline {
-            outline: 2px solid #0d6efd !important;
-            cursor: pointer !important;
-            position: relative;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            flex-grow: 1;
         }
     </style>
 </head>
@@ -290,7 +383,8 @@
 
                 <!-- Content Area -->
                 <div class="col py-3" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
-                    <div class="main-toolbar d-flex justify-content-end align-items-start mb-2">
+                    <!-- Only show standard toolbar if NOT in preview tab, we have a custom one there -->
+                    <div id="standard-toolbar" class="main-toolbar d-flex justify-content-end align-items-start mb-2">
                         <div class="btn-group me-2" role="group" aria-label="Save actions">
                             <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
                                 <i class="bi bi-cloud-arrow-up"></i>
@@ -449,282 +543,190 @@
                             </div>
                         </div>
 
-                        <!-- MODIFIED PREVIEW TAB (VISUAL EDITOR) -->
-                         <div id="preview" class="tab-content" style="height:100%; padding: 0 !important; overflow: hidden;">
-                            <div class="d-flex flex-column h-100">
-                                <!-- Visual Editor Toolbar -->
-                                <div class="ve-toolbar d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="text-white fw-bold me-2">Vibe Visual Editor</span>
-                                        <div class="btn-group btn-group-sm device-toggles" role="group">
-                                            <button type="button" class="btn btn-outline-secondary device-btn active" id="ve-device-desktop" title="Desktop View"><i class="bi bi-pc-display"></i></button>
-                                            <button type="button" class="btn btn-outline-secondary device-btn" id="ve-device-tablet" title="Tablet View"><i class="bi bi-tablet"></i></button>
-                                            <button type="button" class="btn btn-outline-secondary device-btn" id="ve-device-mobile" title="Mobile View"><i class="bi bi-phone"></i></button>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button id="toggle-inspect-button" class="btn btn-sm btn-primary" title="Enable Inspect Mode">
-                                            <i class="bi bi-cursor-fill me-1"></i> Inspect
-                                        </button>
-                                        <button id="ve-refresh-button" class="btn btn-sm btn-secondary" title="Reload Preview">
-                                            <i class="bi bi-arrow-clockwise"></i>
-                                        </button>
-                                        <button id="ve-popout-button" class="btn btn-sm btn-dark" title="Open in New Tab">
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </button>
+                        <!-- NEW VISUAL EDITOR TAB (WIX STYLE) -->
+                         <div id="preview" class="tab-content" style="height:100%; padding: 0 !important; overflow: hidden; position: relative;">
+                            
+                            <!-- 1. Top Bar -->
+                            <div class="ve-top-bar">
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="text-white fw-bold">Vibe Builder</span>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary device-btn active" id="ve-device-desktop"><i class="bi bi-pc-display"></i></button>
+                                        <button class="btn btn-outline-secondary device-btn" id="ve-device-tablet"><i class="bi bi-tablet"></i></button>
+                                        <button class="btn btn-outline-secondary device-btn" id="ve-device-mobile"><i class="bi bi-phone"></i></button>
                                     </div>
                                 </div>
-
-                                <!-- Visual Editor Workspace (Flex Container) -->
-                                <div class="ve-workspace" id="ve-workspace">
-                                    
-                                    <!-- Canvas Area -->
-                                    <div class="ve-canvas-area" id="ve-canvas-area">
-                                        <iframe id="website-preview" title="Live Website Preview"></iframe>
-                                    </div>
-
-                                    <!-- Resizer Handle -->
-                                    <div class="ve-resizer" id="ve-resizer"></div>
-
-                                    <!-- Properties Sidebar -->
-                                    <div id="ve-properties-panel" class="ve-sidebar">
-                                        <div class="p-3 border-bottom border-secondary sticky-top bg-dark" style="z-index: 5;">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <h6 class="text-white m-0">Selected Element</h6>
-                                                <span id="ve-selection-indicator" class="badge bg-secondary">None</span>
-                                            </div>
-                                            <div class="input-group input-group-sm mb-2">
-                                                <span class="input-group-text bg-dark text-secondary border-secondary">Tag</span>
-                                                <input type="text" id="ve-selected-tag" class="form-control bg-dark text-white border-secondary" readonly placeholder="Click element...">
-                                            </div>
-                                            <div class="d-flex gap-1">
-                                                <button id="ve-action-parent" class="btn btn-sm btn-outline-secondary flex-grow-1" title="Select Parent"><i class="bi bi-arrow-up"></i> Parent</button>
-                                                <button id="ve-action-delete" class="btn btn-sm btn-outline-danger" title="Delete Element"><i class="bi bi-trash"></i></button>
-                                            </div>
-                                        </div>
-
-                                        <!-- Properties Accordion -->
-                                        <div class="accordion accordion-flush" id="ve-accordion" style="flex-grow: 1;">
-                                            
-                                            <!-- AI Edit Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAI">
-                                                        <i class="bi bi-stars me-2 text-warning"></i> AI Edit
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseAI" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <textarea id="ve-ai-prompt" class="form-control bg-dark text-white border-secondary mb-2" rows="2" placeholder="e.g. 'Make this button blue and round'"></textarea>
-                                                        <button id="ve-ai-execute" class="btn btn-sm btn-warning w-100">Apply with AI</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Content Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseContent">
-                                                        Content
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseContent" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <label class="ve-property-label mb-1">Text Content</label>
-                                                        <textarea id="ve-input-text" class="ve-input w-100" rows="3"></textarea>
-                                                        
-                                                        <label class="ve-property-label mt-2 mb-1">Classes</label>
-                                                        <input type="text" id="ve-input-classes" class="ve-input w-100" placeholder="btn btn-primary...">
-                                                        
-                                                        <label class="ve-property-label mt-2 mb-1">ID</label>
-                                                        <input type="text" id="ve-input-id" class="ve-input w-100" placeholder="element-id">
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Layout Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLayout">
-                                                        Layout
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseLayout" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Display</span>
-                                                            <select id="ve-input-display" class="ve-input" style="width: 60%">
-                                                                <option value="">Default</option>
-                                                                <option value="block">Block</option>
-                                                                <option value="inline">Inline</option>
-                                                                <option value="flex">Flex</option>
-                                                                <option value="grid">Grid</option>
-                                                                <option value="none">None</option>
-                                                            </select>
-                                                        </div>
-                                                        <div id="ve-flex-controls" style="display:none;">
-                                                            <div class="ve-property-row">
-                                                                <span class="ve-property-label">Direction</span>
-                                                                <select id="ve-input-flex-dir" class="ve-input" style="width: 60%">
-                                                                    <option value="row">Row</option>
-                                                                    <option value="column">Column</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="ve-property-row">
-                                                                <span class="ve-property-label">Justify</span>
-                                                                <select id="ve-input-justify" class="ve-input" style="width: 60%">
-                                                                    <option value="flex-start">Start</option>
-                                                                    <option value="center">Center</option>
-                                                                    <option value="flex-end">End</option>
-                                                                    <option value="space-between">Space Between</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="ve-property-row">
-                                                                <span class="ve-property-label">Align</span>
-                                                                <select id="ve-input-align" class="ve-input" style="width: 60%">
-                                                                    <option value="stretch">Stretch</option>
-                                                                    <option value="center">Center</option>
-                                                                    <option value="flex-start">Start</option>
-                                                                    <option value="flex-end">End</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="ve-property-row">
-                                                                <span class="ve-property-label">Gap</span>
-                                                                <input type="text" id="ve-input-gap" class="ve-input" style="width: 60%" placeholder="e.g. 10px">
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Spacing Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSpacing">
-                                                        Spacing (Margin/Pad)
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseSpacing" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <div class="text-center mb-1 text-muted small">Margin</div>
-                                                        <div class="box-model-grid mb-3">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-mt" class="ve-input" placeholder="T">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-ml" class="ve-input" placeholder="L">
-                                                            <div class="text-white small d-flex align-items-center justify-content-center">Box</div>
-                                                            <input type="text" id="ve-input-mr" class="ve-input" placeholder="R">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-mb" class="ve-input" placeholder="B">
-                                                            <div></div>
-                                                        </div>
-                                                        <div class="text-center mb-1 text-muted small">Padding</div>
-                                                        <div class="box-model-grid">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-pt" class="ve-input" placeholder="T">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-pl" class="ve-input" placeholder="L">
-                                                            <div class="text-white small d-flex align-items-center justify-content-center">Content</div>
-                                                            <input type="text" id="ve-input-pr" class="ve-input" placeholder="R">
-                                                            <div></div>
-                                                            <input type="text" id="ve-input-pb" class="ve-input" placeholder="B">
-                                                            <div></div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Size Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSize">
-                                                        Size
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseSize" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Width</span>
-                                                            <input type="text" id="ve-input-width" class="ve-input" style="width: 60%" placeholder="auto">
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Height</span>
-                                                            <input type="text" id="ve-input-height" class="ve-input" style="width: 60%" placeholder="auto">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Typography Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTypography">
-                                                        Typography
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseTypography" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Color</span>
-                                                            <input type="color" id="ve-input-color" class="form-control form-control-color" style="padding: 2px; height: 25px;">
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Size</span>
-                                                            <input type="text" id="ve-input-font-size" class="ve-input" style="width: 60%" placeholder="16px">
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Weight</span>
-                                                            <select id="ve-input-font-weight" class="ve-input" style="width: 60%">
-                                                                <option value="400">Normal</option>
-                                                                <option value="700">Bold</option>
-                                                                <option value="300">Light</option>
-                                                            </select>
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Align</span>
-                                                            <div class="btn-group btn-group-sm" role="group">
-                                                                <input type="radio" class="btn-check" name="ve-align" id="ve-align-left" value="left" autocomplete="off">
-                                                                <label class="btn btn-outline-secondary" for="ve-align-left"><i class="bi bi-text-left"></i></label>
-                                                                
-                                                                <input type="radio" class="btn-check" name="ve-align" id="ve-align-center" value="center" autocomplete="off">
-                                                                <label class="btn btn-outline-secondary" for="ve-align-center"><i class="bi bi-text-center"></i></label>
-                                                                
-                                                                <input type="radio" class="btn-check" name="ve-align" id="ve-align-right" value="right" autocomplete="off">
-                                                                <label class="btn btn-outline-secondary" for="ve-align-right"><i class="bi bi-text-right"></i></label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Decoration Section -->
-                                            <div class="accordion-item bg-dark border-secondary">
-                                                <h2 class="accordion-header">
-                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDecoration">
-                                                        Appearance
-                                                    </button>
-                                                </h2>
-                                                <div id="collapseDecoration" class="accordion-collapse collapse" data-bs-parent="#ve-accordion">
-                                                    <div class="accordion-body">
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Bg Color</span>
-                                                            <input type="color" id="ve-input-bg-color" class="form-control form-control-color" style="padding: 2px; height: 25px;">
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Border</span>
-                                                            <input type="text" id="ve-input-border" class="ve-input" style="width: 60%" placeholder="1px solid #000">
-                                                        </div>
-                                                        <div class="ve-property-row">
-                                                            <span class="ve-property-label">Radius</span>
-                                                            <input type="text" id="ve-input-radius" class="ve-input" style="width: 60%" placeholder="4px">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button id="toggle-inspect-button" class="btn btn-sm btn-primary" title="Toggle Interact Mode">
+                                        <i class="bi bi-cursor-fill me-1"></i> Inspect
+                                    </button>
+                                    <button id="ve-toggle-inspector" class="btn btn-sm btn-dark border-secondary">
+                                        <i class="bi bi-layout-sidebar-reverse"></i>
+                                    </button>
                                 </div>
                             </div>
+
+                            <!-- 2. Main Workspace -->
+                            <div class="ve-workspace">
+                                
+                                <!-- Left Toolbar (Icons) -->
+                                <div class="ve-left-toolbar">
+                                    <button class="ve-tool-btn" id="ve-tool-add" data-title="Add Elements"><i class="bi bi-plus-lg"></i></button>
+                                    <button class="ve-tool-btn" id="ve-tool-layers" data-title="Layers"><i class="bi bi-layers"></i></button>
+                                    <button class="ve-tool-btn" id="ve-tool-theme" data-title="Theme"><i class="bi bi-palette"></i></button>
+                                    <div style="flex-grow: 1;"></div>
+                                    <button class="ve-tool-btn" id="ve-tool-settings" data-title="Settings"><i class="bi bi-gear"></i></button>
+                                </div>
+
+                                <!-- Floating Drawer: Add Elements -->
+                                <div class="ve-drawer" id="ve-drawer-add">
+                                    <div class="ve-drawer-header">
+                                        <span>Add Elements</span>
+                                        <span class="close-drawer" style="cursor:pointer;">&times;</span>
+                                    </div>
+                                    <div class="ve-element-list">
+                                        <small class="text-muted d-block mb-2">Double click to add</small>
+                                        <div class="ve-draggable-item" data-tag="div" data-text="Container">
+                                            <i class="bi bi-square"></i> Container
+                                        </div>
+                                        <div class="ve-draggable-item" data-tag="h2" data-text="Heading">
+                                            <i class="bi bi-type-h1"></i> Heading
+                                        </div>
+                                        <div class="ve-draggable-item" data-tag="p" data-text="Paragraph">
+                                            <i class="bi bi-paragraph"></i> Paragraph
+                                        </div>
+                                        <div class="ve-draggable-item" data-tag="button" data-text="Button">
+                                            <i class="bi bi-hand-index-thumb"></i> Button
+                                        </div>
+                                        <div class="ve-draggable-item" data-tag="img" data-text="Image">
+                                            <i class="bi bi-image"></i> Image
+                                        </div>
+                                        <div class="ve-draggable-item" data-tag="div" data-class="card p-3" data-text="Card">
+                                            <i class="bi bi-card-text"></i> Card Component
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Canvas Area -->
+                                <div class="ve-canvas-area">
+                                    <iframe id="website-preview" title="Live Website Preview"></iframe>
+                                    
+                                    <!-- Floating Context Bar (Above Element) -->
+                                    <div class="ve-context-bar" id="ve-context-bar">
+                                        <span class="text-white small fw-bold px-2 align-self-center" id="ve-ctx-tag">DIV</span>
+                                        <div class="vr bg-secondary mx-1"></div>
+                                        <button class="ve-context-btn" id="ve-ctx-up" title="Move Up"><i class="bi bi-arrow-up"></i></button>
+                                        <button class="ve-context-btn" id="ve-ctx-down" title="Move Down"><i class="bi bi-arrow-down"></i></button>
+                                        <button class="ve-context-btn" id="ve-ctx-duplicate" title="Duplicate"><i class="bi bi-copy"></i></button>
+                                        <div class="vr bg-secondary mx-1"></div>
+                                        <button class="ve-context-btn" id="ve-ctx-parent" title="Select Parent"><i class="bi bi-box-arrow-in-up"></i></button>
+                                        <button class="ve-context-btn danger" id="ve-ctx-delete" title="Delete"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                </div>
+
+                                <!-- Right Inspector Panel -->
+                                <div class="ve-inspector" id="ve-inspector">
+                                    <div class="p-3 border-bottom border-secondary bg-dark text-white d-flex justify-content-between">
+                                        <span class="fw-bold">Inspector</span>
+                                        <span class="badge bg-primary" id="ve-selected-label">None</span>
+                                    </div>
+
+                                    <!-- Properties List -->
+                                    <div class="ve-property-group">
+                                        <div class="ve-group-header" data-bs-toggle="collapse" data-bs-target="#insp-layout">Layout <i class="bi bi-chevron-down"></i></div>
+                                        <div id="insp-layout" class="ve-group-body collapse show">
+                                            <div class="ve-input-row">
+                                                <span class="ve-label">Display</span>
+                                                <select id="ve-input-display" class="ve-input-control">
+                                                    <option value="block">Block</option>
+                                                    <option value="flex">Flex</option>
+                                                    <option value="grid">Grid</option>
+                                                    <option value="inline-block">Inline Block</option>
+                                                    <option value="none">None</option>
+                                                </select>
+                                            </div>
+                                            <!-- Flex Options (Conditional via JS) -->
+                                            <div id="ve-flex-options" style="display:none;">
+                                                <div class="ve-input-row">
+                                                    <span class="ve-label">Dir</span>
+                                                    <select id="ve-input-flex-dir" class="ve-input-control">
+                                                        <option value="row">Row</option>
+                                                        <option value="column">Col</option>
+                                                    </select>
+                                                </div>
+                                                <div class="ve-input-row">
+                                                    <span class="ve-label">Justify</span>
+                                                    <select id="ve-input-justify" class="ve-input-control">
+                                                        <option value="flex-start">Start</option>
+                                                        <option value="center">Center</option>
+                                                        <option value="space-between">Space Between</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="ve-property-group">
+                                        <div class="ve-group-header" data-bs-toggle="collapse" data-bs-target="#insp-spacing">Spacing <i class="bi bi-chevron-down"></i></div>
+                                        <div id="insp-spacing" class="ve-group-body collapse show">
+                                            <div class="text-center text-muted small mb-1">Margin</div>
+                                            <div class="d-flex gap-1 mb-2">
+                                                <input id="ve-input-mt" class="ve-input-control text-center" placeholder="T">
+                                                <input id="ve-input-mr" class="ve-input-control text-center" placeholder="R">
+                                                <input id="ve-input-mb" class="ve-input-control text-center" placeholder="B">
+                                                <input id="ve-input-ml" class="ve-input-control text-center" placeholder="L">
+                                            </div>
+                                            <div class="text-center text-muted small mb-1">Padding</div>
+                                            <div class="d-flex gap-1">
+                                                <input id="ve-input-pt" class="ve-input-control text-center" placeholder="T">
+                                                <input id="ve-input-pr" class="ve-input-control text-center" placeholder="R">
+                                                <input id="ve-input-pb" class="ve-input-control text-center" placeholder="B">
+                                                <input id="ve-input-pl" class="ve-input-control text-center" placeholder="L">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="ve-property-group">
+                                        <div class="ve-group-header" data-bs-toggle="collapse" data-bs-target="#insp-style">Style <i class="bi bi-chevron-down"></i></div>
+                                        <div id="insp-style" class="ve-group-body collapse show">
+                                            <div class="ve-input-row">
+                                                <span class="ve-label">Fill</span>
+                                                <input type="color" id="ve-input-bg-color" class="form-control form-control-color" style="width: 100%;">
+                                            </div>
+                                            <div class="ve-input-row">
+                                                <span class="ve-label">Text</span>
+                                                <input type="color" id="ve-input-color" class="form-control form-control-color" style="width: 100%;">
+                                            </div>
+                                            <div class="ve-input-row">
+                                                <span class="ve-label">Size</span>
+                                                <input type="text" id="ve-input-font-size" class="ve-input-control" placeholder="16px">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="ve-property-group">
+                                        <div class="ve-group-header" data-bs-toggle="collapse" data-bs-target="#insp-content">Content <i class="bi bi-chevron-down"></i></div>
+                                        <div id="insp-content" class="ve-group-body collapse show">
+                                            <textarea id="ve-input-text" class="ve-input-control w-100" rows="3"></textarea>
+                                            <div class="ve-input-row mt-2">
+                                                <span class="ve-label">ID</span>
+                                                <input id="ve-input-id" class="ve-input-control">
+                                            </div>
+                                            <div class="ve-input-row">
+                                                <span class="ve-label">Class</span>
+                                                <input id="ve-input-classes" class="ve-input-control">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-3">
+                                        <label class="text-warning small mb-1">AI Prompt</label>
+                                        <textarea id="ve-ai-prompt" class="ve-input-control w-100 mb-2" rows="2" placeholder="e.g. 'Make it round'"></textarea>
+                                        <button id="ve-ai-execute" class="btn btn-sm btn-warning w-100">Apply AI Edit</button>
+                                    </div>
+
+                                </div> <!-- End Inspector -->
+                            </div> <!-- End Workspace -->
                         </div>
 
                         <div id="editor" class="tab-content">
@@ -1151,70 +1153,92 @@
     <!-- Visual Editor Logic -->
     <script>
         (function() {
-            // --- RESIZER LOGIC ---
-            const resizer = document.getElementById('ve-resizer');
-            const sidebar = document.getElementById('ve-properties-panel');
-            const workspace = document.getElementById('ve-workspace');
-            const iframe = document.getElementById('website-preview');
-            const inspectBtn = document.getElementById('toggle-inspect-button');
-            const refreshBtn = document.getElementById('ve-refresh-button');
+            // --- UI TOGGLES ---
+            const toggleInspectorBtn = document.getElementById('ve-toggle-inspector');
+            const inspector = document.getElementById('ve-inspector');
+            const toolAdd = document.getElementById('ve-tool-add');
+            const drawerAdd = document.getElementById('ve-drawer-add');
+            const closeDrawerBtn = document.querySelector('.close-drawer');
+            const standardToolbar = document.getElementById('standard-toolbar');
             
-            if (resizer && sidebar && workspace) {
-                let isResizing = false;
-                let lastDownX = 0;
-                let lastDownY = 0;
-
-                resizer.addEventListener('mousedown', (e) => {
-                    isResizing = true;
-                    lastDownX = e.clientX;
-                    lastDownY = e.clientY;
-                    resizer.classList.add('resizing');
-                    document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
-                    e.preventDefault();
+            // Hide standard toolbar when in preview tab to avoid clutter
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                   if(btn.dataset.tab === 'preview') {
+                       if(standardToolbar) standardToolbar.style.display = 'none';
+                   } else {
+                       if(standardToolbar) standardToolbar.style.display = 'flex';
+                   }
                 });
+            });
 
-                document.addEventListener('mousemove', (e) => {
-                    if (!isResizing) return;
-                    if (window.innerWidth > 768) {
-                        const dx = lastDownX - e.clientX;
-                        const newWidth = parseInt(window.getComputedStyle(sidebar).width) + dx;
-                        if (newWidth > 200 && newWidth < 600) {
-                            sidebar.style.width = newWidth + 'px';
-                            lastDownX = e.clientX;
-                        }
-                    } else {
-                        const dy = lastDownY - e.clientY;
-                        const newHeight = parseInt(window.getComputedStyle(sidebar).height) + dy;
-                        if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
-                            sidebar.style.height = newHeight + 'px';
-                            lastDownY = e.clientY;
-                        }
+            if(toggleInspectorBtn && inspector) {
+                toggleInspectorBtn.addEventListener('click', () => {
+                    inspector.classList.toggle('closed');
+                    if(window.innerWidth <= 768) inspector.classList.toggle('mobile-open');
+                });
+            }
+
+            if(toolAdd && drawerAdd) {
+                toolAdd.addEventListener('click', () => {
+                    drawerAdd.classList.toggle('open');
+                    toolAdd.classList.toggle('active');
+                });
+            }
+            
+            if(closeDrawerBtn) {
+                closeDrawerBtn.addEventListener('click', () => {
+                    drawerAdd.classList.remove('open');
+                    toolAdd.classList.remove('active');
+                });
+            }
+            
+            // --- INJECT ELEMENT LOGIC ---
+            const iframe = document.getElementById('website-preview');
+            
+            document.querySelectorAll('.ve-draggable-item').forEach(item => {
+                item.addEventListener('dblclick', () => {
+                    const tag = item.dataset.tag;
+                    const text = item.dataset.text;
+                    const className = item.dataset.class || '';
+                    
+                    if(iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({
+                            type: 'VE_INJECT_ELEMENT',
+                            payload: { tag, text, className }
+                        }, '*');
                     }
                 });
+            });
 
-                document.addEventListener('mouseup', () => {
-                    if (isResizing) {
-                        isResizing = false;
-                        resizer.classList.remove('resizing');
-                        document.body.style.cursor = 'default';
+
+            // --- SELECTION & INSPECT LOGIC ---
+            let inspectEnabled = false;
+            const inspectBtn = document.getElementById('toggle-inspect-button');
+            const contextBar = document.getElementById('ve-context-bar');
+
+            // Toggle Inspect Mode
+            if (inspectBtn) {
+                inspectBtn.addEventListener('click', () => {
+                    inspectEnabled = !inspectEnabled;
+                    inspectBtn.classList.toggle('btn-primary', !inspectEnabled);
+                    inspectBtn.classList.toggle('btn-warning', inspectEnabled);
+                    inspectBtn.innerHTML = inspectEnabled ? '<i class="bi bi-stop-circle me-1"></i> Stop' : '<i class="bi bi-cursor-fill me-1"></i> Inspect';
+                    
+                    if (iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'VE_TOGGLE_INSPECT', enabled: inspectEnabled }, '*');
                     }
                 });
             }
 
-            // --- SELECTION & INSPECT LOGIC ---
-            let inspectEnabled = false;
-            let spyScriptInjected = false;
-
-            // Mapping IDs to CSS properties
-            const inputMap = {
+            // --- PROPERTY UPDATES ---
+             const inputMap = {
                 've-input-text': 'textContent',
                 've-input-classes': 'className',
                 've-input-id': 'id',
                 've-input-display': 'style.display',
                 've-input-flex-dir': 'style.flexDirection',
                 've-input-justify': 'style.justifyContent',
-                've-input-align': 'style.alignItems',
-                've-input-gap': 'style.gap',
                 've-input-mt': 'style.marginTop',
                 've-input-ml': 'style.marginLeft',
                 've-input-mr': 'style.marginRight',
@@ -1223,70 +1247,36 @@
                 've-input-pl': 'style.paddingLeft',
                 've-input-pr': 'style.paddingRight',
                 've-input-pb': 'style.paddingBottom',
-                've-input-width': 'style.width',
-                've-input-height': 'style.height',
                 've-input-color': 'style.color',
                 've-input-bg-color': 'style.backgroundColor',
-                've-input-font-size': 'style.fontSize',
-                've-input-font-weight': 'style.fontWeight',
-                've-input-border': 'style.border',
-                've-input-radius': 'style.borderRadius'
+                've-input-font-size': 'style.fontSize'
             };
 
-            // Toggle Inspect Mode
-            if (inspectBtn) {
-                inspectBtn.addEventListener('click', () => {
-                    inspectEnabled = !inspectEnabled;
-                    inspectBtn.classList.toggle('btn-primary', !inspectEnabled);
-                    inspectBtn.classList.toggle('btn-warning', inspectEnabled);
-                    inspectBtn.innerHTML = inspectEnabled ? '<i class="bi bi-stop-circle me-1"></i> Stop Inspect' : '<i class="bi bi-cursor-fill me-1"></i> Inspect';
-                    
-                    // Send message to iframe
-                    if (iframe.contentWindow) {
-                        iframe.contentWindow.postMessage({ type: 'VE_TOGGLE_INSPECT', enabled: inspectEnabled }, '*');
-                    }
-                });
-            }
-            
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', () => {
-                     // Force re-inject on refresh
-                    iframe.src = iframe.src; 
-                    // Wait for load to re-inject (handled by load listener below)
-                });
-            }
-
-            // Handle Input Changes in Visual Editor
             Object.keys(inputMap).forEach(inputId => {
                 const input = document.getElementById(inputId);
                 if (input) {
                     const eventType = (input.type === 'text' || input.tagName === 'TEXTAREA') ? 'input' : 'change';
                     input.addEventListener(eventType, (e) => {
-                        const prop = inputMap[inputId];
-                        const val = e.target.value;
                         if (iframe.contentWindow) {
                             iframe.contentWindow.postMessage({ 
                                 type: 'VE_UPDATE_ELEMENT', 
-                                property: prop, 
-                                value: val 
+                                property: inputMap[inputId], 
+                                value: e.target.value 
                             }, '*');
                         }
                     });
                 }
             });
-            
-            // Handle Alignment Buttons
-            document.querySelectorAll('input[name="ve-align"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    if (iframe.contentWindow) {
-                        iframe.contentWindow.postMessage({ 
-                            type: 'VE_UPDATE_ELEMENT', 
-                            property: 'style.textAlign', 
-                            value: e.target.value 
-                        }, '*');
-                    }
-                });
+
+            // --- CONTEXT ACTIONS ---
+            document.getElementById('ve-ctx-delete').addEventListener('click', () => {
+                 if (iframe.contentWindow) iframe.contentWindow.postMessage({ type: 'VE_ACTION_DELETE' }, '*');
+                 contextBar.classList.remove('visible');
             });
+             document.getElementById('ve-ctx-parent').addEventListener('click', () => {
+                 if (iframe.contentWindow) iframe.contentWindow.postMessage({ type: 'VE_ACTION_PARENT' }, '*');
+            });
+
 
             // Receive Messages from Iframe
             window.addEventListener('message', (e) => {
@@ -1294,26 +1284,23 @@
 
                 if (e.data.type === 'VE_ELEMENT_SELECTED') {
                     const data = e.data.payload;
-                    document.getElementById('ve-selection-indicator').textContent = data.tagName;
-                    document.getElementById('ve-selected-tag').value = `<${data.tagName}>`;
+                    document.getElementById('ve-selected-label').textContent = data.tagName;
+                    document.getElementById('ve-ctx-tag').textContent = data.tagName.toUpperCase();
                     
+                    // Show/Pos Context Bar (Fake pos for now, simplified)
+                    contextBar.classList.add('visible');
+
                     // Populate inputs
                     if (data.id) document.getElementById('ve-input-id').value = data.id;
                     if (data.className) document.getElementById('ve-input-classes').value = data.className;
                     if (data.textContent) document.getElementById('ve-input-text').value = data.textContent;
                     
-                    // Helper to safely set values
-                    const setVal = (id, val) => {
-                        const el = document.getElementById(id);
-                        if(el && val) el.value = val;
-                    };
-
+                    const setVal = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
                     const s = data.style;
+                    
                     setVal('ve-input-display', s.display);
                     setVal('ve-input-color', s.color);
                     setVal('ve-input-bg-color', s.backgroundColor);
-                    setVal('ve-input-width', s.width);
-                    setVal('ve-input-height', s.height);
                     setVal('ve-input-mt', s.marginTop);
                     setVal('ve-input-mr', s.marginRight);
                     setVal('ve-input-mb', s.marginBottom);
@@ -1323,17 +1310,13 @@
                     setVal('ve-input-pb', s.paddingBottom);
                     setVal('ve-input-pl', s.paddingLeft);
                     setVal('ve-input-font-size', s.fontSize);
-                    setVal('ve-input-font-weight', s.fontWeight);
+                    
                     // Flex toggle
-                    const flexControls = document.getElementById('ve-flex-controls');
-                    if (s.display === 'flex') {
-                        flexControls.style.display = 'block';
+                    const flexOpts = document.getElementById('ve-flex-options');
+                    flexOpts.style.display = (s.display === 'flex') ? 'block' : 'none';
+                    if(s.display === 'flex') {
                         setVal('ve-input-flex-dir', s.flexDirection);
                         setVal('ve-input-justify', s.justifyContent);
-                        setVal('ve-input-align', s.alignItems);
-                        setVal('ve-input-gap', s.gap);
-                    } else {
-                        flexControls.style.display = 'none';
                     }
                 }
             });
@@ -1343,19 +1326,17 @@
                 const doc = iframe.contentDocument;
                 if (!doc) return;
 
-                // Script to run INSIDE the iframe
                 const scriptContent = `
                     (function() {
                         let selectedElement = null;
                         let inspectMode = false;
                         let originalOutline = '';
 
-                        // Helper: RGB to Hex
                         function rgbToHex(col) {
                             if(!col) return '#ffffff';
                             if(col.charAt(0)=='#') return col;
                             const rgb = col.match(/\\d+/g);
-                            if(!rgb) return '#ffffff'; // Fallback
+                            if(!rgb) return '#ffffff';
                             return "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1);
                         }
 
@@ -1368,89 +1349,67 @@
                                     selectedElement = null;
                                 }
                             }
-                            if (e.data.type === 'VE_UPDATE_ELEMENT') {
-                                if (selectedElement) {
-                                    const prop = e.data.property;
-                                    const val = e.data.value;
-                                    
-                                    if (prop.startsWith('style.')) {
-                                        selectedElement.style[prop.split('.')[1]] = val;
-                                    } else if (prop === 'textContent') {
-                                        selectedElement.textContent = val;
-                                    } else if (prop === 'className') {
-                                        selectedElement.className = val;
-                                    } else if (prop === 'id') {
-                                        selectedElement.id = val;
-                                    }
-                                }
+                            if (e.data.type === 'VE_UPDATE_ELEMENT' && selectedElement) {
+                                const prop = e.data.property;
+                                if (prop.startsWith('style.')) selectedElement.style[prop.split('.')[1]] = e.data.value;
+                                else selectedElement[prop] = e.data.value;
+                            }
+                            if (e.data.type === 'VE_ACTION_DELETE' && selectedElement) {
+                                selectedElement.remove();
+                                selectedElement = null;
+                            }
+                            if (e.data.type === 'VE_ACTION_PARENT' && selectedElement) {
+                                if(selectedElement.parentElement) selectedElement.parentElement.click();
+                            }
+                            if (e.data.type === 'VE_INJECT_ELEMENT') {
+                                const el = document.createElement(e.data.payload.tag);
+                                el.textContent = e.data.payload.text;
+                                if(e.data.payload.className) el.className = e.data.payload.className;
+                                
+                                if(selectedElement) selectedElement.appendChild(el);
+                                else document.body.appendChild(el);
                             }
                         });
 
                         document.addEventListener('click', (e) => {
                             if (!inspectMode) return;
-                            e.preventDefault();
-                            e.stopPropagation();
+                            e.preventDefault(); e.stopPropagation();
 
-                            // Restore previous outline
-                            if (selectedElement) {
-                                selectedElement.style.outline = originalOutline;
-                            }
-
+                            if (selectedElement) selectedElement.style.outline = originalOutline;
                             selectedElement = e.target;
                             originalOutline = selectedElement.style.outline;
                             selectedElement.style.outline = '2px solid #0d6efd';
 
                             const comp = window.getComputedStyle(selectedElement);
                             
-                            const payload = {
-                                tagName: selectedElement.tagName.toLowerCase(),
-                                id: selectedElement.id,
-                                className: selectedElement.className,
-                                textContent: selectedElement.innerText.substring(0, 1000), // Cap length
-                                style: {
-                                    display: comp.display,
-                                    flexDirection: comp.flexDirection,
-                                    justifyContent: comp.justifyContent,
-                                    alignItems: comp.alignItems,
-                                    gap: comp.gap,
-                                    color: rgbToHex(comp.color),
-                                    backgroundColor: rgbToHex(comp.backgroundColor),
-                                    width: comp.width,
-                                    height: comp.height,
-                                    marginTop: comp.marginTop,
-                                    marginRight: comp.marginRight,
-                                    marginBottom: comp.marginBottom,
-                                    marginLeft: comp.marginLeft,
-                                    paddingTop: comp.paddingTop,
-                                    paddingRight: comp.paddingRight,
-                                    paddingBottom: comp.paddingBottom,
-                                    paddingLeft: comp.paddingLeft,
-                                    fontSize: comp.fontSize,
-                                    fontWeight: comp.fontWeight,
-                                    border: comp.border,
-                                    borderRadius: comp.borderRadius
-                                }
-                            };
-
-                            window.parent.postMessage({ type: 'VE_ELEMENT_SELECTED', payload: payload }, '*');
+                            window.parent.postMessage({ 
+                                type: 'VE_ELEMENT_SELECTED', 
+                                payload: {
+                                    tagName: selectedElement.tagName.toLowerCase(),
+                                    id: selectedElement.id,
+                                    className: selectedElement.className,
+                                    textContent: selectedElement.childNodes.length === 1 && selectedElement.firstChild.nodeType === 3 ? selectedElement.innerText : '',
+                                    style: {
+                                        display: comp.display,
+                                        flexDirection: comp.flexDirection,
+                                        justifyContent: comp.justifyContent,
+                                        color: rgbToHex(comp.color),
+                                        backgroundColor: rgbToHex(comp.backgroundColor),
+                                        marginTop: comp.marginTop,
+                                        marginRight: comp.marginRight,
+                                        marginBottom: comp.marginBottom,
+                                        marginLeft: comp.marginLeft,
+                                        paddingTop: comp.paddingTop,
+                                        paddingRight: comp.paddingRight,
+                                        paddingBottom: comp.paddingBottom,
+                                        paddingLeft: comp.paddingLeft,
+                                        fontSize: comp.fontSize
+                                    }
+                                } 
+                            }, '*');
                         }, true);
-
-                        // Highlight on hover in inspect mode
-                        document.addEventListener('mouseover', (e) => {
-                            if (!inspectMode) return;
-                            e.target.style.boxShadow = 'inset 0 0 0 2px rgba(13, 110, 253, 0.5)';
-                            e.stopPropagation();
-                        }, true);
-                        
-                        document.addEventListener('mouseout', (e) => {
-                            if (!inspectMode) return;
-                            e.target.style.boxShadow = '';
-                            e.stopPropagation();
-                        }, true);
-
                     })();
                 `;
-
                 const scriptEl = doc.createElement('script');
                 scriptEl.textContent = scriptContent;
                 doc.body.appendChild(scriptEl);
