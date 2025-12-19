@@ -1,8 +1,7 @@
 
-
 /**
  * Vibe Web Builder - Automation System (Auto-Pilot)
- * Event-Driven Sequential Execution
+ * Fixed UI Injection + Event-Driven Logic
  */
 
 (function() {
@@ -40,57 +39,100 @@
         constructor() {
             this.taskQueue = [];
             this.isRunning = false;
+            this.init();
+        }
+
+        init() {
+            console.log("🤖 Auto-Pilot System Initializing...");
             this.injectUI();
             
             // Listen for internal "step-complete" event to drive the sequence
+            window.removeEventListener('vibe-task-complete', this.handleTaskComplete);
             window.addEventListener('vibe-task-complete', () => this.processNextTask());
         }
 
         injectUI() {
+            // Remove existing if re-injected
+            if (document.getElementById('auto-pilot-btn')) return;
+
             const styles = document.createElement('style');
+            styles.id = 'auto-pilot-styles';
             styles.textContent = `
-                #auto-pilot-btn { position: fixed; bottom: 25px; right: 25px; width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%); color: white; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); z-index: 9999; display: flex; align-items: center; justify-content: center; font-size: 28px; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-                #auto-pilot-btn:hover { transform: scale(1.1) rotate(5deg); }
-                #auto-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; background: #1a1d21; border: 1px solid #333; border-radius: 12px; z-index: 10000; box-shadow: 0 20px 50px rgba(0,0,0,0.7); padding: 25px; color: #e0e0e0; font-family: 'Inter', sans-serif; }
-                #auto-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; backdrop-filter: blur(2px); }
-                .auto-input { width: 100%; padding: 12px; margin: 15px 0; background: #0f1115; border: 1px solid #444; color: white; border-radius: 6px; resize: vertical; }
-                .auto-actions { display: flex; justify-content: flex-end; gap: 10px; }
-                .auto-btn { padding: 8px 20px; border-radius: 6px; cursor: pointer; border: none; font-weight: 600; }
-                .auto-btn-run { background: #4A00E0; color: white; }
-                .auto-log-box { max-height: 150px; overflow-y: auto; background: #000; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 12px; color: #00ff00; margin-top: 10px; border-radius: 4px; display: none; }
-                .target-highlight { outline: 4px solid #d946ef !important; outline-offset: 2px; transition: all 0.3s; box-shadow: 0 0 20px rgba(217, 70, 239, 0.6); z-index: 10001; }
+                #auto-pilot-btn { 
+                    position: fixed !important; 
+                    bottom: 25px !important; 
+                    right: 25px !important; 
+                    width: 60px !important; 
+                    height: 60px !important; 
+                    border-radius: 50% !important; 
+                    background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%) !important; 
+                    color: white !important; 
+                    border: 2px solid rgba(255,255,255,0.2) !important; 
+                    cursor: pointer !important; 
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important; 
+                    z-index: 2147483647 !important; 
+                    display: flex !important; 
+                    align-items: center !important; 
+                    justify-content: center !important; 
+                    font-size: 30px !important; 
+                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+                }
+                #auto-pilot-btn:hover { transform: scale(1.1) rotate(10deg); box-shadow: 0 8px 30px rgba(142, 45, 226, 0.6); }
+                
+                #auto-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; background: #1a1d21; border: 1px solid #444; border-radius: 12px; z-index: 2147483647; box-shadow: 0 20px 60px rgba(0,0,0,0.8); padding: 20px; color: #fff; font-family: sans-serif; }
+                #auto-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2147483646; backdrop-filter: blur(4px); }
+                
+                .auto-input { width: 100%; padding: 12px; margin: 15px 0; background: #000; border: 1px solid #444; color: #00ff00; border-radius: 6px; font-family: monospace; font-size: 13px; box-sizing: border-box; }
+                .auto-log-box { max-height: 120px; overflow-y: auto; background: #080808; border: 1px solid #222; padding: 10px; font-family: monospace; font-size: 11px; color: #888; margin-bottom: 15px; border-radius: 4px; display: none; }
+                .auto-btn { padding: 10px 20px; border-radius: 6px; cursor: pointer; border: none; font-weight: bold; }
+                
+                .target-highlight { 
+                    outline: 4px solid #d946ef !important; 
+                    outline-offset: 4px !important; 
+                    box-shadow: 0 0 30px rgba(217, 70, 239, 0.8) !important; 
+                    position: relative !important;
+                    z-index: 2147483645 !important;
+                }
             `;
             document.head.appendChild(styles);
 
             const btn = document.createElement('button');
             btn.id = 'auto-pilot-btn';
             btn.innerHTML = '🤖'; 
+            btn.title = 'AI Auto-Pilot';
             btn.onclick = () => this.openModal();
-            document.body.appendChild(btn);
-
+            
             const overlay = document.createElement('div');
             overlay.id = 'auto-overlay';
+            overlay.onclick = () => this.closeModal();
+
             const modal = document.createElement('div');
             modal.id = 'auto-modal';
             modal.innerHTML = `
-                <h3 style="margin-top:0;">🤖 Auto-Pilot</h3>
-                <textarea id="auto-prompt" class="auto-input" rows="3" placeholder="e.g. 'Go to agent, type Hello, click Add Task'"></textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; color:#8E2DE2;">🤖 AI Auto-Pilot</h3>
+                    <button id="auto-close-x" style="background:none; border:none; color:#666; cursor:pointer; font-size:20px;">&times;</button>
+                </div>
+                <p style="font-size:12px; color:#aaa; margin-bottom:10px;">Enter steps (e.g., "Go to Chat, type 'Hello', click Send")</p>
+                <textarea id="auto-prompt" class="auto-input" rows="3" placeholder="Describe the automation..."></textarea>
                 <div id="auto-logs" class="auto-log-box"></div>
-                <div class="auto-actions">
-                    <button id="auto-close-btn" class="auto-btn" style="background:#333; color:white;">Close</button>
-                    <button id="auto-run-btn" class="auto-btn auto-btn-run">Run Sequence</button>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button id="auto-run-btn" class="auto-btn" style="background:#4A00E0; color:white;">Run Sequence</button>
                 </div>
             `;
+
+            document.body.appendChild(btn);
             document.body.appendChild(overlay);
             document.body.appendChild(modal);
 
-            document.getElementById('auto-close-btn').onclick = () => this.closeModal();
+            document.getElementById('auto-close-x').onclick = () => this.closeModal();
             document.getElementById('auto-run-btn').onclick = () => this.startAutomation();
         }
 
         openModal() {
             document.getElementById('auto-modal').style.display = 'block';
             document.getElementById('auto-overlay').style.display = 'block';
+            document.getElementById('auto-prompt').focus();
         }
 
         closeModal() {
@@ -108,16 +150,29 @@
         }
 
         async startAutomation() {
-            const prompt = document.getElementById('auto-prompt').value;
+            const promptInput = document.getElementById('auto-prompt');
+            const runBtn = document.getElementById('auto-run-btn');
+            const prompt = promptInput.value;
+
             if(!prompt || this.isRunning) return;
 
-            this.log("Consulting AI for sequence steps...");
+            runBtn.disabled = true;
+            runBtn.textContent = "Analyzing...";
+            this.log("Parsing instructions via AI...");
             
             try {
-                const systemPrompt = `You are an automation engine. Convert instruction to JSON array.
-                COMMANDS: click, input (requires value), navigate (to start, preview, editor, agent, chat, files, code), wait (ms).
-                UI KEYS: ${Object.keys(UI_MAP).join(', ')}.
-                Example: [{"action":"navigate","target":"agent"},{"action":"input","target":"Agent Input","value":"Test"}]`;
+                const systemPrompt = `You are a browser automation engine. Convert user instructions into a JSON execution array.
+                COMMANDS:
+                - {"action": "click", "target": "UI_MAP_KEY"}
+                - {"action": "input", "target": "UI_MAP_KEY", "value": "text"}
+                - {"action": "navigate", "target": "tab_name"} (tabs: start, preview, editor, agent, chat, files, code)
+                - {"action": "wait", "value": 1000}
+
+                UI_MAP_KEYS: ${Object.keys(UI_MAP).join(', ')}
+                
+                Example User: "Go to agent tab, type 'Refactor this' and click Add Task"
+                Result: [{"action":"navigate","target":"agent"},{"action":"input","target":"Agent Input","value":"Refactor this"},{"action":"click","target":"Add Task"}]
+                Return ONLY the JSON array.`;
 
                 const response = await window.vibeAPI.callAI(systemPrompt, prompt, true);
                 let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -126,11 +181,12 @@
                 this.isRunning = true;
                 this.closeModal();
                 
-                // Kick off the event-driven chain
+                // Start sequence
                 window.dispatchEvent(new CustomEvent('vibe-task-complete'));
             } catch (e) {
-                this.log("Error parsing script: " + e.message);
-                this.isRunning = false;
+                this.log("AI Error: " + e.message);
+                runBtn.disabled = false;
+                runBtn.textContent = "Run Sequence";
             }
         }
 
@@ -138,34 +194,32 @@
             if (this.taskQueue.length === 0) {
                 this.log("Sequence complete.");
                 this.isRunning = false;
+                document.getElementById('auto-run-btn').disabled = false;
+                document.getElementById('auto-run-btn').textContent = "Run Sequence";
                 return;
             }
 
             const step = this.taskQueue.shift();
-            this.log(`Executing: ${step.action} on ${step.target || 'delay'}`);
-
-            try {
-                await this.performAction(step);
-                // Dispatch event to trigger the next item in the queue
-                window.dispatchEvent(new CustomEvent('vibe-task-complete'));
-            } catch (err) {
-                console.error("Task failed", err);
-                this.isRunning = false;
-            }
+            await this.performAction(step);
+            
+            // Dispatch event to trigger the next step in the sequence
+            window.dispatchEvent(new CustomEvent('vibe-task-complete'));
         }
 
         async performAction(step) {
             return new Promise(async (resolve) => {
+                this.log(`Action: ${step.action} on ${step.target || 'delay'}`);
+
                 if (step.action === 'wait') {
                     setTimeout(resolve, step.value || 1000);
                     return;
                 }
 
                 if (step.action === 'navigate') {
-                    if (window.vibeAPI.switchToTab) {
+                    if (window.vibeAPI && window.vibeAPI.switchToTab) {
                         window.vibeAPI.switchToTab(step.target);
-                        setTimeout(resolve, 800); // Wait for DOM swap
-                    }
+                        setTimeout(resolve, 800); 
+                    } else { resolve(); }
                     return;
                 }
 
@@ -176,7 +230,7 @@
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     el.classList.add('target-highlight');
 
-                    // Visual pause so the user sees what's happening
+                    // Allow time for scroll and visual focus
                     setTimeout(() => {
                         if (step.action === 'click') {
                             el.click();
@@ -189,18 +243,30 @@
                         setTimeout(() => {
                             el.classList.remove('target-highlight');
                             resolve();
-                        }, 500);
-                    }, 600);
+                        }, 600);
+                    }, 700);
                 } else {
-                    this.log(`Element not found: ${step.target}`);
-                    resolve(); // Continue anyway to prevent hanging
+                    console.warn("Element not found for step:", step);
+                    resolve();
                 }
             });
         }
     }
 
-    window.addEventListener('load', () => {
-        setTimeout(() => { window.vibeAutomator = new VibeAutomator(); }, 1000);
-    });
+    // Initialize logic: Check for document body and vibeAPI availability
+    function bootstrap() {
+        if (document.body) {
+            window.vibeAutomator = new VibeAutomator();
+        } else {
+            setTimeout(bootstrap, 100);
+        }
+    }
+
+    // Start immediately if possible
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        bootstrap();
+    } else {
+        window.addEventListener('DOMContentLoaded', bootstrap);
+    }
+
 })();
- sequences if the button is clicked multiple times.
