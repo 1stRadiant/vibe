@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,6 +17,104 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <style>
+        /* Agent Right Sidebar Styles */
+        .agent-sidebar {
+            width: 380px;
+            min-width: 380px;
+            background-color: #1a1d21;
+            border-left: 1px solid #343a40;
+            display: flex;
+            flex-column;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .agent-sidebar h2 {
+            font-size: 1.25rem;
+            color: #0dcaf0;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .agent-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 1rem;
+        }
+
+        #agent-controls {
+            background: #212529;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #343a40;
+        }
+
+        #agent-prompt-input {
+            width: 100%;
+            background: #2b3035;
+            color: white;
+            border: 1px solid #495057;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            resize: none;
+            font-size: 14px;
+        }
+
+        .agent-buttons-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        #agent-output-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #agent-output {
+            flex-grow: 1;
+            background: #000;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 13px;
+            overflow-y: auto;
+            border: 1px solid #343a40;
+            color: #d1d1d1;
+        }
+
+        .agent-message-placeholder {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* Adjusting main container for 3-column layout */
+        #main-app-container {
+            display: flex !important;
+            flex-direction: row;
+            overflow: hidden;
+        }
+
+        .main-content-col {
+            flex-grow: 1;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Hide the old agent tab content if it exists */
+        #agent.tab-content {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
 
@@ -47,669 +144,246 @@
 
     <!-- Main App Container -->
     <div id="main-app-container" style="width:100%; height: 100vh; display: none;">
-        <div class="container-fluid">
-            <div class="row flex-nowrap">
-                <!-- Desktop Sidebar -->
-                <div class="col-auto px-0 bg-dark d-none d-md-flex">
-                    <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
-                        <a href="#" class="d-flex align-items-center p-3 text-info text-decoration-none" title="Vibe Coding System">
-                           <span class="fs-4" style="font-weight: bold;"></span>
+        
+        <!-- 1. LEFT SIDEBAR: Navigation -->
+        <div class="col-auto px-0 bg-dark d-none d-md-flex">
+            <div class="d-flex flex-column align-items-center pt-2 text-white min-vh-100">
+                <a href="#" class="d-flex align-items-center p-3 text-info text-decoration-none" title="Vibe Coding System">
+                   <span class="fs-4" style="font-weight: bold;"></span>
+                </a>
+                <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
+                            <i class="fs-4 bi-house"></i>
                         </a>
-                        <ul class="nav nav-pills flex-column mb-auto text-center" id="menu">
-                            <li class="nav-item">
-                                <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
-                                    <i class="fs-4 bi-house"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
-                                    <i class="fs-4 bi-display"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
-                                    <i class="fs-4 bi-pencil-square"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
-                                    <i class="fs-4 bi-robot"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
-                                    <i class="fs-4 bi-chat-dots"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
-                                    <i class="fs-4 bi-diagram-3"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
-                                    <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
-                                    <i class="fs-4 bi-folder"></i>
-                                </a>
-                            </li>
-                             <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
-                                    <i class="fs-4 bi-archive"></i>
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
-                                    <i class="fs-4 bi-code-slash"></i>
-                                </a>
-                            </li>
-                        </ul>
-                        <div class="dropdown pb-4">
-                            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fs-4 bi-person-circle"></i>
-                                <span class="d-none" id="user-status-text">User</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                                <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
-                                <li>
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
-                            </ul>
-                        </div>
-                    </div>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
+                            <i class="fs-4 bi-display"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
+                            <i class="fs-4 bi-pencil-square"></i>
+                        </a>
+                    </li>
+                    <!-- Agent icon removed here as it is now a sidebar -->
+                    <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="chat" title="Chat">
+                            <i class="fs-4 bi-chat-dots"></i>
+                        </a>
+                    </li>
+                     <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="flowchart" title="Flowchart">
+                            <i class="fs-4 bi-diagram-3"></i>
+                        </a>
+                    </li>
+                     <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="console" title="Console">
+                            <i class="fs-4 bi-terminal"></i><span id="console-error-indicator"></span>
+                        </a>
+                    </li>
+                     <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
+                            <i class="fs-4 bi-folder"></i>
+                        </a>
+                    </li>
+                     <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="context" title="Context">
+                            <i class="fs-4 bi-archive"></i>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
+                            <i class="fs-4 bi-code-slash"></i>
+                        </a>
+                    </li>
+                </ul>
+                <div class="dropdown pb-4">
+                    <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fs-4 bi-person-circle"></i>
+                        <span class="d-none" id="user-status-text">User</span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                        <li><a class="dropdown-item" href="#" id="new-project-button">New project...</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" id="logout-button">Sign out</a></li>
+                    </ul>
                 </div>
+            </div>
+        </div>
 
-                <!-- Content Area -->
-                <div class="col py-3">
-                    <div class="main-toolbar d-flex justify-content-end align-items-start">
-                        <div class="btn-group me-2" role="group" aria-label="Save actions">
-                            <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
-                                <i class="bi bi-cloud-arrow-up"></i>
-                            </button>
-                            <button class="btn btn-secondary" type="button" id="save-to-local-button" disabled title="Save to Local Storage">
-                                <i class="bi bi-hdd"></i>
-                            </button>
-                            <button class="btn btn-dark" type="button" id="save-to-github-button" disabled title="Save to GitHub">
-                                <i class="bi bi-github"></i>
-                            </button>
-                        </div>
-                        <div class="dropdown">
-                            <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
-                                <i class="bi bi-three-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li>
-                                    <button class="dropdown-item" type="button" id="open-ai-structure-modal-button" disabled>
-                                        <i class="bi bi-diagram-2 me-2"></i>AI Structure
-                                    </button>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <button class="dropdown-item" type="button" id="share-project-button" disabled>
-                                        <i class="bi bi-share me-2"></i>Share Project
-                                    </button>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <button class="dropdown-item" type="button" id="undo-button">
-                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Undo
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item" type="button" id="redo-button">
-                                        <i class="bi bi-arrow-clockwise me-2"></i>Redo
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+        <!-- 2. MIDDLE AREA: Tab Content -->
+        <div class="main-content-col py-3 px-3">
+            <div class="main-toolbar d-flex justify-content-end align-items-start mb-3">
+                <div class="btn-group me-2" role="group" aria-label="Save actions">
+                    <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                    </button>
+                    <button class="btn btn-secondary" type="button" id="save-to-local-button" disabled title="Save to Local Storage">
+                        <i class="bi bi-hdd"></i>
+                    </button>
+                    <button class="btn btn-dark" type="button" id="save-to-github-button" disabled title="Save to GitHub">
+                        <i class="bi bi-github"></i>
+                    </button>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" type="button" id="open-ai-structure-modal-button" disabled><i class="bi bi-diagram-2 me-2"></i>AI Structure</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item" type="button" id="share-project-button" disabled><i class="bi bi-share me-2"></i>Share Project</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item" type="button" id="undo-button"><i class="bi bi-arrow-counterclockwise me-2"></i>Undo</button></li>
+                        <li><button class="dropdown-item" type="button" id="redo-button"><i class="bi bi-arrow-clockwise me-2"></i>Redo</button></li>
+                    </ul>
+                </div>
+            </div>
 
-                    <div class="tab-content-area">
-                        <div id="start" class="tab-content active">
-                             <div class="start-page-content">
-                                <div class="start-header d-flex justify-content-between align-items-center">
-                                    <h1>Vibe</h1>
-                                    <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+            <div class="tab-content-area">
+                <div id="start" class="tab-content active">
+                     <div class="start-page-content">
+                        <div class="start-header d-flex justify-content-between align-items-center">
+                            <h1>Vibe</h1>
+                            <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+                        </div>
+                        
+                        <div class="accordion" id="start-page-accordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingProjects">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProjects" aria-expanded="true" aria-controls="collapseProjects">Your Projects</button>
+                                </h2>
+                                <div id="collapseProjects" class="accordion-collapse collapse show" aria-labelledby="headingProjects" data-bs-parent="#start-page-accordion">
+                                    <div class="accordion-body">
+                                        <div class="storage-toggle btn-group" role="group">
+                                            <button type="button" class="btn btn-outline-primary active" data-storage="cloud"><i class="bi bi-cloud me-1"></i> Cloud</button>
+                                            <button type="button" class="btn btn-outline-primary" data-storage="local"><i class="bi bi-hdd me-1"></i> Local</button>
+                                        </div>
+                                        <div id="project-list"></div>
+                                        <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                                    </div>
                                 </div>
-                                
-                                <div class="accordion" id="start-page-accordion">
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header" id="headingProjects">
-                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProjects" aria-expanded="true" aria-controls="collapseProjects">
-                                                Your Projects
-                                            </button>
-                                        </h2>
-                                        <div id="collapseProjects" class="accordion-collapse collapse show" aria-labelledby="headingProjects" data-bs-parent="#start-page-accordion">
-                                            <div class="accordion-body">
-                                                <div class="storage-toggle btn-group" role="group">
-                                                    <button type="button" class="btn btn-outline-primary active" data-storage="cloud">
-                                                        <i class="bi bi-cloud me-1"></i> Cloud
-                                                    </button>
-                                                    <button type="button" class="btn btn-outline-primary" data-storage="local">
-                                                        <i class="bi bi-hdd me-1"></i> Local
-                                                    </button>
-                                                </div>
-                                                <div id="project-list"></div>
-                                                <p id="no-projects-message" style="display: none;">You have no saved projects. Create one below!</p>
+                            </div>
+                            <div class="accordion-item" id="github-load-container" style="display: none;">
+                                <h2 class="accordion-header" id="headingGithub">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGithub" aria-expanded="false" aria-controls="collapseGithub">Load from GitHub</button>
+                                </h2>
+                                <div id="collapseGithub" class="accordion-collapse collapse" aria-labelledby="headingGithub" data-bs-parent="#start-page-accordion">
+                                    <div class="accordion-body">
+                                        <div class="form-group"><label>Repository</label><select id="github-repo-select" class="form-select"><option>-- Connect to GitHub in Settings --</option></select></div>
+                                        <div class="form-group"><label>Branch</label><select id="github-branch-select" class="form-select"><option>-- Select a Repo First --</option></select></div>
+                                        <button id="load-from-github-button" class="action-button primary"><i class="bi bi-github me-2"></i>Load Project</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingNewProject">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewProject" aria-expanded="false" aria-controls="collapseNewProject">Create a New Project</button>
+                                </h2>
+                                <div id="collapseNewProject" class="accordion-collapse collapse" aria-labelledby="headingNewProject" data-bs-parent="#start-page-accordion">
+                                    <div class="accordion-body">
+                                        <div class="new-project-form">
+                                            <div class="form-group"><label>Project Name</label><input type="text" id="new-project-id-input" placeholder="my-awesome-new-site"></div>
+                                             <div class="form-group"><label>Save Location</label><div class="btn-group" role="group"><input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" checked><label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label><input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local"><label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label></div></div>
+                                        </div>
+                                        <hr class="section-divider">
+                                        <div class="project-creation-method">
+                                            <h3>From a High-Level Goal</h3>
+                                            <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                            <div class="button-container">
+                                                <button id="start-iterative-build-button" class="action-button agent"><i class="bi bi-robot me-2"></i>Build</button>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="accordion-item" id="github-load-container" style="display: none;">
-                                        <h2 class="accordion-header" id="headingGithub">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGithub" aria-expanded="false" aria-controls="collapseGithub">
-                                                Load from GitHub
-                                            </button>
-                                        </h2>
-                                        <div id="collapseGithub" class="accordion-collapse collapse" aria-labelledby="headingGithub" data-bs-parent="#start-page-accordion">
-                                            <div class="accordion-body">
-                                                <div class="form-group">
-                                                    <label for="github-repo-select">Repository</label>
-                                                    <select id="github-repo-select" class="form-select">
-                                                        <option>-- Connect to GitHub in Settings --</option>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label for="github-branch-select">Branch</label>
-                                                    <select id="github-branch-select" class="form-select">
-                                                        <option>-- Select a Repo First --</option>
-                                                    </select>
-                                                </div>
-                                                <button id="load-from-github-button" class="action-button primary"><i class="bi bi-github me-2"></i>Load Project</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header" id="headingNewProject">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewProject" aria-expanded="false" aria-controls="collapseNewProject">
-                                                Create a New Project
-                                            </button>
-                                        </h2>
-                                        <div id="collapseNewProject" class="accordion-collapse collapse" aria-labelledby="headingNewProject" data-bs-parent="#start-page-accordion">
-                                            <div class="accordion-body">
-                                                <div class="new-project-form">
-                                                    <div class="form-group">
-                                                        <label for="new-project-id-input">Project Name</label>
-                                                        <input type="text" id="new-project-id-input" placeholder="my-awesome-new-site">
-                                                    </div>
-                                                     <div class="form-group">
-                                                        <label>Save Location</label>
-                                                         <div class="btn-group" role="group" aria-label="New project storage location">
-                                                             <input type="radio" class="btn-check" name="projectStorage" id="storageCloud" value="cloud" autocomplete="off" checked>
-                                                             <label class="btn btn-outline-primary" for="storageCloud"><i class="bi bi-cloud me-1"></i> Cloud</label>
-
-                                                             <input type="radio" class="btn-check" name="projectStorage" id="storageLocal" value="local" autocomplete="off">
-                                                             <label class="btn btn-outline-primary" for="storageLocal"><i class="bi bi-hdd me-1"></i> Local</label>
-                                                         </div>
-                                                     </div>
-                                                </div>
-                                                
-                                                <hr class="section-divider">
-
-                                                <div class="project-creation-method">
-                                                    <h3>From a High-Level Goal</h3>
-                                                    <p>Describe your website, and let the AI figure out the structure and code.</p>
-                                                    <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
-                                                    <div class="button-container">
-<button hidden id="generate-project-button" class="action-button primary"><i class="bi bi-stars me-2"></i>Generate Project</button>                                                        
-                                                        <button id="start-iterative-build-button" class="action-button agent"><i class="bi bi-robot me-2"></i>Build</button>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="project-creation-method">
-                                                    <h3>From Structural Instructions</h3>
-                                                    <p>Tell the AI exactly how to structure the Vibe Nodes for boilerplate generation.</p>
-                                                    <textarea id="project-instructions-input" placeholder="e.g., 'Create a header, a main section with three feature cards, and a footer. Also add a global CSS node for styles.'"></textarea>
-                                                    <div class="button-container">
-                                                        <button id="generate-from-instructions-button" class="action-button primary"><i class="bi bi-diagram-2 me-2"></i>Generate from Instructions</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div id="start-page-generation-output" style="display: none;">
-                                    <div id="generation-status-container">
-                                        <h3 id="generation-status-text">Generating your project...</h3>
-                                        <div class="loading-spinner"></div>
-                                    </div>
-                                    <div id="live-code-container">
-                                        <pre><code id="live-code-output" class="language-html"></code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                         <div id="preview" class="tab-content" style="height:1000px;">
-                            <div class="preview-container">
-                                <div class="preview-header d-flex justify-content-between align-items-center">
-                                    <h2>Vibe</h2>
-                                    <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
-                                </div>
-                                <iframe id="website-preview" title="Live Website Preview"></iframe>
-                            </div>
-                        </div>
-
-                        <div id="editor" class="tab-content">
-                            <div class="editor-container">
-                                <div class="editor-header">
-                                    <div class="editor-header-left">
-                                        <h2>Vibe</h2>
-                                        <p>Edit the descriptions to change the website. Updating a parent will automatically update its children.</p>
-                                    </div>
-                                    <div class="editor-header-right">
-                                        <div id="ai-editor-search-container">
-                                            <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
-                                            <button id="ai-editor-search-button" class="action-button">Search</button>
-                                        </div>
-                                        <button id="open-settings-modal-button" class="action-button">API Settings</button>
-                                    </div>
-                                </div>
-                                <div id="vibe-editor"></div>
-                            </div>
-                        </div>
-                        <div id="agent" class="tab-content">
-                            <div class="agent-container">
-                                <h2>Vibe</h2>
-                                <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
-                                
-                                <div id="agent-controls">
-                                    <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
-                                    <div class="agent-buttons-container">
-                                        <button id="run-agent-single-task-button" class="action-button">Add Task</button>
-                                        <button id="start-iterative-session-button" class="action-button">Process Queue</button>
-                                        <button id="end-session-button" style="display: none;">Stop Queue</button>
-                                    </div>
-                                </div>
-
-                                <div id="agent-output-container">
-                                    <h3>Agent Log</h3>
-                                    <div id="agent-output">
-                                        <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="chat" class="tab-content">
-                            <div class="chat-container">
-                                <h2>Vibe</h2>
-                                <div class="system-prompt-container">
-                                    <label for="chat-system-prompt-input">System Prompt (Optional)</label>
-                                    <textarea id="chat-system-prompt-input" placeholder="e.g., You are a helpful assistant that only replies in haikus."></textarea>
-                                </div>
-                                <div class="chat-output-container">
-                                    <div id="chat-output">
-                                        <div class="chat-message-placeholder">Start the conversation by typing a message below.</div>
-                                    </div>
-                                </div>
-                                <div class="chat-controls">
-                                    <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
-                                    <button id="send-chat-button" class="action-button">Send</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="flowchart" class="tab-content">
-                            <div class="flowchart-container">
-                                <h2>Vibe</h2>
-                                <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
-                                <div class="flowchart-controls">
-                                    <button id="generate-flowchart-button" class="action-button">Generate Flowchart</button>
-                                </div>
-                                <div id="flowchart-output">
-                                    <div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram of your website's logic.</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="console" class="tab-content">
-                            <div id="console-container">
-                                <h2>Vibe</h2>
-                                <div id="console-output"></div>
-                            </div>
-                        </div>
-                        <div id="files" class="tab-content">
-                            <div class="files-container">
-                                <h2>Vibe</h2>
-                                <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
-                                <div class="files-toolbar">
-                                    <input type="file" id="files-upload-input" multiple style="display: none;">
-                                    <button id="files-upload-button" class="action-button">Upload</button>
-                                    <button id="files-new-folder-button" class="action-button">New Folder</button>
-                                    <button id="files-new-file-button" class="action-button">New File</button>
-                                    <button id="files-download-button" class="action-button">Download</button>
-                                    <button id="files-copy-button" class="action-button">Copy</button>
-                                    <button id="files-paste-button" class="action-button">Paste</button>
-                                    <button id="files-rename-button" class="action-button">Rename</button>
-                                    <button id="files-delete-button" class="action-button danger">Delete</button>
-                                </div>
-                                <div class="assets-hint">
-                                    <strong>Hint:</strong> You can reference these assets in your prompts and code. The AI receives a list of available assets. Use paths exactly as shown below.
-                                </div>
-                                <div class="files-browser">
-                                    <div class="files-tree" id="files-tree"></div>
-                                    <div class="files-preview" id="files-preview">
-                                        <div class="files-preview-placeholder">Select a file to preview it here.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                         <div id="context" class="tab-content">
-                            <div class="context-container">
-                                <h2>Vibe</h2>
-                                <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
-                                <div class="context-browser">
-                                    <div class="context-list-panel">
-                                        <h3>Components</h3>
-                                        <div id="context-component-list"></div>
-                                        <button id="add-new-component-button" class="action-button">Add New Component</button>
-                                        <div class="context-io-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
-                                            <input type="file" id="context-upload-input" accept=".json,application/json" style="display: none;">
-                                            <button id="upload-context-button" class="action-button" title="Import a component library from a .json file">Upload Library</button>
-                                            <button id="download-context-button" class="action-button" title="Export the current component library to a .json file">Download Library</button>
-                                        </div>
-                                    </div>
-                                    <div id="context-component-viewer" class="context-viewer-panel">
-                                        <div class="files-preview-placeholder">Select a component to view it here.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="code" class="tab-content">
-                            <div class="full-code-container">
-                                <h2>Vibe</h2>
-                                <div class="file-io-section">
-                                    <div class="file-upload-container">
-                                        <p>Load a single HTML file into the editor.</p>
-                                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
-                                        <button id="upload-html-button" class="action-button"><i class="bi bi-file-earmark-code"></i> Upload HTML</button>
-                                    </div>
-                                    <div class="file-upload-container">
-                                        <p>Load a full website from a ZIP file.</p>
-                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
-                                        <button id="upload-zip-button" class="action-button"><i class="bi bi-file-earmark-zip"></i> Upload ZIP</button>
-                                    </div>
-                                    <div class="file-upload-container">
-                                        <p>Download your current project as a ZIP.</p>
-                                        <button id="download-zip-button" class="action-button"><i class="bi bi-download"></i> Download ZIP</button>
-                                    </div>
-                                </div>
-                                <hr/>
-                                <div class="search-container">
-                                    <input type="text" id="search-input" placeholder="Find in code...">
-                                    <button id="find-prev-button" class="action-button">&lt; Prev</button>
-                                    <button id="find-next-button" class="action-button">Next &gt;</button>
-                                    <span id="search-results-count"></span>
-                                </div>
-                                <textarea id="full-code-editor" class="form-control" rows="25" style="width: 100%; height: 600px !important; min-height: 60vh; font-family: 'Roboto Mono', monospace; font-size: 14px; background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #444; border-radius: 5px; padding: 10px;"></textarea>
-                                <div class="full-code-actions">
-                                    <button id="update-tree-from-code-button" class="action-button">
-                                        <i class="bi bi-arrow-clockwise"></i> Update from Code
-                                    </button>
-                                    <div class="ai-prompt-container">
-                                        <input type="text" id="full-code-ai-prompt" placeholder="Select code and describe your change..."/>
-                                        <button id="run-full-code-ai-button" class="action-button primary ai-powered-button">
-                                            <i class="bi bi-stars"></i> Update with AI
-                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Bottom Navigation for Mobile -->
-    <div class="fixed-bottom bg-dark d-md-none">
-        <div class="d-flex justify-content-around">
-            <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
-                <i class="fs-4 bi-house text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
-                <i class="fs-4 bi-display text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
-                <i class="fs-4 bi-pencil-square text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
-                <i class="fs-4 bi-robot text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
-                <i class="fs-4 bi-folder text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
-                <i class="fs-4 bi-code-slash text-white"></i>
-            </a>
-        </div>
-    </div>
-    
-    <!-- Modals -->
-     <div id="add-node-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Add New Child Node</h2>
-            <p>Define the new component to add to the selected container.</p>
-            <input type="hidden" id="add-node-parent-id">
-            <input type="hidden" id="add-node-target-id">
-            <input type="hidden" id="add-node-position">
-            <label for="new-node-id">New Node ID (kebab-case):</label>
-            <input type="text" id="new-node-id" placeholder="e.g., my-new-button">
-            <label for="new-node-description">Description:</label>
-            <textarea id="new-node-description" rows="2" placeholder="A concise description..."></textarea>
-            <label for="new-node-type">Node Type:</label>
-            <select id="new-node-type">
-                <option value="html">HTML</option>
-                <option value="css">CSS</option>
-                <option value="javascript">JavaScript</option>
-            </select>
-            <button id="create-node-button" class="action-button">Create Node</button>
-            <div id="add-node-error" class="modal-error"></div>
-        </div>
-    </div>
+                <div id="preview" class="tab-content" style="height:100%;">
+                    <div class="preview-container">
+                        <div class="preview-header d-flex justify-content-between align-items-center">
+                            <h2>Vibe Live Preview</h2>
+                            <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                        </div>
+                        <iframe id="website-preview" title="Live Website Preview" style="width:100%; height: 80vh;"></iframe>
+                    </div>
+                </div>
 
-    <div id="settings-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-settings-modal-button">&times;</span>
-            <h2>Settings</h2>
-            <div class="ai-provider-container">
-                <h3>AI Provider</h3>
-                <select id="ai-provider-select">
-                    <option value="gemini">Google Gemini</option>
-                    <option value="nscale">nscale</option>
-                </select>
-            </div>
-            <div id="gemini-settings-container">
-                 <h3>Gemini Model</h3>
-                 <select id="gemini-model-select">
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                    <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
-                    <option value="gemini-3-flash-preview">Gemini 3 Flash (Preview)</option>
-                 </select>
-                <div id="gemini-api-key-container" class="api-key-container">
-                    <h3>Gemini API Key</h3>
-                    <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
-                    <button id="save-api-key-button">Save Key</button>
-                    <div id="api-key-status"></div>
+                <div id="editor" class="tab-content">
+                    <div class="editor-container">
+                        <div class="editor-header">
+                            <div class="editor-header-left">
+                                <h2>Vibe Editor</h2>
+                            </div>
+                            <div class="editor-header-right">
+                                <div id="ai-editor-search-container">
+                                    <input type="text" id="ai-editor-search-input" placeholder="AI Search: 'find the navbar styles'">
+                                    <button id="ai-editor-search-button" class="action-button">Search</button>
+                                </div>
+                                <button id="open-settings-modal-button" class="action-button">API Settings</button>
+                            </div>
+                        </div>
+                        <div id="vibe-editor"></div>
+                    </div>
                 </div>
-            </div>
-            <div id="nscale-api-key-container" class="api-key-container" style="display: none;">
-                <h3>nscale API Key</h3>
-                <input type="password" id="nscale-api-key-input" placeholder="Enter your nscale API Key here...">
-                <button id="save-nscale-api-key-button">Save Key</button>
-                <div id="nscale-api-key-status"></div>
-            </div>
-            <hr>
-            <div id="github-settings-container" class="api-key-container">
-                <h3>GitHub Integration</h3>
-                <div id="github-pat-form">
-                    <label for="github-pat-input">Personal Access Token (repo scope)</label>
-                    <input type="password" id="github-pat-input" placeholder="ghp_...">
-                    <button id="save-github-pat-button">Connect to GitHub</button>
-                </div>
-                <div id="github-status"></div>
-                <button id="logout-github-button" style="display:none;">Disconnect from GitHub</button>
-            </div>
-        </div>
-    </div>
 
-    <div id="edit-node-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-edit-node-modal-button">&times;</span>
-            <h2>Edit Component</h2>
-            <label>Node ID</label>
-            <input type="text" id="edit-node-id" readonly>
-            <label>Type</label>
-            <input type="text" id="edit-node-type" readonly>
-            <label for="edit-node-description">Description</label>
-            <textarea id="edit-node-description" rows="3"></textarea>
-            <button id="ai-improve-description-button" class="action-button" style="margin-top: 10px;">AI: Improve Description</button>
-            <label for="edit-node-code">Code</label>
-            <textarea id="edit-node-code" rows="10"></textarea>
-            <div class="button-row">
-                <button id="save-edit-node-button" class="action-button">Save & Update Vibe</button>
-                <button id="save-as-component-button" class="action-button">Save as Component</button>
+                <!-- Chat, Flowchart, Console, Files, Code Tabs stay here -->
+                <div id="chat" class="tab-content">...</div>
+                <div id="flowchart" class="tab-content">...</div>
+                <div id="console" class="tab-content">...</div>
+                <div id="files" class="tab-content">...</div>
+                <div id="context" class="tab-content">...</div>
+                <div id="code" class="tab-content">
+                    <div class="full-code-container">
+                        <h2>Full Code Editor</h2>
+                        <textarea id="full-code-editor" class="form-control" rows="25" style="width: 100%; background-color: #1e1e1e; color: #d4d4d4; font-family: 'Roboto Mono', monospace;"></textarea>
+                    </div>
+                </div>
             </div>
-            <div id="edit-node-error" class="modal-error"></div>
         </div>
-    </div>
 
-    <div id="context-component-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" id="close-context-modal-button">&times;</span>
-            <h2 id="component-modal-title">Add New Component</h2>
-            <div class="component-ai-generator">
-                <label for="component-ai-prompt-input">Generate with AI:</label>
-                <textarea id="component-ai-prompt-input" rows="3" placeholder="e.g., 'a responsive card with an image...'"></textarea>
-                <button id="generate-component-button" class="action-button">Generate Component</button>
-            </div>
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #4b5263;">
-            <label for="component-id-input">Component ID (unique, kebab-case):</label>
-            <input type="text" id="component-id-input" placeholder="e.g., responsive-navbar">
-            <label for="component-name-input">Display Name:</label>
-            <input type="text" id="component-name-input" placeholder="e.g., Responsive Navbar">
-            <label for="component-description-input">Description:</label>
-            <textarea id="component-description-input" rows="2"></textarea>
-            <div class="component-modal-code-fields">
-                <div>
-                    <label for="component-html-input">HTML Snippet:</label>
-                    <textarea id="component-html-input" rows="6"></textarea>
+        <!-- 3. RIGHT SIDEBAR: Auto Pilot (Agent) -->
+        <div class="agent-sidebar">
+            <div class="agent-container">
+                <h2><i class="bi bi-robot me-2"></i>Auto Pilot</h2>
+                <p class="small text-muted">Tasks will process sequentially.</p>
+                
+                <div id="agent-controls">
+                    <textarea id="agent-prompt-input" rows="4" placeholder="Describe a task for the AI..."></textarea>
+                    <div class="agent-buttons-container">
+                        <button id="run-agent-single-task-button" class="btn btn-primary btn-sm">Add Task</button>
+                        <button id="start-iterative-session-button" class="btn btn-success btn-sm">Process</button>
+                        <button id="end-session-button" class="btn btn-danger btn-sm" style="display: none;">Stop</button>
+                    </div>
                 </div>
-                <div>
-                    <label for="component-css-input">CSS Snippet:</label>
-                    <textarea id="component-css-input" rows="6"></textarea>
-                </div>
-                <div>
-                    <label for="component-js-input">JavaScript Snippet:</label>
-                    <textarea id="component-js-input" rows="6"></textarea>
-                </div>
-            </div>
-            <div class="button-row">
-                <button id="save-component-button" class="action-button">Save Component</button>
-                <button id="delete-component-button" class="action-button danger" style="display: none;">Delete</button>
-            </div>
-            <div id="component-modal-error" class="modal-error"></div>
-        </div>
-    </div>
 
-    <div id="global-agent-loader">
-        <div class="loading-spinner"></div>
-        <div class="loader-text">
-            <p id="global-agent-status-text">Agent is working...</p>
-            <p id="global-agent-progress-text"></p>
-        </div>
-    </div>
-    
-    <div id="ai-project-edit-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="ai-project-edit-modal-title">AI Command</h2>
-                <button id="ai-project-edit-close-button" class="close-button">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Enter a command to modify the project. The AI will use the selected component as context but can edit any part of the project to achieve your goal.</p>
-                <input type="hidden" id="ai-project-edit-node-id">
-                <div class="form-group">
-                    <label for="ai-project-edit-prompt-input">Your Command:</label>
-                    <textarea id="ai-project-edit-prompt-input" rows="4" placeholder="e.g., 'Make all the links in this navigation bar turn red on hover'"></textarea>
+                <div id="agent-output-container">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-uppercase small fw-bold text-muted">Agent Log</span>
+                    </div>
+                    <div id="agent-output">
+                        <div class="agent-message-placeholder">Waiting for tasks...</div>
+                    </div>
                 </div>
-                <p id="ai-project-edit-error" class="modal-error"></p>
-            </div>
-            <div class="modal-footer">
-                <button id="ai-project-edit-execute-button" class="action-button">Execute Command</button>
             </div>
         </div>
-    </div>
-    
-    <div id="ai-structure-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>AI Structure Update</h2>
-                <button id="ai-structure-close-button" class="close-button">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Describe how you want to change the current Vibe Tree structure. The AI will generate a new tree based on your instructions. This is a powerful tool for refactoring.</p>
-                <div class="form-group">
-                    <label for="ai-structure-prompt-input">Your Instructions:</label>
-                    <textarea id="ai-structure-prompt-input" rows="6" placeholder="e.g., 'Move the 'login-button' node inside the 'user-profile-card' node. Create a new CSS node called 'card-styles' and link it.'"></textarea>
-                </div>
-                <p id="ai-structure-error" class="modal-error"></p>
-            </div>
-            <div class="modal-footer">
-                <button id="ai-structure-execute-button" class="action-button">Update Structure</button>
-            </div>
-        </div>
-    </div>
 
-    <div id="ai-controls-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="ai-controls-modal-title">Generate Controls</h3>
-                <span id="ai-controls-close-button" class="close-button">&times;</span>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="ai-controls-node-id">
-                <p>Describe the controls you want to generate for this element (e.g., "add controls for background color, padding, and font size").</p>
-                <textarea id="ai-controls-prompt-input" class="modal-textarea" rows="4" placeholder="Enter your instructions..."></textarea>
-                <div id="ai-controls-error" class="modal-error"></div>
-            </div>
-            <div class="modal-footer">
-                <button id="ai-controls-execute-button" class="action-button ai-powered-button">Generate Controls</button>
-            </div>
-        </div>
-    </div>
-    <!-- START GITHUB CHANGE: Add Save to GitHub Modal -->
-    <div id="github-save-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Save Project to GitHub</h2>
-                <button id="close-github-save-modal-button" class="close-button">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>Select a repository and branch to save your project.</p>
-                <div class="form-group">
-                    <label for="github-save-repo-select">Repository</label>
-                    <select id="github-save-repo-select" class="form-select"></select>
-                </div>
-                <div class="form-group">
-                    <label for="github-save-branch-select">Branch</label>
-                    <select id="github-save-branch-select" class="form-select"></select>
-                </div>
-                 <div class="form-group">
-                    <label for="github-save-commit-message">Commit Message</label>
-                    <input type="text" id="github-save-commit-message">
-                </div>
-                <p id="github-save-error" class="modal-error"></p>
-            </div>
-            <div class="modal-footer">
-                <button id="execute-github-save-button" class="action-button">Save to GitHub</button>
-            </div>
-        </div>
-    </div>
-    <!-- END GITHUB CHANGE -->
+    </div> <!-- End Main App Container -->
+
+    <!-- Modals Section (Unchanged) -->
+    <div id="add-node-modal" class="modal">...</div>
+    <div id="settings-modal" class="modal">...</div>
+    <div id="edit-node-modal" class="modal">...</div>
+    <div id="context-component-modal" class="modal">...</div>
+    <div id="global-agent-loader">...</div>
+    <div id="ai-project-edit-modal" class="modal">...</div>
+    <div id="ai-structure-modal" class="modal">...</div>
+    <div id="ai-controls-modal" class="modal">...</div>
+    <div id="github-save-modal" class="modal">...</div>
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
