@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,6 +16,76 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <!-- NEW: Automation Panel Styles -->
+    <style>
+        #automation-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 400px;
+            background-color: #212529; /* Dark Bootstrap */
+            border: 1px solid #495057;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            z-index: 1050;
+            display: none; /* Hidden by default, toggled via JS */
+            font-family: 'Inter', sans-serif;
+        }
+
+        .auto-header {
+            background-color: #343a40;
+            padding: 10px 15px;
+            border-bottom: 1px solid #495057;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+        }
+
+        .auto-body {
+            padding: 15px;
+        }
+
+        .auto-toolbar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .auto-btn {
+            font-size: 0.75rem;
+            padding: 5px;
+            text-align: center;
+            background: #2c3035;
+            border: 1px solid #495057;
+            color: #ccc;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .auto-btn:hover { background: #3d4248; color: #fff; border-color: #0dcaf0; }
+        .auto-btn i { display: block; font-size: 1.2rem; margin-bottom: 2px; }
+
+        .auto-sequence-display {
+            background-color: #000;
+            border: 1px solid #495057;
+            border-radius: 4px;
+            height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.85rem;
+            color: #00ff9d;
+            margin-bottom: 15px;
+        }
+
+        .auto-footer {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
 </head>
 <body>
 
@@ -138,6 +206,11 @@
                             </button>
                         </div>
                         <div class="dropdown">
+                            <!-- NEW: Auto Pilot Button added to toolbar -->
+                            <button class="btn btn-outline-info me-2" type="button" id="toggle-automation-panel" title="Open Auto Pilot">
+                                <i class="bi bi-airplane-engines me-1"></i> Pilot
+                            </button>
+
                             <button class="btn btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More options">
                                 <i class="bi bi-three-dots-vertical"></i>
                             </button>
@@ -711,9 +784,63 @@
     </div>
     <!-- END GITHUB CHANGE -->
 
+    <!-- NEW: AUTO PILOT UI PANEL -->
+    <div id="automation-panel">
+        <div class="auto-header" id="auto-header-drag">
+            <h6 class="m-0 text-white"><i class="bi bi-robot me-2"></i>Auto Pilot</h6>
+            <button type="button" class="btn-close btn-close-white" id="close-automation-panel" aria-label="Close"></button>
+        </div>
+        <div class="auto-body">
+            <!-- Steps Display -->
+            <div class="auto-sequence-display" id="automation-sequence-display">
+                <div class="text-secondary fst-italic">No sequence loaded...</div>
+            </div>
+
+            <!-- Toolbar Grid -->
+            <div class="auto-toolbar">
+                <button class="auto-btn" id="auto-btn-queue-done" title="Queue Done"><i class="bi bi-check2-square"></i>Done</button>
+                <button class="auto-btn" id="auto-btn-loader-gone" title="Wait for Loader"><i class="bi bi-hourglass-split"></i>No Load</button>
+                <button class="auto-btn" id="auto-btn-wait-2s" title="Wait 2 Seconds"><i class="bi bi-clock"></i>Wait 2s</button>
+                <button class="auto-btn" id="auto-btn-click-add" title="Add Click Action"><i class="bi bi-mouse"></i>Click</button>
+                <button class="auto-btn" id="auto-btn-type-fix" title="Type Text"><i class="bi bi-keyboard"></i>Type</button>
+                <button class="auto-btn" id="auto-btn-go-preview" title="Switch to Preview"><i class="bi bi-eye"></i>Preview</button>
+                <button class="auto-btn" id="auto-btn-ai-decide" title="AI Decision"><i class="bi bi-cpu"></i>AI Decide</button>
+            </div>
+
+            <!-- Hidden Input for logic compatibility -->
+            <textarea id="automation-sequence-input" style="display:none;"></textarea>
+
+            <div class="auto-footer">
+                <button id="run-automation-sequence-button" class="btn btn-primary flex-grow-1">
+                    <i class="bi bi-play-fill me-1"></i> Run Sequence
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
+    
+    <!-- Script to toggle UI -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleBtn = document.getElementById('toggle-automation-panel');
+            const closeBtn = document.getElementById('close-automation-panel');
+            const panel = document.getElementById('automation-panel');
+            
+            if(toggleBtn && panel) {
+                toggleBtn.addEventListener('click', () => {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                });
+            }
+            if(closeBtn && panel) {
+                closeBtn.addEventListener('click', () => {
+                    panel.style.display = 'none';
+                });
+            }
+        });
+    </script>
     <script src="automation.js"></script>
 </body>
 </html>
