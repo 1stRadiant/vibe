@@ -1,262 +1,392 @@
 
 /**
  * Vibe Web Builder - Automation System (Auto-Pilot)
- * v3.1: Sidebar Compatible + Updated Selectors
+ * v4.0: Visual Sequence Builder & Integrated UI
  */
 
 (function() {
-    // UPDATED UI MAP: Matches the new Sidebar + Layout structure
+    // Comprehensive mapping of UI labels to CSS selectors
     const UI_MAP = {
-        // --- TABS (Left Sidebar) ---
+        // --- TABS ---
         "Start Tab": ".tab-button[data-tab='start']",
         "Preview Tab": ".tab-button[data-tab='preview']",
         "Editor Tab": ".tab-button[data-tab='editor']",
+        "Agent Tab": ".tab-button[data-tab='agent']",
         "Chat Tab": ".tab-button[data-tab='chat']",
         "Files Tab": ".tab-button[data-tab='files']",
         "Code Tab": ".tab-button[data-tab='code']",
+        "Settings Tab": "#open-settings-modal-button",
         "Context Tab": ".tab-button[data-tab='context']",
-        "Console Tab": ".tab-button[data-tab='console']",
         
-        // --- AUTO PILOT (Right Sidebar) ---
-        "Agent Sidebar": ".agent-sidebar", // The new sidebar container
+        // --- INPUTS ---
+        "Project Name Input": "#new-project-id-input",
+        "Project Prompt Input": "#project-prompt-input",
         "Agent Input": "#agent-prompt-input",
+        "Chat Input": "#chat-prompt-input",
+        "Search Input": "#search-input",
+        "Full Code Editor": "#full-code-editor",
+        "Zip Input": "#zip-file-input",
+        
+        // --- BUTTONS ---
+        "Build Project Button": "#start-iterative-build-button", 
+        "Generate From Instructions": "#generate-from-instructions-button",
+        "Load GitHub Button": "#load-from-github-button",
+        "Save Cloud": "#save-to-cloud-button",
+        "Save Local": "#save-to-local-button",
+        "Undo": "#undo-button",
+        "Redo": "#redo-button",
+        "Inspect": "#toggle-inspect-button",
         "Add Task": "#run-agent-single-task-button",
         "Process Queue": "#start-iterative-session-button",
         "Stop Queue": "#end-session-button",
-        "Agent Log": "#agent-output",
-
-        // --- INPUTS & BUTTONS ---
-        "Project Name Input": "#new-project-id-input",
-        "Project Prompt Input": "#project-prompt-input",
-        "Build Project Button": "#start-iterative-build-button", 
-        "Chat Input": "#chat-prompt-input",
         "Send Chat": "#send-chat-button",
-        "Search Input": "#search-input",
-        "Full Code Editor": "#full-code-editor",
+        "Upload HTML": "#upload-html-button",
+        "Upload Zip": "#upload-zip-button",
         "Update From Code": "#update-tree-from-code-button",
-        "Save Cloud": "#save-to-cloud-button",
-        "Save Local": "#save-to-local-button",
-        "Settings Button": "#open-settings-modal-button",
         "Close Modal": ".close-button",
+        "Login Button": "#login-button",
+        "Run Code AI": "#run-full-code-ai-button",
+        "Generate Flowchart": "#generate-flowchart-button",
         
-        // --- OBSERVATION ---
+        // --- OBSERVATION TARGETS ---
+        "Agent Log": "#agent-output",
         "Console Log": "#console-output",
         "Global Loader": "#global-agent-loader",
-        "Preview Frame": "#website-preview"
+        "Preview Frame": "#website-preview",
+        "Task Queue List": "#task-queue-list"
     };
-
-    const TEMPLATES = [
-        { label: '⚡ Queue Done', type: 'event', text: 'Wait until "Task queue complete" appears in Agent Log, then ' },
-        { label: '👻 Loader Gone', type: 'event', text: 'Wait until Global Loader disappears, then ' },
-        { label: '⏳ Wait 2s', type: 'event', text: 'Wait 2000ms, then ' },
-        { label: '👆 Click Add', type: 'action', text: 'Click "Add Task" ' },
-        { label: '⌨️ Type Fix', type: 'action', text: 'Type "Make the font larger" into Agent Input ' },
-        { label: '🧭 Focus Agent', type: 'action', text: 'Go to Agent Sidebar ' },
-        { label: '🧭 Go Preview', type: 'action', text: 'Go to Preview Tab ' },
-        { label: '🧠 AI Decide', type: 'logic', text: 'Analyze logs and decide next step to: "Ensure the page looks correct" ' }
-    ];
 
     class VibeAutomator {
         constructor() {
-            this.taskQueue = [];
+            this.sequence = []; // The visual list of steps
+            this.taskQueue = []; // The internal execution queue
             this.isRunning = false;
             this.init();
         }
 
         init() {
-            console.log("🤖 Auto-Pilot v3.1 (Sidebar Mode) Initializing...");
-            this.injectUI();
+            console.log("🤖 Auto-Pilot System Initializing...");
+            
+            // Wait for DOM in case loaded in head
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.bindUI());
+            } else {
+                this.bindUI();
+            }
+
+            // Listen for internal "step-complete" event to drive the sequence
             window.removeEventListener('vibe-task-complete', this.handleTaskComplete);
             window.addEventListener('vibe-task-complete', () => this.processNextTask());
         }
 
-        injectUI() {
-            if (document.getElementById('auto-pilot-btn')) return;
-
-            const styles = document.createElement('style');
-            styles.id = 'auto-pilot-styles';
-            styles.textContent = `
-                #auto-pilot-btn { 
-                    position: fixed !important; bottom: 25px !important; right: 400px !important; 
-                    width: 50px !important; height: 50px !important; border-radius: 50% !important; 
-                    background: #8E2DE2 !important; color: white !important; border: none !important;
-                    cursor: pointer !important; z-index: 2147483647 !important; display: flex !important; 
-                    align-items: center !important; justify-content: center !important; font-size: 24px !important;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
-                }
-                #auto-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 550px; background: #1a1d21; border: 1px solid #444; border-radius: 12px; z-index: 2147483647; padding: 20px; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
-                #auto-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2147483646; }
-                .auto-input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: #00ff00; border-radius: 6px; font-family: monospace; }
-                .trigger-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
-                .trigger-chip { font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #444; background: #2c313a; color: #eee; }
-                .target-highlight { outline: 4px solid #0dcaf0 !important; outline-offset: 2px !important; transition: all 0.3s; }
-            `;
-            document.head.appendChild(styles);
-
-            const btn = document.createElement('button');
-            btn.id = 'auto-pilot-btn'; btn.innerHTML = '🪄'; 
-            btn.onclick = () => this.openModal();
+        bindUI() {
+            // 1. Dragging Logic for the Panel Header
+            const panel = document.getElementById('automation-panel');
+            const header = document.getElementById('auto-header-drag');
             
-            const overlay = document.createElement('div');
-            overlay.id = 'auto-overlay'; overlay.onclick = () => this.closeModal();
+            if (panel && header) {
+                let isDragging = false, startX, startY, initialLeft, initialTop;
+                
+                header.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    const rect = panel.getBoundingClientRect();
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+                    panel.style.right = 'auto'; // Disable right anchoring once dragged
+                    panel.style.bottom = 'auto'; // Disable bottom anchoring
+                    panel.style.left = initialLeft + 'px';
+                    panel.style.top = initialTop + 'px';
+                    header.style.cursor = 'grabbing';
+                });
 
-            const modal = document.createElement('div');
-            modal.id = 'auto-modal';
-            modal.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h4 style="margin:0;">🪄 Automation Sequence</h4>
-                    <button id="auto-close-x" style="background:none; border:none; color:#666; cursor:pointer; font-size:20px;">&times;</button>
-                </div>
-                <div class="trigger-row" id="trigger-container"></div>
-                <textarea id="auto-prompt" class="auto-input" rows="4" placeholder="e.g. Go to Start Tab, type 'My Project' into Project Name, click Build..."></textarea>
-                <div id="auto-logs" style="max-height:100px; overflow:auto; background:#000; font-size:11px; padding:8px; margin-bottom:10px; display:none; color:#888;"></div>
-                <button id="auto-run-btn" style="width:100%; padding:10px; background:#4A00E0; color:white; border:none; border-radius:5px; font-weight:bold;">Run Sequence</button>
-            `;
+                window.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    panel.style.left = (initialLeft + dx) + 'px';
+                    panel.style.top = (initialTop + dy) + 'px';
+                });
 
-            document.body.appendChild(btn);
-            document.body.appendChild(overlay);
-            document.body.appendChild(modal);
+                window.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    header.style.cursor = 'grab';
+                });
+            }
 
-            document.getElementById('auto-close-x').onclick = () => this.closeModal();
-            document.getElementById('auto-run-btn').onclick = () => this.startAutomation();
-            this.renderTriggers();
+            // 2. Bind Toolbar Buttons to Add Steps
+            this.bindBtn('auto-btn-queue-done', { 
+                action: 'waitForText', target: 'Agent Log', value: 'Task queue complete', 
+                label: 'Wait for Agent Finish', icon: 'bi-check2-square' 
+            });
+            
+            this.bindBtn('auto-btn-loader-gone', { 
+                action: 'waitForDisappear', target: 'Global Loader', 
+                label: 'Wait for Loader', icon: 'bi-hourglass-split' 
+            });
+            
+            this.bindBtn('auto-btn-wait-2s', { 
+                action: 'wait', value: 2000, 
+                label: 'Wait 2 Seconds', icon: 'bi-clock' 
+            });
+            
+            this.bindBtn('auto-btn-click-add', { 
+                action: 'click', target: 'Add Task', 
+                label: 'Click "Add Task"', icon: 'bi-mouse' 
+            });
+            
+            this.bindBtn('auto-btn-type-fix', { 
+                action: 'input', target: 'Agent Input', value: 'Fix the errors in the code', 
+                label: 'Type "Fix errors..."', icon: 'bi-keyboard' 
+            });
+            
+            this.bindBtn('auto-btn-go-preview', { 
+                action: 'navigate', target: 'Preview Tab', 
+                label: 'Go to Preview', icon: 'bi-eye' 
+            });
+            
+            this.bindBtn('auto-btn-ai-decide', { 
+                action: 'aiDecision', value: 'Check logs and fix any errors found.', 
+                label: 'AI: Fix Errors', icon: 'bi-cpu' 
+            });
+
+            // 3. Bind Run Button
+            const runBtn = document.getElementById('run-automation-sequence-button');
+            if (runBtn) {
+                runBtn.addEventListener('click', () => this.runSequence());
+            }
         }
 
-        renderTriggers() {
-            const container = document.getElementById('trigger-container');
-            TEMPLATES.forEach(item => {
-                const btn = document.createElement('button');
-                btn.className = 'trigger-chip';
-                btn.textContent = item.label;
-                btn.onclick = () => {
-                    const input = document.getElementById('auto-prompt');
-                    input.value += item.text;
-                    input.focus();
+        bindBtn(id, stepData) {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => this.addStep(stepData));
+            }
+        }
+
+        addStep(step) {
+            // Clone to avoid reference issues
+            this.sequence.push({ ...step });
+            this.renderSequence();
+        }
+
+        renderSequence() {
+            const display = document.getElementById('automation-sequence-display');
+            if (!display) return;
+            
+            display.innerHTML = '';
+            if (this.sequence.length === 0) {
+                display.innerHTML = '<div class="text-secondary fst-italic p-2">Sequence is empty. Click buttons below to add steps.</div>';
+                return;
+            }
+
+            this.sequence.forEach((step, index) => {
+                const row = document.createElement('div');
+                row.className = 'd-flex justify-content-between align-items-center mb-1 p-1';
+                row.style.borderBottom = '1px solid #333';
+                row.style.fontSize = '0.9rem';
+                
+                // Highlight current step if running
+                if (this.isRunning && index === 0) { // Since we shift() from taskQueue, visual index logic is tricky. 
+                                                     // Simpler approach: Just list them. 
+                }
+
+                row.innerHTML = `
+                    <div class="text-white">
+                        <span class="text-secondary me-2">${index + 1}.</span>
+                        <i class="bi ${step.icon || 'bi-dot'} me-2 text-info"></i>
+                        ${step.label}
+                    </div>
+                `;
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'bi bi-x text-danger';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.fontSize = '1.2rem';
+                deleteBtn.title = 'Remove Step';
+                deleteBtn.onclick = () => {
+                    this.sequence.splice(index, 1);
+                    this.renderSequence();
                 };
-                container.appendChild(btn);
+
+                row.appendChild(deleteBtn);
+                display.appendChild(row);
             });
         }
 
-        openModal() {
-            document.getElementById('auto-modal').style.display = 'block';
-            document.getElementById('auto-overlay').style.display = 'block';
-        }
-
-        closeModal() {
-            document.getElementById('auto-modal').style.display = 'none';
-            document.getElementById('auto-overlay').style.display = 'none';
-        }
-
-        log(msg) {
-            const logBox = document.getElementById('auto-logs');
-            logBox.style.display = 'block';
-            logBox.innerHTML += `<div>> ${msg}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-
-        async startAutomation() {
-            const prompt = document.getElementById('auto-prompt').value;
-            if(!prompt || this.isRunning) return;
+        async runSequence() {
+            if (this.isRunning) return;
+            if (this.sequence.length === 0) {
+                alert("Please add steps to the sequence first.");
+                return;
+            }
+            
+            const runBtn = document.getElementById('run-automation-sequence-button');
+            const originalText = runBtn.innerHTML;
+            
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running...';
 
             this.isRunning = true;
-            this.log("AI parsing instructions...");
             
-            try {
-                const systemPrompt = `You are a browser automation engine. Convert user instructions into a JSON array.
-                COMMANDS: click, input, navigate, wait, waitForText, waitForDisappear, aiDecision.
-                UI KEYS: ${Object.keys(UI_MAP).join(', ')}.
-                If navigating to "Agent Sidebar", use {"action": "navigate", "target": "Agent Sidebar"}.`;
-
-                const response = await window.vibeAPI.callAI(systemPrompt, prompt, true);
-                let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
-                
-                this.taskQueue = JSON.parse(cleanJson);
-                this.closeModal();
-                window.dispatchEvent(new CustomEvent('vibe-task-complete'));
-            } catch (e) {
-                this.log("Error: " + e.message);
+            // Copy sequence to execution queue
+            this.taskQueue = JSON.parse(JSON.stringify(this.sequence));
+            
+            this.processNextTask().then(() => {
+                // Done
                 this.isRunning = false;
-            }
+                runBtn.disabled = false;
+                runBtn.innerHTML = originalText;
+            });
         }
 
         async processNextTask() {
+            if (!this.isRunning) return;
+
             if (this.taskQueue.length === 0) {
-                this.log("Finished.");
+                console.log("🤖 Sequence complete.");
                 this.isRunning = false;
+                const runBtn = document.getElementById('run-automation-sequence-button');
+                if(runBtn) {
+                    runBtn.disabled = false;
+                    runBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i> Run Sequence';
+                }
                 return;
             }
+
             const step = this.taskQueue.shift();
+            
+            // Visual feedback: Highlight the top item in display? 
+            // (Simpler: just execute)
+            
             await this.performAction(step);
-            window.dispatchEvent(new CustomEvent('vibe-task-complete'));
+            
+            // Recursively call next
+            setTimeout(() => this.processNextTask(), 100);
         }
 
         async performAction(step) {
             return new Promise(async (resolve) => {
-                this.log(`${step.action}: ${step.target || step.value}`);
+                console.log(`🤖 Action: ${step.action} | Target: ${step.target || 'N/A'}`);
 
-                // Handle Navigation
-                if (step.action === 'navigate') {
-                    const targetKey = step.target;
-                    
-                    // If it's the Agent Sidebar, just highlight it (since it's always visible)
-                    if (targetKey.includes("Agent")) {
-                        const el = document.querySelector(UI_MAP["Agent Sidebar"]);
-                        if (el) {
-                            el.scrollIntoView({ behavior: 'smooth' });
-                            el.classList.add('target-highlight');
-                            setTimeout(() => { el.classList.remove('target-highlight'); resolve(); }, 1000);
-                            return;
-                        }
-                    }
-
-                    // Otherwise, try to find the tab button and click it
-                    const selector = UI_MAP[targetKey];
-                    const btn = document.querySelector(selector);
-                    if (btn) {
-                        btn.click();
-                        setTimeout(resolve, 500);
-                    } else {
-                        resolve();
-                    }
-                    return;
-                }
-
+                // --- 1. Basic Wait ---
                 if (step.action === 'wait') {
                     setTimeout(resolve, step.value || 1000);
                     return;
                 }
 
-                // Standard Interaction
-                const selector = UI_MAP[step.target] || step.target;
-                const el = document.querySelector(selector);
-
-                if (!el) {
-                    this.log(`Missing: ${step.target}`);
+                // --- 2. AI Decision ---
+                if (step.action === 'aiDecision') {
+                    // Requires vibeAPI to be available
+                    if (window.vibeAPI) {
+                        const agentLogs = document.querySelector('#agent-output') ? document.querySelector('#agent-output').innerText.slice(-2000) : "";
+                        const systemPrompt = `You are the automation brain. Goal: ${step.value}.
+                        Logs: ${agentLogs}
+                        Return a JSON array of next actions using standard commands (click, input, navigate).
+                        Available Targets: ${Object.keys(UI_MAP).join(', ')}.
+                        If the goal is satisfied, return [].`;
+                        
+                        try {
+                            const response = await window.vibeAPI.callAI(systemPrompt, "Decide next steps", true);
+                            let cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+                            // Simple heuristic to clean non-json
+                            const jsonStart = cleanJson.indexOf('[');
+                            const jsonEnd = cleanJson.lastIndexOf(']');
+                            if(jsonStart !== -1 && jsonEnd !== -1) {
+                                cleanJson = cleanJson.substring(jsonStart, jsonEnd + 1);
+                                const newSteps = JSON.parse(cleanJson);
+                                if (newSteps.length > 0) {
+                                    console.log(`🧠 AI added ${newSteps.length} steps.`);
+                                    // Map AI simplified steps to our internal format
+                                    const formattedSteps = newSteps.map(s => ({
+                                        ...s,
+                                        label: `AI: ${s.action} ${s.target || ''}`,
+                                        icon: 'bi-robot'
+                                    }));
+                                    this.taskQueue.unshift(...formattedSteps);
+                                }
+                            }
+                        } catch (e) { console.error("AI Decision Error:", e); }
+                    }
                     resolve();
                     return;
                 }
 
-                el.classList.add('target-highlight');
+                // --- 3. Navigation ---
+                if (step.action === 'navigate') {
+                    let tabId = step.target.toLowerCase();
+                    const knownTabs = ['start', 'preview', 'editor', 'agent', 'chat', 'files', 'code', 'context'];
+                    const mappedTab = knownTabs.find(t => tabId.includes(t));
 
-                if (step.action === 'click') {
-                    el.click();
-                } else if (step.action === 'input') {
-                    el.value = step.value;
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    if (mappedTab && window.vibeAPI && window.vibeAPI.switchToTab) {
+                        window.vibeAPI.switchToTab(mappedTab);
+                        setTimeout(resolve, 800);
+                        return;
+                    }
                 }
 
+                // --- Resolve Selector ---
+                const selector = UI_MAP[step.target] || step.target;
+                
+                // --- 4. Wait Logic ---
+                if (step.action === 'waitForDisappear') {
+                    const checkInterval = setInterval(() => {
+                        const el = document.querySelector(selector);
+                        if (!el || el.offsetParent === null || el.style.display === 'none') {
+                            clearInterval(checkInterval); clearTimeout(timeout); resolve();
+                        }
+                    }, 500);
+                    const timeout = setTimeout(() => { clearInterval(checkInterval); resolve(); }, 30000);
+                    return;
+                }
+
+                if (step.action === 'waitForText') {
+                    const checkInterval = setInterval(() => {
+                        const currentEl = document.querySelector(selector);
+                        const txt = currentEl ? (currentEl.innerText || "") : "";
+                        if (txt.includes(step.value)) {
+                            clearInterval(checkInterval); clearTimeout(timeout); resolve();
+                        }
+                    }, 500);
+                    const timeout = setTimeout(() => { clearInterval(checkInterval); resolve(); }, 30000);
+                    return;
+                }
+
+                // --- 5. Interactions ---
+                const el = document.querySelector(selector);
+
+                if (!el) {
+                    console.warn(`Element not found: ${step.target} (${selector})`);
+                    resolve(); 
+                    return;
+                }
+
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Visual Highlight
+                const originalOutline = el.style.outline;
+                el.style.outline = "3px solid #00d2ff";
+                
                 setTimeout(() => {
-                    el.classList.remove('target-highlight');
-                    resolve();
-                }, 800);
+                    if (step.action === 'click') {
+                        el.click();
+                    } else if (step.action === 'input') {
+                        el.value = step.value;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    
+                    setTimeout(() => {
+                        el.style.outline = originalOutline;
+                        resolve();
+                    }, 500);
+                }, 500);
             });
         }
     }
 
-    // Launch
-    if (document.readyState === 'complete') {
-        window.vibeAutomator = new VibeAutomator();
-    } else {
-        window.addEventListener('load', () => window.vibeAutomator = new VibeAutomator());
-    }
+    // Initialize
+    window.vibeAutomator = new VibeAutomator();
+
 })();
