@@ -1,3 +1,5 @@
+
+
 body {
     font-family: 'Inter', sans-serif;
     background-color: #1a1a1a;
@@ -2034,5 +2036,33 @@ body.is-dragging-vibe .drag-handle {
     font-size: 0.9em;
     color: #5c6370;
     min-height: 1.2em; /* Prevent layout shift when text appears */
+}
+/* END OF FIX */
+
+/* START OF FIX: Mobile Responsive Adjustments */
+@media (max-width: 768px) {
+    body {
+        padding: 5px; /* Reduce body padding on mobile to use full width */
+    }
+
+    #projects .start-page-content {
+        padding: 15px; /* Reduce from 40px to 15px to prevent narrow content */
+        margin: 10px 0; /* Remove horizontal margin */
+        width: 100%;
+    }
+
+    .tab-content {
+        padding: 10px; /* Reduce from 20px */
+    }
+
+    .preview-container {
+        min-width: 100%; /* Fix the 400px limit that causes overflow/narrowness */
+    }
+    
+    /* Ensure the container fluid inside HTML doesn't add too much padding either */
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
 }
 /* END OF FIX */
