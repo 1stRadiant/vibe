@@ -1,8 +1,4 @@
 
-/**
- * Vibe Web Builder - Automation System (Auto-Pilot)
- * v3.0: Fixed Core Actions + Event-Driven + AI Logic
- */
 
 (function() {
     // Comprehensive mapping of UI labels to CSS selectors
@@ -96,6 +92,7 @@
 
             const styles = document.createElement('style');
             styles.id = 'auto-pilot-styles';
+            // UPDATED CSS HERE
             styles.textContent = `
                 #auto-pilot-btn { 
                     position: fixed !important; bottom: 25px !important; right: 25px !important; 
@@ -109,7 +106,25 @@
                 }
                 #auto-pilot-btn:hover { transform: scale(1.1) rotate(10deg); box-shadow: 0 8px 30px rgba(142, 45, 226, 0.6); }
                 
-                #auto-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px; background: #1a1d21; border: 1px solid #444; border-radius: 12px; z-index: 2147483647; box-shadow: 0 20px 60px rgba(0,0,0,0.8); padding: 20px; color: #fff; font-family: sans-serif; }
+                #auto-modal { 
+                    display: none; 
+                    position: fixed; 
+                    top: 50%; 
+                    left: 50%; 
+                    transform: translate(-50%, -50%); 
+                    width: 90%; 
+                    max-width: 500px; 
+                    max-height: 90vh; 
+                    overflow-y: auto;
+                    background: #1a1d21; 
+                    border: 1px solid #444; 
+                    border-radius: 12px; 
+                    z-index: 2147483647; 
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.8); 
+                    padding: 20px; 
+                    color: #fff; 
+                    font-family: sans-serif; 
+                }
                 #auto-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2147483646; backdrop-filter: blur(4px); }
                 
                 .auto-input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: #00ff00; border-radius: 6px; font-family: monospace; font-size: 13px; box-sizing: border-box; resize: vertical; }
