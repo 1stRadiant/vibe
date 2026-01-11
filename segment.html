@@ -1,0 +1,572 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Context Merger</title>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --border: #3c3c3c;
+            --text: #d4d4d4;
+            --accent: #007acc;
+            --success: #2ea043;
+            --danger: #f85149;
+            --code-del: #451818;
+            --code-add: #133618;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1, h2, h3 { margin-top: 0; }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            align-items: center;
+        }
+
+        .workspace {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0; /* logic for scroll */
+        }
+
+        .column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            resize: none;
+            border-radius: 4px;
+        }
+
+        .diff-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 10px;
+        }
+
+        .diff-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .diff-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+        }
+
+        .diff-type {
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #9cdcfe;
+        }
+
+        .diff-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-primary { background-color: var(--accent); }
+        .btn-success { background-color: var(--success); }
+        .btn-danger { background-color: var(--danger); }
+        .btn-secondary { background-color: var(--border); color: var(--text); }
+
+        /* Code Diff Views */
+        .code-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            background: #000;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .code-block {
+            white-space: pre-wrap;
+            word-break: break-all;
+            padding: 5px;
+        }
+
+        .original { background-color: var(--code-del); border-left: 3px solid var(--danger); }
+        .replacement { background-color: var(--code-add); border-left: 3px solid var(--success); }
+
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+        .status-pending { background: #ce9178; color: #333; }
+        .status-approved { background: var(--success); color: white; }
+        .status-rejected { background: var(--border); color: #888; text-decoration: line-through; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Top Controls -->
+        <div class="controls">
+            <div>
+                <label for="fileInput" style="display:block; font-size:0.8em; margin-bottom:4px;">1. Load Source File (.js)</label>
+                <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx">
+            </div>
+            <div style="flex:1"></div>
+            <button id="analyzeBtn" class="btn-primary" disabled>Analyze & Compare</button>
+            <button id="downloadBtn" class="btn-success" disabled>Download Updated File</button>
+        </div>
+
+        <div class="workspace">
+            <!-- Left: Input Area -->
+            <div class="column">
+                <h3>2. Paste AI Snippet / Update</h3>
+                <textarea id="aiInput" placeholder="// Paste the code provided by ChatGPT/Claude here...&#10;function existingFunction() {&#10;   // New logic...&#10;}"></textarea>
+            </div>
+
+            <!-- Right: Interactive Diff -->
+            <div class="column">
+                <h3>3. Review & Approve Changes</h3>
+                <div id="diffContainer" class="diff-list">
+                    <div style="text-align: center; color: #666; margin-top: 50px;">
+                        Waiting for source file and AI input...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let sourceCode = "";
+        let sourceFilename = "updated_script.js";
+        let proposedPatches = [];
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const aiInput = document.getElementById('aiInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const diffContainer = document.getElementById('diffContainer');
+
+        // --- Event Listeners ---
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            sourceFilename = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                sourceCode = event.target.result;
+                checkReady();
+            };
+            reader.readAsText(file);
+        });
+
+        aiInput.addEventListener('input', checkReady);
+
+        function checkReady() {
+            if (sourceCode && aiInput.value.trim().length > 0) {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        analyzeBtn.addEventListener('click', () => {
+            const updateCode = aiInput.value;
+            performAnalysis(sourceCode, updateCode);
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            downloadString(sourceCode, "updated_" + sourceFilename);
+        });
+
+        // --- Core Logic: Segmentation & Matching ---
+
+        /**
+         * The strategy:
+         * 1. Break code into "Chunks" based on brackets { }. 
+         *    We assume top-level chunks are functions, classes, or loose variables.
+         * 2. For every chunk in the AI Input, calculate similarity against every chunk in Source.
+         * 3. If similarity > threshold, propose a replacement.
+         */
+
+        function performAnalysis(source, update) {
+            const sourceChunks = segmentCode(source);
+            const updateChunks = segmentCode(update);
+            
+            proposedPatches = [];
+            diffContainer.innerHTML = '';
+
+            // Configuration
+            const SIMILARITY_THRESHOLD = 0.4; // Loose enough to catch refactors
+            const SIGNATURE_WEIGHT = 0.7; // Weigh the first line (signature) heavily
+
+            // For tracking which source chunks are already matched to avoid double replacement
+            const matchedSourceIndices = new Set();
+
+            updateChunks.forEach((uChunk) => {
+                let bestMatch = null;
+                let highestScore = 0;
+
+                // Simple heuristic: Ignore tiny chunks (like closing braces or short comments)
+                if (uChunk.content.trim().length < 5) return;
+
+                sourceChunks.forEach((sChunk, sIndex) => {
+                    if (matchedSourceIndices.has(sIndex)) return;
+
+                    // 1. Check Signature Similarity (First line mostly)
+                    const sigScore = similarity(uChunk.signature, sChunk.signature);
+                    
+                    // 2. Check Content Similarity
+                    const contentScore = similarity(uChunk.content, sChunk.content);
+
+                    // Weighted score: Signature is very important for identifying intent
+                    // If signature is identical, score is very high.
+                    const totalScore = (sigScore * 0.7) + (contentScore * 0.3);
+
+                    if (totalScore > highestScore) {
+                        highestScore = totalScore;
+                        bestMatch = { chunk: sChunk, index: sIndex };
+                    }
+                });
+
+                if (highestScore > SIMILARITY_THRESHOLD && bestMatch) {
+                    // It's a match. Is it different?
+                    if (uChunk.content.trim() !== bestMatch.chunk.content.trim()) {
+                        matchedSourceIndices.add(bestMatch.index);
+                        addPatchProposal(bestMatch.chunk, uChunk, highestScore);
+                    }
+                } else {
+                    // Logic for "New Code" (Insertion) could go here
+                    // For now, we focus on updates/fixes as requested.
+                }
+            });
+
+            if (proposedPatches.length === 0) {
+                diffContainer.innerHTML = '<div style="padding:20px; text-align:center;">No matchable segments found or code is identical.</div>';
+                downloadBtn.disabled = true;
+            } else {
+                downloadBtn.disabled = false;
+            }
+        }
+
+        function addPatchProposal(originalChunk, newChunk, confidence) {
+            const id = Date.now() + Math.random();
+            
+            const patch = {
+                id,
+                original: originalChunk,
+                new: newChunk,
+                status: 'pending' // pending, approved, rejected
+            };
+            proposedPatches.push(patch);
+
+            // Create UI Card
+            const card = document.createElement('div');
+            card.className = 'diff-card';
+            card.id = `card-${id}`;
+            
+            const confPercent = Math.round(confidence * 100);
+            
+            card.innerHTML = `
+                <div class="diff-header">
+                    <div>
+                        <span class="diff-type">Match found (${confPercent}% similarity)</span>
+                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
+                    </div>
+                    <div class="diff-actions">
+                        <button class="btn-success" onclick="updatePatch('${id}', 'approved')">Replace</button>
+                        <button class="btn-secondary" onclick="updatePatch('${id}', 'rejected')">Ignore</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 5px; font-size: 0.85em; color: #888;">
+                    Lines ${originalChunk.start}-${originalChunk.end} in original file
+                </div>
+                <div class="code-compare">
+                    <div class="code-block original">${escapeHtml(originalChunk.content)}</div>
+                    <div class="code-block replacement">${escapeHtml(newChunk.content)}</div>
+                </div>
+            `;
+
+            diffContainer.appendChild(card);
+        }
+
+        // --- Global function for button clicks ---
+        window.updatePatch = function(id, status) {
+            const patch = proposedPatches.find(p => p.id == id);
+            if (!patch) return;
+
+            patch.status = status;
+            
+            // Update UI
+            const card = document.getElementById(`card-${id}`);
+            const statusBadge = document.getElementById(`status-${id}`);
+            const btns = card.querySelectorAll('button');
+            
+            if (status === 'approved') {
+                statusBadge.className = 'status-badge status-approved';
+                statusBadge.innerText = 'To be Replaced';
+                card.style.opacity = '1';
+                // Trigger re-generation of source code immediately or wait? 
+                // Let's re-generate source code logic immediately for the final download
+                applyPatchesToSource();
+            } else {
+                statusBadge.className = 'status-badge status-rejected';
+                statusBadge.innerText = 'Ignored';
+                card.style.opacity = '0.6';
+                applyPatchesToSource();
+            }
+        };
+
+        function applyPatchesToSource() {
+            // We need to apply patches from bottom to top to preserve indices
+            // Filter only approved patches
+            const toApply = proposedPatches.filter(p => p.status === 'approved');
+            
+            // Sort by start index descending
+            toApply.sort((a, b) => b.original.startIndex - a.original.startIndex);
+
+            // We need a fresh copy of the original source loaded from file (we don't want to accumulate changes on dirty state if user toggles buttons)
+            // But we only have 'sourceCode' variable. 
+            // Better approach: Store rawSource in a separate variable.
+            // *Self-correction*: For this V1, let's assume sourceCode is the "Master" and we apply patches to a temporary string for download. 
+            // Actually, to support toggling, we need the initial raw text.
+        }
+        
+        // Wrap the file loader to save raw state
+        let rawOriginalSource = "";
+        
+        // Hook into the file reader again
+        fileInput.addEventListener('change', (e) => {
+             // ... previous logic handles reading ...
+             const file = e.target.files[0];
+             const reader = new FileReader();
+             reader.onload = (ev) => {
+                 rawOriginalSource = ev.target.result;
+                 sourceCode = rawOriginalSource; // Reset
+             };
+             reader.readAsText(file);
+        });
+
+        // The actual patching logic override
+        window.applyPatchesToSource = function() {
+            let tempCode = rawOriginalSource;
+            
+            const toApply = proposedPatches.filter(p => p.status === 'approved');
+            // Sort descending by character index
+            toApply.sort((a, b) => b.original.startIndex - a.original.startIndex);
+
+            toApply.forEach(p => {
+                const before = tempCode.substring(0, p.original.startIndex);
+                const after = tempCode.substring(p.original.endIndex);
+                tempCode = before + p.new.content + after;
+            });
+
+            // Update global sourceCode so download works
+            sourceCode = tempCode;
+        }
+
+        // --- Helpers ---
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;")
+                       .replace(/</g, "&lt;")
+                       .replace(/>/g, "&gt;")
+                       .replace(/"/g, "&quot;")
+                       .replace(/'/g, "&#039;");
+        }
+
+        function downloadString(text, filename) {
+            var blob = new Blob([text], { type: 'text/javascript' });
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        // --- Code Segmentation Logic (The heavy lifter) ---
+        
+        function segmentCode(code) {
+            const lines = code.split('\n');
+            const segments = [];
+            
+            let currentBlock = [];
+            let startIndex = 0; // char index
+            let startLine = 0;
+            let braceDepth = 0;
+            let inBlock = false;
+            let charCount = 0; // Tracker for character indices
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmed = line.trim();
+                
+                // Track character indices (line length + newline)
+                const lineLength = line.length + 1; 
+
+                // Basic bracket counting (ignores comments/strings for simplicity in this V1)
+                // A robust parser would strip comments first, but this works for 90% of JS structures
+                const openBraces = (line.match(/\{/g) || []).length;
+                const closeBraces = (line.match(/\}/g) || []).length;
+
+                // Detect start of a block (function, class, const, let at root level)
+                // We start a block if we are at depth 0 and see something significant,
+                // OR if we are already in a block.
+                
+                if (!inBlock) {
+                    if (trimmed.length > 0 && !trimmed.startsWith('//')) {
+                        inBlock = true;
+                        startLine = i + 1;
+                        startIndex = charCount;
+                        currentBlock = [];
+                    }
+                }
+
+                if (inBlock) {
+                    currentBlock.push(line);
+                    braceDepth += (openBraces - closeBraces);
+
+                    // If depth returns to 0 (or less, in case of errors) and we have content
+                    if (braceDepth <= 0 && currentBlock.length > 0) {
+                        // Check if it's really a block or just a one-liner
+                        // We close the block here
+                        const content = currentBlock.join('\n');
+                        segments.push({
+                            signature: currentBlock[0].trim(), // First line is signature
+                            content: content,
+                            start: startLine,
+                            end: i + 1,
+                            startIndex: startIndex,
+                            endIndex: charCount + lineLength - 1 // -1 to exclude next newline usually
+                        });
+                        
+                        inBlock = false;
+                        braceDepth = 0;
+                        currentBlock = [];
+                    }
+                }
+                
+                charCount += lineLength;
+            }
+
+            // Flush remaining if file ends without closing (common in partial snippets)
+            if (inBlock && currentBlock.length > 0) {
+                const content = currentBlock.join('\n');
+                segments.push({
+                    signature: currentBlock[0].trim(),
+                    content: content,
+                    start: startLine,
+                    end: lines.length,
+                    startIndex: startIndex,
+                    endIndex: charCount
+                });
+            }
+
+            return segments;
+        }
+
+        // --- Levenshtein Distance (Similarity) ---
+        function similarity(s1, s2) {
+            let longer = s1;
+            let shorter = s2;
+            if (s1.length < s2.length) {
+                longer = s2;
+                shorter = s1;
+            }
+            const longerLength = longer.length;
+            if (longerLength === 0) {
+                return 1.0;
+            }
+            return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+        }
+
+        function editDistance(s1, s2) {
+            s1 = s1.toLowerCase();
+            s2 = s2.toLowerCase();
+
+            const costs = new Array();
+            for (let i = 0; i <= s1.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= s2.length; j++) {
+                    if (i == 0)
+                        costs[j] = j;
+                    else {
+                        if (j > 0) {
+                            let newValue = costs[j - 1];
+                            if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                                newValue = Math.min(Math.min(newValue, lastValue),
+                                    costs[j]) + 1;
+                            costs[j - 1] = lastValue;
+                            lastValue = newValue;
+                        }
+                    }
+                }
+                if (i > 0)
+                    costs[s2.length] = lastValue;
+            }
+            return costs[s2.length];
+        }
+
+    </script>
+</body>
+</html>
