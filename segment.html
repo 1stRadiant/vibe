@@ -4,8 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Code Block Merger (Name Match)</title>
+    <title>AI Code Smart Merger</title>
     <style>
+        /* --- CSS VARIABLES & RESET --- */
         :root {
             --bg: #1e1e1e;
             --panel: #252526;
@@ -17,6 +18,7 @@
             --danger: #f85149;
             --code-del: #451818;
             --code-add: #133618;
+            --line-num: #858585;
         }
 
         body {
@@ -29,9 +31,10 @@
             flex-direction: column;
             height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
-        h1, h2, h3 { margin-top: 0; font-size: 1.1rem; color: #fff; }
+        h1, h2, h3 { margin-top: 0; font-size: 1.1rem; color: #fff; margin-bottom: 10px; }
         
         .container {
             display: flex;
@@ -40,7 +43,7 @@
             height: 100%;
         }
 
-        /* Controls */
+        /* --- CONTROLS --- */
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -50,17 +53,18 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .file-upload-group { flex: 1; min-width: 250px; }
         .action-group { display: flex; gap: 10px; }
 
-        /* Workspace */
+        /* --- WORKSPACE --- */
         .workspace {
             display: flex;
             gap: 20px;
             flex: 1;
-            min-height: 0;
+            min-height: 0; /* Important for scrolling */
         }
 
         .column {
@@ -71,28 +75,24 @@
             min-width: 0;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            body { padding: 10px; height: auto; min-height: 100vh; }
-            .workspace { flex-direction: column; height: auto; }
-            .column { min-height: 400px; }
-            .controls { flex-direction: column; align-items: stretch; }
-        }
-
+        /* Text Input */
         textarea {
             width: 100%;
             height: 100%;
             background: var(--bg);
             color: var(--text);
             border: 1px solid var(--border);
-            padding: 10px;
+            padding: 15px;
             font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
             resize: none;
             border-radius: 4px;
             box-sizing: border-box;
-            font-size: 0.9em;
+            white-space: pre;
         }
 
+        /* Diff List Scroll Area */
         .diff-list {
             overflow-y: auto;
             display: flex;
@@ -100,42 +100,47 @@
             gap: 15px;
             padding-right: 5px;
             height: 100%;
+            padding-bottom: 20px;
         }
 
+        /* --- DIFF CARD STYLING --- */
         .diff-card {
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 10px;
-            transition: all 0.2s;
+            padding: 0; /* Padding inside header/body */
+            display: flex;
+            flex-direction: column;
         }
 
         .diff-header {
+            padding: 10px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
             border-bottom: 1px solid var(--border);
-            padding-bottom: 8px;
+            background: #2d2d2d;
+            border-radius: 6px 6px 0 0;
             flex-wrap: wrap;
             gap: 10px;
         }
 
         .diff-info { display: flex; align-items: center; gap: 10px; }
-        
         .diff-type { font-weight: bold; font-size: 0.9em; }
         .type-replace { color: #faa356; }
         .type-insert { color: #89d185; }
 
         .diff-actions { display: flex; gap: 8px; }
 
+        /* --- BUTTONS --- */
         button {
-            padding: 6px 14px;
+            padding: 6px 12px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             color: white;
+            font-size: 12px;
             transition: opacity 0.2s;
         }
         button:hover { opacity: 0.9; }
@@ -145,33 +150,49 @@
         .btn-success { background-color: var(--success); }
         .btn-secondary { background-color: var(--border); color: var(--text); }
 
-        /* Code Views */
-        .code-compare {
+        /* --- CODE VIEW WITH LINE NUMBERS --- */
+        .code-compare-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px;
+            grid-template-columns: 1fr 1fr; /* Split view */
+            background: #1e1e1e;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 11px;
-            background: #000;
-            padding: 5px;
-            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.5;
+            border-radius: 0 0 6px 6px;
+            overflow: hidden;
         }
         
-        .code-compare.insert-mode { grid-template-columns: 1fr; }
-
-        .code-block {
-            white-space: pre-wrap;
-            word-break: break-all;
-            padding: 8px;
-            overflow-x: auto;
-            max-height: 300px;
-            overflow-y: auto;
+        .code-compare-container.insert-mode {
+            grid-template-columns: 1fr; /* Single view for inserts */
         }
 
-        .original { background-color: var(--code-del); border-left: 3px solid var(--danger); opacity: 0.8; }
-        .replacement { background-color: var(--code-add); border-left: 3px solid var(--success); }
-        .insert-only { background-color: var(--code-add); border-left: 3px solid var(--success); }
+        .code-pane {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 0;
+        }
 
+        .original { background-color: #2d1818; border-right: 1px solid var(--border); }
+        .replacement { background-color: #122615; }
+        .insert-only { background-color: #122615; }
+
+        .line-numbers {
+            text-align: right;
+            padding: 0 10px;
+            color: var(--line-num);
+            border-right: 1px solid var(--border);
+            user-select: none;
+            min-width: 30px;
+        }
+
+        .code-content {
+            padding: 0 10px;
+            white-space: pre;
+            color: #d4d4d4;
+            tab-size: 4;
+        }
+
+        /* --- BADGES --- */
         .status-badge {
             padding: 2px 8px;
             border-radius: 12px;
@@ -189,6 +210,15 @@
             margin-left: 5px;
             font-style: italic;
         }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 900px) {
+            body { padding: 10px; height: auto; min-height: 100vh; overflow: auto; }
+            .workspace { flex-direction: column; height: auto; }
+            .column { min-height: 500px; }
+            .code-compare-container { grid-template-columns: 1fr; } /* Stack code views on mobile */
+            .original { border-bottom: 1px solid var(--border); border-right: none; }
+        }
     </style>
 </head>
 <body>
@@ -201,24 +231,24 @@
                 <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx" style="color:white;">
             </div>
             <div class="action-group">
-                <button id="analyzeBtn" class="btn-primary" disabled>Analyze Segments</button>
-                <button id="downloadBtn" class="btn-success" disabled>Download Result</button>
+                <button id="analyzeBtn" class="btn-primary" disabled>Analyze & Diff</button>
+                <button id="downloadBtn" class="btn-success" disabled>Download Updated File</button>
             </div>
         </div>
 
         <div class="workspace">
             <!-- Left: Input Area -->
             <div class="column">
-                <h3>2. Paste AI Output</h3>
-                <textarea id="aiInput" placeholder="// Paste the code here...&#10;function existingFunc() {&#10;   // New logic...&#10;}&#10;&#10;if (condition) {&#10;   // ...&#10;}"></textarea>
+                <h3>2. Paste AI Code Segment</h3>
+                <textarea id="aiInput" placeholder="// Paste code here...&#10;// It can be functions, classes, or just loose lines of code.&#10;&#10;const newConfig = { ... };&#10;&#10;function updateSomething() {&#10;   // ...&#10;}"></textarea>
             </div>
 
             <!-- Right: Interactive Diff -->
             <div class="column">
-                <h3>3. Review Updates</h3>
+                <h3>3. Review & Merge</h3>
                 <div id="diffContainer" class="diff-list">
                     <div style="text-align: center; color: #666; margin-top: 50px;">
-                        Waiting for source file and AI input...
+                        Load a file and paste AI code to begin...
                     </div>
                 </div>
             </div>
@@ -226,26 +256,24 @@
     </div>
 
     <script>
-        // State
+        // --- STATE MANAGEMENT ---
         let sourceCode = "";
         let rawOriginalSource = ""; 
         let sourceFilename = "updated_script.js";
         let proposedPatches = [];
 
-        // DOM Elements
+        // --- DOM ELEMENTS ---
         const fileInput = document.getElementById('fileInput');
         const aiInput = document.getElementById('aiInput');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const diffContainer = document.getElementById('diffContainer');
 
-        // --- Event Listeners ---
-
+        // --- EVENT LISTENERS ---
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             sourceFilename = file.name;
-            
             const reader = new FileReader();
             reader.onload = (event) => {
                 rawOriginalSource = event.target.result;
@@ -273,769 +301,151 @@
             downloadString(sourceCode, "updated_" + sourceFilename);
         });
 
-        // --- Core Logic: Parser & Matcher ---
+        // --- CORE LOGIC: SEGMENTATION & MATCHING ---
 
         function performAnalysis(source, update) {
-            const sourceBlocks = parseTopLevelBlocks(source);
-            const updateBlocks = parseTopLevelBlocks(update);
+            // New Parser: Handles blocks AND loose lines
+            const sourceSegments = parseCodeSegments(source);
+            const updateSegments = parseCodeSegments(update);
             
             proposedPatches = [];
             diffContainer.innerHTML = '';
 
             const matchedSourceIndices = new Set();
 
-            updateBlocks.forEach((uBlock) => {
+            updateSegments.forEach((uSeg) => {
                 let bestMatch = null;
                 
-                // 1. Try EXACT Name Match (Functions, Classes, Variables)
-                if (uBlock.name) {
-                    const match = sourceBlocks.find((sBlock, idx) => 
-                        !matchedSourceIndices.has(idx) && sBlock.name === uBlock.name
+                // Strategy 1: Explicit Name Match (for functions/classes/consts)
+                if (uSeg.name) {
+                    const match = sourceSegments.find((sSeg, idx) => 
+                        !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
                     );
                     if (match) {
-                        bestMatch = { block: match, reason: `Matched name: "${uBlock.name}"`, index: sourceBlocks.indexOf(match) };
+                        bestMatch = { seg: match, reason: `Matched Name: "${uSeg.name}"`, index: sourceSegments.indexOf(match) };
                     }
                 }
 
-                // 2. Try Signature Match (If statements, anonymous functions, etc.)
-                // This cleans spaces to handle formatting differences
+                // Strategy 2: Signature/Line Match (for "loose" code or if statements)
                 if (!bestMatch) {
-                    const match = sourceBlocks.find((sBlock, idx) => {
+                    const match = sourceSegments.find((sSeg, idx) => {
                         if (matchedSourceIndices.has(idx)) return false;
-                        return cleanSig(sBlock.signature) === cleanSig(uBlock.signature);
+                        // High similarity on the "Signature" (first line)
+                        return similarity(uSeg.signature, sSeg.signature) > 0.9;
                     });
                     if (match) {
-                        bestMatch = { block: match, reason: "Matched line signature", index: sourceBlocks.indexOf(match) };
+                        bestMatch = { seg: match, reason: "Matched Similar Start Line", index: sourceSegments.indexOf(match) };
                     }
                 }
 
-                // Decision
+                // Create Patch Proposal
                 if (bestMatch) {
                     matchedSourceIndices.add(bestMatch.index);
-                    // Even if the content is identical, we show it, or check for diff?
-                    // Let's check diff to reduce noise.
-                    if (cleanContent(bestMatch.block.content) !== cleanContent(uBlock.content)) {
-                        addPatchProposal('replace', bestMatch.block, uBlock, bestMatch.reason);
+                    // Check if content is actually different
+                    if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
+                        addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
                     }
                 } else {
-                    addPatchProposal('insert', null, uBlock, "No matching block found");
+                    addPatchUI('insert', null, uSeg, "New Code Segment");
                 }
             });
 
             if (proposedPatches.length === 0) {
-                diffContainer.innerHTML = '<div style="padding:20px; text-align:center;">No changes detected or code is identical.</div>';
+                diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No relevant changes detected.</div>';
                 downloadBtn.disabled = true;
             } else {
                 downloadBtn.disabled = false;
             }
         }
 
-        function cleanSig(str) {
-            return str.replace(/\s+/g, ' ').trim();
-        }
-        
-        function cleanContent(str) {
-            return str.replace(/\s+/g, '').trim();
-        }
-
-        function addPatchProposal(type, originalBlock, newBlock, reason) {
-            const id = Date.now() + Math.random();
-            
-            const patch = {
-                id,
-                type,
-                original: originalBlock,
-                new: newBlock,
-                status: 'pending' 
-            };
-            proposedPatches.push(patch);
-
-            const card = document.createElement('div');
-            card.className = 'diff-card';
-            card.id = `card-${id}`;
-            
-            let badgeHtml, contentHtml, btnHtml;
-
-            if (type === 'replace') {
-                badgeHtml = `<span class="diff-type type-replace">Replace Block</span><span class="match-reason">(${reason})</span>`;
-                contentHtml = `
-                    <div class="code-compare">
-                        <div class="code-block original" title="Original Code">${escapeHtml(originalBlock.content)}</div>
-                        <div class="code-block replacement" title="New Code from AI">${escapeHtml(newBlock.content)}</div>
-                    </div>`;
-                btnHtml = `<button class="btn-success" onclick="updatePatch('${id}', 'approved')">Replace</button>`;
-            } else {
-                badgeHtml = `<span class="diff-type type-insert">New Block</span><span class="match-reason">(Will append to end)</span>`;
-                contentHtml = `
-                    <div class="code-compare insert-mode">
-                        <div class="code-block insert-only" title="New Code to Insert">${escapeHtml(newBlock.content)}</div>
-                    </div>`;
-                btnHtml = `<button class="btn-primary" onclick="updatePatch('${id}', 'approved')">Insert</button>`;
-            }
-            
-            card.innerHTML = `
-                <div class="diff-header">
-                    <div class="diff-info">
-                        ${badgeHtml}
-                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
-                    </div>
-                    <div class="diff-actions">
-                        ${btnHtml}
-                        <button class="btn-secondary" onclick="updatePatch('${id}', 'rejected')">Ignore</button>
-                    </div>
-                </div>
-                ${contentHtml}
-            `;
-
-            diffContainer.appendChild(card);
-        }
-
-        window.updatePatch = function(id, status) {
-            const patch = proposedPatches.find(p => p.id == id);
-            if (!patch) return;
-
-            patch.status = status;
-            const card = document.getElementById(`card-${id}`);
-            const statusBadge = document.getElementById(`status-${id}`);
-            
-            if (status === 'approved') {
-                statusBadge.className = 'status-badge status-approved';
-                statusBadge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
-                card.style.opacity = '1';
-                card.style.borderColor = 'var(--success)';
-            } else {
-                statusBadge.className = 'status-badge status-rejected';
-                statusBadge.innerText = 'Ignored';
-                card.style.opacity = '0.5';
-                card.style.borderColor = 'var(--border)';
-            }
-        };
-
-        window.applyPatchesToSource = function() {
-            let tempCode = rawOriginalSource;
-            
-            // 1. Replacements (Bottom-up)
-            const replacements = proposedPatches
-                .filter(p => p.status === 'approved' && p.type === 'replace')
-                .sort((a, b) => b.original.startIndex - a.original.startIndex);
-
-            replacements.forEach(p => {
-                const before = tempCode.substring(0, p.original.startIndex);
-                const after = tempCode.substring(p.original.endIndex);
-                tempCode = before + p.new.content + after;
-            });
-
-            // 2. Insertions
-            const insertions = proposedPatches
-                .filter(p => p.status === 'approved' && p.type === 'insert');
-            
-            if (insertions.length > 0) {
-                tempCode += "\n\n// --- AI Inserted Blocks ---\n";
-                insertions.forEach(p => {
-                    tempCode += "\n" + p.new.content + "\n";
-                });
-            }
-
-            sourceCode = tempCode;
-        }
-
-        // --- Helpers ---
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        function downloadString(text, filename) {
-            var blob = new Blob([text], { type: 'text/javascript' });
-            var link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-        }
-
-        // --- Smart Parsing Logic ---
-
-        /**
-         * Segments code into top-level blocks with { content }.
-         * Also attempts to identify the Name of the block.
-         */
-        function parseTopLevelBlocks(code) {
+        // --- PARSER: Handles Blocks AND Loose Lines ---
+        function parseCodeSegments(code) {
             const lines = code.split('\n');
-            const blocks = [];
+            const segments = [];
             
-            let inBlock = false;
-            let braceDepth = 0;
-            let currentBlockLines = [];
-            let startIndex = 0;
+            let currentContent = [];
             let currentSig = "";
+            let startLineNum = 0; // 0-based
+            let startIndex = 0;
+            let braceDepth = 0;
+            let inBlock = false;
             let charCount = 0;
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 const trimmed = line.trim();
                 const lineLength = line.length + 1; // + newline
-                
-                // Identify braces
-                // Note: Simple counter. Fails on strings containing braces "{", but sufficient for 95% of use cases.
+
+                // Skip pure whitespace if we aren't in a block
+                if (!inBlock && trimmed === '') {
+                    charCount += lineLength;
+                    continue;
+                }
+
                 const open = (line.match(/\{/g) || []).length;
                 const close = (line.match(/\}/g) || []).length;
 
-                // Detect Start of Block (Depth 0 -> 1+)
+                // DETECT START
                 if (!inBlock) {
-                    if (open > close && braceDepth === 0) {
+                    startLineNum = i;
+                    startIndex = charCount;
+                    currentContent = [line];
+                    currentSig = line; // First line is the signature
+                    
+                    if (open > close) {
+                        // Start of a bracketed block
                         inBlock = true;
-                        startIndex = charCount; // Actually, start index might be previous lines if they are decorators/comments
-                        // But for replacement, we usually replace from the line with the signature.
-                        
-                        currentBlockLines = [line];
-                        currentSig = line.split('{')[0].trim(); // Rough signature extraction
-                        braceDepth += (open - close);
-                    } else if (open > 0 && braceDepth > 0) {
-                        // Already in something weird?
-                    }
-                } else {
-                    // Inside Block
-                    currentBlockLines.push(line);
-                    braceDepth += (open - close);
-
-                    // End of Block
-                    if (braceDepth <= 0) {
-                        const content = currentBlockLines.join('\n');
-                        const name = extractName(currentSig);
-                        
-                        blocks.push({
+                        braceDepth = (open - close);
+                    } else {
+                        // This is a "Loose Line" (e.g. variable, import, call)
+                        // We treat this single line as a segment immediately
+                        // UNLESS the next line looks like a continuation? 
+                        // For simplicity: group loose lines? No, line-by-line is safer for diffs unless bracketed.
+                        const name = extractName(trimmed);
+                        segments.push({
                             name: name,
-                            signature: currentSig,
-                            content: content,
+                            signature: trimmed,
+                            content: line,
+                            startLine: startLineNum + 1,
                             startIndex: startIndex,
                             endIndex: charCount + lineLength - 1
                         });
-
-                        inBlock = false;
-                        braceDepth = 0;
-                        currentBlockLines = [];
+                        currentContent = []; // reset
                     }
-                }
-                charCount += lineLength;
-            }
-            
-            return blocks;
-        }
-
-        /**
-         * extractName: Tries to parse "function name", "class name", "const name ="
-         */
-        function extractName(signature) {
-            // Function Declaration: function myFunc
-            let match = signature.match(/function\s+([a-zA-Z0-9_$]+)/);
-            if (match) return match[1];
-
-            // Class Declaration: class MyClass
-            match = signature.match(/class\s+([a-zA-Z0-9_$]+)/);
-            if (match) return match[1];
-
-            // Variable Assignment: const myVar = ...
-            // let myVar = ...
-            match = signature.match(/(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/);
-            if (match) return match[1];
-
-            // Method in class: myMethod() (Harder to distinguish from function calls without context, ignoring for now)
-            
-            return null; // No distinct name found (e.g. if statements, loops, anonymous callbacks)
-        }
-
-    </script>
-</body>
-</html>
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            height: 100%;
-        }
-
-        /* Controls Area */
-        .controls {
-            display: flex;
-            flex-wrap: wrap; /* Responsive wrapping */
-            gap: 15px;
-            padding: 15px;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            align-items: center;
-        }
-
-        .file-upload-group {
-            flex: 1;
-            min-width: 250px;
-        }
-
-        .action-group {
-            display: flex;
-            gap: 10px;
-        }
-
-        /* Workspace (Split View) */
-        .workspace {
-            display: flex;
-            gap: 20px;
-            flex: 1;
-            min-height: 0;
-        }
-
-        .column {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-width: 0;
-        }
-
-        /* Responsive Adjustments */
-        @media (max-width: 768px) {
-            body { padding: 10px; height: auto; min-height: 100vh; }
-            .workspace { flex-direction: column; height: auto; }
-            .column { min-height: 400px; }
-            .controls { flex-direction: column; align-items: stretch; }
-            .action-group { flex-direction: column; }
-            button { width: 100%; }
-        }
-
-        textarea {
-            width: 100%;
-            height: 100%;
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
-            padding: 10px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            resize: none;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        .diff-list {
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            padding-right: 5px;
-            height: 100%;
-        }
-
-        .diff-card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px;
-            transition: all 0.2s;
-        }
-
-        .diff-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 8px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .diff-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .diff-type {
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-        .type-replace { color: #faa356; }
-        .type-insert { color: #89d185; }
-
-        .diff-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            color: white;
-            transition: opacity 0.2s;
-            white-space: nowrap;
-        }
-
-        button:hover { opacity: 0.9; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--border); }
-
-        .btn-primary { background-color: var(--accent); }
-        .btn-success { background-color: var(--success); }
-        .btn-warning { background-color: var(--warning); color: #222; }
-        .btn-secondary { background-color: var(--border); color: var(--text); }
-
-        /* Code Diff Views */
-        .code-compare {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 12px;
-            background: #000;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        
-        /* Layout for Insertions (Single Column) */
-        .code-compare.insert-mode {
-            grid-template-columns: 1fr;
-        }
-
-        .code-block {
-            white-space: pre-wrap;
-            word-break: break-all;
-            padding: 8px;
-            overflow-x: auto;
-        }
-
-        .original { background-color: var(--code-del); border-left: 3px solid var(--danger); opacity: 0.8; }
-        .replacement { background-color: var(--code-add); border-left: 3px solid var(--success); }
-        .insert-only { background-color: var(--code-add); border-left: 3px solid var(--success); }
-
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75em;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .status-pending { background: #444; color: #ddd; }
-        .status-approved { background: var(--success); color: white; }
-        .status-rejected { background: var(--border); color: #888; text-decoration: line-through; }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <!-- Top Controls -->
-        <div class="controls">
-            <div class="file-upload-group">
-                <label for="fileInput" style="display:block; font-size:0.8em; margin-bottom:4px; color:#aaa;">1. Load Source File (.js/.ts)</label>
-                <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx" style="color:white;">
-            </div>
-            <div class="action-group">
-                <button id="analyzeBtn" class="btn-primary" disabled>Analyze Segments</button>
-                <button id="downloadBtn" class="btn-success" disabled>Download Result</button>
-            </div>
-        </div>
-
-        <div class="workspace">
-            <!-- Left: Input Area -->
-            <div class="column">
-                <h3>2. Paste AI Output</h3>
-                <textarea id="aiInput" placeholder="// Paste the code provided by ChatGPT/Claude here...&#10;function newFeature() {&#10;   // ...&#10;}"></textarea>
-            </div>
-
-            <!-- Right: Interactive Diff -->
-            <div class="column">
-                <h3>3. Review Updates</h3>
-                <div id="diffContainer" class="diff-list">
-                    <div style="text-align: center; color: #666; margin-top: 50px;">
-                        Waiting for source file and AI input...
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // State
-        let sourceCode = "";
-        let rawOriginalSource = ""; // Keeps the pristine original
-        let sourceFilename = "updated_script.js";
-        let proposedPatches = [];
-
-        // DOM Elements
-        const fileInput = document.getElementById('fileInput');
-        const aiInput = document.getElementById('aiInput');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const diffContainer = document.getElementById('diffContainer');
-
-        // --- Event Listeners ---
-
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            sourceFilename = file.name;
-            
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                rawOriginalSource = event.target.result;
-                sourceCode = rawOriginalSource;
-                checkReady();
-            };
-            reader.readAsText(file);
-        });
-
-        aiInput.addEventListener('input', checkReady);
-
-        function checkReady() {
-            if (rawOriginalSource && aiInput.value.trim().length > 0) {
-                analyzeBtn.disabled = false;
-            }
-        }
-
-        analyzeBtn.addEventListener('click', () => {
-            const updateCode = aiInput.value;
-            performAnalysis(rawOriginalSource, updateCode);
-        });
-
-        downloadBtn.addEventListener('click', () => {
-            applyPatchesToSource(); // Ensure latest state
-            downloadString(sourceCode, "updated_" + sourceFilename);
-        });
-
-        // --- Core Logic ---
-
-        function performAnalysis(source, update) {
-            const sourceChunks = segmentCode(source);
-            const updateChunks = segmentCode(update);
-            
-            proposedPatches = [];
-            diffContainer.innerHTML = '';
-
-            // Configuration
-            const REPLACE_THRESHOLD = 0.90; // 90% Match required to replace
-            const matchedSourceIndices = new Set();
-
-            updateChunks.forEach((uChunk) => {
-                // Ignore extremely short garbage (like single brackets)
-                if (uChunk.content.trim().length < 4) return;
-
-                let bestMatch = null;
-                let highestScore = 0;
-
-                // Find best matching chunk in source
-                sourceChunks.forEach((sChunk, sIndex) => {
-                    if (matchedSourceIndices.has(sIndex)) return;
-
-                    // Weighted score: Signature (function name) is very important
-                    const sigScore = similarity(uChunk.signature, sChunk.signature);
-                    const contentScore = similarity(uChunk.content, sChunk.content);
-                    const totalScore = (sigScore * 0.7) + (contentScore * 0.3);
-
-                    if (totalScore > highestScore) {
-                        highestScore = totalScore;
-                        bestMatch = { chunk: sChunk, index: sIndex };
-                    }
-                });
-
-                // DECISION LOGIC
-                if (bestMatch && highestScore >= REPLACE_THRESHOLD) {
-                    // Exact or very close match -> PROPOSE REPLACEMENT
-                    if (uChunk.content.trim() !== bestMatch.chunk.content.trim()) {
-                        matchedSourceIndices.add(bestMatch.index);
-                        addPatchProposal('replace', bestMatch.chunk, uChunk, highestScore);
-                    }
-                } else {
-                    // Low score (< 90%) -> PROPOSE INSERTION
-                    // Even if score is 0.8, user requested we treat < 0.9 as insert.
-                    addPatchProposal('insert', null, uChunk, highestScore);
-                }
-            });
-
-            if (proposedPatches.length === 0) {
-                diffContainer.innerHTML = '<div style="padding:20px; text-align:center;">Code appears identical. No updates needed.</div>';
-                downloadBtn.disabled = true;
-            } else {
-                downloadBtn.disabled = false;
-            }
-        }
-
-        function addPatchProposal(type, originalChunk, newChunk, confidence) {
-            const id = Date.now() + Math.random();
-            
-            const patch = {
-                id,
-                type,
-                original: originalChunk,
-                new: newChunk,
-                status: 'pending' // pending, approved, rejected
-            };
-            proposedPatches.push(patch);
-
-            // Create UI
-            const card = document.createElement('div');
-            card.className = 'diff-card';
-            card.id = `card-${id}`;
-            
-            const confPercent = Math.round(confidence * 100);
-            
-            let badgeHtml = '';
-            let contentHtml = '';
-            let btnHtml = '';
-
-            if (type === 'replace') {
-                badgeHtml = `<span class="diff-type type-replace">Found Match (${confPercent}%)</span>`;
-                contentHtml = `
-                    <div class="code-compare">
-                        <div class="code-block original" title="Original Code">${escapeHtml(originalChunk.content)}</div>
-                        <div class="code-block replacement" title="New Code">${escapeHtml(newChunk.content)}</div>
-                    </div>`;
-                btnHtml = `<button class="btn-success" onclick="updatePatch('${id}', 'approved')">Confirm Replace</button>`;
-            } else {
-                badgeHtml = `<span class="diff-type type-insert">New Code Segment (Match: ${confPercent}%)</span>`;
-                contentHtml = `
-                    <div class="code-compare insert-mode">
-                        <div class="code-block insert-only" title="New Code to Insert">${escapeHtml(newChunk.content)}</div>
-                    </div>`;
-                btnHtml = `<button class="btn-primary" onclick="updatePatch('${id}', 'approved')">Insert Block</button>`;
-            }
-            
-            card.innerHTML = `
-                <div class="diff-header">
-                    <div class="diff-info">
-                        ${badgeHtml}
-                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
-                    </div>
-                    <div class="diff-actions">
-                        ${btnHtml}
-                        <button class="btn-secondary" onclick="updatePatch('${id}', 'rejected')">Ignore</button>
-                    </div>
-                </div>
-                ${contentHtml}
-            `;
-
-            diffContainer.appendChild(card);
-        }
-
-        window.updatePatch = function(id, status) {
-            const patch = proposedPatches.find(p => p.id == id);
-            if (!patch) return;
-
-            patch.status = status;
-            
-            // Update UI
-            const card = document.getElementById(`card-${id}`);
-            const statusBadge = document.getElementById(`status-${id}`);
-            
-            if (status === 'approved') {
-                statusBadge.className = 'status-badge status-approved';
-                statusBadge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
-                card.style.opacity = '1';
-                card.style.borderColor = 'var(--success)';
-            } else {
-                statusBadge.className = 'status-badge status-rejected';
-                statusBadge.innerText = 'Ignored';
-                card.style.opacity = '0.5';
-                card.style.borderColor = 'var(--border)';
-            }
-        };
-
-        window.applyPatchesToSource = function() {
-            let tempCode = rawOriginalSource;
-            
-            // 1. Handle Replacements (Sort desc to preserve indices)
-            const replacements = proposedPatches
-                .filter(p => p.status === 'approved' && p.type === 'replace')
-                .sort((a, b) => b.original.startIndex - a.original.startIndex);
-
-            replacements.forEach(p => {
-                const before = tempCode.substring(0, p.original.startIndex);
-                const after = tempCode.substring(p.original.endIndex);
-                tempCode = before + p.new.content + after;
-            });
-
-            // 2. Handle Insertions (Append to end of file)
-            const insertions = proposedPatches
-                .filter(p => p.status === 'approved' && p.type === 'insert');
-            
-            if (insertions.length > 0) {
-                tempCode += "\n\n// --- AI Inserted Blocks ---\n";
-                insertions.forEach(p => {
-                    tempCode += "\n" + p.new.content + "\n";
-                });
-            }
-
-            sourceCode = tempCode;
-        }
-
-        // --- Helpers ---
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        function downloadString(text, filename) {
-            var blob = new Blob([text], { type: 'text/javascript' });
-            var link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-        }
-
-        // --- Code Parsing & Similarity ---
-        
-        function segmentCode(code) {
-            const lines = code.split('\n');
-            const segments = [];
-            
-            let currentBlock = [];
-            let startIndex = 0;
-            let startLine = 0;
-            let braceDepth = 0;
-            let inBlock = false;
-            let charCount = 0;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmed = line.trim();
-                const lineLength = line.length + 1; // +1 for newline
-
-                const openBraces = (line.match(/\{/g) || []).length;
-                const closeBraces = (line.match(/\}/g) || []).length;
-
-                // Start block heuristic
-                if (!inBlock) {
-                    // Ignore empty lines or pure comments at root unless attached to code
-                    if (trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*')) {
-                        inBlock = true;
-                        startLine = i + 1;
-                        startIndex = charCount;
-                        currentBlock = [];
-                    }
-                }
-
-                if (inBlock) {
-                    currentBlock.push(line);
-                    braceDepth += (openBraces - closeBraces);
-
-                    // End block heuristic
-                    if (braceDepth <= 0 && currentBlock.length > 0) {
+                } 
+                else {
+                    // INSIDE BLOCK
+                    currentContent.push(line);
+                    braceDepth += (open - close);
+                    
+                    if (braceDepth <= 0) {
+                        // Block Closed
+                        const contentStr = currentContent.join('\n');
+                        const name = extractName(currentSig);
                         segments.push({
-                            signature: currentBlock[0].trim(),
-                            content: currentBlock.join('\n'),
+                            name: name,
+                            signature: currentSig.trim(),
+                            content: contentStr,
+                            startLine: startLineNum + 1,
                             startIndex: startIndex,
-                            endIndex: charCount + lineLength - 1 
+                            endIndex: charCount + lineLength - 1
                         });
                         inBlock = false;
                         braceDepth = 0;
-                        currentBlock = [];
+                        currentContent = [];
                     }
                 }
                 charCount += lineLength;
             }
-            
-            // Catch trailing content
-            if (inBlock && currentBlock.length > 0) {
-                segments.push({
-                    signature: currentBlock[0].trim(),
-                    content: currentBlock.join('\n'),
+
+            // Cleanup remaining (e.g. unclosed block at end of paste)
+            if (currentContent.length > 0) {
+                 const contentStr = currentContent.join('\n');
+                 segments.push({
+                    name: null,
+                    signature: currentSig.trim(),
+                    content: contentStr,
+                    startLine: startLineNum + 1,
                     startIndex: startIndex,
                     endIndex: charCount
                 });
@@ -1044,12 +454,147 @@
             return segments;
         }
 
+        // --- UI GENERATION ---
+
+        function addPatchUI(type, origSeg, newSeg, reason) {
+            const id = Date.now() + Math.random();
+            const patch = { id, type, original: origSeg, new: newSeg, status: 'pending' };
+            proposedPatches.push(patch);
+
+            const card = document.createElement('div');
+            card.className = 'diff-card';
+            card.id = `card-${id}`;
+
+            let headerHtml = '', bodyHtml = '', btnHtml = '';
+
+            // Generate Code Panes with Line Numbers
+            if (type === 'replace') {
+                headerHtml = `<span class="diff-type type-replace">Replace (Line ${origSeg.startLine})</span> <span class="match-reason">${reason}</span>`;
+                bodyHtml = `
+                    <div class="code-compare-container">
+                        <div class="code-pane original">
+                            <div class="line-numbers">${genLineNums(origSeg.content, origSeg.startLine)}</div>
+                            <div class="code-content">${escapeHtml(origSeg.content)}</div>
+                        </div>
+                        <div class="code-pane replacement">
+                            <div class="line-numbers">${genLineNums(newSeg.content, newSeg.startLine || 1)}</div>
+                            <div class="code-content">${escapeHtml(newSeg.content)}</div>
+                        </div>
+                    </div>`;
+                btnHtml = `<button class="btn-success" onclick="setPatchStatus('${id}', 'approved')">Confirm Replace</button>`;
+            } else {
+                headerHtml = `<span class="diff-type type-insert">Insert New</span> <span class="match-reason">${reason}</span>`;
+                bodyHtml = `
+                    <div class="code-compare-container insert-mode">
+                        <div class="code-pane insert-only">
+                            <div class="line-numbers">${genLineNums(newSeg.content, 1)}</div>
+                            <div class="code-content">${escapeHtml(newSeg.content)}</div>
+                        </div>
+                    </div>`;
+                btnHtml = `<button class="btn-primary" onclick="setPatchStatus('${id}', 'approved')">Confirm Insert</button>`;
+            }
+
+            card.innerHTML = `
+                <div class="diff-header">
+                    <div class="diff-info">
+                        ${headerHtml}
+                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
+                    </div>
+                    <div class="diff-actions">
+                        ${btnHtml}
+                        <button class="btn-secondary" onclick="setPatchStatus('${id}', 'rejected')">Ignore</button>
+                    </div>
+                </div>
+                ${bodyHtml}
+            `;
+            diffContainer.appendChild(card);
+        }
+
+        function genLineNums(text, start) {
+            const count = text.split('\n').length;
+            let html = '';
+            for(let i=0; i<count; i++) {
+                html += (start + i) + '<br>';
+            }
+            return html;
+        }
+
+        window.setPatchStatus = function(id, status) {
+            const patch = proposedPatches.find(p => p.id == id);
+            if (!patch) return;
+            patch.status = status;
+            
+            const card = document.getElementById(`card-${id}`);
+            const badge = document.getElementById(`status-${id}`);
+            
+            if (status === 'approved') {
+                badge.className = 'status-badge status-approved';
+                badge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
+                card.style.opacity = '1';
+                card.style.borderColor = 'var(--success)';
+            } else {
+                badge.className = 'status-badge status-rejected';
+                badge.innerText = 'Ignored';
+                card.style.opacity = '0.5';
+                card.style.borderColor = 'var(--border)';
+            }
+        };
+
+        window.applyPatchesToSource = function() {
+            let tempCode = rawOriginalSource;
+            
+            // 1. Replacements (Bottom-up to preserve indices)
+            const replacements = proposedPatches
+                .filter(p => p.status === 'approved' && p.type === 'replace')
+                .sort((a, b) => b.original.startIndex - a.original.startIndex);
+
+            replacements.forEach(p => {
+                const before = tempCode.substring(0, p.original.startIndex);
+                const after = tempCode.substring(p.original.endIndex);
+                tempCode = before + p.new.content + after;
+            });
+
+            // 2. Insertions (Append)
+            const insertions = proposedPatches
+                .filter(p => p.status === 'approved' && p.type === 'insert');
+            
+            if (insertions.length > 0) {
+                tempCode += "\n\n// --- AI Inserted Blocks ---\n";
+                insertions.forEach(p => {
+                    tempCode += "\n" + p.new.content + "\n";
+                });
+            }
+            sourceCode = tempCode;
+        }
+
+        // --- UTILS ---
+        function extractName(str) {
+            // Function, Class, Variable match
+            let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
+            if(m) return m[1];
+            return null;
+        }
+
+        function cleanContent(str) { return str.replace(/\s+/g, '').trim(); }
+        
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function downloadString(text, filename) {
+            var blob = new Blob([text], { type: 'text/javascript' });
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
         function similarity(s1, s2) {
+            // Simple edit distance ratio
             let longer = s1, shorter = s2;
             if (s1.length < s2.length) { longer = s2; shorter = s1; }
-            const longerLength = longer.length;
-            if (longerLength === 0) return 1.0;
-            return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+            if (longer.length == 0) return 1.0;
+            return (longer.length - editDistance(longer, shorter)) / parseFloat(longer.length);
         }
 
         function editDistance(s1, s2) {
