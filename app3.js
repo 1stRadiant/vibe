@@ -1,5 +1,3 @@
-
-
 // --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
 // This section runs immediately to prepare the page for a live view,
 // preventing the editor UI from flashing and setting a preliminary page title.
@@ -776,18 +774,43 @@ const SuggestionEngine = {
         this.activeInput = input;
         
         const cursorIndex = input.selectionStart;
-        const textBeforeCursor = input.value.substring(0, cursorIndex);
+        const text = input.value;
+        const textBeforeCursor = text.substring(0, cursorIndex);
         
-        // Match a # followed by characters, ensuring it's at the end of the string or word
-        const match = textBeforeCursor.match(/#([\w-]*)$/);
+        // Regex to find the last trigger (@ or #) followed by valid ID chars
+        // capturing the trigger group 1, and the partial query group 2
+        const match = textBeforeCursor.match(/([@#])([\w-]*)$/);
         
         if (match) {
-            const query = match[1].toLowerCase();
-            this.nodes = this.flattenNodes();
-            const filtered = this.nodes.filter(n => n.id.toLowerCase().includes(query));
+            const trigger = match[1];
+            const query = match[2].toLowerCase();
             
-            if (filtered.length > 0) {
-                this.show(filtered, input);
+            let items = [];
+            
+            if (trigger === '#') {
+                this.nodes = this.flattenNodes();
+                const filtered = this.nodes.filter(n => n.id.toLowerCase().includes(query));
+                items = filtered.map(n => ({
+                    id: n.id,
+                    display: n.id,
+                    type: n.type,
+                    description: n.description || '',
+                    insertValue: '#' + n.id // Keep # for node references
+                }));
+            } else if (trigger === '@') {
+                const components = listComponents();
+                const filtered = components.filter(c => c.id.toLowerCase().includes(query) || c.name.toLowerCase().includes(query));
+                items = filtered.map(c => ({
+                    id: c.id,
+                    display: c.name,
+                    type: 'Component',
+                    description: c.description || 'Custom Component',
+                    insertValue: '@' + c.id // Keep @ for component references
+                }));
+            }
+            
+            if (items.length > 0) {
+                this.show(items, input, trigger, query.length);
             } else {
                 this.hide();
             }
@@ -814,7 +837,7 @@ const SuggestionEngine = {
         } else if (e.key === 'Enter' || e.key === 'Tab') {
             e.preventDefault();
             if (selected) {
-                this.insertId(selected.dataset.id);
+                this.insertId(selected.dataset.insert);
             }
         } else if (e.key === 'Escape') {
             this.hide();
@@ -828,22 +851,26 @@ const SuggestionEngine = {
         item.scrollIntoView({ block: 'nearest' });
     },
 
-    show(items, input) {
+    currentReplaceLen: 0, // How many chars to replace (including trigger)
+
+    show(items, input, trigger, queryLen) {
         this.visible = true;
+        this.currentReplaceLen = queryLen + 1; // +1 for the trigger char
         this.dropdown.innerHTML = '';
         
         items.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'vibe-suggestion-item';
             if (idx === 0) div.classList.add('selected');
-            div.dataset.id = item.id;
+            div.dataset.insert = item.insertValue;
             div.innerHTML = `
-                ${item.id} <span class="type">${item.type}</span>
+                <span class="main">${item.display}</span> 
+                <span class="type">${item.type}</span>
                 <span class="desc">${item.description}</span>
             `;
             div.onclick = (e) => {
                 e.preventDefault(); // Prevent blur
-                this.insertId(item.id);
+                this.insertId(item.insertValue);
             };
             this.dropdown.appendChild(div);
         });
@@ -861,34 +888,23 @@ const SuggestionEngine = {
         this.dropdown.style.display = 'none';
     },
 
-    insertId(id) {
+    insertId(textToInsert) {
         if (!this.activeInput) return;
         const input = this.activeInput;
         const cursorIndex = input.selectionStart;
         const text = input.value;
-        const textBeforeCursor = text.substring(0, cursorIndex);
-        const match = textBeforeCursor.match(/#([\w-]*)$/); // Find the trigger
-
-        if (match) {
-            const beforeMatch = text.substring(0, match.index);
-            const afterCursor = text.substring(cursorIndex);
-            // Insert just the ID, stripping the '#' that triggered it if desired, 
-            // OR keep the '#' if you want the output to be '#main-header'. 
-            // User requested "id of the component". Standard references usually exclude # unless it's a CSS selector.
-            // However, in prompt writing, keeping # helps denote it's an ID.
-            // Let's insert the raw ID, but since the user typed #, we replace the #... part with the ID.
-            
-            // Result: User typed "#hea" -> selects "head-content" -> Result: "head-content" (replacing #)
-            // OR Result: "head-content" replacing the whole thing.
-            // Let's replace the triggered text with just the ID.
-            
-            input.value = beforeMatch + id + afterCursor;
-            input.focus();
-            
-            // Move cursor to end of inserted ID
-            const newCursorPos = beforeMatch.length + id.length;
-            input.setSelectionRange(newCursorPos, newCursorPos);
-        }
+        
+        // Calculate start position by backing up length of (trigger + query)
+        const startPos = cursorIndex - this.currentReplaceLen;
+        const before = text.substring(0, startPos);
+        const after = text.substring(cursorIndex);
+        
+        input.value = before + textToInsert + after;
+        input.focus();
+        
+        const newCursorPos = startPos + textToInsert.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        
         this.hide();
     }
 };
@@ -2542,6 +2558,18 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}
 
+**VIBE SHORTHAND SYNTAX (Advanced):**
+The user may provide a structured prompt to define specific components. You must parse this syntax if present:
+\`\`\`text
+[SECTION NAME]
+  Type: @library-id OR > HTML tag
+  Overrides:
+    - Key: Value
+\`\`\`
+1. **Type: @library-id**: Checks "AVAILABLE CUSTOM COMPONENTS". If found, adapt that component. If not, generate a standard component fitting the name (e.g., @hero-section -> generate a hero section).
+2. **Type: > tag**: Use this specific HTML tag (e.g., '> form' -> <form>).
+3. **Overrides**: Apply these properties to the generated node (text, styles, attributes, or child structure).
+
 **JSON SCHEMA & RULES for each node in the array:**
 
 1.  **Component Node Object:** Each object in the array must have:
@@ -3851,6 +3879,18 @@ function getAgentSystemPrompt() {
 
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}
+
+**VIBE SHORTHAND SYNTAX (Advanced):**
+The user may provide a structured prompt to define specific components. You must parse this syntax if present:
+\`\`\`text
+[SECTION NAME]
+  Type: @library-id OR > HTML tag
+  Overrides:
+    - Key: Value
+\`\`\`
+1. **Type: @library-id**: Checks "AVAILABLE CUSTOM COMPONENTS". If found, adapt that component. If not, generate a standard component fitting the name (e.g., @hero-section -> generate a hero section).
+2. **Type: > tag**: Use this specific HTML tag (e.g., '> form' -> <form>).
+3. **Overrides**: Apply these properties to the generated node (text, styles, attributes, or child structure).
 
 **INPUT:**
 1.  **User Request:** A natural language description of a desired change. This could be a general instruction or a specific update to one component's description.
@@ -5243,6 +5283,245 @@ function handleSearchInput() {
     };
 }
 
+// --- Suggestion Engine (Autocompletion for Component IDs) ---
+const SuggestionEngine = {
+    dropdown: null,
+    activeInput: null,
+    visible: false,
+    nodes: [],
+    
+    init() {
+        // Create styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .vibe-suggestion-dropdown {
+                position: absolute;
+                background: #282c34;
+                border: 1px solid #444;
+                border-radius: 4px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 9999;
+                min-width: 250px;
+                display: none;
+            }
+            .vibe-suggestion-item {
+                padding: 8px 12px;
+                cursor: pointer;
+                color: #abb2bf;
+                border-bottom: 1px solid #333;
+                font-family: monospace;
+                font-size: 0.9em;
+            }
+            .vibe-suggestion-item:last-child { border-bottom: none; }
+            .vibe-suggestion-item:hover, .vibe-suggestion-item.selected {
+                background-color: #3e4451;
+                color: #fff;
+            }
+            .vibe-suggestion-item .type {
+                float: right;
+                font-size: 0.8em;
+                opacity: 0.6;
+                margin-left: 10px;
+                background: #21252b;
+                padding: 2px 4px;
+                border-radius: 3px;
+            }
+            .vibe-suggestion-item .desc {
+                display: block;
+                font-size: 0.8em;
+                opacity: 0.7;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                margin-top: 2px;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Create dropdown element
+        this.dropdown = document.createElement('div');
+        this.dropdown.className = 'vibe-suggestion-dropdown';
+        document.body.appendChild(this.dropdown);
+    },
+
+    flattenNodes(node = vibeTree, list = []) {
+        if(!node) return list;
+        // Don't add raw container if it's the root in raw mode, but generally okay
+        if (node.id) {
+            list.push({
+                id: node.id,
+                type: node.type,
+                description: node.description || ''
+            });
+        }
+        if (node.children) {
+            node.children.forEach(child => this.flattenNodes(child, list));
+        }
+        return list;
+    },
+
+    attachToInputs() {
+        const inputs = [
+            agentPromptInput,
+            chatPromptInput,
+            aiStructurePromptInput,
+            aiProjectEditPromptInput,
+            aiControlsPromptInput,
+            componentAiPromptInput,
+            fullCodeAiPromptInput
+        ];
+
+        inputs.forEach(input => {
+            if(!input) return;
+            input.addEventListener('keyup', (e) => this.handleInput(e));
+            input.addEventListener('keydown', (e) => this.handleKeydown(e));
+            input.addEventListener('blur', () => setTimeout(() => this.hide(), 200));
+            input.addEventListener('click', () => this.hide());
+        });
+    },
+
+    handleInput(e) {
+        const input = e.target;
+        this.activeInput = input;
+        
+        const cursorIndex = input.selectionStart;
+        const text = input.value;
+        const textBeforeCursor = text.substring(0, cursorIndex);
+        
+        // Regex to find the last trigger (@ or #) followed by valid ID chars
+        // capturing the trigger group 1, and the partial query group 2
+        const match = textBeforeCursor.match(/([@#])([\w-]*)$/);
+        
+        if (match) {
+            const trigger = match[1];
+            const query = match[2].toLowerCase();
+            
+            let items = [];
+            
+            if (trigger === '#') {
+                this.nodes = this.flattenNodes();
+                const filtered = this.nodes.filter(n => n.id.toLowerCase().includes(query));
+                items = filtered.map(n => ({
+                    id: n.id,
+                    display: n.id,
+                    type: n.type,
+                    description: n.description || '',
+                    insertValue: '#' + n.id // Keep # for node references
+                }));
+            } else if (trigger === '@') {
+                const components = listComponents();
+                const filtered = components.filter(c => c.id.toLowerCase().includes(query) || c.name.toLowerCase().includes(query));
+                items = filtered.map(c => ({
+                    id: c.id,
+                    display: c.name,
+                    type: 'Component',
+                    description: c.description || 'Custom Component',
+                    insertValue: '@' + c.id // Keep @ for component references
+                }));
+            }
+            
+            if (items.length > 0) {
+                this.show(items, input, trigger, query.length);
+            } else {
+                this.hide();
+            }
+        } else {
+            this.hide();
+        }
+    },
+
+    handleKeydown(e) {
+        if (!this.visible) return;
+
+        const items = this.dropdown.querySelectorAll('.vibe-suggestion-item');
+        let selected = this.dropdown.querySelector('.vibe-suggestion-item.selected');
+        let index = Array.from(items).indexOf(selected);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            index = (index + 1) % items.length;
+            this.selectItem(items[index]);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            index = (index - 1 + items.length) % items.length;
+            this.selectItem(items[index]);
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            if (selected) {
+                this.insertId(selected.dataset.insert);
+            }
+        } else if (e.key === 'Escape') {
+            this.hide();
+        }
+    },
+
+    selectItem(item) {
+        if (!item) return;
+        this.dropdown.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+        item.scrollIntoView({ block: 'nearest' });
+    },
+
+    currentReplaceLen: 0, // How many chars to replace (including trigger)
+
+    show(items, input, trigger, queryLen) {
+        this.visible = true;
+        this.currentReplaceLen = queryLen + 1; // +1 for the trigger char
+        this.dropdown.innerHTML = '';
+        
+        items.forEach((item, idx) => {
+            const div = document.createElement('div');
+            div.className = 'vibe-suggestion-item';
+            if (idx === 0) div.classList.add('selected');
+            div.dataset.insert = item.insertValue;
+            div.innerHTML = `
+                <span class="main">${item.display}</span> 
+                <span class="type">${item.type}</span>
+                <span class="desc">${item.description}</span>
+            `;
+            div.onclick = (e) => {
+                e.preventDefault(); // Prevent blur
+                this.insertId(item.insertValue);
+            };
+            this.dropdown.appendChild(div);
+        });
+
+        // Position dropdown relative to input
+        const rect = input.getBoundingClientRect();
+        this.dropdown.style.left = `${rect.left + window.scrollX}px`;
+        this.dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        this.dropdown.style.width = `${rect.width}px`;
+        this.dropdown.style.display = 'block';
+    },
+
+    hide() {
+        this.visible = false;
+        this.dropdown.style.display = 'none';
+    },
+
+    insertId(textToInsert) {
+        if (!this.activeInput) return;
+        const input = this.activeInput;
+        const cursorIndex = input.selectionStart;
+        const text = input.value;
+        
+        // Calculate start position by backing up length of (trigger + query)
+        const startPos = cursorIndex - this.currentReplaceLen;
+        const before = text.substring(0, startPos);
+        const after = text.substring(cursorIndex);
+        
+        input.value = before + textToInsert + after;
+        input.focus();
+        
+        const newCursorPos = startPos + textToInsert.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        
+        this.hide();
+    }
+};
+
 // --- NEW: Vibe Editor AI Search Logic ---
 
 function clearEditorHighlights() {
@@ -5804,7 +6083,7 @@ function handleSaveComponent() {
 
     componentModalError.textContent = '';
     if (!id || !name) {
-        componentModalError.textContent = 'ID and Name are required.';
+        componentModalError.textContent  = 'ID and Name are required.';
         return;
     }
 
