@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,6 +17,15 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        .shorthand-toolbar {
+            background: #2a2a2a;
+            padding: 8px;
+            border-radius: 4px 4px 0 0;
+            border: 1px solid #444;
+            border-bottom: none;
+        }
+    </style>
 </head>
 <body>
 
@@ -253,6 +260,16 @@
                                                 <div class="project-creation-method">
                                                     <h3>From a High-Level Goal</h3>
                                                     <p>Describe your website, and let the AI figure out the structure and code.</p>
+
+                                                    <!-- START SHORTHAND TOOLBAR -->
+                                                    <div class="shorthand-toolbar d-flex gap-2">
+                                                        <select id="start-component-shorthand-select" class="form-select form-select-sm" style="flex: 1; background: #1e1e1e; color: #ccc; border-color: #444;">
+                                                            <option value="">-- Insert Component Library (@) --</option>
+                                                        </select>
+                                                        <button id="start-insert-shorthand-button" class="btn btn-sm btn-outline-info">Insert</button>
+                                                    </div>
+                                                    <!-- END SHORTHAND TOOLBAR -->
+
                                                     <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
                                                     
                                                     <!-- VIBE SHORTHAND GUIDE START -->
@@ -335,6 +352,15 @@
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
                                 
                                 <div id="agent-controls">
+                                    <!-- START SHORTHAND TOOLBAR -->
+                                    <div class="shorthand-toolbar d-flex gap-2">
+                                        <select id="agent-component-shorthand-select" class="form-select form-select-sm" style="flex: 1; background: #1e1e1e; color: #ccc; border-color: #444;">
+                                            <option value="">-- Insert Component Library (@) --</option>
+                                        </select>
+                                        <button id="agent-insert-shorthand-button" class="btn btn-sm btn-outline-info">Insert</button>
+                                    </div>
+                                    <!-- END SHORTHAND TOOLBAR -->
+
                                     <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
                                     <!-- AGENT SYNTAX HINT START -->
                                     <div class="input-hint" style="font-size: 0.85em; color: #888; margin-bottom: 10px; display: flex; justify-content: space-between;">
