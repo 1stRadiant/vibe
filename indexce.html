@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -253,8 +254,25 @@
                                                     <h3>From a High-Level Goal</h3>
                                                     <p>Describe your website, and let the AI figure out the structure and code.</p>
                                                     <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                                    
+                                                    <!-- VIBE SHORTHAND GUIDE START -->
+                                                    <details class="syntax-guide" style="margin-top: 10px; margin-bottom: 10px; border: 1px solid #444; border-radius: 5px; background: #2a2a2a;">
+                                                        <summary style="padding: 10px; cursor: pointer; font-weight: bold; color: #61afef;">Advanced: Use Vibe Shorthand</summary>
+                                                        <div style="padding: 10px; font-size: 0.9em; color: #ccc;">
+                                                            <p>Type <code>#</code> to reference existing nodes or <code>@</code> to use components from your library.</p>
+                                                            <p><strong>Syntax Example:</strong></p>
+                                                            <pre style="background: #1e1e1e; padding: 10px; border-radius: 4px; color: #98c379; overflow-x: auto;">
+1. Hero Section
+   Type: @hero-banner
+   Overrides:
+     - Title: "Welcome Home"
+     - Button: "Get Started"</pre>
+                                                        </div>
+                                                    </details>
+                                                    <!-- VIBE SHORTHAND GUIDE END -->
+
                                                     <div class="button-container">
-<button hidden id="generate-project-button" class="action-button primary"><i class="bi bi-stars me-2"></i>Generate Project</button>                                                        
+                                                        <button hidden id="generate-project-button" class="action-button primary"><i class="bi bi-stars me-2"></i>Generate Project</button>                                                        
                                                         <button id="start-iterative-build-button" class="action-button agent"><i class="bi bi-robot me-2"></i>Build</button>
                                                     </div>
                                                 </div>
@@ -318,6 +336,22 @@
                                 
                                 <div id="agent-controls">
                                     <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
+                                    <!-- AGENT SYNTAX HINT START -->
+                                    <div class="input-hint" style="font-size: 0.85em; color: #888; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                                        <span>Type <strong>@</strong> to reference components, <strong>#</strong> to reference nodes.</span>
+                                        <details style="display: inline-block;">
+                                            <summary style="cursor: pointer; color: #61afef;">Show Syntax</summary>
+                                            <div style="position: absolute; background: #222; border: 1px solid #444; padding: 10px; z-index: 100; width: 300px; border-radius: 4px; margin-top: 5px;">
+                                                <strong>Vibe Shorthand:</strong><br>
+                                                <pre style="margin: 5px 0; color: #98c379;">
+[New Section]
+  Type: @card-grid
+  Overrides:
+    - Title: "Services"</pre>
+                                            </div>
+                                        </details>
+                                    </div>
+                                    <!-- AGENT SYNTAX HINT END -->
                                     <div class="agent-buttons-container">
                                         <button id="run-agent-single-task-button" class="action-button">Add Task</button>
                                         <button id="start-iterative-session-button" class="action-button">Process Queue</button>
