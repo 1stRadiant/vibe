@@ -1,10 +1,10 @@
-html
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Code Context Merger</title>
+    <title>AI Code Context Merger (Smart Insert)</title>
     <style>
         :root {
             --bg: #1e1e1e;
@@ -13,6 +13,7 @@ html
             --text: #d4d4d4;
             --accent: #007acc;
             --success: #2ea043;
+            --warning: #e3b341;
             --danger: #f85149;
             --code-del: #451818;
             --code-add: #133618;
@@ -30,17 +31,19 @@ html
             box-sizing: border-box;
         }
 
-        h1, h2, h3 { margin-top: 0; }
+        h1, h2, h3 { margin-top: 0; font-size: 1.1rem; color: #fff; }
         
         .container {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 15px;
             height: 100%;
         }
 
+        /* Controls Area */
         .controls {
             display: flex;
+            flex-wrap: wrap; /* Responsive wrapping */
             gap: 15px;
             padding: 15px;
             background: var(--panel);
@@ -49,11 +52,22 @@ html
             align-items: center;
         }
 
+        .file-upload-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Workspace (Split View) */
         .workspace {
             display: flex;
             gap: 20px;
             flex: 1;
-            min-height: 0; /* logic for scroll */
+            min-height: 0;
         }
 
         .column {
@@ -62,6 +76,16 @@ html
             flex-direction: column;
             gap: 10px;
             min-width: 0;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            body { padding: 10px; height: auto; min-height: 100vh; }
+            .workspace { flex-direction: column; height: auto; }
+            .column { min-height: 400px; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .action-group { flex-direction: column; }
+            button { width: 100%; }
         }
 
         textarea {
@@ -74,6 +98,7 @@ html
             font-family: 'Consolas', 'Monaco', monospace;
             resize: none;
             border-radius: 4px;
+            box-sizing: border-box;
         }
 
         .diff-list {
@@ -81,7 +106,8 @@ html
             display: flex;
             flex-direction: column;
             gap: 15px;
-            padding-right: 10px;
+            padding-right: 5px;
+            height: 100%;
         }
 
         .diff-card {
@@ -89,6 +115,7 @@ html
             border: 1px solid var(--border);
             border-radius: 6px;
             padding: 10px;
+            transition: all 0.2s;
         }
 
         .diff-header {
@@ -97,36 +124,46 @@ html
             align-items: center;
             margin-bottom: 10px;
             border-bottom: 1px solid var(--border);
-            padding-bottom: 5px;
+            padding-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .diff-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .diff-type {
             font-weight: bold;
             font-size: 0.9em;
-            color: #9cdcfe;
         }
+        .type-replace { color: #faa356; }
+        .type-insert { color: #89d185; }
 
         .diff-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
         button {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             color: white;
             transition: opacity 0.2s;
+            white-space: nowrap;
         }
 
         button:hover { opacity: 0.9; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--border); }
 
         .btn-primary { background-color: var(--accent); }
         .btn-success { background-color: var(--success); }
-        .btn-danger { background-color: var(--danger); }
+        .btn-warning { background-color: var(--warning); color: #222; }
         .btn-secondary { background-color: var(--border); color: var(--text); }
 
         /* Code Diff Views */
@@ -140,26 +177,33 @@ html
             padding: 5px;
             border-radius: 4px;
         }
+        
+        /* Layout for Insertions (Single Column) */
+        .code-compare.insert-mode {
+            grid-template-columns: 1fr;
+        }
 
         .code-block {
             white-space: pre-wrap;
             word-break: break-all;
-            padding: 5px;
+            padding: 8px;
+            overflow-x: auto;
         }
 
-        .original { background-color: var(--code-del); border-left: 3px solid var(--danger); }
+        .original { background-color: var(--code-del); border-left: 3px solid var(--danger); opacity: 0.8; }
         .replacement { background-color: var(--code-add); border-left: 3px solid var(--success); }
+        .insert-only { background-color: var(--code-add); border-left: 3px solid var(--success); }
 
         .status-badge {
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.8em;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            font-weight: bold;
         }
-        .status-pending { background: #ce9178; color: #333; }
+        .status-pending { background: #444; color: #ddd; }
         .status-approved { background: var(--success); color: white; }
         .status-rejected { background: var(--border); color: #888; text-decoration: line-through; }
-
-        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -167,25 +211,26 @@ html
     <div class="container">
         <!-- Top Controls -->
         <div class="controls">
-            <div>
-                <label for="fileInput" style="display:block; font-size:0.8em; margin-bottom:4px;">1. Load Source File (.js)</label>
-                <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx">
+            <div class="file-upload-group">
+                <label for="fileInput" style="display:block; font-size:0.8em; margin-bottom:4px; color:#aaa;">1. Load Source File (.js/.ts)</label>
+                <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx" style="color:white;">
             </div>
-            <div style="flex:1"></div>
-            <button id="analyzeBtn" class="btn-primary" disabled>Analyze & Compare</button>
-            <button id="downloadBtn" class="btn-success" disabled>Download Updated File</button>
+            <div class="action-group">
+                <button id="analyzeBtn" class="btn-primary" disabled>Analyze Segments</button>
+                <button id="downloadBtn" class="btn-success" disabled>Download Result</button>
+            </div>
         </div>
 
         <div class="workspace">
             <!-- Left: Input Area -->
             <div class="column">
-                <h3>2. Paste AI Snippet / Update</h3>
-                <textarea id="aiInput" placeholder="// Paste the code provided by ChatGPT/Claude here...&#10;function existingFunction() {&#10;   // New logic...&#10;}"></textarea>
+                <h3>2. Paste AI Output</h3>
+                <textarea id="aiInput" placeholder="// Paste the code provided by ChatGPT/Claude here...&#10;function newFeature() {&#10;   // ...&#10;}"></textarea>
             </div>
 
             <!-- Right: Interactive Diff -->
             <div class="column">
-                <h3>3. Review & Approve Changes</h3>
+                <h3>3. Review Updates</h3>
                 <div id="diffContainer" class="diff-list">
                     <div style="text-align: center; color: #666; margin-top: 50px;">
                         Waiting for source file and AI input...
@@ -198,6 +243,7 @@ html
     <script>
         // State
         let sourceCode = "";
+        let rawOriginalSource = ""; // Keeps the pristine original
         let sourceFilename = "updated_script.js";
         let proposedPatches = [];
 
@@ -217,7 +263,8 @@ html
             
             const reader = new FileReader();
             reader.onload = (event) => {
-                sourceCode = event.target.result;
+                rawOriginalSource = event.target.result;
+                sourceCode = rawOriginalSource;
                 checkReady();
             };
             reader.readAsText(file);
@@ -226,29 +273,22 @@ html
         aiInput.addEventListener('input', checkReady);
 
         function checkReady() {
-            if (sourceCode && aiInput.value.trim().length > 0) {
+            if (rawOriginalSource && aiInput.value.trim().length > 0) {
                 analyzeBtn.disabled = false;
             }
         }
 
         analyzeBtn.addEventListener('click', () => {
             const updateCode = aiInput.value;
-            performAnalysis(sourceCode, updateCode);
+            performAnalysis(rawOriginalSource, updateCode);
         });
 
         downloadBtn.addEventListener('click', () => {
+            applyPatchesToSource(); // Ensure latest state
             downloadString(sourceCode, "updated_" + sourceFilename);
         });
 
-        // --- Core Logic: Segmentation & Matching ---
-
-        /**
-         * The strategy:
-         * 1. Break code into "Chunks" based on brackets { }. 
-         *    We assume top-level chunks are functions, classes, or loose variables.
-         * 2. For every chunk in the AI Input, calculate similarity against every chunk in Source.
-         * 3. If similarity > threshold, propose a replacement.
-         */
+        // --- Core Logic ---
 
         function performAnalysis(source, update) {
             const sourceChunks = segmentCode(source);
@@ -258,30 +298,23 @@ html
             diffContainer.innerHTML = '';
 
             // Configuration
-            const SIMILARITY_THRESHOLD = 0.4; // Loose enough to catch refactors
-            const SIGNATURE_WEIGHT = 0.7; // Weigh the first line (signature) heavily
-
-            // For tracking which source chunks are already matched to avoid double replacement
+            const REPLACE_THRESHOLD = 0.90; // 90% Match required to replace
             const matchedSourceIndices = new Set();
 
             updateChunks.forEach((uChunk) => {
+                // Ignore extremely short garbage (like single brackets)
+                if (uChunk.content.trim().length < 4) return;
+
                 let bestMatch = null;
                 let highestScore = 0;
 
-                // Simple heuristic: Ignore tiny chunks (like closing braces or short comments)
-                if (uChunk.content.trim().length < 5) return;
-
+                // Find best matching chunk in source
                 sourceChunks.forEach((sChunk, sIndex) => {
                     if (matchedSourceIndices.has(sIndex)) return;
 
-                    // 1. Check Signature Similarity (First line mostly)
+                    // Weighted score: Signature (function name) is very important
                     const sigScore = similarity(uChunk.signature, sChunk.signature);
-                    
-                    // 2. Check Content Similarity
                     const contentScore = similarity(uChunk.content, sChunk.content);
-
-                    // Weighted score: Signature is very important for identifying intent
-                    // If signature is identical, score is very high.
                     const totalScore = (sigScore * 0.7) + (contentScore * 0.3);
 
                     if (totalScore > highestScore) {
@@ -290,68 +323,85 @@ html
                     }
                 });
 
-                if (highestScore > SIMILARITY_THRESHOLD && bestMatch) {
-                    // It's a match. Is it different?
+                // DECISION LOGIC
+                if (bestMatch && highestScore >= REPLACE_THRESHOLD) {
+                    // Exact or very close match -> PROPOSE REPLACEMENT
                     if (uChunk.content.trim() !== bestMatch.chunk.content.trim()) {
                         matchedSourceIndices.add(bestMatch.index);
-                        addPatchProposal(bestMatch.chunk, uChunk, highestScore);
+                        addPatchProposal('replace', bestMatch.chunk, uChunk, highestScore);
                     }
                 } else {
-                    // Logic for "New Code" (Insertion) could go here
-                    // For now, we focus on updates/fixes as requested.
+                    // Low score (< 90%) -> PROPOSE INSERTION
+                    // Even if score is 0.8, user requested we treat < 0.9 as insert.
+                    addPatchProposal('insert', null, uChunk, highestScore);
                 }
             });
 
             if (proposedPatches.length === 0) {
-                diffContainer.innerHTML = '<div style="padding:20px; text-align:center;">No matchable segments found or code is identical.</div>';
+                diffContainer.innerHTML = '<div style="padding:20px; text-align:center;">Code appears identical. No updates needed.</div>';
                 downloadBtn.disabled = true;
             } else {
                 downloadBtn.disabled = false;
             }
         }
 
-        function addPatchProposal(originalChunk, newChunk, confidence) {
+        function addPatchProposal(type, originalChunk, newChunk, confidence) {
             const id = Date.now() + Math.random();
             
             const patch = {
                 id,
+                type,
                 original: originalChunk,
                 new: newChunk,
                 status: 'pending' // pending, approved, rejected
             };
             proposedPatches.push(patch);
 
-            // Create UI Card
+            // Create UI
             const card = document.createElement('div');
             card.className = 'diff-card';
             card.id = `card-${id}`;
             
             const confPercent = Math.round(confidence * 100);
             
+            let badgeHtml = '';
+            let contentHtml = '';
+            let btnHtml = '';
+
+            if (type === 'replace') {
+                badgeHtml = `<span class="diff-type type-replace">Found Match (${confPercent}%)</span>`;
+                contentHtml = `
+                    <div class="code-compare">
+                        <div class="code-block original" title="Original Code">${escapeHtml(originalChunk.content)}</div>
+                        <div class="code-block replacement" title="New Code">${escapeHtml(newChunk.content)}</div>
+                    </div>`;
+                btnHtml = `<button class="btn-success" onclick="updatePatch('${id}', 'approved')">Confirm Replace</button>`;
+            } else {
+                badgeHtml = `<span class="diff-type type-insert">New Code Segment (Match: ${confPercent}%)</span>`;
+                contentHtml = `
+                    <div class="code-compare insert-mode">
+                        <div class="code-block insert-only" title="New Code to Insert">${escapeHtml(newChunk.content)}</div>
+                    </div>`;
+                btnHtml = `<button class="btn-primary" onclick="updatePatch('${id}', 'approved')">Insert Block</button>`;
+            }
+            
             card.innerHTML = `
                 <div class="diff-header">
-                    <div>
-                        <span class="diff-type">Match found (${confPercent}% similarity)</span>
+                    <div class="diff-info">
+                        ${badgeHtml}
                         <span id="status-${id}" class="status-badge status-pending">Pending</span>
                     </div>
                     <div class="diff-actions">
-                        <button class="btn-success" onclick="updatePatch('${id}', 'approved')">Replace</button>
+                        ${btnHtml}
                         <button class="btn-secondary" onclick="updatePatch('${id}', 'rejected')">Ignore</button>
                     </div>
                 </div>
-                <div style="margin-bottom: 5px; font-size: 0.85em; color: #888;">
-                    Lines ${originalChunk.start}-${originalChunk.end} in original file
-                </div>
-                <div class="code-compare">
-                    <div class="code-block original">${escapeHtml(originalChunk.content)}</div>
-                    <div class="code-block replacement">${escapeHtml(newChunk.content)}</div>
-                </div>
+                ${contentHtml}
             `;
 
             diffContainer.appendChild(card);
         }
 
-        // --- Global function for button clicks ---
         window.updatePatch = function(id, status) {
             const patch = proposedPatches.find(p => p.id == id);
             if (!patch) return;
@@ -361,79 +411,52 @@ html
             // Update UI
             const card = document.getElementById(`card-${id}`);
             const statusBadge = document.getElementById(`status-${id}`);
-            const btns = card.querySelectorAll('button');
             
             if (status === 'approved') {
                 statusBadge.className = 'status-badge status-approved';
-                statusBadge.innerText = 'To be Replaced';
+                statusBadge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
                 card.style.opacity = '1';
-                // Trigger re-generation of source code immediately or wait? 
-                // Let's re-generate source code logic immediately for the final download
-                applyPatchesToSource();
+                card.style.borderColor = 'var(--success)';
             } else {
                 statusBadge.className = 'status-badge status-rejected';
                 statusBadge.innerText = 'Ignored';
-                card.style.opacity = '0.6';
-                applyPatchesToSource();
+                card.style.opacity = '0.5';
+                card.style.borderColor = 'var(--border)';
             }
         };
 
-        function applyPatchesToSource() {
-            // We need to apply patches from bottom to top to preserve indices
-            // Filter only approved patches
-            const toApply = proposedPatches.filter(p => p.status === 'approved');
-            
-            // Sort by start index descending
-            toApply.sort((a, b) => b.original.startIndex - a.original.startIndex);
-
-            // We need a fresh copy of the original source loaded from file (we don't want to accumulate changes on dirty state if user toggles buttons)
-            // But we only have 'sourceCode' variable. 
-            // Better approach: Store rawSource in a separate variable.
-            // *Self-correction*: For this V1, let's assume sourceCode is the "Master" and we apply patches to a temporary string for download. 
-            // Actually, to support toggling, we need the initial raw text.
-        }
-        
-        // Wrap the file loader to save raw state
-        let rawOriginalSource = "";
-        
-        // Hook into the file reader again
-        fileInput.addEventListener('change', (e) => {
-             // ... previous logic handles reading ...
-             const file = e.target.files[0];
-             const reader = new FileReader();
-             reader.onload = (ev) => {
-                 rawOriginalSource = ev.target.result;
-                 sourceCode = rawOriginalSource; // Reset
-             };
-             reader.readAsText(file);
-        });
-
-        // The actual patching logic override
         window.applyPatchesToSource = function() {
             let tempCode = rawOriginalSource;
             
-            const toApply = proposedPatches.filter(p => p.status === 'approved');
-            // Sort descending by character index
-            toApply.sort((a, b) => b.original.startIndex - a.original.startIndex);
+            // 1. Handle Replacements (Sort desc to preserve indices)
+            const replacements = proposedPatches
+                .filter(p => p.status === 'approved' && p.type === 'replace')
+                .sort((a, b) => b.original.startIndex - a.original.startIndex);
 
-            toApply.forEach(p => {
+            replacements.forEach(p => {
                 const before = tempCode.substring(0, p.original.startIndex);
                 const after = tempCode.substring(p.original.endIndex);
                 tempCode = before + p.new.content + after;
             });
 
-            // Update global sourceCode so download works
+            // 2. Handle Insertions (Append to end of file)
+            const insertions = proposedPatches
+                .filter(p => p.status === 'approved' && p.type === 'insert');
+            
+            if (insertions.length > 0) {
+                tempCode += "\n\n// --- AI Inserted Blocks ---\n";
+                insertions.forEach(p => {
+                    tempCode += "\n" + p.new.content + "\n";
+                });
+            }
+
             sourceCode = tempCode;
         }
 
         // --- Helpers ---
 
         function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;")
-                       .replace(/</g, "&lt;")
-                       .replace(/>/g, "&gt;")
-                       .replace(/"/g, "&quot;")
-                       .replace(/'/g, "&#039;");
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
         function downloadString(text, filename) {
@@ -444,37 +467,31 @@ html
             link.click();
         }
 
-        // --- Code Segmentation Logic (The heavy lifter) ---
+        // --- Code Parsing & Similarity ---
         
         function segmentCode(code) {
             const lines = code.split('\n');
             const segments = [];
             
             let currentBlock = [];
-            let startIndex = 0; // char index
+            let startIndex = 0;
             let startLine = 0;
             let braceDepth = 0;
             let inBlock = false;
-            let charCount = 0; // Tracker for character indices
+            let charCount = 0;
 
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 const trimmed = line.trim();
-                
-                // Track character indices (line length + newline)
-                const lineLength = line.length + 1; 
+                const lineLength = line.length + 1; // +1 for newline
 
-                // Basic bracket counting (ignores comments/strings for simplicity in this V1)
-                // A robust parser would strip comments first, but this works for 90% of JS structures
                 const openBraces = (line.match(/\{/g) || []).length;
                 const closeBraces = (line.match(/\}/g) || []).length;
 
-                // Detect start of a block (function, class, const, let at root level)
-                // We start a block if we are at depth 0 and see something significant,
-                // OR if we are already in a block.
-                
+                // Start block heuristic
                 if (!inBlock) {
-                    if (trimmed.length > 0 && !trimmed.startsWith('//')) {
+                    // Ignore empty lines or pure comments at root unless attached to code
+                    if (trimmed.length > 0 && !trimmed.startsWith('//') && !trimmed.startsWith('/*')) {
                         inBlock = true;
                         startLine = i + 1;
                         startIndex = charCount;
@@ -486,37 +503,27 @@ html
                     currentBlock.push(line);
                     braceDepth += (openBraces - closeBraces);
 
-                    // If depth returns to 0 (or less, in case of errors) and we have content
+                    // End block heuristic
                     if (braceDepth <= 0 && currentBlock.length > 0) {
-                        // Check if it's really a block or just a one-liner
-                        // We close the block here
-                        const content = currentBlock.join('\n');
                         segments.push({
-                            signature: currentBlock[0].trim(), // First line is signature
-                            content: content,
-                            start: startLine,
-                            end: i + 1,
+                            signature: currentBlock[0].trim(),
+                            content: currentBlock.join('\n'),
                             startIndex: startIndex,
-                            endIndex: charCount + lineLength - 1 // -1 to exclude next newline usually
+                            endIndex: charCount + lineLength - 1 
                         });
-                        
                         inBlock = false;
                         braceDepth = 0;
                         currentBlock = [];
                     }
                 }
-                
                 charCount += lineLength;
             }
-
-            // Flush remaining if file ends without closing (common in partial snippets)
+            
+            // Catch trailing content
             if (inBlock && currentBlock.length > 0) {
-                const content = currentBlock.join('\n');
                 segments.push({
                     signature: currentBlock[0].trim(),
-                    content: content,
-                    start: startLine,
-                    end: lines.length,
+                    content: currentBlock.join('\n'),
                     startIndex: startIndex,
                     endIndex: charCount
                 });
@@ -525,48 +532,35 @@ html
             return segments;
         }
 
-        // --- Levenshtein Distance (Similarity) ---
         function similarity(s1, s2) {
-            let longer = s1;
-            let shorter = s2;
-            if (s1.length < s2.length) {
-                longer = s2;
-                shorter = s1;
-            }
+            let longer = s1, shorter = s2;
+            if (s1.length < s2.length) { longer = s2; shorter = s1; }
             const longerLength = longer.length;
-            if (longerLength === 0) {
-                return 1.0;
-            }
+            if (longerLength === 0) return 1.0;
             return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
         }
 
         function editDistance(s1, s2) {
-            s1 = s1.toLowerCase();
-            s2 = s2.toLowerCase();
-
+            s1 = s1.toLowerCase(); s2 = s2.toLowerCase();
             const costs = new Array();
             for (let i = 0; i <= s1.length; i++) {
                 let lastValue = i;
                 for (let j = 0; j <= s2.length; j++) {
-                    if (i == 0)
-                        costs[j] = j;
+                    if (i == 0) costs[j] = j;
                     else {
                         if (j > 0) {
                             let newValue = costs[j - 1];
                             if (s1.charAt(i - 1) != s2.charAt(j - 1))
-                                newValue = Math.min(Math.min(newValue, lastValue),
-                                    costs[j]) + 1;
+                                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
                             costs[j - 1] = lastValue;
                             lastValue = newValue;
                         }
                     }
                 }
-                if (i > 0)
-                    costs[s2.length] = lastValue;
+                if (i > 0) costs[s2.length] = lastValue;
             }
             return costs[s2.length];
         }
-
     </script>
 </body>
 </html>
