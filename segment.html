@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Code Merger (Line Exact)</title>
+    <title>AI Code Smart Merger (Editable + Custom Insert)</title>
     <style>
         /* --- CSS VARIABLES & RESET --- */
         :root {
@@ -64,7 +64,7 @@
             display: flex;
             gap: 20px;
             flex: 1;
-            min-height: 0;
+            min-height: 0; /* Important for scrolling */
         }
 
         .column {
@@ -133,12 +133,6 @@
 
         .diff-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
         .btn-row { display: flex; gap: 8px; }
-        
-        .location-wrapper {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
 
         /* Select Dropdown */
         select.location-select {
@@ -150,19 +144,6 @@
             font-size: 0.85em;
             max-width: 200px;
         }
-
-        /* Line Input */
-        input.line-input {
-            background: var(--bg);
-            color: white;
-            border: 1px solid var(--border);
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85em;
-            width: 60px;
-        }
-        
-        .hidden { display: none; }
 
         /* --- BUTTONS --- */
         button {
@@ -227,8 +208,13 @@
             outline: none;
         }
 
-        .code-content[contenteditable="true"] { cursor: text; }
-        .code-content[contenteditable="true"]:focus { background-color: #18301b; }
+        /* Indicator that code is editable */
+        .code-content[contenteditable="true"] {
+            cursor: text;
+        }
+        .code-content[contenteditable="true"]:focus {
+            background-color: #18301b; /* Slightly lighter green on focus */
+        }
 
         /* --- BADGES --- */
         .status-badge {
@@ -304,7 +290,7 @@
         let rawOriginalSource = ""; 
         let sourceFilename = "updated_script.js";
         let proposedPatches = [];
-        let globalSourceSegments = [];
+        let globalSourceSegments = []; // Used to populate "Insert After" dropdowns
 
         // --- DOM ELEMENTS ---
         const fileInput = document.getElementById('fileInput');
@@ -345,10 +331,11 @@
             downloadString(sourceCode, "updated_" + sourceFilename);
         });
 
-        // --- CORE LOGIC ---
+        // --- CORE LOGIC: SEGMENTATION & MATCHING ---
 
         function performAnalysis(source, update) {
-            globalSourceSegments = parseCodeSegments(source); 
+            // Parse segments
+            globalSourceSegments = parseCodeSegments(source); // Store globally for dropdowns
             const updateSegments = parseCodeSegments(update);
             
             proposedPatches = [];
@@ -380,8 +367,10 @@
                     }
                 }
 
+                // Create Patch
                 if (bestMatch) {
                     matchedSourceIndices.add(bestMatch.index);
+                    // Only show if content is different
                     if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
                         addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
                     }
@@ -411,30 +400,21 @@
 
             let headerLeftHtml = '', bodyHtml = '', headerRightHtml = '';
 
-            // --- Generate Insert Location Controls ---
-            let locationControlsHtml = '';
+            // --- Generate Insert Location Dropdown ---
+            let locationSelectHtml = '';
             if (type === 'insert') {
-                locationControlsHtml = `
-                <div class="location-wrapper">
-                    <select id="loc-${id}" class="location-select" onchange="toggleLineInput('${id}')">
-                        <option value="bottom" selected>Insert at Bottom</option>
-                        <option value="top">Insert at Top</option>
-                        <option value="line">At Specific Line...</option>
-                        <optgroup label="After Existing Block:">
-                `;
+                locationSelectHtml = `<select id="loc-${id}" class="location-select" onchange="updatePatchLocation('${id}')">`;
+                locationSelectHtml += `<option value="bottom" selected>Insert at Bottom (Default)</option>`;
+                locationSelectHtml += `<option value="top">Insert at Top</option>`;
                 
+                // Add option to insert after specific existing functions
                 globalSourceSegments.forEach(seg => {
                     if (seg.name) {
-                        locationControlsHtml += `<option value="${seg.endIndex}">After ${seg.name}</option>`;
+                        // Value is the end index of the existing block
+                        locationSelectHtml += `<option value="${seg.endIndex}">After ${seg.name}</option>`;
                     }
                 });
-                
-                locationControlsHtml += `
-                        </optgroup>
-                    </select>
-                    <input type="number" id="line-input-${id}" class="line-input hidden" placeholder="Line #" min="1">
-                </div>
-                `;
+                locationSelectHtml += `</select>`;
             }
 
             // --- Generate Body ---
@@ -453,6 +433,7 @@
                         </div>
                         <div class="code-pane replacement">
                             <div class="line-numbers" id="ln-${id}">${genLineNums(newSeg.content, newSeg.startLine || 1)}</div>
+                            <!-- Editable content area -->
                             <div class="code-content" id="edit-${id}" contenteditable="true" spellcheck="false" oninput="handleCodeEdit('${id}')">${escapeHtml(newSeg.content)}</div>
                         </div>
                     </div>`;
@@ -481,7 +462,7 @@
                     </div>`;
 
                 headerRightHtml = `
-                    ${locationControlsHtml}
+                    ${locationSelectHtml}
                     <div class="btn-row">
                         <button class="btn-primary" onclick="setPatchStatus('${id}', 'approved')">Confirm Insert</button>
                         <button class="btn-secondary" onclick="setPatchStatus('${id}', 'rejected')">Ignore</button>
@@ -512,21 +493,21 @@
             return html;
         }
 
+        // Update line numbers when user types in the editable box
         window.handleCodeEdit = function(id) {
             const editor = document.getElementById(`edit-${id}`);
             const lnContainer = document.getElementById(`ln-${id}`);
-            lnContainer.innerHTML = genLineNums(editor.innerText, 1);
+            const text = editor.innerText;
+            // For inserts, start at 1. For replacements, technically should be original line, but 1 is safer for edited context.
+            const startLine = 1; 
+            lnContainer.innerHTML = genLineNums(text, startLine);
         };
 
-        window.toggleLineInput = function(id) {
+        window.updatePatchLocation = function(id) {
+            // Just storage, logic handles it during Apply
             const select = document.getElementById(`loc-${id}`);
-            const input = document.getElementById(`line-input-${id}`);
-            if (select.value === 'line') {
-                input.classList.remove('hidden');
-                input.focus();
-            } else {
-                input.classList.add('hidden');
-            }
+            const patch = proposedPatches.find(p => p.id == id);
+            if(patch) patch.location = select.value;
         };
 
         window.setPatchStatus = function(id, status) {
@@ -553,13 +534,18 @@
         // --- APPLY LOGIC ---
 
         window.applyPatchesToSource = function() {
+            // 1. Gather all approved patches
             const validPatches = proposedPatches.filter(p => p.status === 'approved');
             
+            // 2. Convert patches into "Operations" { index, textToAdd, removeLength }
             let operations = [];
 
             validPatches.forEach(p => {
+                // Get the latest edited code from the DOM
                 const editor = document.getElementById(`edit-${p.id}`);
                 const finalCode = editor ? editor.innerText : p.new.content; 
+                
+                // Add indentation fix could go here, but raw is usually safer
                 
                 if (p.type === 'replace') {
                     operations.push({
@@ -570,38 +556,32 @@
                     });
                 } else {
                     // INSERT
-                    const locSelect = document.getElementById(`loc-${p.id}`);
-                    const locValue = locSelect ? locSelect.value : 'bottom';
+                    const loc = document.getElementById(`loc-${p.id}`) ? document.getElementById(`loc-${p.id}`).value : 'bottom';
                     
                     let insertIndex;
-
-                    if (locValue === 'top') {
+                    if (loc === 'top') {
                         insertIndex = 0;
-                    } else if (locValue === 'bottom') {
-                        insertIndex = Infinity; 
-                    } else if (locValue === 'line') {
-                        // Calculate index based on line number
-                        const lineInput = document.getElementById(`line-input-${p.id}`);
-                        let lineNum = parseInt(lineInput.value) || 0;
-                        if(lineNum < 1) lineNum = 1;
-                        insertIndex = getIndexFromLineNumber(rawOriginalSource, lineNum);
+                    } else if (loc === 'bottom') {
+                        insertIndex = Infinity; // Handle separately
                     } else {
-                        // After specific function (value is char index)
-                        insertIndex = parseInt(locValue);
+                        // It's a number (index of another block)
+                        insertIndex = parseInt(loc);
                     }
 
                     operations.push({
                         index: insertIndex,
                         content: "\n" + finalCode + "\n",
-                        removeEndIndex: insertIndex, 
+                        removeEndIndex: insertIndex, // remove nothing
                         type: 'insert'
                     });
                 }
             });
 
-            // Apply operations from Bottom to Top to keep indices valid
+            // 3. Apply Operations
+            // We must apply from Bottom (Higher Index) to Top (Lower Index) 
+            // so that insertions/replacements don't shift the indices of subsequent operations.
             
-            // Separate Infinity (Bottom appends)
+            // Treat Infinity (Bottom) specially
             let bottomAppends = "";
             operations = operations.filter(op => {
                 if (op.index === Infinity) {
@@ -611,16 +591,19 @@
                 return true;
             });
 
+            // Sort descending
             operations.sort((a, b) => b.index - a.index);
 
             let tempCode = rawOriginalSource;
 
             operations.forEach(op => {
                 const before = tempCode.substring(0, op.index);
+                // If it's a replacement, we skip the original content. If insert, removeEndIndex == index.
                 const after = tempCode.substring(op.removeEndIndex);
                 tempCode = before + op.content + after;
             });
 
+            // Append bottom inserts
             if (bottomAppends) {
                 tempCode += "\n" + bottomAppends;
             }
@@ -628,20 +611,7 @@
             sourceCode = tempCode;
         }
 
-        // --- UTILS ---
-
-        function getIndexFromLineNumber(text, lineNum) {
-            const lines = text.split('\n');
-            if (lineNum > lines.length) return text.length; // Append if line too high
-            
-            // We want to insert *before* the target line.
-            // Slice lines 0 to lineNum-1. Join them. The length + 1 (for next newline) is start index.
-            if (lineNum <= 1) return 0;
-            
-            const precedingText = lines.slice(0, lineNum - 1).join('\n');
-            // +1 for the newline character that was consumed by split/join
-            return precedingText.length + 1;
-        }
+        // --- UTILS & PARSERS ---
 
         function parseCodeSegments(code) {
             const lines = code.split('\n');
@@ -658,7 +628,7 @@
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
                 const trimmed = line.trim();
-                const lineLength = line.length + 1;
+                const lineLength = line.length + 1; // + newline
 
                 if (!inBlock && trimmed === '') {
                     charCount += lineLength;
