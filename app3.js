@@ -6562,7 +6562,7 @@ window.vibeAPI = {
 console.log("Vibe Automation API exposed as window.vibeAPI");
 
 
-    if (typeof newValue === 'boolean') {
+/*  if (typeof newValue === 'boolean') {
         replacementValue = String(newValue); // "true" or "false" (no quotes)
     } else if (!isNaN(Number(newValue)) && String(newValue).trim() !== '') {
         // It's a number
@@ -6571,3 +6571,4 @@ console.log("Vibe Automation API exposed as window.vibeAPI");
         // It's a string, wrap in quotes
         replacementValue = `"${String(newValue).replace(/"/g, '\\"')}"`;
     }
+*/
