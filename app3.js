@@ -5879,6 +5879,85 @@ function updateDynamicJsVariable(control) {
         targetNode.code = newCode;
         
         recordHistory(`Update JS variable ${variableName}`);
+function updateDynamicJsVariable(control) {
+    if (!control.targetJsNodeId || !control.targetJsVariable) {
+        console.warn('JS control is missing targetJsNodeId or targetJsVariable', control);
+        return;
+    }
+
+    const targetNode = findNodeById(control.targetJsNodeId);
+    if (!targetNode) {
+        console.error(`Could not find target JS node with ID: ${control.targetJsNodeId}`);
+        return;
+    }
+
+    const variableName = control.targetJsVariable;
+    const rawValue = control.value;
+    let replacementValue;
+
+    // --- SAFE VALUE FORMATTING ---
+    // We determine how to format the value in the JS code based on the control type.
+    
+    if (control.type === 'checkbox') {
+        // Boolean: true or false (no quotes)
+        // Handles if the value comes in as boolean true or string "true"
+        replacementValue = String(rawValue === true || rawValue === 'true');
+    } 
+    else if (control.type === 'number' || control.type === 'slider') {
+        // Number: 10, 3.5 (no quotes)
+        // Handle edge cases where value might be empty or invalid
+        if (rawValue === '' || rawValue === null || isNaN(Number(rawValue))) {
+            replacementValue = '0';
+        } else {
+            replacementValue = String(rawValue);
+        }
+    } 
+    else {
+        // Strings: "text", "color", "url" (needs quotes)
+        // We use String(rawValue) to safely handle any input type, then escape quotes
+        const safeString = String(rawValue === null || rawValue === undefined ? '' : rawValue);
+        replacementValue = `"${safeString.replace(/"/g, '\\"')}"`;
+    }
+    // -----------------------------
+
+    const patterns = [
+        new RegExp(`(const|let|var)\\s+(${variableName})\\s*=\\s*([^;]+);`, 'g'),
+        new RegExp(`(${variableName})\\s*:\\s*([^,}]+)([,}])`, 'g'),
+        new RegExp(`(${variableName})\\s*=\\s*([^;]+);`, 'g')
+    ];
+    
+    let matched = false;
+    let newCode = targetNode.code;
+    
+    for (let i = 0; i < patterns.length && !matched; i++) {
+        const pattern = patterns[i];
+        if (pattern.test(targetNode.code)) {
+            pattern.lastIndex = 0;
+            
+            if (i === 0) {
+                newCode = targetNode.code.replace(pattern, `$1 $2 = ${replacementValue};`);
+            } else if (i === 1) {
+                newCode = targetNode.code.replace(pattern, `$1: ${replacementValue}$3`);
+            } else if (i === 2) {
+                newCode = targetNode.code.replace(pattern, `$1 = ${replacementValue};`);
+            }
+            
+            if (newCode !== targetNode.code) {
+                matched = true;
+            }
+        }
+    }
+    
+    if (!matched) {
+        console.error(`Could not find variable "${variableName}" in node "${targetNode.id}". Code:\n${targetNode.code}`);
+        return;
+    }
+
+    if (targetNode.code !== newCode) {
+        console.log(`Updating JS variable '${variableName}' in node '${targetNode.id}' to ${replacementValue}`);
+        targetNode.code = newCode;
+        
+        recordHistory(`Update JS variable ${variableName}`);
         
         applyVibes();
         autoSaveProject();
