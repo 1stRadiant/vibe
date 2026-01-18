@@ -1,10 +1,10 @@
-
+html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Code Merger (Line Exact)</title>
+    <title>AI Code Merger (Robust Parser)</title>
     <style>
         /* --- CSS VARIABLES & RESET --- */
         :root {
@@ -14,7 +14,6 @@
             --text: #d4d4d4;
             --accent: #007acc;
             --success: #2ea043;
-            --warning: #e3b341;
             --danger: #f85149;
             --code-del: #451818;
             --code-add: #133618;
@@ -140,7 +139,6 @@
             align-items: center;
         }
 
-        /* Select Dropdown */
         select.location-select {
             background: var(--bg);
             color: white;
@@ -151,7 +149,6 @@
             max-width: 200px;
         }
 
-        /* Line Input */
         input.line-input {
             background: var(--bg);
             color: white;
@@ -251,7 +248,6 @@
             font-style: italic;
         }
 
-        /* --- RESPONSIVE --- */
         @media (max-width: 900px) {
             body { padding: 10px; height: auto; min-height: 100vh; overflow: auto; }
             .workspace { flex-direction: column; height: auto; }
@@ -274,7 +270,7 @@
                 <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx" style="color:white;">
             </div>
             <div class="action-group">
-                <button id="analyzeBtn" class="btn-primary" disabled>Analyze & Diff</button>
+                <button id="analyzeBtn" class="btn-primary" disabled>Analyze Segments</button>
                 <button id="downloadBtn" class="btn-success" disabled>Download Updated File</button>
             </div>
         </div>
@@ -283,7 +279,7 @@
             <!-- Left: Input Area -->
             <div class="column">
                 <h3>2. Paste AI Code Segment</h3>
-                <textarea id="aiInput" placeholder="// Paste code here...&#10;function newFeature() {&#10;   // This can be edited later in the right panel&#10;}"></textarea>
+                <textarea id="aiInput" placeholder="// Paste code here...&#10;function existingFunc() {&#10;   // This parser will handle brackets inside strings correctly!&#10;   const s = 'string with } bracket';&#10;}"></textarea>
             </div>
 
             <!-- Right: Interactive Diff -->
@@ -345,11 +341,12 @@
             downloadString(sourceCode, "updated_" + sourceFilename);
         });
 
-        // --- CORE LOGIC ---
+        // --- CORE LOGIC: ROBUST PARSING & MATCHING ---
 
         function performAnalysis(source, update) {
-            globalSourceSegments = parseCodeSegments(source); 
-            const updateSegments = parseCodeSegments(update);
+            // Use the new Robust Parser
+            globalSourceSegments = robustParser(source); 
+            const updateSegments = robustParser(update);
             
             proposedPatches = [];
             diffContainer.innerHTML = '';
@@ -359,8 +356,9 @@
             updateSegments.forEach((uSeg) => {
                 let bestMatch = null;
                 
-                // 1. Explicit Name Match
+                // 1. Strict Name Match (Best reliability)
                 if (uSeg.name) {
+                    // Try to find exact name match
                     const match = globalSourceSegments.find((sSeg, idx) => 
                         !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
                     );
@@ -369,19 +367,36 @@
                     }
                 }
 
-                // 2. Similarity Match
+                // 2. Loose Name Match (Case insensitive or minor variance)
+                if (!bestMatch && uSeg.name) {
+                     const match = globalSourceSegments.find((sSeg, idx) => 
+                        !matchedSourceIndices.has(idx) && 
+                        sSeg.name && 
+                        sSeg.name.toLowerCase() === uSeg.name.toLowerCase()
+                    );
+                    if (match) {
+                        bestMatch = { seg: match, reason: `Matched Name (Approx): "${uSeg.name}"`, index: globalSourceSegments.indexOf(match) };
+                    }
+                }
+
+                // 3. Normalized Signature Match (For anonymous functions or weird formatting)
+                // We strip all whitespace to compare "function foo () {" vs "function foo(){"
                 if (!bestMatch) {
+                    const uSigNorm = cleanSignature(uSeg.signature);
                     const match = globalSourceSegments.find((sSeg, idx) => {
                         if (matchedSourceIndices.has(idx)) return false;
-                        return similarity(uSeg.signature, sSeg.signature) > 0.85;
+                        const sSigNorm = cleanSignature(sSeg.signature);
+                        // Very high threshold for signature matching
+                        return similarity(uSigNorm, sSigNorm) > 0.95; 
                     });
                     if (match) {
-                        bestMatch = { seg: match, reason: "Matched Similar Signature", index: globalSourceSegments.indexOf(match) };
+                        bestMatch = { seg: match, reason: "Matched Signature Logic", index: globalSourceSegments.indexOf(match) };
                     }
                 }
 
                 if (bestMatch) {
                     matchedSourceIndices.add(bestMatch.index);
+                    // Check if content is actually different (ignoring simple whitespace changes)
                     if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
                         addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
                     }
@@ -396,6 +411,132 @@
             } else {
                 downloadBtn.disabled = false;
             }
+        }
+
+        // --- NEW: ROBUST STATE-MACHINE PARSER ---
+        // Handles strings and comments correctly so brackets aren't miscounted.
+
+        function robustParser(code) {
+            const segments = [];
+            const len = code.length;
+            
+            // State
+            let i = 0;
+            let braceDepth = 0;
+            let inString = null; // null, ', ", `
+            let inComment = null; // null, line, block
+            
+            // Block Tracking
+            let blockStartIndex = -1;
+            let potentialStart = 0; // Where the current "statement" might have begun
+            
+            // Helper to get line number from index
+            const getLineNum = (index) => {
+                return code.substring(0, index).split('\n').length;
+            };
+
+            while (i < len) {
+                const char = code[i];
+                const nextChar = code[i+1] || '';
+                const prevChar = code[i-1] || '';
+
+                // Handle Comments & Strings (Ignore content inside them)
+                if (inComment) {
+                    if (inComment === 'line' && char === '\n') inComment = null;
+                    else if (inComment === 'block' && char === '*' && nextChar === '/') {
+                        inComment = null;
+                        i++; // skip /
+                    }
+                } else if (inString) {
+                    if (char === '\\') {
+                        i++; // skip escaped char
+                    } else if (char === inString) {
+                        inString = null;
+                    }
+                } else {
+                    // Normal Code State
+                    if (char === '/' && nextChar === '/') {
+                        inComment = 'line';
+                        i++;
+                    } else if (char === '/' && nextChar === '*') {
+                        inComment = 'block';
+                        i++;
+                    } else if (char === '"' || char === "'" || char === '`') {
+                        inString = char;
+                    } else if (char === '{') {
+                        // Start of a block?
+                        if (braceDepth === 0) {
+                            blockStartIndex = potentialStart; 
+                        }
+                        braceDepth++;
+                    } else if (char === '}') {
+                        braceDepth--;
+                        // End of a block?
+                        if (braceDepth === 0 && blockStartIndex !== -1) {
+                            const endIndex = i + 1; // include }
+                            const fullContent = code.substring(blockStartIndex, endIndex);
+                            
+                            // Determine signature (everything before the first {)
+                            const firstBraceRel = fullContent.indexOf('{');
+                            const sigRaw = fullContent.substring(0, firstBraceRel);
+                            
+                            // Cleanup: Start index should skip leading empty newlines for cleaner replacement
+                            // But we need to be careful. Let's trust the potentialStart which updates after previous block.
+                            
+                            segments.push({
+                                name: extractName(sigRaw),
+                                signature: sigRaw.trim(),
+                                content: fullContent,
+                                startIndex: blockStartIndex,
+                                endIndex: endIndex,
+                                startLine: getLineNum(blockStartIndex)
+                            });
+                            
+                            blockStartIndex = -1;
+                            potentialStart = i + 1;
+                        } else if (braceDepth < 0) {
+                            braceDepth = 0; // Reset if unbalanced
+                        }
+                    } else if (char === ';') {
+                         // If we are at depth 0, a semicolon ends a loose statement
+                         if (braceDepth === 0) {
+                             // Optional: Capture loose lines? 
+                             // For this logic, we primarily focus on blocks { }. 
+                             // If you want loose lines, we'd capture them here.
+                             // Reset start for next block
+                             potentialStart = i + 1;
+                         }
+                    } else if (char !== '\n' && char !== ' ' && char !== '\t') {
+                        // If we see actual code characters at depth 0, ensure potentialStart is set correctly
+                        // (Usually handled by resetting at end of block)
+                    }
+                }
+                i++;
+            }
+
+            // Post-processing: Filter out tiny blocks (like `if(x){}`) if needed, 
+            // or ensure names are extracted correctly.
+            
+            // Refine Start Indices: `potentialStart` logic is basic. 
+            // Better approach: When `blockStartIndex` is used, look backwards from the `{` 
+            // to find the start of the line or the statement.
+            // *Correction*: The parser above captures from `potentialStart`. 
+            // If there was junk between blocks, it gets included in the next block's "signature".
+            // Let's refine the segment trimming.
+            
+            return segments.map(seg => {
+                // Trim leading whitespace from content but adjust startIndex accordingly
+                const leadingSpace = seg.content.match(/^\s*/)[0];
+                if (leadingSpace.length > 0) {
+                    seg.startIndex += leadingSpace.length;
+                    seg.content = seg.content.substring(leadingSpace.length);
+                    // Re-extract signature
+                    const firstBrace = seg.content.indexOf('{');
+                    seg.signature = seg.content.substring(0, firstBrace).trim();
+                    seg.name = extractName(seg.signature);
+                }
+                return seg;
+            });
         }
 
         // --- UI GENERATION ---
@@ -423,7 +564,9 @@
                         <optgroup label="After Existing Block:">
                 `;
                 
-                globalSourceSegments.forEach(seg => {
+                // Sort segments by line number for easier reading
+                const sortedSegs = [...globalSourceSegments].sort((a,b) => a.startLine - b.startLine);
+                sortedSegs.forEach(seg => {
                     if (seg.name) {
                         locationControlsHtml += `<option value="${seg.endIndex}">After ${seg.name}</option>`;
                     }
@@ -554,7 +697,6 @@
 
         window.applyPatchesToSource = function() {
             const validPatches = proposedPatches.filter(p => p.status === 'approved');
-            
             let operations = [];
 
             validPatches.forEach(p => {
@@ -569,10 +711,8 @@
                         type: 'replace'
                     });
                 } else {
-                    // INSERT
                     const locSelect = document.getElementById(`loc-${p.id}`);
                     const locValue = locSelect ? locSelect.value : 'bottom';
-                    
                     let insertIndex;
 
                     if (locValue === 'top') {
@@ -580,13 +720,11 @@
                     } else if (locValue === 'bottom') {
                         insertIndex = Infinity; 
                     } else if (locValue === 'line') {
-                        // Calculate index based on line number
                         const lineInput = document.getElementById(`line-input-${p.id}`);
                         let lineNum = parseInt(lineInput.value) || 0;
                         if(lineNum < 1) lineNum = 1;
                         insertIndex = getIndexFromLineNumber(rawOriginalSource, lineNum);
                     } else {
-                        // After specific function (value is char index)
                         insertIndex = parseInt(locValue);
                     }
 
@@ -599,9 +737,7 @@
                 }
             });
 
-            // Apply operations from Bottom to Top to keep indices valid
-            
-            // Separate Infinity (Bottom appends)
+            // Sort operations descending by index to apply safely
             let bottomAppends = "";
             operations = operations.filter(op => {
                 if (op.index === Infinity) {
@@ -610,129 +746,52 @@
                 }
                 return true;
             });
-
             operations.sort((a, b) => b.index - a.index);
 
             let tempCode = rawOriginalSource;
-
             operations.forEach(op => {
                 const before = tempCode.substring(0, op.index);
                 const after = tempCode.substring(op.removeEndIndex);
                 tempCode = before + op.content + after;
             });
 
-            if (bottomAppends) {
-                tempCode += "\n" + bottomAppends;
-            }
-
+            if (bottomAppends) tempCode += "\n" + bottomAppends;
             sourceCode = tempCode;
         }
 
         // --- UTILS ---
 
         function getIndexFromLineNumber(text, lineNum) {
-            const lines = text.split('\n');
-            if (lineNum > lines.length) return text.length; // Append if line too high
-            
-            // We want to insert *before* the target line.
-            // Slice lines 0 to lineNum-1. Join them. The length + 1 (for next newline) is start index.
             if (lineNum <= 1) return 0;
-            
+            const lines = text.split('\n');
+            if (lineNum > lines.length) return text.length;
             const precedingText = lines.slice(0, lineNum - 1).join('\n');
-            // +1 for the newline character that was consumed by split/join
-            return precedingText.length + 1;
-        }
-
-        function parseCodeSegments(code) {
-            const lines = code.split('\n');
-            const segments = [];
-            
-            let currentContent = [];
-            let currentSig = "";
-            let startLineNum = 0;
-            let startIndex = 0;
-            let braceDepth = 0;
-            let inBlock = false;
-            let charCount = 0;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const trimmed = line.trim();
-                const lineLength = line.length + 1;
-
-                if (!inBlock && trimmed === '') {
-                    charCount += lineLength;
-                    continue;
-                }
-
-                const open = (line.match(/\{/g) || []).length;
-                const close = (line.match(/\}/g) || []).length;
-
-                if (!inBlock) {
-                    startLineNum = i;
-                    startIndex = charCount;
-                    currentContent = [line];
-                    currentSig = line;
-                    
-                    if (open > close) {
-                        inBlock = true;
-                        braceDepth = (open - close);
-                    } else {
-                        // Loose line
-                        const name = extractName(trimmed);
-                        segments.push({
-                            name: name,
-                            signature: trimmed,
-                            content: line,
-                            startLine: startLineNum + 1,
-                            startIndex: startIndex,
-                            endIndex: charCount + lineLength - 1
-                        });
-                        currentContent = [];
-                    }
-                } 
-                else {
-                    currentContent.push(line);
-                    braceDepth += (open - close);
-                    
-                    if (braceDepth <= 0) {
-                        const contentStr = currentContent.join('\n');
-                        const name = extractName(currentSig);
-                        segments.push({
-                            name: name,
-                            signature: currentSig.trim(),
-                            content: contentStr,
-                            startLine: startLineNum + 1,
-                            startIndex: startIndex,
-                            endIndex: charCount + lineLength - 1
-                        });
-                        inBlock = false;
-                        braceDepth = 0;
-                        currentContent = [];
-                    }
-                }
-                charCount += lineLength;
-            }
-
-            if (currentContent.length > 0) {
-                 const contentStr = currentContent.join('\n');
-                 segments.push({
-                    name: null,
-                    signature: currentSig.trim(),
-                    content: contentStr,
-                    startLine: startLineNum + 1,
-                    startIndex: startIndex,
-                    endIndex: charCount
-                });
-            }
-
-            return segments;
+            return precedingText.length + 1; // +1 for newline
         }
 
         function extractName(str) {
-            let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
+            // Supports: function foo, class Foo, const foo =, let foo =, async function foo
+            let m = str.match(/(?:function|class|const|let|var)\s+(?:[\w$]+\s+)?([a-zA-Z0-9_$]+)/);
+            // Handle "async function foo" (name is group 1 matches the identifier)
+            // Simplified regex:
+            // 1. Look for 'function', 'class', 'const', 'let', 'var'
+            // 2. Allow optional space/words (like 'async')
+            // 3. Capture identifier
+            
+            // Standard declarations
+            m = str.match(/(?:function|class)\s+\*?\s*([a-zA-Z0-9_$]+)/);
             if(m) return m[1];
+            
+            // Variable assignments (const x = ...)
+            m = str.match(/(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/);
+            if(m) return m[1];
+
             return null;
+        }
+
+        function cleanSignature(str) {
+            // Remove all whitespace for comparison
+            return str.replace(/\s+/g, '');
         }
 
         function cleanContent(str) { return str.replace(/\s+/g, '').trim(); }
