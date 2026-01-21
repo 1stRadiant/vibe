@@ -25,6 +25,207 @@
             border: 1px solid #444;
             border-bottom: none;
         }
+
+        /* --- MERGE TAB CSS START --- */
+        :root {
+            --merge-bg: #1e1e1e;
+            --merge-panel: #252526;
+            --merge-border: #3c3c3c;
+            --merge-text: #d4d4d4;
+            --merge-accent: #007acc;
+            --merge-success: #2ea043;
+            --merge-warning: #e3b341;
+            --merge-danger: #f85149;
+            --merge-line-num: #858585;
+        }
+
+        .merge-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            padding: 20px;
+            color: var(--merge-text);
+        }
+
+        .merge-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            background: var(--merge-panel);
+            border: 1px solid var(--merge-border);
+            border-radius: 6px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .merge-workspace {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden; /* Prevent spillover */
+        }
+
+        .merge-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .merge-textarea {
+            width: 100%;
+            height: 100%;
+            background: var(--merge-bg);
+            color: var(--merge-text);
+            border: 1px solid var(--merge-border);
+            padding: 15px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            resize: none;
+            border-radius: 4px;
+            box-sizing: border-box;
+            white-space: pre;
+        }
+
+        .diff-list {
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-right: 5px;
+            height: 100%;
+            padding-bottom: 40px;
+        }
+
+        .diff-card {
+            background: var(--merge-panel);
+            border: 1px solid var(--merge-border);
+            border-radius: 6px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .diff-header {
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--merge-border);
+            background: #2d2d2d;
+            border-radius: 6px 6px 0 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .diff-info { display: flex; flex-direction: column; gap: 5px; }
+        .diff-type { font-weight: bold; font-size: 0.9em; }
+        .type-replace { color: #faa356; }
+        .type-insert { color: #89d185; }
+
+        .diff-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+        
+        .location-wrapper {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        select.location-select {
+            background: var(--merge-bg);
+            color: white;
+            border: 1px solid var(--merge-border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            max-width: 200px;
+        }
+
+        input.line-input {
+            background: var(--merge-bg);
+            color: white;
+            border: 1px solid var(--merge-border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            width: 60px;
+        }
+        
+        .hidden { display: none; }
+
+        .code-compare-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: #1e1e1e;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            border-radius: 0 0 6px 6px;
+            overflow: hidden;
+        }
+        
+        .code-compare-container.insert-mode {
+            grid-template-columns: 1fr;
+        }
+
+        .code-pane {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 0;
+            position: relative;
+        }
+
+        .original { background-color: #2d1818; border-right: 1px solid var(--merge-border); }
+        .replacement { background-color: #122615; }
+        .insert-only { background-color: #122615; }
+
+        .line-numbers {
+            text-align: right;
+            padding: 0 10px;
+            color: var(--merge-line-num);
+            border-right: 1px solid var(--merge-border);
+            user-select: none;
+            min-width: 30px;
+        }
+
+        .code-content {
+            padding: 0 10px;
+            white-space: pre;
+            color: #d4d4d4;
+            tab-size: 4;
+            flex: 1;
+            outline: none;
+        }
+
+        .code-content[contenteditable="true"] { cursor: text; }
+        .code-content[contenteditable="true"]:focus { background-color: #18301b; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-top: 5px;
+            align-self: flex-start;
+        }
+        .status-pending { background: #444; color: #ddd; }
+        .status-approved { background: var(--merge-success); color: white; }
+        .status-rejected { background: var(--merge-border); color: #888; text-decoration: line-through; }
+        
+        .match-reason {
+            font-size: 0.8em;
+            color: #888;
+            font-style: italic;
+        }
+        /* --- MERGE TAB CSS END --- */
     </style>
 </head>
 <body>
@@ -114,6 +315,12 @@
                                     <i class="fs-4 bi-code-slash"></i>
                                 </a>
                             </li>
+                            <!-- NEW MERGE TAB BUTTON -->
+                            <li>
+                                <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="merge" title="Smart Merge">
+                                    <i class="fs-4 bi-git"></i>
+                                </a>
+                            </li>
                         </ul>
                         <div class="dropdown pb-4">
                             <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-3" id="dropdownUser1" data-bs-toggle="dropdown" aria-expanded="false">
@@ -179,6 +386,7 @@
                     <div class="tab-content-area">
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
+                                <!-- ... Start Page Content (No changes) ... -->
                                 <div class="start-header d-flex justify-content-between align-items-center">
                                     <h1>Vibe</h1>
                                     <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
@@ -329,7 +537,8 @@
                         </div>
 
                         <div id="editor" class="tab-content">
-                            <div class="editor-container">
+                            <!-- ... Editor Content ... -->
+                             <div class="editor-container">
                                 <div class="editor-header">
                                     <div class="editor-header-left">
                                         <h2>Vibe</h2>
@@ -347,7 +556,8 @@
                             </div>
                         </div>
                         <div id="agent" class="tab-content">
-                            <div class="agent-container">
+                            <!-- ... Agent Content ... -->
+                             <div class="agent-container">
                                 <h2>Vibe</h2>
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
                                 
@@ -394,7 +604,8 @@
                             </div>
                         </div>
                         <div id="chat" class="tab-content">
-                            <div class="chat-container">
+                            <!-- ... Chat Content ... -->
+                             <div class="chat-container">
                                 <h2>Vibe</h2>
                                 <div class="system-prompt-container">
                                     <label for="chat-system-prompt-input">System Prompt (Optional)</label>
@@ -412,7 +623,8 @@
                             </div>
                         </div>
                         <div id="flowchart" class="tab-content">
-                            <div class="flowchart-container">
+                            <!-- ... Flowchart Content ... -->
+                             <div class="flowchart-container">
                                 <h2>Vibe</h2>
                                 <p>This flowchart visualizes the user interactions and logic defined in your website's code.</p>
                                 <div class="flowchart-controls">
@@ -424,13 +636,14 @@
                             </div>
                         </div>
                         <div id="console" class="tab-content">
-                            <div id="console-container">
+                             <div id="console-container">
                                 <h2>Vibe</h2>
                                 <div id="console-output"></div>
                             </div>
                         </div>
                         <div id="files" class="tab-content">
-                            <div class="files-container">
+                            <!-- ... Files Content ... -->
+                             <div class="files-container">
                                 <h2>Vibe</h2>
                                 <p>Manage files for this project. You can upload images, fonts, JSON, and other assets. Reference them in code using their paths (e.g., "assets/images/logo.png").</p>
                                 <div class="files-toolbar">
@@ -456,7 +669,8 @@
                             </div>
                         </div>
                          <div id="context" class="tab-content">
-                            <div class="context-container">
+                            <!-- ... Context Content ... -->
+                             <div class="context-container">
                                 <h2>Vibe</h2>
                                 <p>Create and manage reusable components (HTML, CSS, JS). The AI will use this library as context to improve generation quality and consistency.</p>
                                 <div class="context-browser">
@@ -477,7 +691,8 @@
                             </div>
                         </div>
                         <div id="code" class="tab-content">
-                            <div class="full-code-container">
+                            <!-- ... Full Code Content ... -->
+                             <div class="full-code-container">
                                 <h2>Vibe</h2>
                                 <div class="file-io-section">
                                     <div class="file-upload-container">
@@ -516,6 +731,46 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- NEW MERGE TAB CONTENT -->
+                        <div id="merge" class="tab-content">
+                            <div class="merge-container">
+                                <h2>Smart Code Merge</h2>
+                                <p>Paste AI-generated code snippets (JS/TS) to intelligently merge them into your existing project code.</p>
+                                <!-- Top Controls -->
+                                <div class="merge-controls">
+                                    <div class="file-upload-group d-flex align-items-center gap-3" style="flex: 1;">
+                                        <button id="loadFromEditorBtn" class="action-button" title="Load content from the Full Code tab">
+                                            <i class="bi bi-arrow-down-square"></i> Load from Full Code
+                                        </button>
+                                        <span id="loadedStatus" style="color: #888; font-style: italic;">No code loaded.</span>
+                                    </div>
+                                    <div class="action-group">
+                                        <button id="analyzeBtn" class="action-button primary" disabled>Analyze & Diff</button>
+                                        <button id="applyToEditorBtn" class="action-button" style="background-color: var(--merge-success);" disabled>Apply to Editor</button>
+                                    </div>
+                                </div>
+
+                                <div class="merge-workspace">
+                                    <!-- Left: Input Area -->
+                                    <div class="merge-column">
+                                        <h3>Paste AI Code Segment</h3>
+                                        <textarea id="aiInput" class="merge-textarea" placeholder="// Paste code here...&#10;function newFeature() {&#10;   // This can be edited later in the right panel&#10;}"></textarea>
+                                    </div>
+
+                                    <!-- Right: Interactive Diff -->
+                                    <div class="merge-column">
+                                        <h3>Review, Edit & Merge</h3>
+                                        <div id="diffContainer" class="diff-list">
+                                            <div style="text-align: center; color: #666; margin-top: 50px;">
+                                                Load code from editor and paste AI segment to begin...
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -546,7 +801,8 @@
         </div>
     </div>
     
-    <!-- Modals -->
+    <!-- Modals (unchanged) -->
+    <!-- ... (Add Node Modal, Settings Modal, etc. from original file) ... -->
      <div id="add-node-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -741,7 +997,7 @@
             </div>
         </div>
     </div>
-    <!-- START GITHUB CHANGE: Add Save to GitHub Modal -->
+    
     <div id="github-save-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -769,11 +1025,496 @@
             </div>
         </div>
     </div>
-    <!-- END GITHUB CHANGE -->
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
     <script src="automation.js"></script>
+    
+    <!-- MERGE LOGIC SCRIPT -->
+    <script>
+        (function() {
+            // --- STATE MANAGEMENT ---
+            let sourceCode = "";
+            let rawOriginalSource = ""; 
+            let proposedPatches = [];
+            let globalSourceSegments = [];
+
+            // --- DOM ELEMENTS ---
+            const loadFromEditorBtn = document.getElementById('loadFromEditorBtn');
+            const loadedStatus = document.getElementById('loadedStatus');
+            const aiInput = document.getElementById('aiInput');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const applyToEditorBtn = document.getElementById('applyToEditorBtn');
+            const diffContainer = document.getElementById('diffContainer');
+            const fullCodeEditor = document.getElementById('full-code-editor');
+
+            // --- EVENT LISTENERS ---
+            loadFromEditorBtn.addEventListener('click', () => {
+                const code = fullCodeEditor.value;
+                if (!code || code.trim() === "") {
+                    loadedStatus.innerText = "Error: Full Code editor is empty.";
+                    loadedStatus.style.color = "var(--merge-danger)";
+                    return;
+                }
+                
+                rawOriginalSource = code;
+                sourceCode = code;
+                loadedStatus.innerText = "Code loaded from editor!";
+                loadedStatus.style.color = "var(--merge-success)";
+                checkReady();
+            });
+
+            aiInput.addEventListener('input', checkReady);
+
+            function checkReady() {
+                if (rawOriginalSource && aiInput.value.trim().length > 0) {
+                    analyzeBtn.disabled = false;
+                }
+            }
+
+            analyzeBtn.addEventListener('click', () => {
+                const updateCode = aiInput.value;
+                performAnalysis(rawOriginalSource, updateCode);
+            });
+
+            applyToEditorBtn.addEventListener('click', () => {
+                applyPatchesToSource(); 
+                // Apply to main editor
+                fullCodeEditor.value = sourceCode;
+                loadedStatus.innerText = "Changes applied to Full Code Editor!";
+                
+                // Switch tab back to code
+                // Try to find the tab button logic if available globally, otherwise manual DOM trigger
+                const codeTabBtn = document.querySelector('a[data-tab="code"]');
+                if(codeTabBtn) codeTabBtn.click();
+            });
+
+            // --- CORE LOGIC ---
+
+            function performAnalysis(source, update) {
+                globalSourceSegments = parseCodeSegments(source); 
+                const updateSegments = parseCodeSegments(update);
+                
+                proposedPatches = [];
+                diffContainer.innerHTML = '';
+
+                const matchedSourceIndices = new Set();
+
+                updateSegments.forEach((uSeg) => {
+                    let bestMatch = null;
+                    
+                    // 1. Explicit Name Match
+                    if (uSeg.name) {
+                        const match = globalSourceSegments.find((sSeg, idx) => 
+                            !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
+                        );
+                        if (match) {
+                            bestMatch = { seg: match, reason: `Matched Name: "${uSeg.name}"`, index: globalSourceSegments.indexOf(match) };
+                        }
+                    }
+
+                    // 2. Similarity Match
+                    if (!bestMatch) {
+                        const match = globalSourceSegments.find((sSeg, idx) => {
+                            if (matchedSourceIndices.has(idx)) return false;
+                            return similarity(uSeg.signature, sSeg.signature) > 0.85;
+                        });
+                        if (match) {
+                            bestMatch = { seg: match, reason: "Matched Similar Signature", index: globalSourceSegments.indexOf(match) };
+                        }
+                    }
+
+                    if (bestMatch) {
+                        matchedSourceIndices.add(bestMatch.index);
+                        if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
+                            addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
+                        }
+                    } else {
+                        addPatchUI('insert', null, uSeg, "No matching block found");
+                    }
+                });
+
+                if (proposedPatches.length === 0) {
+                    diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No relevant changes detected.</div>';
+                    applyToEditorBtn.disabled = true;
+                } else {
+                    applyToEditorBtn.disabled = false;
+                }
+            }
+
+            // --- UI GENERATION ---
+
+            function addPatchUI(type, origSeg, newSeg, reason) {
+                const id = Date.now() + Math.random();
+                const patch = { id, type, original: origSeg, new: newSeg, status: 'pending' };
+                proposedPatches.push(patch);
+
+                const card = document.createElement('div');
+                card.className = 'diff-card';
+                card.id = `card-${id}`;
+
+                let headerLeftHtml = '', bodyHtml = '', headerRightHtml = '';
+
+                // --- Generate Insert Location Controls ---
+                let locationControlsHtml = '';
+                if (type === 'insert') {
+                    locationControlsHtml = `
+                    <div class="location-wrapper">
+                        <select id="loc-${id}" class="location-select" onchange="window.merge_toggleLineInput('${id}')">
+                            <option value="bottom" selected>Insert at Bottom</option>
+                            <option value="top">Insert at Top</option>
+                            <option value="line">At Specific Line...</option>
+                            <optgroup label="After Existing Block:">
+                    `;
+                    
+                    globalSourceSegments.forEach(seg => {
+                        if (seg.name) {
+                            locationControlsHtml += `<option value="${seg.endIndex}">After ${seg.name}</option>`;
+                        }
+                    });
+                    
+                    locationControlsHtml += `
+                            </optgroup>
+                        </select>
+                        <input type="number" id="line-input-${id}" class="line-input hidden" placeholder="Line #" min="1">
+                    </div>
+                    `;
+                }
+
+                // --- Generate Body ---
+                if (type === 'replace') {
+                    headerLeftHtml = `
+                        <span class="diff-type type-replace">Replace Block</span>
+                        <span class="match-reason">${reason}</span>
+                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
+                    `;
+                    
+                    bodyHtml = `
+                        <div class="code-compare-container">
+                            <div class="code-pane original">
+                                <div class="line-numbers">${genLineNums(origSeg.content, origSeg.startLine)}</div>
+                                <div class="code-content">${escapeHtml(origSeg.content)}</div>
+                            </div>
+                            <div class="code-pane replacement">
+                                <div class="line-numbers" id="ln-${id}">${genLineNums(newSeg.content, newSeg.startLine || 1)}</div>
+                                <div class="code-content" id="edit-${id}" contenteditable="true" spellcheck="false" oninput="window.merge_handleCodeEdit('${id}')">${escapeHtml(newSeg.content)}</div>
+                            </div>
+                        </div>`;
+                    
+                    headerRightHtml = `
+                        <div class="btn-row">
+                            <button class="action-button primary" style="background-color:var(--merge-success)" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Replace</button>
+                            <button class="action-button secondary" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
+                        </div>
+                    `;
+
+                } else {
+                    // INSERT
+                    headerLeftHtml = `
+                        <span class="diff-type type-insert">Insert New Block</span>
+                        <span class="match-reason">${reason}</span>
+                        <span id="status-${id}" class="status-badge status-pending">Pending</span>
+                    `;
+
+                    bodyHtml = `
+                        <div class="code-compare-container insert-mode">
+                            <div class="code-pane insert-only">
+                                <div class="line-numbers" id="ln-${id}">${genLineNums(newSeg.content, 1)}</div>
+                                <div class="code-content" id="edit-${id}" contenteditable="true" spellcheck="false" oninput="window.merge_handleCodeEdit('${id}')">${escapeHtml(newSeg.content)}</div>
+                            </div>
+                        </div>`;
+
+                    headerRightHtml = `
+                        ${locationControlsHtml}
+                        <div class="btn-row">
+                            <button class="action-button primary" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Insert</button>
+                            <button class="action-button secondary" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="diff-header">
+                        <div class="diff-info">
+                            ${headerLeftHtml}
+                        </div>
+                        <div class="diff-actions">
+                            ${headerRightHtml}
+                        </div>
+                    </div>
+                    ${bodyHtml}
+                `;
+                diffContainer.appendChild(card);
+            }
+
+            // --- INTERACTIVE FUNCTIONS (Exposed globally for HTML onclicks) ---
+
+            function genLineNums(text, start) {
+                const count = text.split('\n').length;
+                let html = '';
+                for(let i=0; i<count; i++) html += (start + i) + '<br>';
+                return html;
+            }
+
+            window.merge_handleCodeEdit = function(id) {
+                const editor = document.getElementById(`edit-${id}`);
+                const lnContainer = document.getElementById(`ln-${id}`);
+                lnContainer.innerHTML = genLineNums(editor.innerText, 1);
+            };
+
+            window.merge_toggleLineInput = function(id) {
+                const select = document.getElementById(`loc-${id}`);
+                const input = document.getElementById(`line-input-${id}`);
+                if (select.value === 'line') {
+                    input.classList.remove('hidden');
+                    input.focus();
+                } else {
+                    input.classList.add('hidden');
+                }
+            };
+
+            window.merge_setPatchStatus = function(id, status) {
+                const patch = proposedPatches.find(p => p.id == id);
+                if (!patch) return;
+                patch.status = status;
+                
+                const card = document.getElementById(`card-${id}`);
+                const badge = document.getElementById(`status-${id}`);
+                
+                if (status === 'approved') {
+                    badge.className = 'status-badge status-approved';
+                    badge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
+                    card.style.opacity = '1';
+                    card.style.borderColor = 'var(--merge-success)';
+                } else {
+                    badge.className = 'status-badge status-rejected';
+                    badge.innerText = 'Ignored';
+                    card.style.opacity = '0.5';
+                    card.style.borderColor = 'var(--merge-border)';
+                }
+            };
+
+            // --- APPLY LOGIC ---
+
+            window.applyPatchesToSource = function() {
+                const validPatches = proposedPatches.filter(p => p.status === 'approved');
+                
+                let operations = [];
+
+                validPatches.forEach(p => {
+                    const editor = document.getElementById(`edit-${p.id}`);
+                    const finalCode = editor ? editor.innerText : p.new.content; 
+                    
+                    if (p.type === 'replace') {
+                        operations.push({
+                            index: p.original.startIndex,
+                            content: finalCode,
+                            removeEndIndex: p.original.endIndex,
+                            type: 'replace'
+                        });
+                    } else {
+                        // INSERT
+                        const locSelect = document.getElementById(`loc-${p.id}`);
+                        const locValue = locSelect ? locSelect.value : 'bottom';
+                        
+                        let insertIndex;
+
+                        if (locValue === 'top') {
+                            insertIndex = 0;
+                        } else if (locValue === 'bottom') {
+                            insertIndex = Infinity; 
+                        } else if (locValue === 'line') {
+                            // Calculate index based on line number
+                            const lineInput = document.getElementById(`line-input-${p.id}`);
+                            let lineNum = parseInt(lineInput.value) || 0;
+                            if(lineNum < 1) lineNum = 1;
+                            insertIndex = getIndexFromLineNumber(rawOriginalSource, lineNum);
+                        } else {
+                            // After specific function (value is char index)
+                            insertIndex = parseInt(locValue);
+                        }
+
+                        operations.push({
+                            index: insertIndex,
+                            content: "\n" + finalCode + "\n",
+                            removeEndIndex: insertIndex, 
+                            type: 'insert'
+                        });
+                    }
+                });
+
+                // Apply operations from Bottom to Top to keep indices valid
+                
+                // Separate Infinity (Bottom appends)
+                let bottomAppends = "";
+                operations = operations.filter(op => {
+                    if (op.index === Infinity) {
+                        bottomAppends += op.content;
+                        return false;
+                    }
+                    return true;
+                });
+
+                operations.sort((a, b) => b.index - a.index);
+
+                let tempCode = rawOriginalSource;
+
+                operations.forEach(op => {
+                    const before = tempCode.substring(0, op.index);
+                    const after = tempCode.substring(op.removeEndIndex);
+                    tempCode = before + op.content + after;
+                });
+
+                if (bottomAppends) {
+                    tempCode += "\n" + bottomAppends;
+                }
+
+                sourceCode = tempCode;
+            }
+
+            // --- UTILS ---
+
+            function getIndexFromLineNumber(text, lineNum) {
+                const lines = text.split('\n');
+                if (lineNum > lines.length) return text.length; // Append if line too high
+                
+                // We want to insert *before* the target line.
+                // Slice lines 0 to lineNum-1. Join them. The length + 1 (for next newline) is start index.
+                if (lineNum <= 1) return 0;
+                
+                const precedingText = lines.slice(0, lineNum - 1).join('\n');
+                // +1 for the newline character that was consumed by split/join
+                return precedingText.length + 1;
+            }
+
+            function parseCodeSegments(code) {
+                const lines = code.split('\n');
+                const segments = [];
+                
+                let currentContent = [];
+                let currentSig = "";
+                let startLineNum = 0;
+                let startIndex = 0;
+                let braceDepth = 0;
+                let inBlock = false;
+                let charCount = 0;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const trimmed = line.trim();
+                    const lineLength = line.length + 1;
+
+                    if (!inBlock && trimmed === '') {
+                        charCount += lineLength;
+                        continue;
+                    }
+
+                    const open = (line.match(/\{/g) || []).length;
+                    const close = (line.match(/\}/g) || []).length;
+
+                    if (!inBlock) {
+                        startLineNum = i;
+                        startIndex = charCount;
+                        currentContent = [line];
+                        currentSig = line;
+                        
+                        if (open > close) {
+                            inBlock = true;
+                            braceDepth = (open - close);
+                        } else {
+                            // Loose line
+                            const name = extractName(trimmed);
+                            segments.push({
+                                name: name,
+                                signature: trimmed,
+                                content: line,
+                                startLine: startLineNum + 1,
+                                startIndex: startIndex,
+                                endIndex: charCount + lineLength - 1
+                            });
+                            currentContent = [];
+                        }
+                    } 
+                    else {
+                        currentContent.push(line);
+                        braceDepth += (open - close);
+                        
+                        if (braceDepth <= 0) {
+                            const contentStr = currentContent.join('\n');
+                            const name = extractName(currentSig);
+                            segments.push({
+                                name: name,
+                                signature: currentSig.trim(),
+                                content: contentStr,
+                                startLine: startLineNum + 1,
+                                startIndex: startIndex,
+                                endIndex: charCount + lineLength - 1
+                            });
+                            inBlock = false;
+                            braceDepth = 0;
+                            currentContent = [];
+                        }
+                    }
+                    charCount += lineLength;
+                }
+
+                if (currentContent.length > 0) {
+                     const contentStr = currentContent.join('\n');
+                     segments.push({
+                        name: null,
+                        signature: currentSig.trim(),
+                        content: contentStr,
+                        startLine: startLineNum + 1,
+                        startIndex: startIndex,
+                        endIndex: charCount
+                    });
+                }
+
+                return segments;
+            }
+
+            function extractName(str) {
+                let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
+                if(m) return m[1];
+                return null;
+            }
+
+            function cleanContent(str) { return str.replace(/\s+/g, '').trim(); }
+            
+            function escapeHtml(text) {
+                return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+
+            function similarity(s1, s2) {
+                let longer = s1, shorter = s2;
+                if (s1.length < s2.length) { longer = s2; shorter = s1; }
+                if (longer.length == 0) return 1.0;
+                return (longer.length - editDistance(longer, shorter)) / parseFloat(longer.length);
+            }
+
+            function editDistance(s1, s2) {
+                s1 = s1.toLowerCase(); s2 = s2.toLowerCase();
+                const costs = new Array();
+                for (let i = 0; i <= s1.length; i++) {
+                    let lastValue = i;
+                    for (let j = 0; j <= s2.length; j++) {
+                        if (i == 0) costs[j] = j;
+                        else {
+                            if (j > 0) {
+                                let newValue = costs[j - 1];
+                                if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                                    newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                                costs[j - 1] = lastValue;
+                                lastValue = newValue;
+                            }
+                        }
+                    }
+                    if (i > 0) costs[s2.length] = lastValue;
+                }
+                return costs[s2.length];
+            }
+        })();
+    </script>
 </body>
 </html>
