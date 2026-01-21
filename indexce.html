@@ -768,30 +768,6 @@
         </div>
     </div>
 
-    <!-- Bottom Navigation for Mobile -->
-    <div class="fixed-bottom bg-dark d-md-none">
-        <div class="d-flex justify-content-around">
-            <a href="#" class="nav-link py-3 px-2 tab-button active" data-tab="start" title="Start">
-                <i class="fs-4 bi-house text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="preview" title="Live Preview">
-                <i class="fs-4 bi-display text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="editor" title="Vibe Editor">
-                <i class="fs-4 bi-pencil-square text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="agent" title="Agent">
-                <i class="fs-4 bi-robot text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="files" title="Files">
-                <i class="fs-4 bi-folder text-white"></i>
-            </a>
-            <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="code" title="Full Code">
-                <i class="fs-4 bi-code-slash text-white"></i>
-            </a>
-        </div>
-    </div>
-    
     <!-- Modals -->
      <div id="add-node-modal" class="modal">
         <div class="modal-content">
@@ -1313,12 +1289,23 @@
                         if (locValue === 'top') {
                             insertIndex = 0;
                         } else if (locValue === 'bottom') {
-                            // Find the last script tag end if possible, else infinite
-                            const lastScript = globalSourceSegments.map(s => s.endIndex).sort((a,b)=>b-a)[0];
-                             // If inside HTML, default "Bottom" means end of file, which might be outside script.
-                             // Better to insert before </body> or inside last script?
-                             // Default to file end for now.
-                            insertIndex = Infinity; 
+                            // Smart Bottom: Find closing body or html tag
+                            const bodyClose = rawOriginalSource.lastIndexOf('</body>');
+                            const scriptClose = rawOriginalSource.lastIndexOf('</script>');
+                            
+                            // If we have a body tag, insert before it
+                            if(bodyClose !== -1) {
+                                insertIndex = bodyClose;
+                            } 
+                            // If no body, but we have a script tag, insert after the last script
+                            else if (scriptClose !== -1) {
+                                insertIndex = scriptClose + 9; // 9 is length of </script>
+                            }
+                            // Else absolute end
+                            else {
+                                insertIndex = Infinity; 
+                            }
+
                         } else if (locValue === 'line') {
                             // Calculate index based on line number
                             const lineInput = document.getElementById(`line-input-${p.id}`);
@@ -1389,10 +1376,11 @@
 
             // --- NEW: HTML/SCRIPT AWARE PARSER ---
             function parseCodeSegments(code) {
-                // Check if HTML
-                if (code.includes("<html") || code.includes("<!DOCTYPE") || code.match(/<script[^>]*>/)) {
+                // Check if HTML (case insensitive check)
+                if (code.match(/<html/i) || code.match(/<!DOCTYPE/i) || code.match(/<script/i)) {
                     const segments = [];
-                    const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/g; 
+                    // Case-insensitive regex for script tags
+                    const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi; 
                     let match;
                     let lastIndex = 0;
                     
@@ -1412,10 +1400,14 @@
                         }
                         
                         // The Script Content
+                        // Note: match[1] is the content capture group
                         const scriptContent = match[1];
-                        const scriptStartIdx = match.index + match[0].indexOf(scriptContent); 
-                        // Note: indexOf(scriptContent) finds start of code inside tag. 
-                        // We must be careful about partial matches, but usually safe.
+                        
+                        // Find the start index of the content within the full string
+                        // We use match.index + match[0].indexOf(scriptContent) to be safe about attributes
+                        const tagFullString = match[0];
+                        const contentOffsetInTag = tagFullString.indexOf(scriptContent);
+                        const scriptStartIdx = match.index + contentOffsetInTag;
                         
                         // Parse the JS inside with offset
                         const scriptLineOffset = getLineNumber(code, scriptStartIdx) - 1; 
@@ -1482,7 +1474,7 @@
                             // Loose line (one-liner or var declaration)
                             const name = extractName(trimmed);
                             // Only add significant named blocks or full functions
-                            if (name || trimmed.includes("function") || trimmed.includes("class")) {
+                            if (name) {
                                 segments.push({
                                     name: name,
                                     signature: trimmed,
@@ -1518,19 +1510,24 @@
                     charCount += lineLength;
                 }
                 
-                // Add any remaining content as a catch-all if needed, but for merging we mostly care about named blocks.
                 return segments;
             }
 
             function extractName(str) {
-                // Expanded regex to capture methods in classes too
-                // Matches: function x(), class x, var x =, x = function, x() {
-                let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
+                // 1. Standard function/class/var
+                // Matches: async function foo, function foo, class Foo, const foo = ..., let foo
+                let m = str.match(/(?:function|class|const|let|var)\s+(?:async\s+)?([a-zA-Z0-9_$]+)/);
                 if (m) return m[1];
-                
-                // Method-like: render() {
-                m = str.match(/^\s*([a-zA-Z0-9_$]+)\s*\(/);
-                if (m && !str.includes("function") && !str.includes("if") && !str.includes("for") && !str.includes("while")) return m[1];
+
+                // 2. Object method / Class method
+                // Matches: render() {, componentDidMount() {
+                // Exclude reserved words like if, while, catch, for, switch
+                m = str.match(/^\s*(?:async\s+)?([a-zA-Z0-9_$]+)\s*\(/);
+                if (m) {
+                    const name = m[1];
+                    const reserved = ['if', 'while', 'for', 'switch', 'catch', 'function', 'await'];
+                    if (!reserved.includes(name)) return name;
+                }
                 
                 return null;
             }
