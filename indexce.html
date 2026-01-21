@@ -997,7 +997,7 @@
     <script type="module" src="app3.js"></script>
     <script src="automation.js"></script>
     
-    <!-- MERGE LOGIC SCRIPT (UPDATED) -->
+    <!-- MERGE LOGIC SCRIPT (FIXED ESCAPING) -->
     <script>
         (function() {
             // --- STATE MANAGEMENT ---
@@ -1290,8 +1290,8 @@
                             insertIndex = 0;
                         } else if (locValue === 'bottom') {
                             // Smart Bottom: Find closing body or html tag
-                            const bodyClose = rawOriginalSource.lastIndexOf('</body>');
-                            const scriptClose = rawOriginalSource.lastIndexOf('</script>');
+                            const bodyClose = rawOriginalSource.lastIndexOf('<' + '/body>');
+                            const scriptClose = rawOriginalSource.lastIndexOf('<' + '/script>');
                             
                             // If we have a body tag, insert before it
                             if(bodyClose !== -1) {
@@ -1299,7 +1299,7 @@
                             } 
                             // If no body, but we have a script tag, insert after the last script
                             else if (scriptClose !== -1) {
-                                insertIndex = scriptClose + 9; // 9 is length of </script>
+                                insertIndex = scriptClose + 9; // 9 is length of < / script >
                             }
                             // Else absolute end
                             else {
@@ -1377,10 +1377,10 @@
             // --- NEW: HTML/SCRIPT AWARE PARSER ---
             function parseCodeSegments(code) {
                 // Check if HTML (case insensitive check)
-                if (code.match(/<html/i) || code.match(/<!DOCTYPE/i) || code.match(/<script/i)) {
+                if (code.match(/<html/i) || code.match(/<!DOCTYPE/i) || code.match(new RegExp("<script", "i"))) {
                     const segments = [];
                     // Case-insensitive regex for script tags
-                    const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi; 
+                    const regex = new RegExp("<script\\b[^>]*>([\\s\\S]*?)<\\/script>", "gi");
                     let match;
                     let lastIndex = 0;
                     
