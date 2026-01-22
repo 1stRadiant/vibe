@@ -1447,9 +1447,10 @@
                 }
             }
 
-            // --- UPDATED: HTML/SCRIPT AWARE PARSER WITH IIFE UNWRAPPING ---
+            // --- UPDATED: HTML/SCRIPT AWARE PARSER ---
+            
             function parseCodeSegments(code) {
-                // Check if HTML
+                // Check if HTML (contains tags or doctype)
                 if (code.includes("<html") || code.includes("<!DOCTYPE") || code.match(/<script[^>]*>/)) {
                     const segments = [];
                     const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/g; 
@@ -1476,17 +1477,17 @@
                         const scriptStartIdx = match.index + match[0].indexOf(scriptContent); 
                         const scriptLineOffset = getLineNumber(code, scriptStartIdx) - 1; 
                         
-                        // --- FIX: Unwrap Vibe IIFE Wrapper ---
+                        // --- UNWRAP VIBE IIFE ---
                         let contentToParse = scriptContent;
                         let currentIdxOffset = scriptStartIdx;
                         let currentLineOffset = scriptLineOffset;
 
-                        // Check for standard Vibe IIFE: (function() { ... })();
+                        // Regex to detect Vibe's auto-generated IIFE wrapper
+                        // Matches: (function(){  ...  })();
                         const prefixMatch = scriptContent.match(/^(\s*\(function\(\)\s*\{\n?)/);
                         const suffixMatch = scriptContent.match(/(\n?\}\)\(\);\s*)$/);
 
                         if (prefixMatch && suffixMatch) {
-                            // It is wrapped. Unwrap it so we can see the functions inside.
                             const prefixLen = prefixMatch[0].length;
                             const suffixLen = suffixMatch[0].length;
                             
@@ -1497,7 +1498,7 @@
                             currentIdxOffset += prefixLen;
                             currentLineOffset += (prefixMatch[0].split('\n').length - 1);
                         }
-                        // --- END FIX ---
+                        // --- END UNWRAP ---
 
                         const jsSegments = parseJsSegments(contentToParse, currentIdxOffset, currentLineOffset);
                         segments.push(...jsSegments);
@@ -1519,25 +1520,95 @@
                     
                     return segments;
                 } else {
+                    // Fallback if just raw JS
                     return parseJsSegments(code, 0, 0);
                 }
             }
 
-            function extractName(str) {
-                // 1. Standard function/class/var
-                // Matches: async function foo, function foo, class Foo, const foo = ..., let foo
-                let m = str.match(/(?:function|class|const|let|var)\s+(?:async\s+)?([a-zA-Z0-9_$]+)/);
-                if (m) return m[1];
+            function parseJsSegments(code, indexOffset, lineOffset) {
+                const lines = code.split('\n');
+                const segments = [];
+                
+                let currentContent = [];
+                let currentSig = "";
+                let startLineNum = 0;
+                let startIndex = 0;
+                let braceDepth = 0;
+                let inBlock = false;
+                let charCount = 0;
 
-                // 2. Object method / Class method
-                // Matches: render() {, componentDidMount() {
-                // Exclude reserved words like if, while, catch, for, switch
-                m = str.match(/^\s*(?:async\s+)?([a-zA-Z0-9_$]+)\s*\(/);
-                if (m) {
-                    const name = m[1];
-                    const reserved = ['if', 'while', 'for', 'switch', 'catch', 'function', 'await'];
-                    if (!reserved.includes(name)) return name;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const trimmed = line.trim();
+                    const lineLength = line.length + 1; // +1 for newline
+
+                    if (!inBlock && trimmed === '') {
+                        charCount += lineLength;
+                        continue;
+                    }
+
+                    const open = (line.match(/\{/g) || []).length;
+                    const close = (line.match(/\}/g) || []).length;
+
+                    if (!inBlock) {
+                        startLineNum = i;
+                        startIndex = charCount;
+                        currentContent = [line];
+                        currentSig = line;
+                        
+                        if (open > close) {
+                            inBlock = true;
+                            braceDepth = (open - close);
+                        } else {
+                            // Loose line (one-liner or var declaration)
+                            const name = extractName(trimmed);
+                            // Only add significant named blocks or full functions
+                            if (name || trimmed.includes("function") || trimmed.includes("class")) {
+                                segments.push({
+                                    name: name,
+                                    signature: trimmed,
+                                    content: line,
+                                    startLine: startLineNum + 1 + lineOffset,
+                                    startIndex: startIndex + indexOffset,
+                                    endIndex: charCount + lineLength - 1 + indexOffset
+                                });
+                            }
+                            currentContent = [];
+                        }
+                    } 
+                    else {
+                        currentContent.push(line);
+                        braceDepth += (open - close);
+                        
+                        if (braceDepth <= 0) {
+                            const contentStr = currentContent.join('\n');
+                            const name = extractName(currentSig);
+                            segments.push({
+                                name: name,
+                                signature: currentSig.trim(),
+                                content: contentStr,
+                                startLine: startLineNum + 1 + lineOffset,
+                                startIndex: startIndex + indexOffset,
+                                endIndex: charCount + lineLength - 1 + indexOffset
+                            });
+                            inBlock = false;
+                            braceDepth = 0;
+                            currentContent = [];
+                        }
+                    }
+                    charCount += lineLength;
                 }
+                return segments;
+            }
+
+            function extractName(str) {
+                // Matches: function x(), class x, var x =, x = function
+                let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
+                if (m) return m[1];
+                
+                // Matches method-like: render() {
+                m = str.match(/^\s*([a-zA-Z0-9_$]+)\s*\(/);
+                if (m && !str.includes("function") && !str.includes("if") && !str.includes("for") && !str.includes("while")) return m[1];
                 
                 return null;
             }
@@ -1577,7 +1648,6 @@
                 }
                 return costs[s2.length];
             }
-        })();
     </script>
 </body>
 </html>
