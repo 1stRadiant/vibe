@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,56 +26,46 @@
             border-bottom: none;
         }
 
-        /* --- MERGE TAB SPECIFIC CSS --- */
-        #merge-tool-root {
-            --bg: #1e1e1e;
-            --panel: #252526;
-            --border: #3c3c3c;
-            --text: #d4d4d4;
-            --accent: #007acc;
-            --success: #2ea043;
-            --warning: #e3b341;
-            --danger: #f85149;
-            --code-del: #451818;
-            --code-add: #133618;
-            --line-num: #858585;
-            color: var(--text);
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        /* --- MERGE TAB CSS START --- */
+        :root {
+            --merge-bg: #1e1e1e;
+            --merge-panel: #252526;
+            --merge-border: #3c3c3c;
+            --merge-text: #d4d4d4;
+            --merge-accent: #007acc;
+            --merge-success: #2ea043;
+            --merge-warning: #e3b341;
+            --merge-danger: #f85149;
+            --merge-line-num: #858585;
         }
 
-        .merge-tool-container {
+        .merge-container {
             display: flex;
             flex-direction: column;
             gap: 15px;
             height: 100%;
-            padding: 10px;
+            padding: 20px;
+            color: var(--merge-text);
         }
 
-        /* --- CONTROLS --- */
         .merge-controls {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
             padding: 15px;
-            background: var(--panel);
-            border: 1px solid var(--border);
+            background: var(--merge-panel);
+            border: 1px solid var(--merge-border);
             border-radius: 6px;
             align-items: center;
             flex-shrink: 0;
         }
 
-        .file-upload-group { flex: 1; min-width: 250px; }
-        .action-group { display: flex; gap: 10px; }
-
-        /* --- WORKSPACE --- */
         .merge-workspace {
             display: flex;
             gap: 20px;
             flex: 1;
             min-height: 0;
+            overflow: hidden; /* Prevent spillover */
         }
 
         .merge-column {
@@ -85,22 +76,14 @@
             min-width: 0;
         }
 
-        .merge-column h3 {
-            margin-top: 0; 
-            font-size: 1.1rem; 
-            color: #fff; 
-            margin-bottom: 10px;
-        }
-
-        /* Text Input */
-        textarea.merge-input {
+        .merge-textarea {
             width: 100%;
             height: 100%;
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid var(--border);
+            background: var(--merge-bg);
+            color: var(--merge-text);
+            border: 1px solid var(--merge-border);
             padding: 15px;
-            font-family: 'Consolas', 'Monaco', monospace;
+            font-family: 'Roboto Mono', monospace;
             font-size: 13px;
             line-height: 1.5;
             resize: none;
@@ -109,7 +92,6 @@
             white-space: pre;
         }
 
-        /* Diff List Scroll Area */
         .diff-list {
             overflow-y: auto;
             display: flex;
@@ -120,10 +102,9 @@
             padding-bottom: 40px;
         }
 
-        /* --- DIFF CARD STYLING --- */
         .diff-card {
-            background: var(--panel);
-            border: 1px solid var(--border);
+            background: var(--merge-panel);
+            border: 1px solid var(--merge-border);
             border-radius: 6px;
             padding: 0;
             display: flex;
@@ -136,7 +117,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--merge-border);
             background: #2d2d2d;
             border-radius: 6px 6px 0 0;
             flex-wrap: wrap;
@@ -149,7 +130,6 @@
         .type-insert { color: #89d185; }
 
         .diff-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-        .btn-row { display: flex; gap: 8px; }
         
         .location-wrapper {
             display: flex;
@@ -157,54 +137,33 @@
             align-items: center;
         }
 
-        /* Select Dropdown */
         select.location-select {
-            background: var(--bg);
+            background: var(--merge-bg);
             color: white;
-            border: 1px solid var(--border);
+            border: 1px solid var(--merge-border);
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 0.85em;
             max-width: 200px;
         }
 
-        /* Line Input */
         input.line-input {
-            background: var(--bg);
+            background: var(--merge-bg);
             color: white;
-            border: 1px solid var(--border);
+            border: 1px solid var(--merge-border);
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 0.85em;
             width: 60px;
         }
         
-        .hidden { display: none !important; }
+        .hidden { display: none; }
 
-        /* --- BUTTONS --- */
-        .merge-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            color: white;
-            font-size: 12px;
-            transition: opacity 0.2s;
-        }
-        .merge-btn:hover { opacity: 0.9; }
-        .merge-btn:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--border); }
-
-        .btn-primary-merge { background-color: var(--accent); }
-        .btn-success-merge { background-color: var(--success); }
-        .btn-secondary-merge { background-color: var(--border); color: var(--text); }
-
-        /* --- CODE VIEW --- */
         .code-compare-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             background: #1e1e1e;
-            font-family: 'Consolas', 'Monaco', monospace;
+            font-family: 'Roboto Mono', monospace;
             font-size: 12px;
             line-height: 1.5;
             border-radius: 0 0 6px 6px;
@@ -222,15 +181,15 @@
             position: relative;
         }
 
-        .original { background-color: #2d1818; border-right: 1px solid var(--border); }
+        .original { background-color: #2d1818; border-right: 1px solid var(--merge-border); }
         .replacement { background-color: #122615; }
         .insert-only { background-color: #122615; }
 
         .line-numbers {
             text-align: right;
             padding: 0 10px;
-            color: var(--line-num);
-            border-right: 1px solid var(--border);
+            color: var(--merge-line-num);
+            border-right: 1px solid var(--merge-border);
             user-select: none;
             min-width: 30px;
         }
@@ -247,7 +206,6 @@
         .code-content[contenteditable="true"] { cursor: text; }
         .code-content[contenteditable="true"]:focus { background-color: #18301b; }
 
-        /* --- BADGES --- */
         .status-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -259,14 +217,15 @@
             align-self: flex-start;
         }
         .status-pending { background: #444; color: #ddd; }
-        .status-approved { background: var(--success); color: white; }
-        .status-rejected { background: var(--border); color: #888; text-decoration: line-through; }
+        .status-approved { background: var(--merge-success); color: white; }
+        .status-rejected { background: var(--merge-border); color: #888; text-decoration: line-through; }
         
         .match-reason {
             font-size: 0.8em;
             color: #888;
             font-style: italic;
         }
+        /* --- MERGE TAB CSS END --- */
     </style>
 </head>
 <body>
@@ -356,7 +315,7 @@
                                     <i class="fs-4 bi-code-slash"></i>
                                 </a>
                             </li>
-                            <!-- MERGE TAB BUTTON -->
+                            <!-- NEW MERGE TAB BUTTON -->
                             <li>
                                 <a href="#" class="nav-link py-3 px-2 tab-button" data-tab="merge" title="Smart Merge">
                                     <i class="fs-4 bi-git"></i>
@@ -454,7 +413,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- GitHub Load Container (Hidden by default) -->
                                     <div class="accordion-item" id="github-load-container" style="display: none;">
                                         <h2 class="accordion-header" id="headingGithub">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseGithub" aria-expanded="false" aria-controls="collapseGithub">
@@ -766,36 +724,38 @@
                             </div>
                         </div>
                         
-                        <!-- REPLACED MERGE TAB CONTENT -->
+                        <!-- NEW MERGE TAB CONTENT -->
                         <div id="merge" class="tab-content">
-                            <div id="merge-tool-root">
-                                <div class="merge-tool-container">
-                                    <!-- Top Controls -->
-                                    <div class="merge-controls">
-                                        <div class="file-upload-group">
-                                            <label for="mergeFileInput" style="display:block; font-size:0.8em; margin-bottom:4px; color:#aaa;">1. Load Source File (.js/.ts)</label>
-                                            <input type="file" id="mergeFileInput" accept=".js,.jsx,.ts,.tsx" style="color:white;">
-                                        </div>
-                                        <div class="action-group">
-                                            <button id="mergeAnalyzeBtn" class="merge-btn btn-primary-merge" disabled>Analyze & Diff</button>
-                                            <button id="mergeDownloadBtn" class="merge-btn btn-success-merge" disabled>Download Updated File</button>
-                                        </div>
+                            <div class="merge-container">
+                                <h2>Smart Code Merge</h2>
+                                <p>Paste AI-generated code snippets (JS/TS) to intelligently merge them into your existing project code.</p>
+                                <!-- Top Controls -->
+                                <div class="merge-controls">
+                                    <div class="file-upload-group d-flex align-items-center gap-3" style="flex: 1;">
+                                        <button id="loadFromEditorBtn" class="action-button" title="Load content from the Full Code tab">
+                                            <i class="bi bi-arrow-down-square"></i> Load from Full Code
+                                        </button>
+                                        <span id="loadedStatus" style="color: #888; font-style: italic;">No code loaded.</span>
+                                    </div>
+                                    <div class="action-group">
+                                        <button id="analyzeBtn" class="action-button primary" disabled>Analyze & Diff</button>
+                                        <button id="applyToEditorBtn" class="action-button" style="background-color: var(--merge-success);" disabled>Apply to Editor</button>
+                                    </div>
+                                </div>
+
+                                <div class="merge-workspace">
+                                    <!-- Left: Input Area -->
+                                    <div class="merge-column">
+                                        <h3>Paste AI Code Segment</h3>
+                                        <textarea id="aiInput" class="merge-textarea" placeholder="// Paste code here...&#10;function newFeature() {&#10;   // This can be edited later in the right panel&#10;}"></textarea>
                                     </div>
 
-                                    <div class="merge-workspace">
-                                        <!-- Left: Input Area -->
-                                        <div class="merge-column">
-                                            <h3>2. Paste AI Code Segment</h3>
-                                            <textarea id="mergeAiInput" class="merge-input" placeholder="// Paste code here...&#10;function newFeature() {&#10;   // This can be edited later in the right panel&#10;}"></textarea>
-                                        </div>
-
-                                        <!-- Right: Interactive Diff -->
-                                        <div class="merge-column">
-                                            <h3>3. Review, Edit & Merge</h3>
-                                            <div id="mergeDiffContainer" class="diff-list">
-                                                <div style="text-align: center; color: #666; margin-top: 50px;">
-                                                    Load a file and paste AI code to begin...
-                                                </div>
+                                    <!-- Right: Interactive Diff -->
+                                    <div class="merge-column">
+                                        <h3>Review, Edit & Merge</h3>
+                                        <div id="diffContainer" class="diff-list">
+                                            <div style="text-align: center; color: #666; margin-top: 50px;">
+                                                Load code from editor and paste AI segment to begin...
                                             </div>
                                         </div>
                                     </div>
@@ -1038,37 +998,50 @@
     <script type="module" src="app3.js"></script>
     <script src="automation.js"></script>
     
-    <!-- MERGE LOGIC SCRIPT (STANDALONE LOGIC COPIED) -->
+    <!-- MERGE LOGIC SCRIPT (FIXED ESCAPING) -->
     <script>
         (function() {
             // --- STATE MANAGEMENT ---
             let sourceCode = "";
             let rawOriginalSource = ""; 
-            let sourceFilename = "updated_script.js";
             let proposedPatches = [];
             let globalSourceSegments = [];
 
             // --- DOM ELEMENTS ---
-            // Naming convention changed slightly to avoid collisions with main app
-            const fileInput = document.getElementById('mergeFileInput');
-            const aiInput = document.getElementById('mergeAiInput');
-            const analyzeBtn = document.getElementById('mergeAnalyzeBtn');
-            const downloadBtn = document.getElementById('mergeDownloadBtn');
-            const diffContainer = document.getElementById('mergeDiffContainer');
+            const loadFromEditorBtn = document.getElementById('loadFromEditorBtn');
+            const loadedStatus = document.getElementById('loadedStatus');
+            const aiInput = document.getElementById('aiInput');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const applyToEditorBtn = document.getElementById('applyToEditorBtn');
+            const diffContainer = document.getElementById('diffContainer');
+            const fullCodeEditor = document.getElementById('full-code-editor');
 
             // --- EVENT LISTENERS ---
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                sourceFilename = file.name;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    rawOriginalSource = event.target.result;
-                    sourceCode = rawOriginalSource;
-                    checkReady();
-                };
-                reader.readAsText(file);
-            });
+            // --- EVENT LISTENERS ---
+            
+            // Define this globally so app3.js can call it when switching tabs
+            window.merge_loadFromGlobalEditor = function() {
+                const fullCodeEditor = document.getElementById('full-code-editor');
+                const loadedStatus = document.getElementById('loadedStatus');
+                
+                if (!fullCodeEditor) return;
+
+                const code = fullCodeEditor.value;
+                if (!code || code.trim() === "") {
+                    loadedStatus.innerText = "Error: Full Code editor is empty.";
+                    loadedStatus.style.color = "var(--merge-danger)";
+                    return;
+                }
+                
+                rawOriginalSource = code;
+                sourceCode = code;
+                loadedStatus.innerText = "Auto-loaded from project.";
+                loadedStatus.style.color = "var(--merge-success)";
+                checkReady();
+            };
+
+            // Keep the button working by referencing the new global function
+            loadFromEditorBtn.addEventListener('click', window.merge_loadFromGlobalEditor);
 
             aiInput.addEventListener('input', checkReady);
 
@@ -1083,9 +1056,16 @@
                 performAnalysis(rawOriginalSource, updateCode);
             });
 
-            downloadBtn.addEventListener('click', () => {
+            applyToEditorBtn.addEventListener('click', () => {
                 applyPatchesToSource(); 
-                downloadString(sourceCode, "updated_" + sourceFilename);
+                // Apply to main editor
+                fullCodeEditor.value = sourceCode;
+                loadedStatus.innerText = "Changes applied to Full Code Editor!";
+                
+                // Switch tab back to code
+                // Try to find the tab button logic if available globally, otherwise manual DOM trigger
+                const codeTabBtn = document.querySelector('a[data-tab="code"]');
+                if(codeTabBtn) codeTabBtn.click();
             });
 
             // --- CORE LOGIC ---
@@ -1103,7 +1083,7 @@
                     let bestMatch = null;
                     
                     // 1. Explicit Name Match
-                    if (uSeg.name) {
+                    if (uSeg.name && uSeg.name !== "<HTML/CSS Block>") {
                         const match = globalSourceSegments.find((sSeg, idx) => 
                             !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
                         );
@@ -1113,9 +1093,9 @@
                     }
 
                     // 2. Similarity Match
-                    if (!bestMatch) {
+                    if (!bestMatch && uSeg.name !== "<HTML/CSS Block>") {
                         const match = globalSourceSegments.find((sSeg, idx) => {
-                            if (matchedSourceIndices.has(idx)) return false;
+                            if (matchedSourceIndices.has(idx) || sSeg.name === "<HTML/CSS Block>") return false;
                             return similarity(uSeg.signature, sSeg.signature) > 0.85;
                         });
                         if (match) {
@@ -1128,16 +1108,16 @@
                         if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
                             addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
                         }
-                    } else {
+                    } else if (uSeg.name !== "<HTML/CSS Block>") {
                         addPatchUI('insert', null, uSeg, "No matching block found");
                     }
                 });
 
                 if (proposedPatches.length === 0) {
                     diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No relevant changes detected.</div>';
-                    downloadBtn.disabled = true;
+                    applyToEditorBtn.disabled = true;
                 } else {
-                    downloadBtn.disabled = false;
+                    applyToEditorBtn.disabled = false;
                 }
             }
 
@@ -1167,7 +1147,7 @@
                     `;
                     
                     globalSourceSegments.forEach(seg => {
-                        if (seg.name) {
+                        if (seg.name && seg.name !== "<HTML/CSS Block>") {
                             locationControlsHtml += `<option value="${seg.endIndex}">After ${seg.name}</option>`;
                         }
                     });
@@ -1202,8 +1182,8 @@
                     
                     headerRightHtml = `
                         <div class="btn-row">
-                            <button class="merge-btn btn-success-merge" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Replace</button>
-                            <button class="merge-btn btn-secondary-merge" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
+                            <button class="action-button primary" style="background-color:var(--merge-success)" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Replace</button>
+                            <button class="action-button secondary" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
                         </div>
                     `;
 
@@ -1226,8 +1206,8 @@
                     headerRightHtml = `
                         ${locationControlsHtml}
                         <div class="btn-row">
-                            <button class="merge-btn btn-primary-merge" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Insert</button>
-                            <button class="merge-btn btn-secondary-merge" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
+                            <button class="action-button primary" onclick="window.merge_setPatchStatus('${id}', 'approved')">Confirm Insert</button>
+                            <button class="action-button secondary" onclick="window.merge_setPatchStatus('${id}', 'rejected')">Ignore</button>
                         </div>
                     `;
                 }
@@ -1246,7 +1226,7 @@
                 diffContainer.appendChild(card);
             }
 
-            // --- INTERACTIVE FUNCTIONS (Exposed to window for inline onclicks) ---
+            // --- INTERACTIVE FUNCTIONS (Exposed globally for HTML onclicks) ---
 
             function genLineNums(text, start) {
                 const count = text.split('\n').length;
@@ -1284,12 +1264,12 @@
                     badge.className = 'status-badge status-approved';
                     badge.innerText = patch.type === 'replace' ? 'Will Replace' : 'Will Insert';
                     card.style.opacity = '1';
-                    card.style.borderColor = 'var(--success)';
+                    card.style.borderColor = 'var(--merge-success)';
                 } else {
                     badge.className = 'status-badge status-rejected';
                     badge.innerText = 'Ignored';
                     card.style.opacity = '0.5';
-                    card.style.borderColor = 'var(--border)';
+                    card.style.borderColor = 'var(--merge-border)';
                 }
             };
 
@@ -1321,7 +1301,23 @@
                         if (locValue === 'top') {
                             insertIndex = 0;
                         } else if (locValue === 'bottom') {
-                            insertIndex = Infinity; 
+                            // Smart Bottom: Find closing body or html tag
+                            const bodyClose = rawOriginalSource.lastIndexOf('<' + '/body>');
+                            const scriptClose = rawOriginalSource.lastIndexOf('<' + '/script>');
+                            
+                            // If we have a body tag, insert before it
+                            if(bodyClose !== -1) {
+                                insertIndex = bodyClose;
+                            } 
+                            // If no body, but we have a script tag, insert after the last script
+                            else if (scriptClose !== -1) {
+                                insertIndex = scriptClose + 9; // 9 is length of < / script >
+                            }
+                            // Else absolute end
+                            else {
+                                insertIndex = Infinity; 
+                            }
+
                         } else if (locValue === 'line') {
                             // Calculate index based on line number
                             const lineInput = document.getElementById(`line-input-${p.id}`);
@@ -1386,7 +1382,73 @@
                 return precedingText.length + 1;
             }
 
+            function getLineNumber(text, index) {
+                return text.substring(0, index).split('\n').length;
+            }
+
+            // --- NEW: HTML/SCRIPT AWARE PARSER ---
             function parseCodeSegments(code) {
+                // Check if HTML (case insensitive check)
+                if (code.match(/<html/i) || code.match(/<!DOCTYPE/i) || code.match(new RegExp("<script", "i"))) {
+                    const segments = [];
+                    // Case-insensitive regex for script tags
+                    const regex = new RegExp("<script\\b[^>]*>([\\s\\S]*?)<\\/script>", "gi");
+                    let match;
+                    let lastIndex = 0;
+                    
+                    // Find all scripts
+                    while ((match = regex.exec(code)) !== null) {
+                        // Content before the script (HTML/CSS)
+                        if (match.index > lastIndex) {
+                            const htmlContent = code.substring(lastIndex, match.index);
+                            segments.push({
+                                name: "<HTML/CSS Block>",
+                                signature: "HTML Content",
+                                content: htmlContent,
+                                startLine: getLineNumber(code, lastIndex),
+                                startIndex: lastIndex,
+                                endIndex: match.index - 1
+                            });
+                        }
+                        
+                        // The Script Content
+                        // Note: match[1] is the content capture group
+                        const scriptContent = match[1];
+                        
+                        // Find the start index of the content within the full string
+                        // We use match.index + match[0].indexOf(scriptContent) to be safe about attributes
+                        const tagFullString = match[0];
+                        const contentOffsetInTag = tagFullString.indexOf(scriptContent);
+                        const scriptStartIdx = match.index + contentOffsetInTag;
+                        
+                        // Parse the JS inside with offset
+                        const scriptLineOffset = getLineNumber(code, scriptStartIdx) - 1; 
+                        
+                        const jsSegments = parseJsSegments(scriptContent, scriptStartIdx, scriptLineOffset);
+                        segments.push(...jsSegments);
+                        
+                        lastIndex = match.index + match[0].length;
+                    }
+                    
+                    // Remaining HTML
+                    if (lastIndex < code.length) {
+                        segments.push({
+                            name: "<HTML/CSS Block>",
+                            signature: "HTML Content",
+                            content: code.substring(lastIndex),
+                            startLine: getLineNumber(code, lastIndex),
+                            startIndex: lastIndex,
+                            endIndex: code.length
+                        });
+                    }
+                    
+                    return segments;
+                } else {
+                    return parseJsSegments(code, 0, 0);
+                }
+            }
+
+            function parseJsSegments(code, indexOffset, lineOffset) {
                 const lines = code.split('\n');
                 const segments = [];
                 
@@ -1401,7 +1463,7 @@
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
                     const trimmed = line.trim();
-                    const lineLength = line.length + 1;
+                    const lineLength = line.length + 1; // +1 for newline
 
                     if (!inBlock && trimmed === '') {
                         charCount += lineLength;
@@ -1421,16 +1483,19 @@
                             inBlock = true;
                             braceDepth = (open - close);
                         } else {
-                            // Loose line
+                            // Loose line (one-liner or var declaration)
                             const name = extractName(trimmed);
-                            segments.push({
-                                name: name,
-                                signature: trimmed,
-                                content: line,
-                                startLine: startLineNum + 1,
-                                startIndex: startIndex,
-                                endIndex: charCount + lineLength - 1
-                            });
+                            // Only add significant named blocks or full functions
+                            if (name) {
+                                segments.push({
+                                    name: name,
+                                    signature: trimmed,
+                                    content: line,
+                                    startLine: startLineNum + 1 + lineOffset,
+                                    startIndex: startIndex + indexOffset,
+                                    endIndex: charCount + lineLength - 1 + indexOffset
+                                });
+                            }
                             currentContent = [];
                         }
                     } 
@@ -1445,9 +1510,9 @@
                                 name: name,
                                 signature: currentSig.trim(),
                                 content: contentStr,
-                                startLine: startLineNum + 1,
-                                startIndex: startIndex,
-                                endIndex: charCount + lineLength - 1
+                                startLine: startLineNum + 1 + lineOffset,
+                                startIndex: startIndex + indexOffset,
+                                endIndex: charCount + lineLength - 1 + indexOffset
                             });
                             inBlock = false;
                             braceDepth = 0;
@@ -1456,25 +1521,26 @@
                     }
                     charCount += lineLength;
                 }
-
-                if (currentContent.length > 0) {
-                     const contentStr = currentContent.join('\n');
-                     segments.push({
-                        name: null,
-                        signature: currentSig.trim(),
-                        content: contentStr,
-                        startLine: startLineNum + 1,
-                        startIndex: startIndex,
-                        endIndex: charCount
-                    });
-                }
-
+                
                 return segments;
             }
 
             function extractName(str) {
-                let m = str.match(/(?:function|class|const|let|var)\s+([a-zA-Z0-9_$]+)/);
-                if(m) return m[1];
+                // 1. Standard function/class/var
+                // Matches: async function foo, function foo, class Foo, const foo = ..., let foo
+                let m = str.match(/(?:function|class|const|let|var)\s+(?:async\s+)?([a-zA-Z0-9_$]+)/);
+                if (m) return m[1];
+
+                // 2. Object method / Class method
+                // Matches: render() {, componentDidMount() {
+                // Exclude reserved words like if, while, catch, for, switch
+                m = str.match(/^\s*(?:async\s+)?([a-zA-Z0-9_$]+)\s*\(/);
+                if (m) {
+                    const name = m[1];
+                    const reserved = ['if', 'while', 'for', 'switch', 'catch', 'function', 'await'];
+                    if (!reserved.includes(name)) return name;
+                }
+                
                 return null;
             }
 
@@ -1484,15 +1550,8 @@
                 return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             }
 
-            function downloadString(text, filename) {
-                var blob = new Blob([text], { type: 'text/javascript' });
-                var link = document.createElement('a');
-                link.href = window.URL.createObjectURL(blob);
-                link.download = filename;
-                link.click();
-            }
-
             function similarity(s1, s2) {
+                if (!s1 || !s2) return 0;
                 let longer = s1, shorter = s2;
                 if (s1.length < s2.length) { longer = s2; shorter = s1; }
                 if (longer.length == 0) return 1.0;
