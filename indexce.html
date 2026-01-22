@@ -1016,7 +1016,15 @@
             const fullCodeEditor = document.getElementById('full-code-editor');
 
             // --- EVENT LISTENERS ---
-            loadFromEditorBtn.addEventListener('click', () => {
+            // --- EVENT LISTENERS ---
+            
+            // Define this globally so app3.js can call it when switching tabs
+            window.merge_loadFromGlobalEditor = function() {
+                const fullCodeEditor = document.getElementById('full-code-editor');
+                const loadedStatus = document.getElementById('loadedStatus');
+                
+                if (!fullCodeEditor) return;
+
                 const code = fullCodeEditor.value;
                 if (!code || code.trim() === "") {
                     loadedStatus.innerText = "Error: Full Code editor is empty.";
@@ -1026,10 +1034,13 @@
                 
                 rawOriginalSource = code;
                 sourceCode = code;
-                loadedStatus.innerText = "Code loaded from editor!";
+                loadedStatus.innerText = "Auto-loaded from project.";
                 loadedStatus.style.color = "var(--merge-success)";
                 checkReady();
-            });
+            };
+
+            // Keep the button working by referencing the new global function
+            loadFromEditorBtn.addEventListener('click', window.merge_loadFromGlobalEditor);
 
             aiInput.addEventListener('input', checkReady);
 
