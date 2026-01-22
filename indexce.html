@@ -1447,81 +1447,80 @@
                 }
             }
 
-            function parseJsSegments(code, indexOffset, lineOffset) {
-                const lines = code.split('\n');
-                const segments = [];
-                
-                let currentContent = [];
-                let currentSig = "";
-                let startLineNum = 0;
-                let startIndex = 0;
-                let braceDepth = 0;
-                let inBlock = false;
-                let charCount = 0;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const trimmed = line.trim();
-                    const lineLength = line.length + 1; // +1 for newline
-
-                    if (!inBlock && trimmed === '') {
-                        charCount += lineLength;
-                        continue;
-                    }
-
-                    const open = (line.match(/\{/g) || []).length;
-                    const close = (line.match(/\}/g) || []).length;
-
-                    if (!inBlock) {
-                        startLineNum = i;
-                        startIndex = charCount;
-                        currentContent = [line];
-                        currentSig = line;
-                        
-                        if (open > close) {
-                            inBlock = true;
-                            braceDepth = (open - close);
-                        } else {
-                            // Loose line (one-liner or var declaration)
-                            const name = extractName(trimmed);
-                            // Only add significant named blocks or full functions
-                            if (name) {
-                                segments.push({
-                                    name: name,
-                                    signature: trimmed,
-                                    content: line,
-                                    startLine: startLineNum + 1 + lineOffset,
-                                    startIndex: startIndex + indexOffset,
-                                    endIndex: charCount + lineLength - 1 + indexOffset
-                                });
-                            }
-                            currentContent = [];
-                        }
-                    } 
-                    else {
-                        currentContent.push(line);
-                        braceDepth += (open - close);
-                        
-                        if (braceDepth <= 0) {
-                            const contentStr = currentContent.join('\n');
-                            const name = extractName(currentSig);
+            // --- UPDATED: HTML/SCRIPT AWARE PARSER WITH IIFE UNWRAPPING ---
+            function parseCodeSegments(code) {
+                // Check if HTML
+                if (code.includes("<html") || code.includes("<!DOCTYPE") || code.match(/<script[^>]*>/)) {
+                    const segments = [];
+                    const regex = /<script\b[^>]*>([\s\S]*?)<\/script>/g; 
+                    let match;
+                    let lastIndex = 0;
+                    
+                    // Find all scripts
+                    while ((match = regex.exec(code)) !== null) {
+                        // Content before the script (HTML/CSS)
+                        if (match.index > lastIndex) {
+                            const htmlContent = code.substring(lastIndex, match.index);
                             segments.push({
-                                name: name,
-                                signature: currentSig.trim(),
-                                content: contentStr,
-                                startLine: startLineNum + 1 + lineOffset,
-                                startIndex: startIndex + indexOffset,
-                                endIndex: charCount + lineLength - 1 + indexOffset
+                                name: "<HTML/CSS Block>",
+                                signature: "HTML Content",
+                                content: htmlContent,
+                                startLine: getLineNumber(code, lastIndex),
+                                startIndex: lastIndex,
+                                endIndex: match.index - 1
                             });
-                            inBlock = false;
-                            braceDepth = 0;
-                            currentContent = [];
                         }
+                        
+                        // The Script Content
+                        const scriptContent = match[1];
+                        const scriptStartIdx = match.index + match[0].indexOf(scriptContent); 
+                        const scriptLineOffset = getLineNumber(code, scriptStartIdx) - 1; 
+                        
+                        // --- FIX: Unwrap Vibe IIFE Wrapper ---
+                        let contentToParse = scriptContent;
+                        let currentIdxOffset = scriptStartIdx;
+                        let currentLineOffset = scriptLineOffset;
+
+                        // Check for standard Vibe IIFE: (function() { ... })();
+                        const prefixMatch = scriptContent.match(/^(\s*\(function\(\)\s*\{\n?)/);
+                        const suffixMatch = scriptContent.match(/(\n?\}\)\(\);\s*)$/);
+
+                        if (prefixMatch && suffixMatch) {
+                            // It is wrapped. Unwrap it so we can see the functions inside.
+                            const prefixLen = prefixMatch[0].length;
+                            const suffixLen = suffixMatch[0].length;
+                            
+                            // Extract inner code
+                            contentToParse = scriptContent.substring(prefixLen, scriptContent.length - suffixLen);
+                            
+                            // Adjust offsets so replacements happen at the correct absolute position
+                            currentIdxOffset += prefixLen;
+                            currentLineOffset += (prefixMatch[0].split('\n').length - 1);
+                        }
+                        // --- END FIX ---
+
+                        const jsSegments = parseJsSegments(contentToParse, currentIdxOffset, currentLineOffset);
+                        segments.push(...jsSegments);
+                        
+                        lastIndex = match.index + match[0].length;
                     }
-                    charCount += lineLength;
+                    
+                    // Remaining HTML
+                    if (lastIndex < code.length) {
+                        segments.push({
+                            name: "<HTML/CSS Block>",
+                            signature: "HTML Content",
+                            content: code.substring(lastIndex),
+                            startLine: getLineNumber(code, lastIndex),
+                            startIndex: lastIndex,
+                            endIndex: code.length
+                        });
+                    }
+                    
+                    return segments;
+                } else {
+                    return parseJsSegments(code, 0, 0);
                 }
-                
-                return segments;
             }
 
             function extractName(str) {
