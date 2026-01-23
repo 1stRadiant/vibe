@@ -25,7 +25,7 @@
             border-bottom: none;
         }
         
-        /* Iframe container styling */
+        /* Iframe container styling for Merge Tab */
         #merge iframe {
             width: 100%;
             height: 100%;
@@ -33,6 +33,205 @@
             border: none;
             background: #1e1e1e;
         }
+
+        /* --- CODE EXPLORER & PREVIEW LAYOUT STYLES --- */
+        
+        /* FIX: Only apply flex layout when the tab is ACTIVE */
+        .tab-content#preview {
+            display: none; /* Default hidden */
+            padding: 0 !important; 
+            height: 100%;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        
+        .tab-content#preview.active {
+            display: flex !important; /* Only flex when active */
+        }
+
+        .preview-layout-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        #preview-top-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 200px;
+            position: relative;
+        }
+
+        #preview-resizer {
+            height: 12px;
+            background: #212529;
+            cursor: row-resize;
+            flex-shrink: 0;
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            display: none; /* Hidden by default */
+            z-index: 100;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #preview-resizer:hover {
+            background: #0d6efd;
+        }
+
+        #preview-resizer::after {
+            content: "••••";
+            color: #6c757d;
+            font-size: 12px;
+            letter-spacing: 2px;
+            position: absolute;
+            top: -5px; 
+        }
+
+        #explorer-panel {
+            height: 0; /* Starts hidden */
+            background: #1e1e1e; /* VS Code dark bg */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid #333;
+            transition: height 0.1s ease-out;
+        }
+        
+        #explorer-panel.active {
+            height: 350px; /* Default height when opened */
+        }
+
+        /* Module Styles */
+        .ce-container {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ccc;
+            padding: 15px;
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+        }
+
+        .ce-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .ce-header h4 { margin: 0; font-size: 15px; color: #fff; font-weight: 600; }
+
+        .ce-search-section {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-bottom: 15px;
+        }
+
+        .ce-search-input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #3c3c3c;
+            border-radius: 4px;
+            background: #252526;
+            color: #fff;
+            font-family: inherit;
+        }
+
+        .ce-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            background: #0d6efd;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .ce-btn:hover { background: #0b5ed7; }
+
+        .ce-results {
+            max-height: 100px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 15px;
+        }
+
+        .ce-output {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* Code Blocks */
+        .ce-code-block {
+            background: #1e1e1e;
+            padding: 0;
+            margin-bottom: 20px;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        
+        .ce-code-block h3, .ce-code-block h4 {
+            font-size: 13px;
+            color: #9cdcfe;
+            margin-bottom: 8px;
+            font-weight: normal;
+        }
+
+        .ce-code-content {
+            color: #d4d4d4;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            padding: 12px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        /* Syntax Colors */
+        .ce-function-name { color: #dcdcaa; font-weight: bold; font-size: 1.1em; display: block; margin-bottom: 5px; }
+        .ce-css-rules { color: #ce9178; }
+        .ce-function-link { 
+            color: #4fc1ff; 
+            text-decoration: none; 
+            cursor: pointer; 
+            margin-right: 8px; 
+            border-bottom: 1px dotted #444;
+        }
+        .ce-function-link:hover { 
+            text-decoration: underline; 
+            color: #9cdcfe;
+        }
+        .ce-search-result { padding: 6px; margin: 2px 0; cursor: pointer; border-radius: 3px; }
+        .ce-search-result:hover { background: #2a2d2e; }
+        .ce-result-type { color: #569cd6; font-weight: bold; margin-right: 8px; font-size: 0.9em; }
+
+        .ce-navigation { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        
+        .ce-btn-small {
+            padding: 4px 12px;
+            font-size: 12px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .ce-btn-small:hover { background: #4c4c4c; border-color: #777; }
     </style>
 </head>
 <body>
@@ -146,8 +345,8 @@
                 </div>
 
                 <!-- Content Area -->
-                <div class="col py-3">
-                    <div class="main-toolbar d-flex justify-content-end align-items-start">
+                <div class="col py-3" style="height: 100vh; overflow: hidden; position: relative;">
+                    <div class="main-toolbar d-flex justify-content-end align-items-start" style="position: absolute; right: 20px; top: 10px; z-index: 1000;">
                         <div class="btn-group me-2" role="group" aria-label="Save actions">
                             <button class="btn btn-primary" type="button" id="save-to-cloud-button" disabled title="Save to Cloud (Ctrl/Cmd + S)">
                                 <i class="bi bi-cloud-arrow-up"></i>
@@ -190,7 +389,7 @@
                         </div>
                     </div>
 
-                    <div class="tab-content-area">
+                    <div class="tab-content-area" style="height: 100%;">
                         <div id="start" class="tab-content active">
                              <div class="start-page-content">
                                 <!-- ... Start Page Content (No changes) ... -->
@@ -333,13 +532,29 @@
                                 </div>
                             </div>
                         </div>
-                         <div id="preview" class="tab-content" style="height:1000px;">
-                            <div class="preview-container">
-                                <div class="preview-header d-flex justify-content-between align-items-center">
-                                    <h2>Vibe</h2>
-                                    <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
+                        
+                        <!-- MODIFIED PREVIEW TAB WITH CODE EXPLORER SPLIT PANE -->
+                        <div id="preview" class="tab-content">
+                            <div class="preview-layout-wrapper">
+                                <!-- Top Pane: Preview Header + Iframe -->
+                                <div id="preview-top-pane">
+                                    <!-- Header: Buttons on LEFT to avoid overlap with global toolbar -->
+                                    <div class="preview-header d-flex align-items-center" style="padding: 12px 16px; background: #212529; color: white; border-bottom: 1px solid #444; height: 60px;">
+                                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 500; margin-right: 15px;">Live Preview</h2>
+                                        <button id="code-explorer-toggle-btn" class="btn btn-outline-info" style="padding: 4px 12px; font-size: 0.9rem;">
+                                            <i class="bi bi-bug me-2"></i>Enable Inspect
+                                        </button>
+                                    </div>
+                                    <iframe id="website-preview" title="Live Website Preview" style="width:100%; height: 100%; border:none; flex: 1; background: #fff;"></iframe>
                                 </div>
-                                <iframe id="website-preview" title="Live Website Preview"></iframe>
+                                
+                                <!-- Resizer Handle -->
+                                <div id="preview-resizer"></div>
+                                
+                                <!-- Bottom Pane: Code Explorer -->
+                                <div id="explorer-panel">
+                                    <!-- Content injected by JS -->
+                                </div>
                             </div>
                         </div>
 
@@ -803,5 +1018,401 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
     <script src="automation.js"></script>
+
+    <!-- CODE EXPLORER MODULE SCRIPT -->
+    <script>
+        class CodeExplorer {
+            constructor(containerId, options = {}) {
+                this.container = document.getElementById(containerId);
+                if (!this.container) return; 
+                
+                this.options = {
+                    onEditRequest: options.onEditRequest || null,
+                    ...options
+                };
+
+                this.functionRegistry = {};
+                this.styleRegistry = {};
+                this.functionHistory = [];
+                this.historyIndex = -1;
+                
+                this._initUI();
+            }
+
+            analyze(doc) {
+                this.functionRegistry = {};
+                this.styleRegistry = {};
+                
+                // Extract Scripts
+                Array.from(doc.getElementsByTagName('script')).forEach(script => {
+                    if (script.textContent) this._extractFunctions(script.textContent);
+                });
+
+                // Extract Styles
+                Array.from(doc.getElementsByTagName('style')).forEach(style => {
+                    if (style.textContent) this._extractStyles(style.textContent);
+                });
+
+                this.outputDiv.innerHTML = `
+                    <div class="ce-code-block" style="text-align:center; color:#888; margin-top:20px;">
+                        <h3><i class="bi bi-search"></i> Code Explorer Ready</h3>
+                        <p>Found ${Object.keys(this.functionRegistry).length} functions and ${Object.keys(this.styleRegistry).length} style rules.</p>
+                        <p><strong>Click any element in the preview above to inspect its code.</strong></p>
+                    </div>`;
+            }
+
+            inspectElement(element) {
+                this.functionHistory = [];
+                this.historyIndex = -1;
+                const content = this._generateElementContent(element);
+                
+                this._addToHistory({
+                    type: 'element',
+                    name: element.tagName.toLowerCase(),
+                    content: content,
+                    element: element
+                });
+            }
+
+            _initUI() {
+                this.container.classList.add('ce-container');
+                this.container.innerHTML = `
+                    <div class="ce-header">
+                        <h4>Code Explorer</h4>
+                        <button class="ce-btn-small" id="ce-close-btn" title="Close Panel"><i class="bi bi-x-lg"></i></button>
+                    </div>
+                    <div class="ce-search-section">
+                        <input type="text" class="ce-search-input" placeholder="Search functions...">
+                        <button class="ce-btn">Search</button>
+                    </div>
+                    <div class="ce-results"></div>
+                    <div class="ce-output"></div>
+                `;
+
+                this.searchInput = this.container.querySelector('.ce-search-input');
+                this.searchBtn = this.container.querySelector('.ce-btn');
+                this.resultsDiv = this.container.querySelector('.ce-results');
+                this.outputDiv = this.container.querySelector('.ce-output');
+
+                this.searchBtn.onclick = () => this._performSearch();
+                this.searchInput.onkeyup = (e) => { if(e.key === 'Enter') this._performSearch(); };
+                
+                this.container.querySelector('#ce-close-btn').onclick = () => {
+                    document.getElementById('code-explorer-toggle-btn').click();
+                };
+            }
+
+            _generateElementContent(element) {
+                const tagName = element.tagName.toLowerCase();
+                const id = element.id ? `#${element.id}` : '';
+                const classes = element.className && typeof element.className === 'string' ? `.${element.className.replace(/\s+/g, '.')}` : '';
+                
+                let matchedStyles = '';
+                for (const selector in this.styleRegistry) {
+                    try {
+                        if (element.matches && element.matches(selector)) {
+                            matchedStyles += `${selector} {\n    ${this.styleRegistry[selector]}\n}\n`;
+                        }
+                    } catch(e){}
+                }
+
+                const relatedFuncs = this._getRelatedFunctions(element);
+
+                return `
+                    <div class="ce-code-block">
+                        <h3>&lt;${tagName}${id}${classes}&gt;</h3>
+                        ${this.options.onEditRequest ? 
+                            `<button class="ce-btn-small" style="float:right;" data-action="edit-el">Ask AI to Edit</button>` : ''}
+                        <div style="clear:both;"></div>
+                        <pre class="ce-code-content">${this._escapeHtml(element.outerHTML.split('>')[0] + '> ...')}</pre>
+                    </div>
+
+                    ${matchedStyles ? `
+                    <div class="ce-code-block">
+                        <h4>CSS Rules</h4>
+                        <pre class="ce-code-content ce-css-rules">${this._escapeHtml(matchedStyles)}</pre>
+                    </div>` : ''}
+
+                    ${relatedFuncs.length > 0 ? `
+                    <div class="ce-code-block">
+                        <h4>Event Handlers</h4>
+                        <div class="ce-dependency-tree">
+                            ${relatedFuncs.map(f => `<span class="ce-function-link" data-fn="${f}">${f}</span>`).join('')}
+                        </div>
+                    </div>` : ''}
+                `;
+            }
+
+            _showFunction(name) {
+                if (!this.functionRegistry[name]) return;
+                const func = this.functionRegistry[name];
+
+                const content = `
+                    <div class="ce-code-block">
+                        <span class="ce-function-name">${name}()</span>
+                        <pre class="ce-code-content">${this._linkifyCode(func.code)}</pre>
+                        ${func.dependencies.length ? `
+                        <div class="ce-dependency-tree">
+                            <h4>Calls:</h4>
+                            ${func.dependencies.map(d => `<span class="ce-function-link" data-fn="${d}">${d}</span>`).join('<br>')}
+                        </div>` : ''}
+                    </div>
+                `;
+
+                this._addToHistory({ type: 'function', name: name, content: content });
+            }
+
+            _addToHistory(state) {
+                if (this.historyIndex < this.functionHistory.length - 1) {
+                    this.functionHistory = this.functionHistory.slice(0, this.historyIndex + 1);
+                }
+                this.functionHistory.push(state);
+                this.historyIndex++;
+                this._renderCurrentState();
+            }
+
+            _renderCurrentState() {
+                const state = this.functionHistory[this.historyIndex];
+                const nav = `
+                    <div class="ce-navigation">
+                        <button class="ce-btn-small" id="ce-back-btn" ${this.historyIndex === 0 ? 'disabled' : ''}>← Back</button>
+                        <span style="color:#888; font-size:12px;">${state.type.toUpperCase()}: ${state.name}</span>
+                    </div>
+                `;
+                this.outputDiv.innerHTML = nav + state.content;
+                this.resultsDiv.innerHTML = ''; 
+
+                this.outputDiv.querySelector('#ce-back-btn').onclick = () => {
+                    if (this.historyIndex > 0) {
+                        this.historyIndex--;
+                        this._renderCurrentState();
+                    }
+                };
+                
+                // ENSURE LINKS ARE CLICKABLE
+                this.outputDiv.querySelectorAll('.ce-function-link').forEach(el => {
+                    el.onclick = () => this._showFunction(el.dataset.fn);
+                });
+                
+                this.outputDiv.querySelectorAll('button[data-action="edit-el"]').forEach(btn => {
+                    btn.onclick = () => {
+                       const prompt = document.getElementById('ai-project-edit-prompt-input'); 
+                       if(prompt) {
+                           prompt.value = `Focusing on the <${state.name}> element... `;
+                           document.getElementById('ai-project-edit-modal').style.display = 'block';
+                       }
+                    };
+                });
+            }
+
+            _extractFunctions(code) {
+                const funcRegex = /function\s+(\w+)\s*\([^)]*\)\s*{/g;
+                let match;
+                while ((match = funcRegex.exec(code)) !== null) {
+                    const name = match[1];
+                    const body = this._extractCodeBlock(code, code.indexOf('{', match.index));
+                    if(body) this.functionRegistry[name] = { code: body, dependencies: this._findDependencies(body) };
+                }
+            }
+            _extractStyles(css) {
+                const ruleRegex = /([^{]+)\{([^}]+)\}/g;
+                let match;
+                while ((match = ruleRegex.exec(css)) !== null) {
+                    this.styleRegistry[match[1].trim()] = match[2].trim();
+                }
+            }
+            _extractCodeBlock(code, openIndex) {
+                if (openIndex < 0) return null;
+                let count = 1, i = openIndex + 1;
+                while (count > 0 && i < code.length) {
+                    if (code[i] === '{') count++;
+                    else if (code[i] === '}') count--;
+                    i++;
+                }
+                return code.substring(openIndex, i + 1);
+            }
+            _findDependencies(body) {
+                return Object.keys(this.functionRegistry).filter(name => body.includes(name + '('));
+            }
+            _getRelatedFunctions(element) {
+                const funcs = [];
+                if (element.attributes) {
+                    Array.from(element.attributes).forEach(attr => {
+                        if (attr.name.startsWith('on')) {
+                            const val = attr.value.split('(')[0];
+                            if(this.functionRegistry[val]) funcs.push(val);
+                        }
+                    });
+                }
+                return funcs;
+            }
+            _performSearch() {
+                const term = this.searchInput.value.toLowerCase();
+                if (!term) return;
+                let html = '';
+                Object.keys(this.functionRegistry).forEach(name => {
+                    if (name.toLowerCase().includes(term)) {
+                        html += `<div class="ce-search-result" data-fn="${name}"><span class="ce-result-type">FN</span> ${name}</div>`;
+                    }
+                });
+                this.resultsDiv.innerHTML = html || '<div style="padding:5px;">No results</div>';
+                this.resultsDiv.querySelectorAll('.ce-search-result').forEach(el => el.onclick = () => this._showFunction(el.dataset.fn));
+            }
+            _linkifyCode(code) { return this._escapeHtml(code); }
+            _escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        }
+
+        /* --- INTEGRATION LOGIC --- */
+        document.addEventListener('DOMContentLoaded', () => {
+            const previewIframe = document.getElementById('website-preview');
+            const inspectBtn = document.getElementById('code-explorer-toggle-btn');
+            const explorerPanel = document.getElementById('explorer-panel');
+            const resizer = document.getElementById('preview-resizer');
+            const topPane = document.getElementById('preview-top-pane');
+            
+            let explorer = null;
+            let isInspectActive = false;
+
+            // 1. Initialize Explorer
+            explorer = new CodeExplorer('explorer-panel', {
+                onEditRequest: (type, name, content) => {
+                    console.log("Edit requested:", type, name);
+                }
+            });
+
+            // 2. Setup Interaction Logic (reusable)
+            const setupIframeInteraction = (iframe) => {
+                if (!isInspectActive) return;
+                
+                try {
+                    const doc = iframe.contentDocument;
+                    if (!doc) return;
+                    
+                    if (doc.hasAttachedVibeInspect) return;
+                    doc.hasAttachedVibeInspect = true;
+
+                    // Inject Styles
+                    if(!doc.getElementById('ce-injected-styles')) {
+                        const style = doc.createElement('style');
+                        style.id = 'ce-injected-styles';
+                        style.textContent = `
+                            .ce-highlight { 
+                                outline: 3px solid #0d6efd !important; 
+                                cursor: pointer !important;
+                                box-shadow: 0 0 10px rgba(13, 110, 253, 0.5);
+                                z-index: 2147483647;
+                            }
+                            body { cursor: default; }
+                        `;
+                        doc.head.appendChild(style);
+                    }
+
+                    // Run analysis
+                    explorer.analyze(doc);
+
+                    // Attach Listener to Document (captures everything)
+                    doc.addEventListener('click', (e) => {
+                        if (!isInspectActive) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Visual Highlight
+                        const prev = doc.querySelector('.ce-highlight');
+                        if(prev) prev.classList.remove('ce-highlight');
+                        
+                        let target = e.target;
+                        if (target.tagName === 'HTML') target = doc.body;
+                        
+                        target.classList.add('ce-highlight');
+
+                        // Send to Explorer
+                        explorer.inspectElement(target);
+                    }, true);
+
+                    // Optional: Hover effect
+                     doc.addEventListener('mouseover', (e) => {
+                        if (!isInspectActive) return;
+                        e.stopPropagation();
+                        e.target.style.cursor = 'crosshair';
+                    }, true);
+
+                } catch (err) {
+                    console.warn("Vibe Code Explorer: Cannot access iframe content (likely cross-origin restriction).", err);
+                }
+            };
+
+            // 3. Toggle Logic
+            inspectBtn.addEventListener('click', () => {
+                isInspectActive = !isInspectActive;
+                
+                if (isInspectActive) {
+                    // Activate UI
+                    inspectBtn.classList.remove('btn-outline-info');
+                    inspectBtn.classList.add('btn-info');
+                    inspectBtn.innerHTML = '<i class="bi bi-bug-fill me-1"></i> Disable Inspect';
+                    resizer.style.display = 'flex';
+                    explorerPanel.classList.add('active');
+                    explorerPanel.style.height = '350px';
+
+                    // Attempt attachment immediately
+                    setupIframeInteraction(previewIframe);
+                } else {
+                    // Deactivate UI
+                    inspectBtn.classList.add('btn-outline-info');
+                    inspectBtn.classList.remove('btn-info');
+                    inspectBtn.innerHTML = '<i class="bi bi-bug me-1"></i> Enable Inspect';
+                    resizer.style.display = 'none';
+                    explorerPanel.classList.remove('active');
+                    explorerPanel.style.height = '0px';
+                    
+                    // Cleanup visual artifacts
+                    try {
+                        const doc = previewIframe.contentDocument;
+                        if(doc) {
+                            const prev = doc.querySelector('.ce-highlight');
+                            if(prev) prev.classList.remove('ce-highlight');
+                            doc.hasAttachedVibeInspect = false;
+                        }
+                    } catch(e) {}
+                }
+            });
+
+            // 4. Iframe Load Handler
+            previewIframe.addEventListener('load', () => {
+                if (isInspectActive) {
+                    setupIframeInteraction(previewIframe);
+                }
+            });
+
+            // 5. Resizer Logic
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                topPane.style.pointerEvents = 'none'; // Prevent iframe capturing mouse
+                document.body.style.cursor = 'row-resize';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                
+                const containerRect = document.querySelector('.preview-layout-wrapper').getBoundingClientRect();
+                const newHeight = containerRect.bottom - e.clientY;
+                
+                // Constraints
+                if (newHeight > 50 && newHeight < containerRect.height - 100) {
+                    explorerPanel.style.height = `${newHeight}px`;
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    topPane.style.pointerEvents = 'auto'; 
+                    document.body.style.cursor = 'default';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
