@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,8 +55,41 @@
             background: var(--merge-panel);
             border: 1px solid var(--merge-border);
             border-radius: 6px;
-            align-items: center;
+            align-items: flex-start;
             flex-shrink: 0;
+        }
+
+        .source-select-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 300px;
+        }
+
+        .source-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .source-divider {
+            color: #666;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .active-source-label {
+            font-size: 0.85em;
+            color: var(--merge-accent);
+            font-family: 'Roboto Mono', monospace;
+            padding: 4px 8px;
+            background: rgba(0, 122, 204, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(0, 122, 204, 0.3);
+            display: inline-block;
         }
 
         .merge-workspace {
@@ -65,7 +97,7 @@
             gap: 20px;
             flex: 1;
             min-height: 0;
-            overflow: hidden; /* Prevent spillover */
+            overflow: hidden; 
         }
 
         .merge-column {
@@ -179,6 +211,17 @@
             overflow-x: auto;
             padding: 10px 0;
             position: relative;
+        }
+
+        .code-pane-label {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(0,0,0,0.5);
+            color: #aaa;
+            font-size: 10px;
+            padding: 2px 6px;
+            pointer-events: none;
         }
 
         .original { background-color: #2d1818; border-right: 1px solid var(--merge-border); }
@@ -729,14 +772,27 @@
                             <div class="merge-container">
                                 <h2>Smart Code Merge</h2>
                                 <p>Paste AI-generated code snippets (JS/TS) to intelligently merge them into your existing project code.</p>
+                                
                                 <!-- Top Controls -->
                                 <div class="merge-controls">
-                                    <div class="file-upload-group d-flex align-items-center gap-3" style="flex: 1;">
-                                        <button id="loadFromEditorBtn" class="action-button" title="Load content from the Full Code tab">
-                                            <i class="bi bi-arrow-down-square"></i> Load from Full Code
-                                        </button>
-                                        <span id="loadedStatus" style="color: #888; font-style: italic;">No code loaded.</span>
+                                    <!-- Source Selection Area -->
+                                    <div class="source-select-group">
+                                        <label style="display:block; font-size:0.8em; margin-bottom:4px; color:#aaa;">1. Select Source Code (File OR Editor)</label>
+                                        <div class="source-buttons">
+                                            <div class="file-upload-wrapper">
+                                                <input type="file" id="mergeFileInput" accept=".js,.jsx,.ts,.tsx,.html" class="form-control form-control-sm" style="color:white; width: auto;">
+                                            </div>
+                                            <span class="source-divider">OR</span>
+                                            <button id="loadFromEditorBtn" class="action-button" title="Load content from the Full Code tab">
+                                                <i class="bi bi-arrow-down-square"></i> Load from Editor
+                                            </button>
+                                        </div>
+                                        <!-- Active Source Indicator -->
+                                        <div id="activeSourceLabel" class="active-source-label">
+                                            No source loaded
+                                        </div>
                                     </div>
+
                                     <div class="action-group">
                                         <button id="analyzeBtn" class="action-button primary" disabled>Analyze & Diff</button>
                                         <button id="applyToEditorBtn" class="action-button" style="background-color: var(--merge-success);" disabled>Apply to Editor</button>
@@ -746,16 +802,16 @@
                                 <div class="merge-workspace">
                                     <!-- Left: Input Area -->
                                     <div class="merge-column">
-                                        <h3>Paste AI Code Segment</h3>
+                                        <h3>2. Paste AI Code Segment</h3>
                                         <textarea id="aiInput" class="merge-textarea" placeholder="// Paste code here...&#10;function newFeature() {&#10;   // This can be edited later in the right panel&#10;}"></textarea>
                                     </div>
 
                                     <!-- Right: Interactive Diff -->
                                     <div class="merge-column">
-                                        <h3>Review, Edit & Merge</h3>
+                                        <h3>3. Review, Edit & Merge</h3>
                                         <div id="diffContainer" class="diff-list">
                                             <div style="text-align: center; color: #666; margin-top: 50px;">
-                                                Load code from editor and paste AI segment to begin...
+                                                Load source code and paste AI segment to begin...
                                             </div>
                                         </div>
                                     </div>
@@ -769,7 +825,8 @@
         </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals (Add/Edit Node, Settings, etc) remain unchanged... -->
+    <!-- (Retaining existing modal HTML structure for compatibility) -->
      <div id="add-node-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -998,7 +1055,7 @@
     <script type="module" src="app3.js"></script>
     <script src="automation.js"></script>
     
-    <!-- MERGE LOGIC SCRIPT (FIXED ESCAPING) -->
+    <!-- MERGE LOGIC SCRIPT -->
     <script>
         (function() {
             // --- STATE MANAGEMENT ---
@@ -1008,8 +1065,9 @@
             let globalSourceSegments = [];
 
             // --- DOM ELEMENTS ---
+            const fileInput = document.getElementById('mergeFileInput');
             const loadFromEditorBtn = document.getElementById('loadFromEditorBtn');
-            const loadedStatus = document.getElementById('loadedStatus');
+            const activeSourceLabel = document.getElementById('activeSourceLabel');
             const aiInput = document.getElementById('aiInput');
             const analyzeBtn = document.getElementById('analyzeBtn');
             const applyToEditorBtn = document.getElementById('applyToEditorBtn');
@@ -1017,30 +1075,51 @@
             const fullCodeEditor = document.getElementById('full-code-editor');
 
             // --- EVENT LISTENERS ---
-            // --- EVENT LISTENERS ---
             
-            // Define this globally so app3.js can call it when switching tabs
+            // 1. Load from File
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    rawOriginalSource = event.target.result;
+                    sourceCode = rawOriginalSource;
+                    
+                    activeSourceLabel.innerText = `Active: File '${file.name}'`;
+                    activeSourceLabel.style.color = 'var(--merge-accent)';
+                    activeSourceLabel.style.borderColor = 'var(--merge-accent)';
+                    
+                    checkReady();
+                };
+                reader.readAsText(file);
+            });
+
+            // 2. Load from Global Editor
             window.merge_loadFromGlobalEditor = function() {
                 const fullCodeEditor = document.getElementById('full-code-editor');
-                const loadedStatus = document.getElementById('loadedStatus');
-                
                 if (!fullCodeEditor) return;
 
                 const code = fullCodeEditor.value;
                 if (!code || code.trim() === "") {
-                    loadedStatus.innerText = "Error: Full Code editor is empty.";
-                    loadedStatus.style.color = "var(--merge-danger)";
+                    activeSourceLabel.innerText = "Error: Editor is empty";
+                    activeSourceLabel.style.color = "var(--merge-danger)";
                     return;
                 }
                 
                 rawOriginalSource = code;
                 sourceCode = code;
-                loadedStatus.innerText = "Auto-loaded from project.";
-                loadedStatus.style.color = "var(--merge-success)";
+                
+                // Clear file input if set
+                fileInput.value = '';
+                
+                activeSourceLabel.innerText = "Active: Editor Code";
+                activeSourceLabel.style.color = "var(--merge-success)";
+                activeSourceLabel.style.borderColor = "var(--merge-success)";
+                
                 checkReady();
             };
 
-            // Keep the button working by referencing the new global function
             loadFromEditorBtn.addEventListener('click', window.merge_loadFromGlobalEditor);
 
             aiInput.addEventListener('input', checkReady);
@@ -1060,10 +1139,9 @@
                 applyPatchesToSource(); 
                 // Apply to main editor
                 fullCodeEditor.value = sourceCode;
-                loadedStatus.innerText = "Changes applied to Full Code Editor!";
+                activeSourceLabel.innerText = "Changes applied to Full Code Editor!";
                 
                 // Switch tab back to code
-                // Try to find the tab button logic if available globally, otherwise manual DOM trigger
                 const codeTabBtn = document.querySelector('a[data-tab="code"]');
                 if(codeTabBtn) codeTabBtn.click();
             });
@@ -1082,17 +1160,21 @@
                 updateSegments.forEach((uSeg) => {
                     let bestMatch = null;
                     
-                    // 1. Explicit Name Match
+                    // 1. Explicit Name Match (Primary Logic for Replacement)
                     if (uSeg.name && uSeg.name !== "<HTML/CSS Block>") {
                         const match = globalSourceSegments.find((sSeg, idx) => 
                             !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
                         );
                         if (match) {
-                            bestMatch = { seg: match, reason: `Matched Name: "${uSeg.name}"`, index: globalSourceSegments.indexOf(match) };
+                            bestMatch = { 
+                                seg: match, 
+                                reason: `Found existing function: <strong>${uSeg.name}</strong>`, 
+                                index: globalSourceSegments.indexOf(match) 
+                            };
                         }
                     }
 
-                    // 2. Similarity Match
+                    // 2. Similarity Match (Fallback)
                     if (!bestMatch && uSeg.name !== "<HTML/CSS Block>") {
                         const match = globalSourceSegments.find((sSeg, idx) => {
                             if (matchedSourceIndices.has(idx) || sSeg.name === "<HTML/CSS Block>") return false;
@@ -1105,16 +1187,20 @@
 
                     if (bestMatch) {
                         matchedSourceIndices.add(bestMatch.index);
+                        // Even if content is same, we might want to show it, but typically only show diffs
                         if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
                             addPatchUI('replace', bestMatch.seg, uSeg, bestMatch.reason);
+                        } else {
+                            // Identical content? Maybe just log it or skip
+                            // For now, we skip exact duplicates
                         }
                     } else if (uSeg.name !== "<HTML/CSS Block>") {
-                        addPatchUI('insert', null, uSeg, "No matching block found");
+                        addPatchUI('insert', null, uSeg, "No matching function found");
                     }
                 });
 
                 if (proposedPatches.length === 0) {
-                    diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No relevant changes detected.</div>';
+                    diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No relevant changes or new functions detected.</div>';
                     applyToEditorBtn.disabled = true;
                 } else {
                     applyToEditorBtn.disabled = false;
@@ -1163,7 +1249,7 @@
                 // --- Generate Body ---
                 if (type === 'replace') {
                     headerLeftHtml = `
-                        <span class="diff-type type-replace">Replace Block</span>
+                        <span class="diff-type type-replace">Replace Function</span>
                         <span class="match-reason">${reason}</span>
                         <span id="status-${id}" class="status-badge status-pending">Pending</span>
                     `;
@@ -1171,10 +1257,12 @@
                     bodyHtml = `
                         <div class="code-compare-container">
                             <div class="code-pane original">
+                                <div class="code-pane-label">Original</div>
                                 <div class="line-numbers">${genLineNums(origSeg.content, origSeg.startLine)}</div>
                                 <div class="code-content">${escapeHtml(origSeg.content)}</div>
                             </div>
                             <div class="code-pane replacement">
+                                <div class="code-pane-label">New (Pasted)</div>
                                 <div class="line-numbers" id="ln-${id}">${genLineNums(newSeg.content, newSeg.startLine || 1)}</div>
                                 <div class="code-content" id="edit-${id}" contenteditable="true" spellcheck="false" oninput="window.merge_handleCodeEdit('${id}')">${escapeHtml(newSeg.content)}</div>
                             </div>
