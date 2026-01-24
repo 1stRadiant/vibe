@@ -29,6 +29,13 @@ const VIBE_JSON_LIBRARY = {
   "theme-switcher": { "id": "theme-switcher", "name": "Theme Switcher", "html": "...", "css": "...", "javascript": "..." }
 };
 
+const SESSION_KEYS = {
+    TAB: 'vibe_session_tab',
+    PROJECT_ID: 'vibe_session_project_id',
+    STORAGE_TYPE: 'vibe_session_storage_type',
+    GITHUB_SOURCE: 'vibe_session_github_source'
+}
+
 
 // --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
 (function() {
