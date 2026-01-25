@@ -6663,17 +6663,6 @@ console.log("Vibe Automation API exposed as window.vibeAPI");
 */
 
 
-function saveSessionMetadata() {
-    if (currentProjectId) {
-        localStorage.setItem(SESSION_KEYS.PROJECT_ID, currentProjectId);
-        localStorage.setItem(SESSION_KEYS.STORAGE_TYPE, currentProjectStorageType);
-        if (currentProjectGithubSource) {
-            localStorage.setItem(SESSION_KEYS.GITHUB_SOURCE, JSON.stringify(currentProjectGithubSource));
-        } else {
-            localStorage.removeItem(SESSION_KEYS.GITHUB_SOURCE);
-        }
-    }
-}
 
 async function clearSessionMetadata() {
     try {
