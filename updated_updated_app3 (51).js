@@ -2,6 +2,14 @@
 const startSel = document.getElementById('start-component-shorthand-select');
 const agentSel = document.getElementById('agent-component-shorthand-select');
 
+// --- UPDATED DATABASE CONFIGURATION & HELPER ---
+const DB_NAME = 'VibeLocalDB';
+const DB_VERSION = 2; // Increased version to create the new store
+const STORE_NAME = 'projects';
+const KV_STORE_NAME = 'appState'; // New store for session metadata
+
+let dbPromise = null;
+
 const VIBE_JSON_LIBRARY = {
   "responsive-navbar": { "id": "responsive-navbar", "name": "Responsive Navbar", "description": "A sleek, modern navigation bar.", "html": "<nav class=\"vibe-nav\">...</nav>", "css": ".vibe-nav{...}", "javascript": "..." },
   "mega-menu": { "id": "mega-menu", "name": "Mega Menu", "html": "...", "css": "...", "javascript": "" },
