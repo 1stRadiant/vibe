@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Code Merger & Editor (Gemini Integration)</title>
+    <style>
+        /* --- CSS VARIABLES & RESET --- */
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --border: #3c3c3c;
+            --text: #d4d4d4;
+            --accent: #007acc;
+            --success: #2ea043;
+            --danger: #f85149;
+            --highlight-bg: #1e3820; 
+            --highlight-border: #2ea043;
+            --editor-font-size: 13px;
+            --editor-line-height: 20px; 
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh; /* Fixed viewport height */
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent body scroll */
+        }
+
+        h3 { margin-top: 0; font-size: 1rem; color: #fff; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+            min-height: 0;
+        }
+
+        /* --- CONTROLS --- */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .file-upload-group { flex: 1; min-width: 200px; }
+        .action-group { display: flex; gap: 10px; }
+
+        /* --- WORKSPACE --- */
+        .workspace {
+            display: flex;
+            gap: 15px;
+            flex: 1;
+            min-height: 0; /* Crucial for flex nested scrolling */
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            height: 100%;
+            overflow: hidden; /* Ensure column doesn't spill over */
+        }
+
+        .col-1 { flex: 1; }
+        .col-2 { flex: 1; }
+        .col-3 { flex: 1.5; }
+
+        /* Header with Nav */
+        .col-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        select.nav-dropdown {
+            background: #2d2d2d;
+            color: white;
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            max-width: 250px;
+            cursor: pointer;
+        }
+
+        /* --- INPUT & GENERATION AREAS --- */
+        .ai-prompt-box {
+            background: #2d2d2d;
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ai-prompt-input {
+            width: 100%;
+            background: #111;
+            border: 1px solid #444;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            resize: none;
+            height: 60px;
+            font-family: inherit;
+        }
+
+        .ai-tools-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .api-key-indicator {
+            font-size: 0.8em;
+            color: #888;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .api-key-indicator.set { color: var(--success); text-decoration: none; }
+
+        /* --- SCROLLABLE AREAS --- */
+        textarea.code-area {
+            width: 100%;
+            flex: 1; 
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px; 
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: var(--editor-font-size);
+            line-height: var(--editor-line-height);
+            border-radius: 4px;
+            box-sizing: border-box;
+            white-space: pre;
+            overflow-y: auto; 
+            outline: none;
+            resize: none;
+        }
+
+        .editor-div {
+            width: 100%;
+            flex: 1; /* Fills remaining height of the column */
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px; 
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: var(--editor-font-size);
+            line-height: var(--editor-line-height);
+            border-radius: 4px;
+            box-sizing: border-box;
+            white-space: pre;
+            overflow-y: auto; /* Forces scrollbar when content is too long */
+            outline: none;
+            tab-size: 4;
+            position: relative;
+        }
+        
+        .merged-change {
+            background-color: var(--highlight-bg);
+            border-left: 2px solid var(--highlight-border);
+            display: inline-block;
+            width: 100%;
+        }
+        
+        /* Diff List Scroll Area */
+        .diff-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 5px;
+            padding-bottom: 20px;
+        }
+
+        /* --- DIFF CARD STYLING --- */
+        .diff-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .diff-header {
+            padding: 8px 12px;
+            background: #2d2d2d;
+            border-bottom: 1px solid var(--border);
+            border-radius: 6px 6px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .diff-type { font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
+        .type-replace { color: #faa356; }
+        .type-insert { color: #89d185; }
+
+        .diff-actions { display: flex; gap: 5px; margin-top: 5px; justify-content: flex-end; }
+        
+        .code-preview-sm {
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            background: #111;
+            max-height: 150px;
+            color: #aaa;
+        }
+
+        /* --- BUTTONS --- */
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            font-size: 12px;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; background-color: var(--border); }
+
+        .btn-primary { background-color: var(--accent); }
+        .btn-success { background-color: var(--success); }
+        .btn-secondary { background-color: var(--border); color: var(--text); }
+        .btn-magic { background: linear-gradient(45deg, #6b2cf5, #bc38d3); color: white; }
+        .btn-sm { padding: 4px 8px; font-size: 10px; }
+
+        .badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .bg-pending { background: #444; }
+        .bg-approved { background: var(--success); }
+        .bg-rejected { background: var(--border); text-decoration: line-through; opacity: 0.7; }
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+            visibility: hidden; opacity: 0;
+            transition: 0.2s;
+        }
+        .modal-overlay.active { visibility: visible; opacity: 1; }
+        
+        .modal-box {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal-input {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #111;
+            border: 1px solid #444;
+            color: white;
+            border-radius: 4px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 12px; height: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 5px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 1000px) {
+            body { height: auto; overflow: auto; }
+            .workspace { flex-direction: column; }
+            .column { height: 500px; }
+            .editor-div, textarea { flex: none; height: 400px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- API KEY MODAL -->
+    <div id="settingsModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="margin-bottom: 10px;">Gemini API Settings</h3>
+            <label style="font-size: 0.9em; color: #aaa;">Google Gemini API Key:</label>
+            <input type="password" id="apiKeyInput" class="modal-input" placeholder="AIzaSy...">
+            
+            <label style="font-size: 0.9em; color: #aaa;">Model Name:</label>
+            <input type="text" id="modelNameInput" class="modal-input" value="gemini-2.0-flash-exp" placeholder="gemini-2.0-flash-exp">
+            
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+                <button class="btn-primary" onclick="saveSettings()">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Top Controls -->
+        <div class="controls">
+            <div class="file-upload-group">
+                <label for="fileInput" style="display:block; font-size:0.8em; margin-bottom:4px; color:#aaa;">1. Load Source File</label>
+                <input type="file" id="fileInput" accept=".js,.jsx,.ts,.tsx,.html,.css,.py" style="color:white;">
+            </div>
+            <div class="action-group">
+                <button class="btn-secondary" onclick="openSettings()">⚙️ Settings</button>
+                <button id="analyzeBtn" class="btn-primary" disabled>Analyze & Merge</button>
+                <button id="downloadBtn" class="btn-success" disabled>Download Result</button>
+            </div>
+        </div>
+
+        <div class="workspace">
+            <!-- Left: Input Area -->
+            <div class="column col-1">
+                <div class="col-header"><h3>2. Generate or Paste Code</h3></div>
+                
+                <!-- AI Generation Box -->
+                <div class="ai-prompt-box">
+                    <textarea id="promptInput" class="ai-prompt-input" placeholder="Describe changes (e.g., 'Update the login function to check for empty passwords')..."></textarea>
+                    <div class="ai-tools-row">
+                        <span id="keyStatus" class="api-key-indicator" onclick="openSettings()">Key not set</span>
+                        <button id="generateBtn" class="btn-magic" onclick="generateCode()" disabled>
+                            Generate with AI
+                        </button>
+                    </div>
+                </div>
+
+                <textarea id="aiInput" class="code-area" placeholder="// Code will appear here after generation, or paste manually..."></textarea>
+            </div>
+
+            <!-- Middle: Change List -->
+            <div class="column col-2">
+                <div class="col-header"><h3>3. Select Changes</h3></div>
+                <div id="diffContainer" class="diff-list">
+                    <div style="text-align: center; color: #666; margin-top: 50px; font-size: 0.9em;">
+                        Pending analysis...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Full Editor -->
+            <div class="column col-3">
+                <div class="col-header">
+                    <h3>4. Final Code</h3>
+                    <!-- NAVIGATION DROPDOWN -->
+                    <select id="codeNavigator" class="nav-dropdown" disabled>
+                        <option value="">Jump to function...</option>
+                    </select>
+                </div>
+                
+                <!-- This Div now handles its own scrolling -->
+                <div id="fullEditor" class="editor-div" contenteditable="true" spellcheck="false">
+                    // Load a file to begin...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        let rawOriginalSource = ""; 
+        let sourceFilename = "updated_script.js";
+        let proposedPatches = []; 
+        let globalSourceSegments = [];
+        let geminiApiKey = "";
+        let geminiModel = "gemini-2.0-flash-exp"; 
+
+        // --- DOM ELEMENTS ---
+        const fileInput = document.getElementById('fileInput');
+        const aiInput = document.getElementById('aiInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const diffContainer = document.getElementById('diffContainer');
+        const fullEditor = document.getElementById('fullEditor');
+        const codeNavigator = document.getElementById('codeNavigator');
+        
+        // AI Elements
+        const promptInput = document.getElementById('promptInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const modelNameInput = document.getElementById('modelNameInput');
+        const keyStatus = document.getElementById('keyStatus');
+
+        // --- EVENT LISTENERS ---
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            sourceFilename = file.name;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                rawOriginalSource = event.target.result;
+                fullEditor.innerText = rawOriginalSource;
+                checkReady();
+                refreshNavigator(); // Populate nav with original file
+            };
+            reader.readAsText(file);
+        });
+
+        aiInput.addEventListener('input', checkReady);
+        
+        // Enable generate button only if file loaded and key set
+        promptInput.addEventListener('input', checkGenerateReady);
+
+        // --- MODAL FUNCTIONS ---
+        function openSettings() {
+            apiKeyInput.value = geminiApiKey;
+            modelNameInput.value = geminiModel;
+            settingsModal.classList.add('active');
+        }
+
+        function closeSettings() {
+            settingsModal.classList.remove('active');
+        }
+
+        function saveSettings() {
+            const key = apiKeyInput.value.trim();
+            const model = modelNameInput.value.trim();
+            if(key) {
+                geminiApiKey = key;
+                geminiModel = model || "gemini-2.0-flash-exp";
+                keyStatus.innerText = "API Key Set ✓";
+                keyStatus.classList.add('set');
+                closeSettings();
+                checkGenerateReady();
+            } else {
+                alert("Please enter a valid API Key");
+            }
+        }
+
+        function checkGenerateReady() {
+            const hasSource = rawOriginalSource.length > 0;
+            const hasKey = geminiApiKey.length > 0;
+            const hasPrompt = promptInput.value.trim().length > 0;
+            generateBtn.disabled = !(hasSource && hasKey && hasPrompt);
+        }
+
+        // --- GEMINI API INTEGRATION ---
+        async function generateCode() {
+            if(!rawOriginalSource || !geminiApiKey) return;
+
+            const userInstruction = promptInput.value;
+            const btnOriginalText = generateBtn.innerHTML;
+            
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner"></span> Generating...';
+
+            try {
+                const systemPrompt = `
+You are an expert coding assistant used in a code merging tool.
+Your task is to take the provided Source Code and the User Instruction, and generate the *modified* code blocks.
+
+CRITICAL RULES:
+1. Return ONLY the functions, classes, or code blocks that need to change.
+2. Return the COMPLETE content of the modified function/block (not just a diff).
+3. If creating a new function, return the whole new function.
+4. Do NOT return the entire file unless specifically asked to rewrite everything.
+5. Do NOT use markdown code fences (like \`\`\`javascript). Just return raw text if possible, or I will strip them.
+6. The output will be parsed to find function signatures to merge with the original.
+`;
+
+                const userContent = `
+SOURCE CODE:
+${rawOriginalSource}
+
+USER INSTRUCTION:
+${userInstruction}
+`;
+
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+                
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: systemPrompt + "\n\n" + userContent }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.2,
+                        maxOutputTokens: 8192
+                    }
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if(!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if(data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+                    let generatedText = data.candidates[0].content.parts[0].text;
+                    
+                    // Clean up markdown code blocks if the model ignored instructions
+                    generatedText = generatedText.replace(/^```[a-z]*\n/gm, '').replace(/```$/gm, '');
+                    
+                    aiInput.value = generatedText.trim();
+                    checkReady(); // Enable Analyze button
+                    
+                    // Auto-trigger analysis for better UX
+                    setTimeout(() => {
+                        performAnalysis(rawOriginalSource, aiInput.value);
+                    }, 500);
+                } else {
+                    throw new Error("Invalid response format from Gemini");
+                }
+
+            } catch (err) {
+                alert("Generation Failed: " + err.message);
+                console.error(err);
+            } finally {
+                generateBtn.innerHTML = btnOriginalText;
+                checkGenerateReady();
+            }
+        }
+
+
+        // --- EXISTING LOGIC BELOW (Scrolling, Analysis, etc.) ---
+
+        // Since .editor-div now has overflow-y:auto, we scroll IT, not the window.
+        codeNavigator.addEventListener('change', (e) => {
+            const index = parseInt(e.target.value);
+            if (isNaN(index)) return;
+            
+            scrollToByteIndex(fullEditor, index);
+        });
+
+        function scrollToByteIndex(container, targetIndex) {
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+            let charCount = 0;
+            let node;
+            
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                if (charCount + nodeLength > targetIndex) {
+                    const offset = targetIndex - charCount;
+                    try {
+                        const range = document.createRange();
+                        range.setStart(node, offset);
+                        range.setEnd(node, Math.min(offset + 1, nodeLength)); 
+                        const rect = range.getBoundingClientRect();
+                        const containerRect = container.getBoundingClientRect();
+                        const relativeTop = rect.top - containerRect.top;
+                        container.scrollTop = container.scrollTop + relativeTop - 50;
+                    } catch(err) { console.error("Scroll error", err); }
+                    return; 
+                }
+                charCount += nodeLength;
+            }
+        }
+
+        function checkReady() {
+            if (rawOriginalSource && aiInput.value.trim().length > 0) {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        analyzeBtn.addEventListener('click', () => {
+            const updateCode = aiInput.value;
+            performAnalysis(rawOriginalSource, updateCode);
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const finalText = fullEditor.innerText; 
+            downloadString(finalText, "updated_" + sourceFilename);
+        });
+
+        // --- ANALYSIS LOGIC ---
+
+        function performAnalysis(source, update) {
+            globalSourceSegments = robustParser(source); 
+            const updateSegments = robustParser(update);
+            
+            proposedPatches = [];
+            diffContainer.innerHTML = '';
+            const matchedSourceIndices = new Set();
+
+            updateSegments.forEach((uSeg) => {
+                let bestMatch = null;
+                
+                if (uSeg.name) {
+                    const match = globalSourceSegments.find((sSeg, idx) => 
+                        !matchedSourceIndices.has(idx) && sSeg.name === uSeg.name
+                    );
+                    if (match) bestMatch = { seg: match, reason: `Match: ${uSeg.name}`, index: globalSourceSegments.indexOf(match) };
+                }
+
+                if (!bestMatch && uSeg.name) {
+                     const match = globalSourceSegments.find((sSeg, idx) => 
+                        !matchedSourceIndices.has(idx) && sSeg.name && sSeg.name.toLowerCase() === uSeg.name.toLowerCase()
+                    );
+                    if (match) bestMatch = { seg: match, reason: `~Match: ${uSeg.name}`, index: globalSourceSegments.indexOf(match) };
+                }
+
+                if (!bestMatch) {
+                    const uSigNorm = cleanSignature(uSeg.signature);
+                    const match = globalSourceSegments.find((sSeg, idx) => {
+                        if (matchedSourceIndices.has(idx)) return false;
+                        const sSigNorm = cleanSignature(sSeg.signature);
+                        return similarity(uSigNorm, sSigNorm) > 0.95; 
+                    });
+                    if (match) bestMatch = { seg: match, reason: "Signature Match", index: globalSourceSegments.indexOf(match) };
+                }
+
+                if (bestMatch) {
+                    matchedSourceIndices.add(bestMatch.index);
+                    if (cleanContent(bestMatch.seg.content) !== cleanContent(uSeg.content)) {
+                        createPatch('replace', bestMatch.seg, uSeg, bestMatch.reason);
+                    }
+                } else {
+                    createPatch('insert', null, uSeg, "New Block");
+                }
+            });
+
+            if (proposedPatches.length === 0) {
+                diffContainer.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No changes detected or AI snippet format issue.</div>';
+            } else {
+                renderDiffList();
+                updateFullEditorPreview(); 
+                downloadBtn.disabled = false;
+            }
+        }
+
+        function createPatch(type, origSeg, newSeg, reason) {
+            const id = Date.now() + Math.random().toString();
+            proposedPatches.push({ 
+                id, type, original: origSeg, new: newSeg, reason, status: 'approved', insertLocation: 'bottom'
+            });
+        }
+
+        // --- UI RENDERING ---
+
+        function renderDiffList() {
+            diffContainer.innerHTML = '';
+            proposedPatches.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'diff-card';
+                card.style.borderColor = p.status === 'approved' ? 'var(--success)' : 'var(--border)';
+                card.style.opacity = p.status === 'rejected' ? '0.6' : '1';
+
+                const typeLabel = p.type === 'replace' ? `<span class="diff-type type-replace">Replace</span>` : `<span class="diff-type type-insert">Insert</span>`;
+                const badge = `<span class="badge ${p.status === 'approved' ? 'bg-approved' : 'bg-rejected'}">${p.status}</span>`;
+
+                let locationHtml = '';
+                if(p.type === 'insert') {
+                    locationHtml = `
+                        <div style="margin-top:5px; font-size:11px; color:#888;">
+                            Loc: <select id="loc-${p.id}" onchange="updatePatchLoc('${p.id}', this.value)" style="background:#222; color:#ddd; border:1px solid #444;">
+                                <option value="bottom" ${p.insertLocation === 'bottom' ? 'selected' : ''}>Bottom</option>
+                                <option value="top" ${p.insertLocation === 'top' ? 'selected' : ''}>Top</option>
+                            </select>
+                        </div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="diff-header">
+                        <div>${typeLabel} <span style="font-size:0.8em; margin-left:5px;">${p.reason}</span></div>
+                        ${badge}
+                    </div>
+                    <div class="code-preview-sm">${escapeHtml(p.new.content.substring(0, 150))}...</div>
+                    <div style="padding:8px; border-top:1px solid #333;">
+                        <div class="diff-actions">
+                            <button class="btn-sm btn-success" onclick="changeStatus('${p.id}', 'approved')">Apply</button>
+                            <button class="btn-sm btn-secondary" onclick="changeStatus('${p.id}', 'rejected')">Ignore</button>
+                        </div>
+                        ${locationHtml}
+                    </div>
+                `;
+                diffContainer.appendChild(card);
+            });
+        }
+
+        window.changeStatus = function(id, status) {
+            const patch = proposedPatches.find(p => p.id === id);
+            if(patch) {
+                patch.status = status;
+                renderDiffList();
+                updateFullEditorPreview(); 
+            }
+        }
+
+        window.updatePatchLoc = function(id, val) {
+            const patch = proposedPatches.find(p => p.id === id);
+            if(patch) {
+                patch.insertLocation = val;
+                updateFullEditorPreview();
+            }
+        }
+
+        // --- FULL EDITOR & NAVIGATOR ---
+
+        function updateFullEditorPreview() {
+            const activePatches = proposedPatches.filter(p => p.status === 'approved');
+            let operations = [];
+
+            activePatches.forEach(p => {
+                let content = p.new.content;
+                const htmlContent = `<span class="merged-change" title="${p.type}">${escapeHtml(content)}</span>`;
+
+                if(p.type === 'replace') {
+                    operations.push({ start: p.original.startIndex, end: p.original.endIndex, content: htmlContent, type: 'replace' });
+                } else {
+                    let index = rawOriginalSource.length;
+                    if(p.insertLocation === 'top') index = 0;
+                    operations.push({ start: index, end: index, content: "\n" + htmlContent + "\n", type: 'insert' });
+                }
+            });
+
+            // Rebuild string (with HTML)
+            let finalHTML = "";
+            let cursor = 0;
+            operations.sort((a, b) => a.start - b.start); 
+
+            operations.forEach(op => {
+                let preText = rawOriginalSource.substring(cursor, op.start);
+                finalHTML += escapeHtml(preText);
+                finalHTML += op.content;
+                cursor = op.end;
+            });
+            finalHTML += escapeHtml(rawOriginalSource.substring(cursor));
+
+            fullEditor.innerHTML = finalHTML;
+            refreshNavigator(); 
+        }
+
+        function refreshNavigator() {
+            const currentCode = fullEditor.innerText;
+            const segments = robustParser(currentCode);
+            
+            codeNavigator.innerHTML = '<option value="">Jump to function...</option>';
+            codeNavigator.disabled = false;
+
+            segments.forEach(seg => {
+                if(seg.name) {
+                    const opt = document.createElement('option');
+                    opt.value = seg.startIndex;
+                    opt.innerText = seg.name;
+                    codeNavigator.appendChild(opt);
+                }
+            });
+
+            if(segments.length === 0) {
+                 codeNavigator.innerHTML = '<option>No functions found</option>';
+                 codeNavigator.disabled = true;
+            }
+        }
+
+        // --- PARSER ---
+        function robustParser(code) {
+            const segments = [];
+            const len = code.length;
+            let i = 0;
+            let braceDepth = 0;
+            let inString = null; 
+            let inComment = null; 
+            let blockStartIndex = -1;
+            let potentialStart = 0; 
+            
+            while (i < len) {
+                const char = code[i];
+                const nextChar = code[i+1] || '';
+
+                if (inComment) {
+                    if (inComment === 'line' && char === '\n') inComment = null;
+                    else if (inComment === 'block' && char === '*' && nextChar === '/') { inComment = null; i++; }
+                } else if (inString) {
+                    if (char === '\\') i++;
+                    else if (char === inString) inString = null;
+                } else {
+                    if (char === '/' && nextChar === '/') { inComment = 'line'; i++; }
+                    else if (char === '/' && nextChar === '*') { inComment = 'block'; i++; }
+                    else if (char === '"' || char === "'" || char === '`') inString = char;
+                    else if (char === '{') {
+                        if (braceDepth === 0) blockStartIndex = potentialStart;
+                        braceDepth++;
+                    } else if (char === '}') {
+                        braceDepth--;
+                        if (braceDepth === 0 && blockStartIndex !== -1) {
+                            const fullContent = code.substring(blockStartIndex, i + 1);
+                            const trimmed = fullContent.trimStart(); 
+                            const offset = fullContent.length - trimmed.length;
+                            const realStart = blockStartIndex + offset;
+                            
+                            segments.push({
+                                name: extractName(trimmed),
+                                signature: trimmed.split('{')[0].trim(),
+                                content: trimmed,
+                                startIndex: realStart,
+                                endIndex: i + 1
+                            });
+                            blockStartIndex = -1;
+                            potentialStart = i + 1;
+                        } else if (braceDepth < 0) braceDepth = 0;
+                    } else if (char === ';') {
+                         if (braceDepth === 0) potentialStart = i + 1;
+                    } 
+                }
+                i++;
+            }
+            return segments;
+        }
+
+        // --- UTILS ---
+        function extractName(str) {
+            let m = str.match(/(?:function|class|const|let|var)\s+(?:[\w$]+\s+)?([a-zA-Z0-9_$]+)/);
+            m = str.match(/(?:function|class)\s+\*?\s*([a-zA-Z0-9_$]+)/);
+            if(m) return m[1];
+            m = str.match(/(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/);
+            if(m) return m[1];
+            return null;
+        }
+
+        function cleanSignature(str) { return str.replace(/\s+/g, ''); }
+        function cleanContent(str) { return str.replace(/\s+/g, '').trim(); }
+        function escapeHtml(text) { if(!text) return ""; return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        function downloadString(text, filename) {
+            var blob = new Blob([text], { type: 'text/javascript' });
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+        function similarity(s1, s2) {
+            let longer = s1, shorter = s2;
+            if (s1.length < s2.length) { longer = s2; shorter = s1; }
+            if (longer.length == 0) return 1.0;
+            return (longer.length - editDistance(longer, shorter)) / parseFloat(longer.length);
+        }
+        function editDistance(s1, s2) {
+            s1 = s1.toLowerCase(); s2 = s2.toLowerCase();
+            const costs = new Array();
+            for (let i = 0; i <= s1.length; i++) {
+                let lastValue = i;
+                for (let j = 0; j <= s2.length; j++) {
+                    if (i == 0) costs[j] = j;
+                    else {
+                        if (j > 0) {
+                            let newValue = costs[j - 1];
+                            if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                                newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                            costs[j - 1] = lastValue;
+                            lastValue = newValue;
+                        }
+                    }
+                }
+                if (i > 0) costs[s2.length] = lastValue;
+            }
+            return costs[s2.length];
+        }
+    </script>
+</body>
+</html>
