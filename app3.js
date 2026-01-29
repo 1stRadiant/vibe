@@ -2867,67 +2867,7 @@ function rewriteCssUrls(cssText, resolverCb) {
 }
 
 
-async function handleZipUpload() {
-    const file = zipFileInput.files && zipFileInput.files[0];
-    if (!file) {
-        alert("Please select a ZIP file to upload.");
-        return;
-    }
-    console.log(`ZIP selected: ${file.name}`);
 
-    const originalText = uploadZipButton.innerHTML;
-    uploadZipButton.disabled = true;
-    uploadZipButton.innerHTML = 'Processing ZIP... <div class="loading-spinner"></div>';
-
-    try {
-        if (!window.JSZip) throw new Error('JSZip library failed to load.');
-
-        const jszip = await JSZip.loadAsync(file);
-        const htmlCandidates = Object.keys(jszip.files).filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
-        if (htmlCandidates.length === 0) throw new Error('No index.html found in ZIP.');
-        htmlCandidates.sort((a, b) => a.split('/').length - b.split('/').length);
-        const indexPath = htmlCandidates[0];
-        console.log(`Using entry point: ${indexPath}`);
-
-        const { combinedHtml } = await buildCombinedHtmlFromZip(jszip, indexPath);
-
-        const derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-        let projectId = derivedId || `zip-project-${Date.now()}`;
-        
-        currentProjectStorageType = 'local';
-        const existing = await localApi.listProjects();
-        let suffix = 1;
-        while (existing.includes(projectId)) {
-            projectId = `${derivedId}-${suffix++}`;
-        }
-        currentProjectId = projectId;
-        
-        updateSaveButtonStates();
-        if(shareProjectButton) shareProjectButton.disabled = true;
-        if(openAiStructureModalButton) openAiStructureModalButton.disabled = true;
-
-        vibeTree = {
-            id: `raw-${currentProjectId}`,
-            type: 'raw-html-container',
-            description: `Raw project uploaded from ZIP file: ${file.name}`,
-            code: combinedHtml,
-            children: []
-        };
-
-        autoSaveProject();
-        resetHistory();
-        refreshAllUI();
-        switchToTab('preview');
-        console.log(`Raw ZIP project '${currentProjectId}' imported locally and is ready for preview and debugging.`);
-
-    } catch (e) {
-        console.error('ZIP import failed:', e);
-        alert(`Failed to import ZIP: ${e.message}`);
-    } finally {
-        uploadZipButton.disabled = false;
-        uploadZipButton.innerHTML = originalText;
-    }
-}
 
 function buildHtmlBodyFromTree(tree = vibeTree) {
     const buildHtmlRecursive = (nodes) => {
