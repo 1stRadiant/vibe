@@ -4749,8 +4749,9 @@ function initializeMermaid() {
 }
 
 const DB_NAME = 'VibeLocalDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // UPDATED: Incremented to trigger onupgradeneeded
 const STORE_NAME = 'projects';
+const KV_STORE_NAME = 'appState'; // FIXED: Defined this missing variable
 let dbPromise = null;
 
 function getDb() {
