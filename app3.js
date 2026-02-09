@@ -6920,7 +6920,6 @@ async function handleZipUpload() {
     }
 }
 
-<script>
 function setCanvasSize(size) {
     const canvas = document.getElementById('no-code-canvas');
     canvas.style.width = size;
@@ -6957,7 +6956,7 @@ function refreshNoCodeCanvas() {
 
     // Standard communication script used in preview, but we force inspection ON
     const commsScriptText = `
-    <script>
+    
     (function(){
         let hoverEl = null;
         const inspectorStyles = \`.__vibe-inspect-highlight-hover{outline:2px solid #61afef !important;outline-offset:2px !important;cursor:pointer}\`;
