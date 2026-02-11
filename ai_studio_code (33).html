@@ -1,0 +1,947 @@
+--- START OF FILE bundle.html ---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Code Merger Pro (Safe Tag Escaping)</title>
+    <style>/* --- CSS VARIABLES --- */
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --header: #333333;
+            --border: #3c3c3c;
+            --text: #d4d4d4;
+            --accent: #007acc;
+            --accent-glow: rgba(0, 122, 204, 0.4);
+            --success: #2ea043;
+            --danger: #f85149;
+            --warning: #faa356;
+            --overlay: rgba(0, 0, 0, 0.7);
+            --ai-gradient: linear-gradient(135deg, #007acc 0%, #764ba2 100%);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        .app-header {
+            background: var(--header);
+            border-bottom: 1px solid var(--border);
+            padding: 0 15px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex: 0 0 50px;
+            z-index: 100;
+            position: relative;
+        }
+
+        .header-title { font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+        .api-status { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; background: #444; color: #aaa; display: flex; align-items: center; gap: 6px; }
+        .api-status.ready { background: var(--success); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .model-badge { background: rgba(0,0,0,0.2); padding: 0 4px; border-radius: 2px; font-weight: bold; }
+        
+        /* --- TABS NAV & MENU --- */
+        .tabs-nav {
+            background: var(--panel);
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            flex: 0 0 41px;
+            z-index: 90;
+            padding-right: 10px;
+        }
+
+        .tabs-list { display: flex; height: 100%; flex: 1; }
+
+        .tab-btn {
+            background: var(--panel); color: #888; border: none;
+            border-right: 1px solid var(--border); padding: 0 20px;
+            cursor: pointer; font-weight: 600; outline: none;
+            height: 100%; display: flex; align-items: center;
+            transition: background 0.2s, color 0.2s;
+            position: relative;
+        }
+        .tab-btn:hover { background: #333; color: #fff; }
+        .tab-btn.active {
+            background: var(--bg);
+            color: var(--accent);
+        }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 -2px 8px var(--accent-glow);
+        }
+
+        .menu-wrapper { position: relative; margin-left: auto; }
+        
+        .icon-btn {
+            background: transparent; border: none; color: var(--text);
+            font-size: 1.5rem; cursor: pointer; padding: 5px 10px;
+            border-radius: 4px; line-height: 1;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.1); }
+
+        .dropdown-menu {
+            position: absolute; top: 100%; right: 0; width: 220px;
+            background: #252526; border: 1px solid var(--border);
+            border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: none; z-index: 1000; flex-direction: column;
+            padding: 5px 0; margin-top: 5px;
+        }
+        .dropdown-menu.show { display: flex; }
+
+        .menu-item {
+            padding: 10px 15px; text-align: left; background: none;
+            border: none; color: var(--text); cursor: pointer;
+            font-size: 0.9rem; display: flex; align-items: center;
+            gap: 10px; width: 100%;
+        }
+        .menu-item:hover { background: var(--accent); color: white; }
+        .menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* --- WORKSPACE --- */
+        .tab-content-container { 
+            flex: 1; position: relative; overflow: hidden; 
+            display: flex; flex-direction: column; min-height: 0; 
+        }
+
+        .tab-pane { 
+            display: none; flex: 1; flex-direction: column; 
+            height: 100%; min-height: 0; overflow: hidden; 
+        }
+        .tab-pane.active { display: flex; }
+
+        .editor-toolbar {
+            padding: 8px 15px; background: #252526; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; flex: 0 0 auto; 
+        }
+        .editor-container { flex: 1; position: relative; overflow: hidden; }
+        
+        textarea.code-editor {
+            width: 100%; height: 100%; background: var(--bg); color: #d4d4d4;
+            border: none; padding: 20px; font-family: 'Fira Code', 'Courier New', monospace; font-size: 14px;
+            resize: none; outline: none; box-sizing: border-box; line-height: 1.5;
+        }
+
+        /* --- BUTTONS --- */
+        .btn {
+            padding: 6px 14px; border: none; border-radius: 4px; 
+            cursor: pointer; color: white; font-weight: 600; 
+            font-size: 12px; transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary { background: var(--accent); }
+        .btn-success { background: var(--success); }
+        .btn-secondary { background: #444; }
+
+        .btn-ai {
+            background: var(--ai-gradient);
+            box-shadow: 0 0 15px rgba(0, 122, 204, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- DIFF STYLING --- */
+        .diff-workspace { 
+            flex: 1; overflow-y: auto; padding: 20px; 
+            background: #181818; min-height: 0; 
+        }
+        
+        .diff-card { 
+            background: var(--panel); border: 1px solid var(--border); 
+            margin-bottom: 15px; border-radius: 4px; transition: opacity 0.2s;
+        }
+        .diff-card.ignored { opacity: 0.5; border-color: #444; }
+        .diff-card.approved { border-color: var(--success); }
+
+        .diff-header { 
+            padding: 10px 12px; background: #2d2d2d; 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
+
+        .status-badge {
+            padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: bold;
+            text-transform: uppercase; display: none; 
+        }
+        .status-badge.visible { display: inline-block; }
+        .badge-replace { background: var(--warning); color: #000; }
+        .badge-insert { background: #89d185; color: #000; }
+        .badge-ignored { background: #666; color: #fff; }
+        .badge-ai-suggested { background: #007acc; color: white; border: 1px solid white; }
+        .badge-loc { background: #9c27b0; color: white; }
+
+        .code-compare { display: grid; grid-template-columns: 1fr 1fr; font-size: 12px; font-family: monospace; }
+        .code-compare.insert-mode { grid-template-columns: 1fr; }
+        
+        .code-pane { 
+            padding: 10px; white-space: pre-wrap; word-break: break-all; 
+            min-height: 40px; border: 1px solid #111; overflow-x: hidden;
+        }
+        .original { background: #2d1818; border-right: 1px solid #444; color: #ffb8b8; }
+        .replacement { background: #122615; color: #b8ffbd; }
+
+        .placement-control { 
+            padding: 8px 12px; background: #222; border-top: 1px solid #3c3c3c; 
+            display: flex; gap: 10px; align-items: center; 
+        }
+        .placement-select {
+            background: #333; color: #ddd; border: 1px solid #444; 
+            font-size: 11px; padding: 2px 6px; border-radius: 2px;
+        }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--overlay); z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: #252526; border: 1px solid var(--border);
+            border-radius: 6px; width: 500px; max-width: 90%;
+            padding: 25px; display: flex; flex-direction: column; gap: 15px;
+        }
+
+        .modal-field-group { display: flex; flex-direction: column; gap: 8px; }
+        .modal-input {
+            width: 100%; padding: 10px; background: #1e1e1e;
+            border: 1px solid var(--border); color: white;
+            border-radius: 4px; box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+
+        .badge-lang-select {
+            font-size: 10px;
+            background: #444;
+            color: #eee;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 1px 4px;
+            cursor: pointer;
+            outline: none;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .badge-lang-select:hover { background: #555; }
+        .badge-lang-select option { background: #252526; color: #d4d4d4; }</style>
+</head>
+<body>
+<div data-vibe-node-id="html-div-section-0" class="app-header" id="div-section-0">
+        <div class="header-title">
+            AI Code Merger Pro <small style="color:var(--accent); font-size:0.7rem; margin-left:5px;">GRANULAR PLACEMENT v5.0 (SAFE ESCAPE)</small>
+            <span id="apiKeyStatus" class="api-status">API Key Required</span>
+        </div>
+    </div>
+<div data-vibe-node-id="html-div-section-1" class="tabs-nav" id="div-section-1">
+        <div class="tabs-list">
+            <button class="tab-btn active" onclick="switchTab('tab-source')">1. Source Code</button>
+            <button class="tab-btn" onclick="switchTab('tab-input')">2. Proposed Changes</button>
+            <button class="tab-btn" onclick="switchTab('tab-review')">3. Review &amp; Merge</button>
+        </div>
+
+        <div class="menu-wrapper">
+            <button class="icon-btn" id="menuToggleBtn" title="Options">⋮</button>
+            <div id="mainMenu" class="dropdown-menu">
+                <button class="menu-item" id="apiKeyMenuBtn">⚙️ AI &amp; Model Settings</button>
+                <button id="menuDownloadBtn" class="menu-item" disabled="">⬇️ Download Source</button>
+            </div>
+        </div>
+    </div>
+<div data-vibe-node-id="html-div-section-2" class="tab-content-container" id="div-section-2">
+        <div id="tab-source" class="tab-pane active">
+            <div class="editor-toolbar">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>Current Content</span>
+                    <select id="blockNavigator" style="background:#333; color:white; border:none; padding:4px; border-radius:3px;">
+                        <option value="">Jump to block...</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-secondary" id="loadFileBtn">📂 Load</button>
+                    <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.js,.css">
+                </div>
+            </div>
+            <div class="editor-container">
+                <textarea id="sourceEditor" class="code-editor" placeholder="// Paste existing code here..."></textarea>
+            </div>
+        </div>
+
+        <div id="tab-input" class="tab-pane">
+            <div class="editor-toolbar">
+                <span>Proposed Blocks</span>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-ai" id="openPromptBtn">✨ Generate</button>
+                    <button id="analyzeBtn" class="btn btn-primary" disabled="">Analyze &amp; Diff →</button>
+                </div>
+            </div>
+            <div class="editor-container">
+                <textarea id="aiInput" class="code-editor" placeholder="// Paste new code blocks wrapped in {{ }} delimiters..."></textarea>
+            </div>
+        </div>
+
+        <div id="tab-review" class="tab-pane">
+            <div class="editor-toolbar">
+                <span>Review &amp; Placement</span>
+                <div style="display:flex; gap:10px;">
+                    <button id="applyBtn" class="btn btn-success" disabled="">Apply Approved Changes</button>
+                </div>
+            </div>
+            <div id="diffContainer" class="diff-workspace">
+                <p style="text-align: center; color: #555; margin-top: 60px;">No analysis performed yet.</p>
+            </div>
+        </div>
+    </div>
+<div data-vibe-node-id="html-apiKeyModal" id="apiKeyModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>AI Settings</h3>
+            <div class="modal-field-group">
+                <label>Gemini API Key</label>
+                <input type="password" id="apiKeyInput" class="modal-input" placeholder="AIza...">
+            </div>
+            <div class="modal-field-group">
+                <label>Model Name</label>
+                <input type="text" id="modelNameInput" class="modal-input" placeholder="gemini-1.5-flash">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeApiKeyModal">Cancel</button>
+                <button class="btn btn-success" id="saveApiKeyBtn">Save</button>
+            </div>
+        </div>
+    </div>
+<div data-vibe-node-id="html-promptModal" id="promptModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Smart Generation</h3>
+            <p style="font-size: 0.8rem; color: #888; margin: 0;">Describe your change. The AI will output code blocks wrapped in {{ }} for separation.</p>
+            <textarea id="aiPromptInput" class="modal-input" style="height:120px;" placeholder="e.g. Add a red button after the login form..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closePromptModal">Cancel</button>
+                <button id="generateBtn" class="btn btn-ai">Generate</button>
+            </div>
+        </div>
+    </div>
+<div data-vibe-node-id="html-statusModal" id="statusModal" class="modal-overlay">
+        <div class="modal-box" style="width: 400px; text-align: center;">
+            <h3 id="statusTitle">Notification</h3>
+            <p id="statusMessage"></p>
+            <button class="btn btn-primary" id="closeStatusModal" style="margin: 0 auto;">OK</button>
+        </div>
+    </div>
+    <script>
+/* --- Vibe Database Connector --- */
+(function() {
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx5p0NpHuIfVUuziW4VkqwTJERjAMpgIdKz0yCO4vVkFt38FerGObaxQQxqPJ2h8RB1yA/exec';
+    const USER_ID = 'user-e4a3399d-d41c-423f-9f0d-05603a1b4e4b';
+    const PROJECT_ID = 'aistudiocode-21';
+    const CHUNK_SIZE = 1500;
+
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT') || !USER_ID || !PROJECT_ID) {
+        window.vibe = { loadData: () => Promise.resolve([]) };
+        return;
+    }
+
+    const getFormDbId = (formId) => `${PROJECT_ID}__form__${formId}`;
+
+    function jsonpRequest(action, params = {}) {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'vibe_jsonp_callback_' + Math.round(100000 * Math.random());
+            const script = document.createElement('script');
+            let url = `${APPS_SCRIPT_URL}?action=${action}&callback=${callbackName}`;
+            for (const key in params) {
+                url += `&${key}=${encodeURIComponent(params[key])}`;
+            }
+            script.src = url;
+            window[callbackName] = (data) => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                if (data.status === 'success') resolve(data.data);
+                else reject(new Error(data.message || 'API Error'));
+            };
+            script.onerror = () => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                reject(new Error('API request failed.'));
+            };
+            document.body.appendChild(script);
+        });
+    }
+    
+    function decompressData(dataString) {
+        const binaryString = atob(dataString);
+        const uint8Array = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i);
+        }
+        const jsonString = new TextDecoder().decode(uint8Array);
+        return JSON.parse(jsonString);
+    }
+
+    async function saveProjectInChunks(projectId, data) {
+        const jsonString = JSON.stringify(data);
+        const uint8Array = new TextEncoder().encode(jsonString);
+        let binaryString = '';
+        uint8Array.forEach(byte => { binaryString += String.fromCharCode(byte); });
+        const dataString = btoa(binaryString);
+
+        const chunks = [];
+        for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+            chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+        }
+
+        for (let i = 0; i < chunks.length; i++) {
+            await jsonpRequest('saveProjectChunk', {
+                userId: USER_ID,
+                projectId: projectId,
+                chunkData: chunks[i],
+                chunkIndex: i,
+                totalChunks: chunks.length,
+                compressed: false,
+            });
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
+    async function saveFormData(formId, formData) {
+        const formDbId = getFormDbId(formId);
+        let submissions = [];
+        try {
+            const existingData = await window.vibe.loadData(formId);
+            if (Array.isArray(existingData)) {
+                submissions = existingData;
+            }
+        } catch (e) {
+            console.log('No existing data for this form, creating new list.');
+        }
+        
+        submissions.push({
+            timestamp: new Date().toISOString(),
+            data: formData
+        });
+
+        await saveProjectInChunks(formDbId, submissions);
+    }
+
+    window.vibe = {
+        loadData: async function(formId) {
+            if (!formId) {
+                return Promise.reject(new Error('formId is required.'));
+            }
+            try {
+                const formDbId = getFormDbId(formId);
+                const compressedData = await jsonpRequest('loadProject', { userId: USER_ID, projectId: formDbId });
+                return decompressData(compressedData);
+            } catch (e) {
+                return [];
+            }
+        }
+    };
+
+    document.addEventListener('submit', async (e) => {
+        const form = e.target;
+        const formId = form.getAttribute('data-vibe-form');
+        if (!formId) return;
+
+        e.preventDefault();
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+        let originalButtonContent = '';
+        if (submitButton) {
+            originalButtonContent = submitButton.innerHTML || submitButton.value;
+            submitButton.disabled = true;
+            submitButton.value = 'Submitting...';
+            submitButton.innerHTML = 'Submitting...';
+        }
+
+        try {
+            await saveFormData(formId, data);
+            form.innerHTML = '<p style="text-align: center; color: green; padding: 20px;">Thank you for your submission!</p>';
+        } catch (error) {
+            console.error('Form submission failed:', error);
+            const errorEl = document.createElement('p');
+            errorEl.style.color = 'red';
+            errorEl.textContent = 'Submission failed. Please try again later.';
+            form.appendChild(errorEl);
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.value = originalButtonContent;
+                submitButton.innerHTML = originalButtonContent;
+            }
+        }
+    }, true);
+})();
+</script>
+    <script>(function() {document.addEventListener('DOMContentLoaded', () => {
+        const KEY_NAME = 'gemini_api_key_v1';
+        const MODEL_KEY_NAME = 'gemini_model_name_v1';
+        const DEFAULT_MODEL = "gemini-1.5-flash";
+
+        let proposedPatches = [];
+        const sourceEditor = document.getElementById('sourceEditor');
+        const aiInput = document.getElementById('aiInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const applyBtn = document.getElementById('applyBtn');
+        const menu = document.getElementById('mainMenu');
+        const apiKeyStatus = document.getElementById('apiKeyStatus');
+        const navSelect = document.getElementById('blockNavigator');
+        const fileInput = document.getElementById('fileInput');
+        const loadFileBtn = document.getElementById('loadFileBtn');
+        const menuDownloadBtn = document.getElementById('menuDownloadBtn');
+
+        window.sourceFileType = 'html';
+
+        // Helper: safe escape for UI
+        const safeEscape = (t) => t ? String(t)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
+            .replace(/`/g, "&#96;") 
+            .replace(/\${/g, "&#36;{") 
+            : "";
+
+        const showStatus = (title, message) => {
+            document.getElementById('statusTitle').innerText = title;
+            document.getElementById('statusMessage').innerText = message;
+            document.getElementById('statusModal').classList.add('open');
+        };
+
+        document.getElementById('closeStatusModal').onclick = () => document.getElementById('statusModal').classList.remove('open');
+
+        loadFileBtn.onclick = () => fileInput.click();
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            window.sourceFileType = file.name.split('.').pop().toLowerCase();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                sourceEditor.value = event.target.result;
+                updateNavigator();
+                checkReady();
+                showStatus("Loaded", `${file.name} (detected as ${window.sourceFileType})`);
+            };
+            reader.readAsText(file);
+        };
+
+        const updateApiStatus = () => {
+            const key = localStorage.getItem(KEY_NAME);
+            const model = localStorage.getItem(MODEL_KEY_NAME) || DEFAULT_MODEL;
+            if (key && key.trim()) {
+                apiKeyStatus.innerHTML = `API Active <span class="model-badge">${model}</span>`;
+                apiKeyStatus.classList.add('ready');
+            } else {
+                apiKeyStatus.innerText = "API Key Required";
+                apiKeyStatus.classList.remove('ready');
+            }
+        };
+        updateApiStatus();
+
+        window.switchTab = (id) => {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            const btns = document.querySelectorAll('.tab-btn');
+            if (id === 'tab-source') btns[0].classList.add('active');
+            else if (id === 'tab-input') btns[1].classList.add('active');
+            else if (id === 'tab-review') btns[2].classList.add('active');
+        };
+
+        document.getElementById('menuToggleBtn').onclick = (e) => { e.stopPropagation(); menu.classList.toggle('show'); };
+        document.body.onclick = () => menu.classList.remove('show');
+
+        document.getElementById('apiKeyMenuBtn').onclick = () => {
+            document.getElementById('apiKeyInput').value = localStorage.getItem(KEY_NAME) || '';
+            document.getElementById('modelNameInput').value = localStorage.getItem(MODEL_KEY_NAME) || DEFAULT_MODEL;
+            document.getElementById('apiKeyModal').classList.add('open');
+        };
+
+        document.getElementById('saveApiKeyBtn').onclick = () => {
+            localStorage.setItem(KEY_NAME, document.getElementById('apiKeyInput').value.trim());
+            localStorage.setItem(MODEL_KEY_NAME, document.getElementById('modelNameInput').value.trim() || DEFAULT_MODEL);
+            document.getElementById('apiKeyModal').classList.remove('open');
+            updateApiStatus();
+        };
+
+        document.getElementById('closeApiKeyModal').onclick = () => document.getElementById('apiKeyModal').classList.remove('open');
+
+        const checkReady = () => {
+            analyzeBtn.disabled = !(sourceEditor.value.trim() && aiInput.value.trim());
+            applyBtn.disabled = !proposedPatches.some(p => p.status === 'approved');
+            menuDownloadBtn.disabled = !sourceEditor.value.trim();
+        };
+
+        sourceEditor.addEventListener('input', () => { updateNavigator(); checkReady(); });
+        aiInput.addEventListener('input', checkReady);
+
+        menuDownloadBtn.onclick = () => {
+            const content = sourceEditor.value;
+            if (!content.trim()) return;
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const fileName = window.sourceFileType ? `merged_source.${window.sourceFileType}` : 'merged_source.html';
+            a.href = url; a.download = fileName;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url); showStatus("Download", "Source exported.");
+        };
+
+        function extractHints(content) {
+            const hints = {
+                isNew: /\/\*\s*\[NEW\]\s*\*\//i.test(content),
+                isUpdate: /\/\*\s*\[UPDATE\]\s*\*\//i.test(content),
+            };
+            const after = content.match(/\/\*\s*\[INSERT_AFTER:\s*(.*?)\s*\]\s*\*\//i);
+            const before = content.match(/\/\*\s*\[INSERT_BEFORE:\s*(.*?)\s*\]\s*\*\//i);
+            const line = content.match(/\/\*\s*\[LINE:\s*(\d+)\s*\]\s*\*\//i);
+            const type = content.match(/\/\*\s*\[TYPE:\s*(.*?)\s*\]\s*\*\//i);
+
+            if (after) hints.after = after[1].trim();
+            if (before) hints.before = before[1].trim();
+            if (line) hints.line = parseInt(line[1]);
+            if (type) hints.lang = type[1].trim().toLowerCase();
+            return hints;
+        }
+
+        function parseAllSegments(code) {
+            let segments = [];
+            const idRegex = /<[^>]+id=[\"']([^\"']+)[\"'][^>]*>/gi;
+            let match;
+            while ((match = idRegex.exec(code)) !== null) {
+                const id = match[1];
+                const tagNameMatch = match[0].match(/<(\w+)/);
+                if (!tagNameMatch) continue;
+                const tagName = tagNameMatch[1];
+                const closingTag = `<\/${tagName}>`;
+                const endIdx = code.indexOf(closingTag, match.index);
+                if (endIdx !== -1) {
+                    const content = code.substring(match.index, endIdx + closingTag.length);
+                    segments.push({ name: '#' + id, content, startIndex: match.index, lang: 'html', hints: extractHints(content) });
+                }
+            }
+            const lines = code.split('\n');
+            let braceCount = 0, current = [], startIdx = 0, running = 0, inBlock = false, sig = "";
+            for(let i=0; i<lines.length; i++) {
+                const line = lines[i];
+                const open = (line.match(/\{/g)||[]).length;
+                const close = (line.match(/\}/g)||[]).length;
+                if(!inBlock && open > 0) {
+                    inBlock = true; startIdx = running; sig = line; current = [line]; braceCount = open - close;
+                } else if(inBlock) {
+                    current.push(line); braceCount += (open - close);
+                }
+                if(inBlock && braceCount <= 0) {
+                    const content = current.join('\n');
+                    const hints = extractHints(content);
+                    let lang = hints.lang || (/(const|let|var|function|async|await|return|if|else|console|window|document)/.test(sig + content) ? 'js' : 'css');
+                    let blockName = sig.split('{')[0].trim();
+                    if (blockName === '{{' || !blockName) blockName = hints.lang ? `Block [${hints.lang.toUpperCase()}]` : 'unnamed segment';
+                    segments.push({ name: blockName, content, startIndex: startIdx, lang, hints });
+                    inBlock = false;
+                }
+                running += line.length + 1;
+            }
+            return segments.sort((a,b) => a.startIndex - b.startIndex);
+        }
+
+        function updateNavigator() {
+            navSelect.innerHTML = '<option value="">Jump to block...</option>';
+            parseAllSegments(sourceEditor.value).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.startIndex; opt.text = s.name; navSelect.appendChild(opt);
+            });
+        }
+
+        navSelect.onchange = (e) => {
+            if (e.target.value) {
+                sourceEditor.focus();
+                sourceEditor.setSelectionRange(e.target.value, e.target.value);
+                sourceEditor.scrollTo(0, 0);
+            }
+        };
+
+        window.changePatchLang = (id, newLang) => {
+            const p = proposedPatches.find(x => x.id === id);
+            if (p) p.replacement.lang = newLang;
+        };
+
+        window.updatePatchStrategy = (id, val) => {
+            const p = proposedPatches.find(x => x.id === id);
+            if (p) p.strategy = val;
+        };
+
+        analyzeBtn.onclick = () => {
+            const srcSegs = parseAllSegments(sourceEditor.value);
+            const newSegs = parseAllSegments(aiInput.value);
+            proposedPatches = [];
+            const container = document.getElementById('diffContainer');
+            container.innerHTML = '';
+
+            newSegs.forEach(nSeg => {
+                const match = srcSegs.find(sSeg => sSeg.name === nSeg.name && sSeg.lang === nSeg.lang);
+                const id = 'p' + Math.random().toString(36).substr(2, 7);
+                const type = match ? 'replace' : 'insert';
+                const status = (type === 'insert' || nSeg.hints.isNew) ? 'approved' : 'pending';
+
+                // Default strategy: replace if matching, otherwise auto
+                const strategy = match ? 'replace' : 'auto';
+
+                proposedPatches.push({ id, type, original: match, replacement: nSeg, status, strategy });
+                
+                const card = document.createElement('div');
+                card.className = 'diff-card ' + (status === 'approved' ? 'approved' : '');
+                card.id = `card-${id}`;
+                
+                // Build placement dropdown options based on type
+                let opts = `<option value="auto" ${strategy==='auto'?'selected':''}>Auto / AI Hint</option>`;
+                if(match) opts += `<option value="replace" ${strategy==='replace'?'selected':''}>Replace Original Block</option>`;
+                opts += `<option value="head_end">Before &lt;/head&gt;</option>`;
+                opts += `<option value="body_end">Before &lt;/body&gt;</option>`;
+                opts += `<option value="body_start">After &lt;body&gt;</option>`;
+                opts += `<option value="script_inside_end">Inside Last &lt;script&gt; (Before closing)</option>`;
+                opts += `<option value="script_after">After Last &lt;script&gt;</option>`;
+                opts += `<option value="style_inside_end">Inside Last &lt;style&gt; (Before closing)</option>`;
+                opts += `<option value="html_end">Append to End</option>`;
+
+                card.innerHTML = `
+                    <div class="diff-header">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <select class="badge-lang-select" onchange="changePatchLang('${id}', this.value)">
+                                <option value="html" ${nSeg.lang === 'html' ? 'selected' : ''}>HTML</option>
+                                <option value="js" ${nSeg.lang === 'js' ? 'selected' : ''}>JS</option>
+                                <option value="css" ${nSeg.lang === 'css' ? 'selected' : ''}>CSS</option>
+                            </select>
+                            <span style="font-weight:600">${safeEscape(nSeg.name)}</span>
+                            <span id="badge-${id}" class="status-badge"></span>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-success" onclick="setPatchStatus('${id}','approved')">Approve</button>
+                            <button class="btn btn-secondary" onclick="setPatchStatus('${id}','ignored')">Ignore</button>
+                        </div>
+                    </div>
+                    <div class="code-compare ${type==='insert'?'insert-mode':''}">
+                        ${type==='replace' ? `<div class="code-pane original">${safeEscape(match.content)}</div>` : ''}
+                        <div class="code-pane replacement">${safeEscape(nSeg.content)}</div>
+                    </div>
+                    <div class="placement-control">
+                        <label style="font-size:11px; color:#aaa;">Placement:</label>
+                        <select class="placement-select" onchange="updatePatchStrategy('${id}', this.value)">
+                            ${opts}
+                        </select>
+                    </div>`;
+                container.appendChild(card);
+                
+                if (status === 'approved') setTimeout(() => window.setPatchStatus(id, 'approved'), 10);
+            });
+            switchTab('tab-review');
+            checkReady();
+        };
+
+        window.setPatchStatus = (id, status) => {
+            const p = proposedPatches.find(x => x.id === id);
+            if(!p) return;
+            p.status = status;
+            const card = document.getElementById(`card-${id}`);
+            const b = document.getElementById(`badge-${id}`);
+            card.className = 'diff-card ' + (status==='approved'?'approved':'ignored');
+            b.className = 'status-badge visible ' + (status==='approved' ? (p.type==='replace'?'badge-replace':'badge-insert') : 'badge-ignored');
+            b.innerText = status==='approved' ? (p.type==='replace'?'REPLACED':'INSERTED') : 'SKIPPED';
+            checkReady();
+        };
+
+        function getElementRange(src, idOrSelector) {
+            const cleanId = idOrSelector.startsWith('#') ? idOrSelector.substring(1) : idOrSelector;
+            const regex = new RegExp(`<(\\w+)[^>]*id=['"]${cleanId}['"][^>]*>`, 'i');
+            const match = src.match(regex);
+            if (!match) return null;
+            const startIdx = match.index;
+            const tagName = match[1];
+            const closingTag = `<\/${tagName}>`;
+            let endIdx = src.indexOf(closingTag, startIdx);
+            if (endIdx !== -1) endIdx += closingTag.length; else endIdx = src.indexOf('>', startIdx) + 1;
+            return { start: startIdx, end: endIdx };
+        }
+
+        applyBtn.onclick = () => {
+            let src = sourceEditor.value;
+            const approved = proposedPatches.filter(p => p.status === 'approved');
+            
+            approved.forEach(p => {
+                let finalContent = p.replacement.content;
+                finalContent = finalContent.replace(/^\s*\{\{/, '').replace(/\}\}\s*$/, '').trim();
+                finalContent = finalContent
+                    .replace(/\/\*[\s\S]*?\[(NEW|UPDATE|INSERT_AFTER|INSERT_BEFORE|LINE|TYPE).*?\][\s\S]*?\*\//gi, '')
+                    .trim();
+
+                const hints = p.replacement.hints;
+                const lang = p.replacement.lang || 'html'; 
+                const strategy = p.strategy || 'auto';
+
+                // Helpers using new RegExp to avoid literal closing tags in source
+                const stripTags = (c) => {
+                    return c.replace(new RegExp('<\\/?script.*?>', 'gi'), '')
+                            .replace(new RegExp('<\\/?style.*?>', 'gi'), '').trim();
+                };
+                
+                const wrapTags = (c) => {
+                    if (lang === 'js' && !c.trim().startsWith('<script')) return '<script>' + c + '<' + '/script>';
+                    if (lang === 'css' && !c.trim().startsWith('<style')) return '<style>' + c + '<' + '/style>';
+                    return c;
+                };
+
+                // EXECUTE STRATEGY
+                if (strategy === 'replace' && p.original) {
+                    src = src.replace(p.original.content, () => finalContent);
+                } 
+                else if (strategy === 'script_inside_end') {
+                    const cleanContent = "\n" + stripTags(finalContent) + "\n";
+                    // Split safely
+                    const parts = src.split(new RegExp('<\\/script>', 'i'));
+                    if (parts.length > 1) {
+                        const lastPart = parts.pop();
+                        // Join safely
+                        src = parts.join('<' + '/script>') + cleanContent + '<' + '/script>' + lastPart;
+                    } else {
+                        src += wrapTags(finalContent);
+                    }
+                }
+                else if (strategy === 'script_after') {
+                    const wrappedContent = "\n" + wrapTags(stripTags(finalContent)) + "\n"; 
+                    const parts = src.split(new RegExp('<\\/script>', 'i'));
+                    if (parts.length > 1) {
+                        const lastPart = parts.pop();
+                        src = parts.join('<' + '/script>') + '<' + '/script>' + wrappedContent + lastPart;
+                    } else {
+                        src += wrappedContent;
+                    }
+                }
+                else if (strategy === 'style_inside_end') {
+                    const cleanContent = "\n" + stripTags(finalContent) + "\n";
+                    const parts = src.split(new RegExp('<\\/style>', 'i'));
+                    if (parts.length > 1) {
+                        const lastPart = parts.pop();
+                        src = parts.join('<' + '/style>') + cleanContent + '<' + '/style>' + lastPart;
+                    } else {
+                        src += wrapTags(finalContent);
+                    }
+                }
+                else if (strategy === 'head_end') {
+                    const nlContent = "\n" + wrapTags(stripTags(finalContent)) + "\n";
+                    if (new RegExp('<\\/head>', 'i').test(src)) src = src.replace(new RegExp('(<\\/head>)', 'i'), (m) => nlContent + m);
+                    else src = nlContent + src;
+                }
+                else if (strategy === 'body_end') {
+                    const nlContent = "\n" + wrapTags(stripTags(finalContent)) + "\n";
+                    if (new RegExp('<\\/body>', 'i').test(src)) src = src.replace(new RegExp('(<\\/body>)', 'i'), (m) => nlContent + m);
+                    else src += nlContent;
+                }
+                else if (strategy === 'body_start') {
+                    const nlContent = "\n" + wrapTags(stripTags(finalContent)) + "\n";
+                    if (new RegExp('<body.*?>', 'i').test(src)) src = src.replace(new RegExp('(<body.*?>)', 'i'), (m) => m + nlContent);
+                    else src = nlContent + src;
+                }
+                else if (strategy === 'html_end') {
+                    src += "\n" + wrapTags(stripTags(finalContent)) + "\n";
+                }
+                else {
+                    // AUTO MODE
+                    let autoContent = finalContent;
+                    
+                    if (hints.line) {
+                        const linesArray = src.split('\n');
+                        linesArray.splice(hints.line - 1, 0, autoContent);
+                        src = linesArray.join('\n');
+                    } else if (hints.after) {
+                        const range = getElementRange(src, hints.after);
+                        if (range) src = src.substring(0, range.end) + '\n' + autoContent + src.substring(range.end);
+                        else src += '\n' + autoContent;
+                    } else if (hints.before) {
+                        const range = getElementRange(src, hints.before);
+                        if (range) src = src.substring(0, range.start) + autoContent + '\n' + src.substring(range.start);
+                        else src = autoContent + '\n' + src;
+                    } else {
+                        if (lang === 'css') {
+                             const clean = stripTags(finalContent);
+                             if (new RegExp('<\\/style>', 'i').test(src)) src = src.replace(new RegExp('(<\\/style>)', 'i'), (m) => "\n" + clean + "\n" + m);
+                             else if (new RegExp('<\\/head>', 'i').test(src)) src = src.replace(new RegExp('(<\\/head>)', 'i'), (m) => "\n<style>" + clean + "<" + "/style>\n" + m);
+                             else src += "\n<style>" + clean + "<" + "/style>";
+                        } else if (lang === 'js') {
+                             const wrapped = wrapTags(stripTags(finalContent));
+                             if (new RegExp('<\\/body>', 'i').test(src)) src = src.replace(new RegExp('(<\\/body>)', 'i'), (m) => wrapped + "\n" + m);
+                             else src += wrapped;
+                        } else {
+                             if (new RegExp('<\\/body>', 'i').test(src)) src = src.replace(new RegExp('(<\\/body>)', 'i'), (m) => finalContent + "\n" + m);
+                             else src += finalContent;
+                        }
+                    }
+                }
+            });
+
+            sourceEditor.value = src;
+            showStatus("Applied", "Merge completed with selected placement strategies.");
+            switchTab('tab-source');
+            updateNavigator();
+            proposedPatches = [];
+            document.getElementById('diffContainer').innerHTML = '<p style="text-align:center; color:#2ea043; padding:40px;">Successfully merged.</p>';
+            checkReady();
+        };
+
+        document.getElementById('openPromptBtn').onclick = () => {
+            if(!localStorage.getItem(KEY_NAME)) showStatus("Error", "Add API key in settings first.");
+            else document.getElementById('promptModal').classList.add('open');
+        };
+
+        document.getElementById('closePromptModal').onclick = () => document.getElementById('promptModal').classList.remove('open');
+
+        document.getElementById('generateBtn').onclick = async () => {
+            const btn = document.getElementById('generateBtn');
+            const prompt = document.getElementById('aiPromptInput').value;
+            const key = localStorage.getItem(KEY_NAME);
+            const model = localStorage.getItem(MODEL_KEY_NAME) || DEFAULT_MODEL;
+
+            if(!prompt || !key) return;
+            btn.disabled = true; btn.innerText = "Generating...";
+            
+            const sysPrompt = `Task: ${prompt}\n\nINSTRUCTIONS:\n1. Output code in separate blocks (HTML, CSS, JS).\n2. USE METADATA COMMENTS at the start of blocks:\n   - /* [NEW] */ or /* [UPDATE] */\n   - /* [TYPE: js|css|html] */\n   - /* [INSERT_AFTER: #id_or_selector] */\n   - /* [INSERT_BEFORE: #id_or_selector] */\n   - /* [LINE: exact_line_number] */\n3. Match existing HTML IDs exactly.\n4. Provide the full tag/block (e.g. <div id='foo'>...</div>).\n5. CRITICAL: Wrap each individual block in {{ and }} delimiters to ensure clear separation. Example: {{ /* [TYPE: html] */ <div id="new">...</div> }}\n\nCURRENT SOURCE FOR CONTEXT (DO NOT PUT CSS/JS OUTSIDE </html> IN FINAL SOURCE):\n${sourceEditor.value}`;
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: sysPrompt }] }] })
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error.message);
+                aiInput.value = data.candidates[0].content.parts[0].text.replace(/```[a-z]*\n?/g, '').replace(/```/g, '').trim();
+                document.getElementById('promptModal').classList.remove('open');
+                switchTab('tab-input');
+                checkReady();
+            } catch (e) { showStatus("AI Error", e.message); }
+            finally { btn.disabled = false; btn.innerText = "Generate"; }
+        };
+
+        updateNavigator();
+        checkReady();
+    });})();</script>
+</body>
+</html>
