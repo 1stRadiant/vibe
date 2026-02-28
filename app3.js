@@ -79,6 +79,23 @@ function compressProjectData(projectData) {
 }
 
 function decompressProjectData(dataString) {
+    if (!dataString) return null;
+
+    // 1. If it's already an object (fetch sometimes auto-parses JSON)
+    if (typeof dataString === 'object') {
+        return dataString;
+    }
+
+    // 2. If it's a raw JSON string (New Cloud format)
+    if (typeof dataString === 'string' && (dataString.trim().startsWith('{') || dataString.trim().startsWith('['))) {
+        try {
+            return JSON.parse(dataString);
+        } catch (e) {
+            console.warn("Looked like JSON but failed to parse directly, trying Base64 decode.", e);
+        }
+    }
+
+    // 3. Fallback to decoding Base64 (LocalDB or Legacy Cloud format)
     try {
         return JSON.parse(decodeURIComponent(atob(dataString).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -88,6 +105,7 @@ function decompressProjectData(dataString) {
         throw new Error("Failed to decode or parse project data. It may be corrupt.");
     }
 }
+
 
 function generateFullCodeString(tree, userId, projectId) {
     let cssContent = '';
@@ -145,111 +163,38 @@ function generateFullCodeString(tree, userId, projectId) {
         htmlContent = buildHtmlRecursive(tree.children);
     }
 
-    const vibeDbScript = `
+const vibeDbScript = `
 <script>
 /* --- Vibe Database Connector --- */
 (function() {
     const APPS_SCRIPT_URL = '${api.APPS_SCRIPT_URL}';
     const USER_ID = '${userId}';
     const PROJECT_ID = '${projectId}';
-    const CHUNK_SIZE = 1500;
 
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT') || !USER_ID || !PROJECT_ID) {
         window.vibe = { loadData: () => Promise.resolve([]) };
         return;
     }
 
-    const getFormDbId = (formId) => \`\${PROJECT_ID}__form__\${formId}\`;
-
-    function jsonpRequest(action, params = {}) {
-        return new Promise((resolve, reject) => {
-            const callbackName = 'vibe_jsonp_callback_' + Math.round(100000 * Math.random());
-            const script = document.createElement('script');
-            let url = \`\${APPS_SCRIPT_URL}?action=\${action}&callback=\${callbackName}\`;
-            for (const key in params) {
-                url += \`&\${key}=\${encodeURIComponent(params[key])}\`;
-            }
-            script.src = url;
-            window[callbackName] = (data) => {
-                delete window[callbackName];
-                document.body.removeChild(script);
-                if (data.status === 'success') resolve(data.data);
-                else reject(new Error(data.message || 'API Error'));
-            };
-            script.onerror = () => {
-                delete window[callbackName];
-                document.body.removeChild(script);
-                reject(new Error('API request failed.'));
-            };
-            document.body.appendChild(script);
+    // Modern POST request to bypass CORS and size limits
+    async function postRequest(action, payload) {
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action, ...payload })
         });
-    }
-    
-    function decompressData(dataString) {
-        const binaryString = atob(dataString);
-        const uint8Array = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            uint8Array[i] = binaryString.charCodeAt(i);
-        }
-        const jsonString = new TextDecoder().decode(uint8Array);
-        return JSON.parse(jsonString);
-    }
-
-    async function saveProjectInChunks(projectId, data) {
-        const jsonString = JSON.stringify(data);
-        const uint8Array = new TextEncoder().encode(jsonString);
-        let binaryString = '';
-        uint8Array.forEach(byte => { binaryString += String.fromCharCode(byte); });
-        const dataString = btoa(binaryString);
-
-        const chunks = [];
-        for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
-            chunks.push(dataString.substring(i, i + CHUNK_SIZE));
-        }
-
-        for (let i = 0; i < chunks.length; i++) {
-            await jsonpRequest('saveProjectChunk', {
-                userId: USER_ID,
-                projectId: projectId,
-                chunkData: chunks[i],
-                chunkIndex: i,
-                totalChunks: chunks.length,
-                compressed: false,
-            });
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-    }
-
-    async function saveFormData(formId, formData) {
-        const formDbId = getFormDbId(formId);
-        let submissions = [];
-        try {
-            const existingData = await window.vibe.loadData(formId);
-            if (Array.isArray(existingData)) {
-                submissions = existingData;
-            }
-        } catch (e) {
-            console.log('No existing data for this form, creating new list.');
-        }
-        
-        submissions.push({
-            timestamp: new Date().toISOString(),
-            data: formData
-        });
-
-        await saveProjectInChunks(formDbId, submissions);
+        const result = await response.json();
+        if (result.status === 'success') return result.data !== undefined ? result.data : result;
+        throw new Error(result.message || 'API Error');
     }
 
     window.vibe = {
         loadData: async function(formId) {
-            if (!formId) {
-                return Promise.reject(new Error('formId is required.'));
-            }
+            if (!formId) return Promise.reject(new Error('formId is required.'));
             try {
-                const formDbId = getFormDbId(formId);
-                const compressedData = await jsonpRequest('loadProject', { userId: USER_ID, projectId: formDbId });
-                return decompressData(compressedData);
+                return await postRequest('loadFormData', { userId: USER_ID, projectId: PROJECT_ID, formId: formId });
             } catch (e) {
+                console.error('VibeDB Load Error:', e);
                 return [];
             }
         }
@@ -263,6 +208,7 @@ function generateFullCodeString(tree, userId, projectId) {
         e.preventDefault();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        
         const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
         let originalButtonContent = '';
         if (submitButton) {
@@ -273,7 +219,7 @@ function generateFullCodeString(tree, userId, projectId) {
         }
 
         try {
-            await saveFormData(formId, data);
+            await postRequest('saveFormData', { userId: USER_ID, projectId: PROJECT_ID, formId: formId, data: data });
             form.innerHTML = '<p style="text-align: center; color: green; padding: 20px;">Thank you for your submission!</p>';
         } catch (error) {
             console.error('Form submission failed:', error);
