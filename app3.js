@@ -1,4 +1,3 @@
-
 const startSel = document.getElementById('start-component-shorthand-select');
 const agentSel = document.getElementById('agent-component-shorthand-select');
 
@@ -2301,30 +2300,41 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
 async function generateCompleteSubtree(parentNode, streamCallback = null) {
     console.log(`Generating subtree for parent: ${parentNode.id}`);
 
-    const systemPrompt = `You are an expert UI/UX designer and frontend architect. You are not just a code generator; you are a creative designer.
+    const systemPrompt = `You are an expert UI/UX designer and frontend architect. 
 
-    **YOUR GOAL:** Create a visually stunning, modern, and fully responsive website component hierarchy based on a high-level description.
+    **YOUR GOAL:** Create a visually stunning, modern website component hierarchy.
     
     **DESIGN GUIDELINES:**
-    1.  **Aesthetics:** Use modern design trends (e.g., clean typography, ample whitespace, subtle shadows, rounded corners, vibrant colors). Avoid "browser default" looks.
-    2.  **CSS:** Write robust, scoped CSS. Use Flexbox and Grid for layout. Ensure mobile responsiveness using media queries.
-    3.  **Content:** Generate realistic, engaging placeholder content (text and images). Do not use "Lorem Ipsum" if possible; invent plausible content.
-    4.  **Creativity:** Feel free to interpret the user's request artistically. If they say "portfolio", don't just make a list; make a hero section, a skills grid, a project gallery, and a contact form with a distinct style.
+    1.  **Visuals:** Use modern trends (Glassmorphism, Bento grids, gradients, clean typography). Avoid "browser default" looks.
+    2.  **Structure:** 
+        - Generate 'html' nodes for structure.
+        - **MANDATORY:** You MUST generate a separate 'css' node to style the HTML you create. Do not rely on inline styles.
+        - Ensure CSS selectors exactly match the IDs and Classes in your HTML.
+    3.  **Responsive:** Use Flexbox/Grid and media queries for mobile responsiveness.
+    4.  **Content:** Use realistic text and images (via Pollinations AI), not Lorem Ipsum.
 
     **TASK:** Generate a valid JSON array of "vibe nodes" that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
 
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}
 
-**JSON SCHEMA & RULES for each node in the array:**
-1.  **Component Node Object:** Each object in the array must have:
-    *   id: A unique, descriptive, kebab-case identifier.
-    *   type: "head", "html", "css", "javascript", "js-function", or "declaration".
-    *   description: A concise, one-sentence summary.
-    *   code: The raw code for the component.
-    *   children: (Optional) Nested array of child component nodes.
-    *   selector: (For html nodes) CSS selector.
-    *   position: (For html nodes) "beforeend" or "afterend".
+**JSON SCHEMA for the array:**
+[
+  {
+    "id": "unique-section-id",
+    "type": "html",
+    "description": "The HTML structure.",
+    "code": "<section id='unique-section-id' class='modern-section'>...</section>",
+    "selector": "#parent-id",
+    "position": "beforeend"
+  },
+  {
+    "id": "section-styles",
+    "type": "css",
+    "description": "Styles for the section.",
+    "code": "#unique-section-id { ... } .modern-section { ... }"
+  }
+]
 `;
 
     const userPrompt = `Generate the child components for the following parent container:
@@ -3394,30 +3404,34 @@ function getAgentSystemPrompt() {
     return `You are an expert AI web developer and designer.
 
 **ROLE:**
-1.  **Designer:** When asked to create or change something, design it with modern UI/UX principles.
-2.  **Implementer:** Convert natural language into specific updates for the project structure.
+1.  **Designer:** Create visually stunning, modern designs (Flexbox/Grid, responsive, ample whitespace).
+2.  **Implementer:** Convert natural language into specific JSON updates.
 
-**CAPABILITIES:**
-- You can create new nodes, update existing ones, or change the structure.
-- You can understand "Vibe Shorthand" (e.g., @navbar) but you are NOT limited to it. You can and should write custom HTML/CSS/JS when the user asks for something specific or unique.
+**CRITICAL RULES FOR EDITING:**
+1.  **CSS Consistency:** If you change HTML IDs or Classes, you MUST update the corresponding CSS.
+2.  **Formatting:** When providing code, ensure it is properly indented and formatted.
+3.  **Completeness:** When updating a node (actionType: "update"), you MUST return the **FULL, COMPLETE CODE** for that node. Do not return diffs or partial snippets.
+4.  **Separation:** Prefer creating/updating specific 'css' nodes for styling. If you must put CSS in an 'html' node, wrap it in a <style> tag at the top of that node's code.
 
 **OUTPUT FORMAT:**
 Return ONLY a single, valid JSON object:
 {
-  "plan": "Briefly explain your design decisions and the changes you are making.",
+  "plan": "Briefly explain exactly what you are changing (e.g., 'Updating hero HTML and adding new CSS for the gradient background').",
   "actions": [
     {
       "actionType": "create" | "update",
-      "nodeId": "id-of-node",
-      "parentId": "parent-id",
+      "nodeId": "id-of-node-to-act-on",
+      "parentId": "parent-id-if-create",
       "newNode": {
-         "id": "unique-id",
+         "id": "unique-kebab-id",
          "type": "html" | "css" | "javascript" | "js-function",
          "description": "...",
-         "code": "FULL MODIFIED CODE STRING HERE",
-         "selector": "#prev-id",
+         "code": "FULL VALID CODE HERE",
+         "selector": "#prev-id", 
          "position": "afterend"
-      }
+      },
+      "newDescription": "Updated description if updating",
+      "newCode": "FULL VALID CODE HERE if updating"
     }
   ]
 }
@@ -3822,7 +3836,9 @@ function executeAgentPlan(agentDecision, agentLogger) {
                 }
                 agentLogger(`<strong>Updating Node:</strong> \`${nodeId}\` (${nodeToUpdate.type})`, 'action');
                 if (newDescription) nodeToUpdate.description = newDescription;
-                if (typeof newCode === 'string') nodeToUpdate.code = newCode;
+                if (newCode !== undefined && newCode !== null) {
+                    nodeToUpdate.code = String(newCode); 
+                }
             } else {
                 agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`, skipping.`, 'warn');
             }
@@ -3831,8 +3847,12 @@ function executeAgentPlan(agentDecision, agentLogger) {
             const parentNode = findNodeById(parentId);
             if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
                 if (!newNode || !newNode.id || findNodeById(newNode.id)) {
-                     agentLogger(`Warning: AI tried to create an invalid or duplicate node \`${newNode.id}\`. Skipping.`, 'warn');
-                     continue;
+                     // Auto-fix ID collision
+                     if(newNode && newNode.id) newNode.id = newNode.id + '-' + Date.now();
+                     else {
+                        agentLogger(`Warning: Invalid node creation skipped.`, 'warn');
+                        continue;
+                     }
                 }
                 if (!parentNode.children) parentNode.children = [];
                 agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentId}\``, 'action');
@@ -4474,16 +4494,15 @@ async function handleAiStructureUpdate() {
     showGlobalAgentLoader('AI is restructuring the project...');
 
     try {
-        const systemPrompt = `You are an expert system that modifies a website's "vibe tree" JSON structure based on user instructions. You will receive the current vibe tree and a set of instructions. Your task is to apply these instructions and return the NEW, COMPLETE, and VALID vibe tree as a single JSON object.
+        const systemPrompt = `You are an expert system that modifies a website's "vibe tree" JSON structure.
+    
+**RULES:**
+1. **CSS Integrity:** If you add new HTML components, you MUST also add or update 'css' nodes to style them. Do not leave new elements unstyled.
+2. **Valid JSON:** Return ONLY the raw JSON object for the complete, modified vibe tree.
+3. **Structure:** HTML nodes need 'selector' and 'position' calculated relative to siblings.
+4. **Modern Design:** Ensure any new structures follow modern design principles (Flexbox, Grid, Responsive).
 
-**CRITICAL OUTPUT RULE:** Your entire response must be ONLY the raw JSON object for the complete, modified vibe tree. Do not include any explanatory text, comments, or markdown formatting.
-
-**VIBE NODE SCHEMA (Reminder):**
-- Each node needs: id, type, description, code.
-- HTML nodes need: selector, position.
-- 'selector' and 'position' MUST be calculated correctly relative to siblings. The first HTML child of a parent uses the parent's ID as a selector. Subsequent siblings chain off the ID of the previous sibling.
-
-Analyze the user's request and intelligently modify the provided vibe tree to match. This may involve adding, removing, reordering, or modifying nodes. Preserve existing code and descriptions where possible unless the user asks for them to be changed.`;
+Analyze the user's request and return the NEW, COMPLETE vibe tree JSON.`;
 
         const userPrompt = `User Instructions: "${prompt}"
 
@@ -6958,4 +6977,4 @@ async function handleZipUpload() {
         // Reset file input so change event triggers again if same file selected
         zipFileInput.value = '';
     }
-}
+      }
