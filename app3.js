@@ -65,13 +65,14 @@ import * as api from './api.js';
 
 function compressProjectData(projectData) {
     try {
-        // Optimization: Use native browser capabilities to handle large strings 
-        // without looping through every single byte manually.
         const jsonString = JSON.stringify(projectData);
-        return btoa(encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g,
-            function toSolidBytes(match, p1) {
-                return String.fromCharCode('0x' + p1);
-            }));
+        const bytes = new TextEncoder().encode(jsonString);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
     } catch (e) {
         console.error("Failed to encode project data:", e);
         throw new Error("Failed to encode project data for saving.");
@@ -79,33 +80,19 @@ function compressProjectData(projectData) {
 }
 
 function decompressProjectData(dataString) {
-    if (!dataString) return null;
-
-    // 1. If it's already an object (fetch sometimes auto-parses JSON)
-    if (typeof dataString === 'object') {
-        return dataString;
-    }
-
-    // 2. If it's a raw JSON string (New Cloud format)
-    if (typeof dataString === 'string' && (dataString.trim().startsWith('{') || dataString.trim().startsWith('['))) {
-        try {
-            return JSON.parse(dataString);
-        } catch (e) {
-            console.warn("Looked like JSON but failed to parse directly, trying Base64 decode.", e);
-        }
-    }
-
-    // 3. Fallback to decoding Base64 (LocalDB or Legacy Cloud format)
     try {
-        return JSON.parse(decodeURIComponent(atob(dataString).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join('')));
+        const binary = atob(dataString);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        const jsonString = new TextDecoder().decode(bytes);
+        return JSON.parse(jsonString);
     } catch (e) {
         console.error("Failed to decode or parse project data:", e);
         throw new Error("Failed to decode or parse project data. It may be corrupt.");
     }
 }
-
 
 function generateFullCodeString(tree, userId, projectId) {
     let cssContent = '';
@@ -163,38 +150,121 @@ function generateFullCodeString(tree, userId, projectId) {
         htmlContent = buildHtmlRecursive(tree.children);
     }
 
-const vibeDbScript = `
+    let htmlAttrsStr = ' lang="en"';
+    if (tree.htmlAttributes && Object.keys(tree.htmlAttributes).length > 0) {
+        htmlAttrsStr = Object.entries(tree.htmlAttributes).map(([k,v]) => ` ${k}="${v}"`).join('');
+    }
+    
+    let bodyAttrsStr = '';
+    if (tree.bodyAttributes && Object.keys(tree.bodyAttributes).length > 0) {
+        bodyAttrsStr = Object.entries(tree.bodyAttributes).map(([k,v]) => ` ${k}="${v}"`).join('');
+    }
+
+    const vibeDbScript = `
 <script>
 /* --- Vibe Database Connector --- */
 (function() {
     const APPS_SCRIPT_URL = '${api.APPS_SCRIPT_URL}';
     const USER_ID = '${userId}';
     const PROJECT_ID = '${projectId}';
+    const CHUNK_SIZE = 1500;
 
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT') || !USER_ID || !PROJECT_ID) {
         window.vibe = { loadData: () => Promise.resolve([]) };
         return;
     }
 
-    // Modern POST request to bypass CORS and size limits
-    async function postRequest(action, payload) {
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action, ...payload })
+    const getFormDbId = (formId) => \`\${PROJECT_ID}__form__\${formId}\`;
+
+    function jsonpRequest(action, params = {}) {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'vibe_jsonp_callback_' + Math.round(100000 * Math.random());
+            const script = document.createElement('script');
+            let url = \`\${APPS_SCRIPT_URL}?action=\${action}&callback=\${callbackName}\`;
+            for (const key in params) {
+                url += \`&\${key}=\${encodeURIComponent(params[key])}\`;
+            }
+            script.src = url;
+            window[callbackName] = (data) => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                if (data.status === 'success') resolve(data.data);
+                else reject(new Error(data.message || 'API Error'));
+            };
+            script.onerror = () => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                reject(new Error('API request failed.'));
+            };
+            document.body.appendChild(script);
         });
-        const result = await response.json();
-        if (result.status === 'success') return result.data !== undefined ? result.data : result;
-        throw new Error(result.message || 'API Error');
+    }
+    
+    function decompressData(dataString) {
+        const binaryString = atob(dataString);
+        const uint8Array = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            uint8Array[i] = binaryString.charCodeAt(i);
+        }
+        const jsonString = new TextDecoder().decode(uint8Array);
+        return JSON.parse(jsonString);
+    }
+
+    async function saveProjectInChunks(projectId, data) {
+        const jsonString = JSON.stringify(data);
+        const uint8Array = new TextEncoder().encode(jsonString);
+        let binaryString = '';
+        uint8Array.forEach(byte => { binaryString += String.fromCharCode(byte); });
+        const dataString = btoa(binaryString);
+
+        const chunks = [];
+        for (let i = 0; i < dataString.length; i += CHUNK_SIZE) {
+            chunks.push(dataString.substring(i, i + CHUNK_SIZE));
+        }
+
+        for (let i = 0; i < chunks.length; i++) {
+            await jsonpRequest('saveProjectChunk', {
+                userId: USER_ID,
+                projectId: projectId,
+                chunkData: chunks[i],
+                chunkIndex: i,
+                totalChunks: chunks.length,
+                compressed: false,
+            });
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    }
+
+    async function saveFormData(formId, formData) {
+        const formDbId = getFormDbId(formId);
+        let submissions = [];
+        try {
+            const existingData = await window.vibe.loadData(formId);
+            if (Array.isArray(existingData)) {
+                submissions = existingData;
+            }
+        } catch (e) {
+            console.log('No existing data for this form, creating new list.');
+        }
+        
+        submissions.push({
+            timestamp: new Date().toISOString(),
+            data: formData
+        });
+
+        await saveProjectInChunks(formDbId, submissions);
     }
 
     window.vibe = {
         loadData: async function(formId) {
-            if (!formId) return Promise.reject(new Error('formId is required.'));
+            if (!formId) {
+                return Promise.reject(new Error('formId is required.'));
+            }
             try {
-                return await postRequest('loadFormData', { userId: USER_ID, projectId: PROJECT_ID, formId: formId });
+                const formDbId = getFormDbId(formId);
+                const compressedData = await jsonpRequest('loadProject', { userId: USER_ID, projectId: formDbId });
+                return decompressData(compressedData);
             } catch (e) {
-                console.error('VibeDB Load Error:', e);
                 return [];
             }
         }
@@ -208,7 +278,6 @@ const vibeDbScript = `
         e.preventDefault();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
-        
         const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
         let originalButtonContent = '';
         if (submitButton) {
@@ -219,7 +288,7 @@ const vibeDbScript = `
         }
 
         try {
-            await postRequest('saveFormData', { userId: USER_ID, projectId: PROJECT_ID, formId: formId, data: data });
+            await saveFormData(formId, data);
             form.innerHTML = '<p style="text-align: center; color: green; padding: 20px;">Thank you for your submission!</p>';
         } catch (error) {
             console.error('Form submission failed:', error);
@@ -239,15 +308,15 @@ const vibeDbScript = `
     `;
 
     return `<!DOCTYPE html>
-<html lang="en">
+<html${htmlAttrsStr}>
 <head>
     ${headContent.trim()}
     <style>${cssContent.trim()}</style>
 </head>
-<body>
+<body${bodyAttrsStr}>
 ${htmlContent.trim()}
     ${(userId && projectId) ? vibeDbScript.trim() : ''}
-    <script>(function() {${jsContent.trim()}})();<\/script>
+    ${jsContent.trim() ? `<script>\n${jsContent.trim()}\n<\/script>` : ''}
 </body>
 </html>`;
 }
@@ -1839,7 +1908,7 @@ function renderEditor(node) {
             <h3>Raw Uploaded Project</h3>
             <p>${node.description || 'This project was loaded directly from a file.'}</p>
             <p>The Vibe Editor is disabled for this mode. Use the <strong>Full Code</strong> tab to view and edit the source code.</p>
-            <p>To enable the editor, use the "Process into Vibe Tree" button in the "Full Code" tab. This will use AI to structure your project.</p>
+            <p>To enable the editor, use the "Process into Vibe Tree" button in the "Full Code" tab. This will force extract scripts/styles and enable UI blocks.</p>
         `;
         return placeholderEl;
     }
@@ -2016,7 +2085,12 @@ ${fullCurrentCode}
 \`\`\``;
 
             const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
+            let jsonText = rawResponse.trim();
+            const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (match && match[1]) {
+                jsonText = match[1];
+            }
+            const agentDecision = JSON.parse(jsonText);
             
             executeAgentPlan(agentDecision, (message, type) => {
                 const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
@@ -2338,9 +2412,9 @@ ${getImageGenerationInstructions()}
     try {
         let jsonResponse = rawResponse.trim();
         
-        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2].trim();
+        const jsonMatch = jsonResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonResponse = jsonMatch[1].trim();
         }
 
         const startIndex = jsonResponse.indexOf('[');
@@ -2425,15 +2499,28 @@ function parseHtmlToVibeTree(fullCode) {
         id: "whole-page",
         type: "container",
         description: `A website with the title: "${doc.title || 'Untitled'}".`,
-        children: []
+        children: [],
+        htmlAttributes: {},
+        bodyAttributes: {}
     };
+
+    if (doc.documentElement.attributes.length > 0) {
+        Array.from(doc.documentElement.attributes).forEach(attr => {
+            vibeTree.htmlAttributes[attr.name] = attr.value;
+        });
+    }
+
+    if (doc.body.attributes.length > 0) {
+        Array.from(doc.body.attributes).forEach(attr => {
+            vibeTree.bodyAttributes[attr.name] = attr.value;
+        });
+    }
 
     const htmlNodes = [];
     const cssNodes = [];
     const jsNodes = [];
     let headNode = null;
 
-    // 1. Extract ALL <style> tags to prevent them from being duplicated in the body
     const styleTags = Array.from(doc.querySelectorAll('style'));
     styleTags.forEach((styleTag, index) => {
         if (styleTag.textContent.trim()) {
@@ -2444,13 +2531,11 @@ function parseHtmlToVibeTree(fullCode) {
                 code: styleTag.textContent.trim()
             });
         }
-        styleTag.remove(); // Remove from DOM
+        styleTag.remove();
     });
 
-    // 2. Extract ALL <script> tags
     const scriptTags = Array.from(doc.querySelectorAll('script'));
     scriptTags.forEach((scriptTag, index) => {
-        // Ignore the injected vibe proxy script if it somehow got here
         if (scriptTag.textContent.includes('Vibe Database Connector') || scriptTag.textContent.includes('__vibe-inspect-highlight-hover')) {
             scriptTag.remove();
             return;
@@ -2465,50 +2550,13 @@ function parseHtmlToVibeTree(fullCode) {
             });
         }
         
-        // Remove scripts without src to avoid duplicate execution
-        // Leave scripts WITH src so they still load external libraries in the body/head
         if (!scriptTag.src) {
             scriptTag.remove();
         }
     });
 
-    // 3. Extract Head content
     const headContent = [];
-    
-    // Preserve <html> attributes (e.g., class="dark", lang="en")
-    if (doc.documentElement.attributes.length > 0) {
-        const htmlAttrsObj = {};
-        Array.from(doc.documentElement.attributes).forEach(attr => {
-            htmlAttrsObj[attr.name] = attr.value;
-        });
-        headContent.push(`<script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const attrs = ${JSON.stringify(htmlAttrsObj)};
-                for (const [key, value] of Object.entries(attrs)) {
-                    document.documentElement.setAttribute(key, value);
-                }
-            });
-        <\/script>`);
-    }
-
-    // Preserve <body> attributes (e.g., classes for Tailwind)
-    if (doc.body.attributes.length > 0) {
-        const bodyAttrsObj = {};
-        Array.from(doc.body.attributes).forEach(attr => {
-            bodyAttrsObj[attr.name] = attr.value;
-        });
-        headContent.push(`<script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const attrs = ${JSON.stringify(bodyAttrsObj)};
-                for (const [key, value] of Object.entries(attrs)) {
-                    document.body.setAttribute(key, value);
-                }
-            });
-        <\/script>`);
-    }
-
     doc.head.childNodes.forEach(child => {
-        // We only care about elements (meta, link, title). Scripts/Styles are gone.
         if (child.nodeType === Node.ELEMENT_NODE) {
             headContent.push(child.outerHTML);
         }
@@ -2521,7 +2569,6 @@ function parseHtmlToVibeTree(fullCode) {
         code: headContent.join('\n')
     };
 
-    // 4. Extract Body children
     const bodyChildren = Array.from(doc.body.children);
     let lastElementId = null;
 
@@ -2553,8 +2600,6 @@ function parseHtmlToVibeTree(fullCode) {
 async function decomposeCodeIntoVibeTree(fullCode, forceClientSide = false) {
     console.log("Starting code decomposition process...");
     
-    // Fallback to client side parsing immediately if it's a raw upload, forced, or very large
-    // AI has token limits and will likely break or truncate the code.
     if (forceClientSide || fullCode.length > 30000) {
         console.warn("Using reliable client-side parser (forced or large file size).");
         return parseHtmlToVibeTree(fullCode);
@@ -2618,7 +2663,6 @@ async function processCodeAndRefreshUI(fullCode) {
     
     try {
         recordHistory('Process full code (replace tree)');
-        // Mark as `true` to force deterministic client-side extraction to guarantee HTML retention.
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode, true);
         vibeTree = newVibeTree;
         refreshAllUI();
@@ -2636,7 +2680,6 @@ async function processCodeAndRefreshUI(fullCode) {
 }
 
 async function handleUpdateTreeFromCode(codeOverride = null) {
-    // Determine source: Override (from merger) or Editor (manual)
     const fullCode = (typeof codeOverride === 'string') ? codeOverride : fullCodeEditor.value;
 
     if (!fullCode.trim()) {
@@ -2644,7 +2687,6 @@ async function handleUpdateTreeFromCode(codeOverride = null) {
         return;
     }
 
-    // Handle Raw HTML Container case
     if (vibeTree && vibeTree.type === 'raw-html-container') {
         vibeTree.code = fullCode;
         recordHistory("Update raw HTML code");
@@ -2658,7 +2700,6 @@ async function handleUpdateTreeFromCode(codeOverride = null) {
         return; 
     }
 
-    // Standard Vibe Tree Processing
     const button = updateTreeFromCodeButton;
     const originalButtonHtml = button.innerHTML;
     button.disabled = true;
@@ -2666,7 +2707,6 @@ async function handleUpdateTreeFromCode(codeOverride = null) {
     
     try {
         recordHistory('Process full code (replace tree)');
-        // Safely force client-side parsing to retain explicit file formats without AI intervention errors
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode, true);
         vibeTree = newVibeTree;
         refreshAllUI();
@@ -2991,16 +3031,25 @@ function assembleMultiFileBundle(tree = vibeTree) {
     const bodyContent = buildHtmlBodyFromTree(tree);
     const { cssNodes, jsNodes } = collectCssJsNodes(tree);
 
+    let htmlAttrsStr = ' lang="en"';
+    if (tree.htmlAttributes && Object.keys(tree.htmlAttributes).length > 0) {
+        htmlAttrsStr = Object.entries(tree.htmlAttributes).map(([k,v]) => ` ${k}="${v}"`).join('');
+    }
+    let bodyAttrsStr = '';
+    if (tree.bodyAttributes && Object.keys(tree.bodyAttributes).length > 0) {
+        bodyAttrsStr = Object.entries(tree.bodyAttributes).map(([k,v]) => ` ${k}="${v}"`).join('');
+    }
+
     const cssLinks = cssNodes.map(n => `<link rel="stylesheet" href="assets/css/${nodeIdToFileName(n.id, 'css')}">`).join('\n    ');
     const jsScripts = jsNodes.map(n => `<script src="assets/js/${nodeIdToFileName(n.id, 'js')}"><\/script>`).join('\n    ');
 
     const indexHtml = `<!DOCTYPE html>
-<html lang="en">
+<html${htmlAttrsStr}>
 <head>
     ${headContent.trim()}
     ${cssLinks ? '\n    ' + cssLinks : ''}
 </head>
-<body>
+<body${bodyAttrsStr}>
 
 ${bodyContent}
 
@@ -3020,8 +3069,7 @@ ${bodyContent}
     jsNodes.forEach(n => {
         const path = `assets/js/${nodeIdToFileName(n.id, 'js')}`;
         const code = (n.code || '').trim();
-        const wrapped = `(function(){\n${code}\n})();\n`;
-        files.set(path, wrapped);
+        files.set(path, code + '\n');
     });
 
     return { files, indexHtml };
@@ -3378,26 +3426,35 @@ function getAgentSystemPrompt() {
 2.  **Implementer:** Convert natural language into specific updates for the project structure.
 
 **CAPABILITIES:**
-- You can create new nodes, update existing ones, or change the structure.
+- You can create new nodes, update existing ones, delete them, or change the structure.
 - You can understand "Vibe Shorthand" (e.g., @navbar) but you are NOT limited to it. You can and should write custom HTML/CSS/JS when the user asks for something specific or unique.
 
 **OUTPUT FORMAT:**
-Return ONLY a single, valid JSON object:
+Return ONLY a single, valid JSON object following this exact schema:
 {
   "plan": "Briefly explain your design decisions and the changes you are making.",
   "actions": [
     {
-      "actionType": "create" | "update",
-      "nodeId": "id-of-node",
-      "parentId": "parent-id",
+      "actionType": "update",
+      "nodeId": "id-of-node-to-update",
+      "newDescription": "Updated description explaining the component",
+      "newCode": "FULL MODIFIED CODE STRING HERE"
+    },
+    {
+      "actionType": "create",
+      "parentId": "id-of-parent-container",
       "newNode": {
-         "id": "unique-id",
+         "id": "unique-kebab-case-id",
          "type": "html" | "css" | "javascript" | "js-function",
          "description": "...",
-         "code": "FULL MODIFIED CODE STRING HERE",
-         "selector": "#prev-id",
+         "code": "FULL COMPONENT CODE STRING HERE",
+         "selector": "#prev-sibling-id",
          "position": "afterend"
       }
+    },
+    {
+      "actionType": "delete",
+      "nodeId": "id-of-node-to-delete"
     }
   ]
 }
@@ -3680,7 +3737,15 @@ async function executeSingleTask(promptContext) {
         const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
+        
+        // Strip markdown backticks safely
+        let jsonText = rawResponse.trim();
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (match && match[1]) {
+            jsonText = match[1];
+        }
+
+        const agentDecision = JSON.parse(jsonText);
         
         if (agentDecision.question) {
             renderAgentQuestionUI(agentDecision.question);
@@ -3792,8 +3857,12 @@ function executeAgentPlan(agentDecision, agentLogger) {
 
     for (const action of agentDecision.actions) {
         if (action.actionType === 'update') {
-            const { nodeId, newDescription, newCode } = action;
+            const nodeId = action.nodeId;
             const nodeToUpdate = findNodeById(nodeId);
+
+            // Robust extraction: AI sometimes puts fields inside a 'newNode' object even on update.
+            const newDesc = action.newDescription !== undefined ? action.newDescription : (action.newNode && action.newNode.description);
+            const newCd = action.newCode !== undefined ? action.newCode : (action.newNode && action.newNode.code);
 
             if (nodeToUpdate) {
                 if (nodeToUpdate.type === 'container') {
@@ -3801,8 +3870,8 @@ function executeAgentPlan(agentDecision, agentLogger) {
                     continue;
                 }
                 agentLogger(`<strong>Updating Node:</strong> \`${nodeId}\` (${nodeToUpdate.type})`, 'action');
-                if (newDescription) nodeToUpdate.description = newDescription;
-                if (typeof newCode === 'string') nodeToUpdate.code = newCode;
+                if (newDesc !== undefined) nodeToUpdate.description = newDesc;
+                if (typeof newCd === 'string') nodeToUpdate.code = newCd;
             } else {
                 agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`, skipping.`, 'warn');
             }
@@ -3811,7 +3880,7 @@ function executeAgentPlan(agentDecision, agentLogger) {
             const parentNode = findNodeById(parentId);
             if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
                 if (!newNode || !newNode.id || findNodeById(newNode.id)) {
-                     agentLogger(`Warning: AI tried to create an invalid or duplicate node \`${newNode.id}\`. Skipping.`, 'warn');
+                     agentLogger(`Warning: AI tried to create an invalid or duplicate node \`${newNode?.id}\`. Skipping.`, 'warn');
                      continue;
                 }
                 if (!parentNode.children) parentNode.children = [];
@@ -3820,12 +3889,22 @@ function executeAgentPlan(agentDecision, agentLogger) {
             } else {
                 agentLogger(`Warning: AI wanted to create node under invalid parent \`${parentId}\`. Skipping.`, 'warn');
             }
+        } else if (action.actionType === 'delete') {
+            const nodeId = action.nodeId;
+            const result = findNodeAndParentById(nodeId);
+            if (result && result.parent) {
+                agentLogger(`<strong>Deleting Node:</strong> \`${nodeId}\``, 'action');
+                result.parent.children = result.parent.children.filter(c => c.id !== nodeId);
+            } else {
+                agentLogger(`Warning: Agent wanted to delete non-existent node \`${nodeId}\`. Skipping.`, 'warn');
+            }
         } else {
             agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType}\`. Skipping.`, 'warn');
         }
     }
     
     refreshAllUI();
+    autoSaveProject(); 
 }
 
 // --- Chat Logic ---
@@ -4505,16 +4584,62 @@ ${JSON.stringify(vibeTree, null, 2)}
     }
 }
 
+async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
+    const node = findNodeById(nodeId);
+    if (!node) throw new Error(`Node not found: ${nodeId}`);
+
+    recordHistory(`Edit description for ${nodeId} (modal)`);
+    node.description = newDescription;
+
+    let originalHtml = '';
+    if (buttonEl) {
+        originalHtml = buttonEl.innerHTML;
+        buttonEl.disabled = true;
+        buttonEl.innerHTML = 'Updating... <div class="loading-spinner"></div>';
+    }
+
+    try {
+        if (node.type === 'container') {
+            const newChildren = await generateCompleteSubtree(node);
+            node.children = newChildren;
+            refreshAllUI();
+        } else {
+            const systemPrompt = getAgentSystemPrompt();
+            const fullTreeString = JSON.stringify(vibeTree, null, 2);
+            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
+
+            const rawResponse = await callAI(systemPrompt, userPrompt, true);
+            
+            let jsonText = rawResponse.trim();
+            const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (match && match[1]) jsonText = match[1];
+            
+            const agentDecision = JSON.parse(jsonText);
+            
+            if (agentDecision.question) {
+                alert(`AI Question: ${agentDecision.question}\n\n(Please provide clearer instructions in the description field and try again.)`);
+                return;
+            }
+
+            executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
+        }
+        switchToTab('preview');
+    } finally {
+        if (buttonEl) {
+            buttonEl.disabled = false;
+            buttonEl.innerHTML = originalHtml || 'Save & Update Vibe';
+        }
+    }
+}
+
 
     window.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'apply-merged-code') {
             console.log("Received merged code from Merger tool.");
             const newCode = event.data.code;
             
-            // Update the hidden full code editor
             if(fullCodeEditor) fullCodeEditor.value = newCode;
             
-            // Update the tree and UI
             handleUpdateTreeFromCode(newCode);
         }
     });
@@ -4679,7 +4804,6 @@ function switchToTab(tabId) {
         return;
     }
 
-    // Save state to IndexedDB
     idbKV.set(SESSION_KEYS.TAB, tabId).catch(err => console.error("Failed to save tab state", err));
 
     const newContent = tabContents.querySelector(`#${tabId}`);
@@ -4716,14 +4840,12 @@ function switchToTab(tabId) {
         }
     }
     
-    // --- MERGE TAB LOGIC ---
     if (tabId === 'merge') {
         showFullCode(); 
         const currentCode = fullCodeEditor.value;
         const mergeFrame = newContent.querySelector('iframe');
         
         if (mergeFrame && mergeFrame.contentWindow) {
-            // Post the current code to the iframe
             mergeFrame.contentWindow.postMessage({
                 type: 'load-source-code',
                 code: currentCode
@@ -4775,9 +4897,9 @@ function initializeMermaid() {
 }
 
 const DB_NAME = 'VibeLocalDB';
-const DB_VERSION = 2; // UPDATED: Incremented to trigger onupgradeneeded
+const DB_VERSION = 2; 
 const STORE_NAME = 'projects';
-const KV_STORE_NAME = 'appState'; // FIXED: Defined this missing variable
+const KV_STORE_NAME = 'appState'; 
 let dbPromise = null;
 
 function getDb() {
@@ -4792,12 +4914,10 @@ function getDb() {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
-                // Ensure 'projects' store exists
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
                 }
 
-                // Ensure 'appState' store exists (This previously caused the error)
                 if (!db.objectStoreNames.contains(KV_STORE_NAME)) {
                     db.createObjectStore(KV_STORE_NAME, { keyPath: 'key' });
                 }
@@ -4947,7 +5067,7 @@ async function handleLoadProject(event) {
         currentProjectStorageType = storageType;
         currentProjectGithubSource = null;
 
-        saveSessionMetadata(); // Save state
+        saveSessionMetadata(); 
 
         shareProjectButton.disabled = (storageType !== 'cloud');
         openAiStructureModalButton.disabled = (storageType !== 'cloud');
@@ -5027,9 +5147,6 @@ projectListContainer.addEventListener('click', (event) => {
     }
 });
 
-// =============================
-// CONTEXT / COMPONENT LIBRARY
-// =============================
 
 function openComponentModal(componentId = null, componentData = null) {
     componentModalError.textContent = '';
@@ -5412,7 +5529,14 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         const userPrompt = `Extract the node with ID "${nodeId}" from the following Vibe Tree into a self-contained component.\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const extractedComponent = JSON.parse(rawResponse);
+        
+        let jsonText = rawResponse.trim();
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (match && match[1]) {
+            jsonText = match[1];
+        }
+
+        const extractedComponent = JSON.parse(jsonText);
 
         if (!extractedComponent.id || !extractedComponent.name) {
             throw new Error("AI failed to return a valid component structure with id and name.");
@@ -5710,7 +5834,14 @@ async function handleExecuteGenerateControls() {
         const userPrompt = `User Request: "${prompt}"\n\nNode Context:\n\`\`\`json\n${JSON.stringify(node, null, 2)}\n\`\`\`\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const newControls = JSON.parse(rawResponse);
+        
+        let jsonText = rawResponse.trim();
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (match && match[1]) {
+            jsonText = match[1];
+        }
+        
+        const newControls = JSON.parse(jsonText);
         
         if (!Array.isArray(newControls)) {
             throw new Error("AI did not return a valid JSON array for controls.");
@@ -6141,48 +6272,6 @@ function resetToStartPage() {
 async function buildAssetUrlMap() { return {}; }
 function injectAssetRewriterScript(doc, assetMap) {}
 
-async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
-    const node = findNodeById(nodeId);
-    if (!node) throw new Error(`Node not found: ${nodeId}`);
-
-    recordHistory(`Edit description for ${nodeId} (modal)`);
-    node.description = newDescription;
-
-    let originalHtml = '';
-    if (buttonEl) {
-        originalHtml = buttonEl.innerHTML;
-        buttonEl.disabled = true;
-        buttonEl.innerHTML = 'Updating... <div class="loading-spinner"></div>';
-    }
-
-    try {
-        if (node.type === 'container') {
-            const newChildren = await generateCompleteSubtree(node);
-            node.children = newChildren;
-            refreshAllUI();
-        } else {
-            const systemPrompt = getAgentSystemPrompt();
-            const fullTreeString = JSON.stringify(vibeTree, null, 2);
-            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
-
-            const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
-            
-            if (agentDecision.question) {
-                alert(`AI Question: ${agentDecision.question}\n\n(Please provide clearer instructions in the description field and try again.)`);
-                return;
-            }
-
-            executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
-        }
-        switchToTab('preview');
-    } finally {
-        if (buttonEl) {
-            buttonEl.disabled = false;
-            buttonEl.innerHTML = originalHtml || 'Save & Update Vibe';
-        }
-    }
-}
 
 function buildBasicMermaidFromTree(tree) {
     if (tree && tree.type === 'raw-html-container') {
@@ -6294,6 +6383,7 @@ async function handleGenerateProject() {
 
         currentProjectId = projectId;
         currentProjectStorageType = storageType;
+        
         shareProjectButton.disabled = (storageType !== 'cloud');
         openAiStructureModalButton.disabled = (storageType !== 'cloud');
         updateSaveButtonStates();
@@ -6560,19 +6650,6 @@ window.vibeAPI = {
 console.log("Vibe Automation API exposed as window.vibeAPI");
 
 
-/*  if (typeof newValue === 'boolean') {
-        replacementValue = String(newValue); // "true" or "false" (no quotes)
-    } else if (!isNaN(Number(newValue)) && String(newValue).trim() !== '') {
-        // It's a number
-        replacementValue = String(newValue); 
-    } else {
-        // It's a string, wrap in quotes
-        replacementValue = `"${String(newValue).replace(/"/g, '\\"')}"`;
-    }
-*/
-
-
-
 async function clearSessionMetadata() {
     try {
         await idbKV.remove(SESSION_KEYS.PROJECT_ID);
@@ -6751,13 +6828,6 @@ async function buildCombinedHtmlFromZip(jszip) {
         // Normalize path relative to the root of the zip
         const normalizedName = normalizePath(name); 
 
-        if (mime.startsWith('text/') || mime === 'application/javascript') {
-            // Store text content (CSS/JS) directly? 
-            // Better strategy: Convert EVERYTHING to Data URI to handle relative paths easily in regex
-            // OR keep text as text for <style> injection. 
-            // Let's go with text for CSS/JS to keep file size slightly lower, DataURI for binary.
-        } 
-        
         // We load everything as Uint8Array first to be safe
         const content = await file.async('uint8array');
         const dataUri = arrayBufferToDataUri(content, mime);
@@ -6789,9 +6859,6 @@ async function buildCombinedHtmlFromZip(jszip) {
             const normalizedTarget = normalizePath(fullPathInZip);
             
             if (assetMap[normalizedTarget]) {
-                // If it's a CSS/JS file, we might want to inline it, but for raw-container, 
-                // replacing with Data URI is the safest "catch-all" for <img src> and background-image.
-                // For <link rel="stylesheet"> and <script src>, we usually want to inline the TEXT content.
                 return `${prefix}${assetMap[normalizedTarget]}${suffix}`;
             }
             
