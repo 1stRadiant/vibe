@@ -28,6 +28,18 @@ const VIBE_JSON_LIBRARY = {
   "theme-switcher": { "id": "theme-switcher", "name": "Theme Switcher", "html": "...", "css": "...", "javascript": "..." }
 };
 
+// --- STUBS FOR MISSING FUNCTIONS (Prevents ReferenceErrors) ---
+function handleFilesUpload() { alert("File management not implemented with backend."); }
+function handleFilesNewFolder() { alert("File management not implemented with backend."); }
+function handleFilesNewFile() { alert("File management not implemented with backend."); }
+function handleFilesDownload() { alert("File management not implemented with backend."); }
+function handleFilesCopy() { alert("File management not implemented with backend."); }
+function handleFilesPaste() { alert("File management not implemented with backend."); }
+function handleFilesRename() { alert("File management not implemented with backend."); }
+function handleFilesDelete() { alert("File management not implemented with backend."); }
+async function buildAssetUrlMap() { return {}; }
+function injectAssetRewriterScript(doc, assetMap) {}
+
 // --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
 (function() {
     try {
@@ -87,7 +99,7 @@ function decompressProjectData(dataString) {
     }
 }
 
-function generateFullCodeString(tree, userId, projectId) {
+function generateFullCodeString(tree, userId, projectId, injectVibeData = false) {
     let cssContent = '';
     let jsContent = '';
     let htmlContent = '';
@@ -99,7 +111,7 @@ function generateFullCodeString(tree, userId, projectId) {
         const htmlNodes = nodes.filter(n => n.type === 'html');
         htmlNodes.forEach(node => {
             let finalCode = node.code;
-            if (finalCode && finalCode.trim().startsWith('<')) {
+            if (injectVibeData && finalCode && finalCode.trim().startsWith('<')) {
                 finalCode = finalCode.replace(/<([a-zA-Z0-9\-]+)/, `<$1 data-vibe-node-id="${node.id}"`);
             }
             if (node.children && node.children.length > 0) {
@@ -143,7 +155,7 @@ function generateFullCodeString(tree, userId, projectId) {
         htmlContent = buildHtmlRecursive(tree.children);
     }
 
-const vibeDbScript = `
+    const vibeDbScript = (injectVibeData && userId && projectId) ? `
 <script>
 /* --- Vibe Database Connector --- */
 (function() {
@@ -215,7 +227,7 @@ const vibeDbScript = `
     }, true);
 })();
 <\/script>
-    `;
+    ` : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -225,7 +237,7 @@ const vibeDbScript = `
 </head>
 <body>
 ${htmlContent.trim()}
-    ${(userId && projectId) ? vibeDbScript.trim() : ''}
+    ${vibeDbScript.trim()}
     <script>${jsContent.trim()}<\/script>
 </body>
 </html>`;
@@ -237,7 +249,8 @@ async function runLiveView(userId, projectId) {
         const compressedData = await api.loadProject(userId, projectId);
         const projectTree = decompressProjectData(compressedData);
         
-        let fullHtml = generateFullCodeString(projectTree, userId, projectId);
+        // Pass 'true' to inject Vibe DB functions into live view
+        let fullHtml = generateFullCodeString(projectTree, userId, projectId, true);
 
         document.open();
         document.write(fullHtml);
@@ -1115,7 +1128,6 @@ function serializeArg(arg, depth = 0, seen = new WeakSet()) {
     return { type: 'string', value: String(arg), preview: String(arg) };
 }
 
-
 Object.keys(originalConsole).forEach(level => {
     if (typeof originalConsole[level] === 'function') {
         console[level] = (...args) => {
@@ -1853,7 +1865,7 @@ async function handleUpdate(event) {
     button.innerHTML = 'Updating... <div class="loading-spinner"></div>';
     
     try {
-        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
         const systemPrompt = `You are an expert AI web developer. The user has updated the description/intent for a specific component in their project.
 Your task is to rewrite the ENTIRE HTML file to incorporate this change, modifying HTML, CSS, or JS as necessary.
 
@@ -2689,7 +2701,7 @@ async function handleDownloadProjectZip() {
             zip.file(path, content);
         }
 
-        const bundledHtmlContent = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const bundledHtmlContent = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
         zip.file("bundle.html", bundledHtmlContent);
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -2706,7 +2718,7 @@ function applyVibes() {
     try {
         iframeErrors = [];
         const doc = previewContainer.contentWindow.document;
-        let html = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        let html = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, true);
 
         const commsScriptText = `
 <script>
@@ -2834,7 +2846,7 @@ function applyVibes() {
 }
 
 function showFullCode() {
-    let fullCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+    let fullCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
     if (updateTreeFromCodeButton) {
         updateTreeFromCodeButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sync Changes';
         updateTreeFromCodeButton.title = 'Update the Vibe Tree structure from the code in this editor.';
@@ -3188,7 +3200,7 @@ async function executeSingleTask(promptContext) {
     showAgentSpinner();
     try {
         const systemPrompt = getAgentSystemPrompt();
-        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
         
         const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Current Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
@@ -3544,7 +3556,7 @@ async function handleAiProjectEditExecute() {
     showGlobalAgentLoader('AI is editing the project...');
 
     try {
-        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
 
         const systemPrompt = `You are an expert AI developer. Your task is to modify a complete HTML file based on a user's request, which is **focused on a specific component** within the project.
 
@@ -3636,7 +3648,7 @@ async function handleAiStructureUpdate() {
 
 Analyze the user's request and return the NEW, COMPLETE HTML code.`;
 
-        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
         const userPrompt = `User Instructions: "${prompt}"\n\nCurrent HTML Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, false);
@@ -4824,7 +4836,7 @@ async function handleExecuteGenerateControls() {
         updateDynamicStyles();
 
         if (fullCodeEditor) {
-            fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+            fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
         }
 
         autoSaveProject();
@@ -4877,7 +4889,7 @@ function handleControlChange(event) {
     }
     
     if (fullCodeEditor) {
-        fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId, false);
     }
 
     autoSaveProject();
@@ -5007,6 +5019,192 @@ function updateDynamicStyles() {
         applyVibes();
     }
 }
+
+function bindEventListeners() {
+    if (showSignupLink) showSignupLink.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('signup'); });
+    if (showLoginLink) showLoginLink.addEventListener('click', (e) => { e.preventDefault(); showAuthForm('login'); });
+    if (loginButton) loginButton.addEventListener('click', handleLogin);
+    if (signupButton) signupButton.addEventListener('click', handleSignup);
+    if (logoutButton) logoutButton.addEventListener('click', handleLogout);
+    if (loginPasswordInput) loginPasswordInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleLogin());
+    if (signupPasswordInput) signupPasswordInput.addEventListener('keydown', (e) => e.key === 'Enter' && handleSignup());
+    
+    handleTabSwitching();
+    if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
+    if (undoButton) undoButton.addEventListener('click', doUndo);
+    if (redoButton) redoButton.addEventListener('click', doRedo);
+    if (shareProjectButton) shareProjectButton.addEventListener('click', handleShareProject);
+    if (saveToCloudButton) saveToCloudButton.addEventListener('click', handleSaveToCloud);
+    if (saveToLocalButton) saveToLocalButton.addEventListener('click', handleSaveToLocal);
+    if (saveToGithubButton) saveToGithubButton.addEventListener('click', handleSaveToGitHub);
+    if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
+    if (runFullCodeAiButton) runFullCodeAiButton.addEventListener('click', handleFullCodeAiUpdate);
+    if (fullCodeAiPromptInput) {
+        fullCodeAiPromptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFullCodeAiUpdate();
+            }
+        });
+    }
+    
+    if (uploadHtmlButton) uploadHtmlButton.addEventListener('click', () => htmlFileInput.click());
+    if (htmlFileInput) htmlFileInput.addEventListener('change', handleFileUpload);
+    if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
+    if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
+    if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
+    
+    if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
+    if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
+    if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
+    if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
+    if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
+    if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
+    if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
+    if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
+    if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
+    
+    if (searchInput) searchInput.addEventListener('input', handleSearchInput());
+    if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
+    if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
+    if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
+    if (aiEditorSearchInput) aiEditorSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleAiEditorSearch();
+    });
+
+    if (storageToggleButtons) {
+        storageToggleButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                storageToggleButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                populateProjectList(button.dataset.storage);
+            });
+        });
+    }
+
+    if (saveGithubPatButton) saveGithubPatButton.addEventListener('click', handleSaveGithubPat);
+    if (logoutGithubButton) logoutGithubButton.addEventListener('click', handleLogoutGithub);
+    if (githubRepoSelect) githubRepoSelect.addEventListener('change', populateGithubBranches);
+    if (loadFromGithubButton) loadFromGithubButton.addEventListener('click', handleLoadFromGithub);
+    
+    if (runAgentSingleTaskButton) runAgentSingleTaskButton.addEventListener('click', handleAddTaskToQueue);
+    if (startIterativeSessionButton) startIterativeSessionButton.addEventListener('click', handleStartTaskQueue);
+    if (endSessionButton) endSessionButton.addEventListener('click', handleStopTaskQueue);
+    
+    if (agentPromptInput) {
+        renderAutoPilotTriggers();
+    }
+    
+    if (generateFlowchartButton) generateFlowchartButton.addEventListener('click', handleGenerateFlowchart);
+    if (generateProjectButton) generateProjectButton.addEventListener('click', handleGenerateProject);
+    if (startIterativeBuildButton) startIterativeBuildButton.addEventListener('click', handleStartIterativeProjectBuild);
+
+    if (sendChatButton) sendChatButton.addEventListener('click', handleSendChatMessage);
+    if (chatPromptInput) {
+        chatPromptInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSendChatMessage();
+            }
+        });
+    }
+    
+    if (addNewComponentButton) addNewComponentButton.addEventListener('click', () => openComponentModal(null));
+    if (saveComponentButton) saveComponentButton.addEventListener('click', handleSaveComponent);
+    if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
+    if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
+
+    if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
+    if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
+    if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
+    if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
+
+    if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
+    
+    if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
+    if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
+    if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
+    if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
+    
+    if (newProjectButton) newProjectButton.addEventListener('click', () => {
+        clearSessionMetadata();
+        resetToStartPage();
+    });
+    
+    if (globalAgentLoader) globalAgentLoader.addEventListener('click', hideGlobalAgentLoader);
+
+    if (openAiStructureModalButton) openAiStructureModalButton.addEventListener('click', openAiStructureModal);
+    if (aiStructureCloseButton) aiStructureCloseButton.addEventListener('click', closeAiStructureModal);
+    if (aiStructureExecuteButton) aiStructureExecuteButton.addEventListener('click', handleAiStructureUpdate);
+    
+    if (aiProjectEditExecuteButton) aiProjectEditExecuteButton.addEventListener('click', handleAiProjectEditExecute);
+    if (aiProjectEditCloseButton) aiProjectEditCloseButton.addEventListener('click', closeAiProjectEditModal);
+    if (aiProjectEditPromptInput) {
+        aiProjectEditPromptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); handleAiProjectEditExecute(); }
+        });
+    }
+
+    if (aiControlsExecuteButton) aiControlsExecuteButton.addEventListener('click', handleExecuteGenerateControls);
+    if (aiControlsCloseButton) aiControlsCloseButton.addEventListener('click', closeGenerateControlsModal);
+    if (aiControlsPromptInput) {
+        aiControlsPromptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); handleExecuteGenerateControls(); }
+        });
+    }
+
+    window.addEventListener('click', (event) => {
+        if (event.target === settingsModal) settingsModal.style.display = 'none';
+        if (event.target === contextComponentModal) closeComponentModal();
+        if (event.target === aiProjectEditModal) closeAiProjectEditModal();
+        if (event.target === aiStructureModal) closeAiStructureModal();
+        if (event.target === aiControlsModal) closeGenerateControlsModal();
+    });
+    
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (currentProjectStorageType === 'cloud' && saveToCloudButton && !saveToCloudButton.disabled) {
+                handleSaveToCloud();
+            } else if (currentProjectStorageType === 'github' && saveToGithubButton && !saveToGithubButton.disabled) {
+                handleSaveToGithub();
+            } else if (saveToLocalButton && !saveToLocalButton.disabled) {
+                handleSaveToLocal();
+            }
+        }
+    });
+}
+
+function initMainApp() {
+    initializeApiSettings();
+    initializeMermaid();
+    initializeShorthandSystem(); 
+    SuggestionEngine.init();
+    
+    bindEventListeners();
+    
+    SuggestionEngine.attachToInputs();
+    
+    checkLoggedInState();
+    checkGithubLoginState(); 
+
+    setTimeout(restoreSession, 100);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const isLiveView = params.get('view') === 'live';
+    const userId = params.get('user');
+    const projectId = params.get('project');
+
+    if (isLiveView && userId && projectId) {
+        runLiveView(userId, projectId);
+    } else {
+        initMainApp();
+    }
+});
 
 window.vibeAPI = {
     callAI: callAI, 
