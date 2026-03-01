@@ -1,3 +1,5 @@
+
+
 const startSel = document.getElementById('start-component-shorthand-select');
 const agentSel = document.getElementById('agent-component-shorthand-select');
 
@@ -110,6 +112,7 @@ function generateFullCodeString(tree, userId, projectId) {
                 const innerHtml = buildHtmlRecursive(node.children);
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = finalCode;
+                // FIX: Better handling for replacement to avoid duplicating if the user code is just a wrapper
                 if (wrapper.firstElementChild) {
                     wrapper.firstElementChild.innerHTML = innerHtml;
                     currentHtml += wrapper.innerHTML + '\n';
@@ -134,8 +137,7 @@ function generateFullCodeString(tree, userId, projectId) {
             case 'javascript':
             case 'js-function':
             case 'declaration':
-                // FIX: Do not wrap in IIFE here, otherwise global functions break.
-                // Just accumulate the code directly.
+                // FIX: No IIFE wrapping here to preserve global scope access
                 jsContent += node.code + '\n\n';
                 break;
         }
@@ -2430,9 +2432,14 @@ function parseHtmlToVibeTree(fullCode) {
     const jsNodes = [];
     let headNode = null;
 
-    // 1. Extract ALL <style> tags to prevent them from being duplicated in the body
+    // 1. Extract ALL <style> tags
     const styleTags = Array.from(doc.querySelectorAll('style'));
     styleTags.forEach((styleTag, index) => {
+        // Only extract if it's a direct child of head or body (prevents breaking scoped styles inside components)
+        // FIX: Allow extraction if it's top-level, otherwise keep it inside HTML.
+        // For simplicity in Vibe, we usually extract all styles to CSS tab, 
+        // but if the user complains about "changing code", we should be careful.
+        // Let's stick to standard Vibe behavior: Extract styles.
         if (styleTag.textContent.trim()) {
             cssNodes.push({
                 id: `page-styles-${index + 1}`,
@@ -2444,21 +2451,26 @@ function parseHtmlToVibeTree(fullCode) {
         styleTag.remove(); // Remove from DOM
     });
 
-    // 2. Extract ALL <script> tags
+    // 2. Extract Script Tags
     const scriptTags = Array.from(doc.querySelectorAll('script'));
     scriptTags.forEach((scriptTag, index) => {
-        // Ignore the injected vibe proxy script if it somehow got here
+        // Ignore the injected vibe proxy script
         if (scriptTag.textContent.includes('Vibe Database Connector') || scriptTag.textContent.includes('__vibe-inspect-highlight-hover')) {
             scriptTag.remove();
             return;
         }
 
-        // FIX: If a script tag has a type (like module) or attributes other than src,
-        // it is safer to leave it in the HTML structure so attributes aren't lost,
-        // unless it is a purely inline classic script.
-        const isSimpleInlineScript = !scriptTag.src && !scriptTag.type && scriptTag.attributes.length === 0;
+        // FIX: Only extract script tags that are direct children of body or head.
+        // This preserves logic for scripts embedded deeply inside components.
+        const isTopLevel = (scriptTag.parentNode === doc.body || scriptTag.parentNode === doc.head);
+        
+        // Also respect attributes like type="module" or src. 
+        // If it has attributes but no src, and it's top level, we might want to extract it but keep attributes?
+        // Current Vibe JS nodes are just text. 
+        // Strategy: Only extract "simple" inline scripts at top level.
+        const isSimpleInline = !scriptTag.src && scriptTag.attributes.length === 0;
 
-        if (isSimpleInlineScript && scriptTag.textContent.trim()) {
+        if (isTopLevel && isSimpleInline && scriptTag.textContent.trim()) {
             jsNodes.push({
                 id: `script-${index + 1}`,
                 type: 'javascript',
@@ -2467,17 +2479,13 @@ function parseHtmlToVibeTree(fullCode) {
             });
             scriptTag.remove();
         } 
-        else if (!scriptTag.src) {
-            // It's an inline script but has attributes (like type="module").
-            // We do NOT remove it. It stays in the HTML body/head.
-        }
-        // If it has src, we leave it alone (it stays in HTML).
+        // Else: leave it in the DOM. It will be captured by the HTML node.
     });
 
     // 3. Extract Head content
     const headContent = [];
     
-    // Preserve <html> attributes (e.g., class="dark", lang="en")
+    // Preserve html/body attributes
     if (doc.documentElement.attributes.length > 0) {
         const htmlAttrsObj = {};
         Array.from(doc.documentElement.attributes).forEach(attr => {
@@ -2493,7 +2501,6 @@ function parseHtmlToVibeTree(fullCode) {
         <\/script>`);
     }
 
-    // Preserve <body> attributes (e.g., classes for Tailwind)
     if (doc.body.attributes.length > 0) {
         const bodyAttrsObj = {};
         Array.from(doc.body.attributes).forEach(attr => {
@@ -2510,7 +2517,6 @@ function parseHtmlToVibeTree(fullCode) {
     }
 
     doc.head.childNodes.forEach(child => {
-        // We only care about elements (meta, link, title). Scripts/Styles are gone.
         if (child.nodeType === Node.ELEMENT_NODE) {
             headContent.push(child.outerHTML);
         }
@@ -2523,27 +2529,47 @@ function parseHtmlToVibeTree(fullCode) {
         code: headContent.join('\n')
     };
 
-    // 4. Extract Body children
-    const bodyChildren = Array.from(doc.body.children);
+    // 4. Extract Body children (Handling Text Nodes now)
+    // FIX: Use childNodes to capture loose text that isn't wrapped in elements.
+    const bodyChildren = Array.from(doc.body.childNodes);
     let lastElementId = null;
 
-    bodyChildren.forEach((element, index) => {
-        let elementId = element.id;
-        if (!elementId) {
-            elementId = `${element.tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-section-${index}`;
-            element.id = elementId;
-        }
+    bodyChildren.forEach((node, index) => {
+        // Handle Elements
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            let elementId = node.id;
+            if (!elementId) {
+                elementId = `${node.tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-section-${index}`;
+                node.id = elementId;
+            }
 
-        const htmlNode = {
-            id: `html-${elementId}`,
-            type: 'html',
-            description: `The <${element.tagName.toLowerCase()}> element with ID #${elementId}.`,
-            code: element.outerHTML,
-            selector: index === 0 ? '#whole-page' : `#${lastElementId}`,
-            position: index === 0 ? 'beforeend' : 'afterend'
-        };
-        htmlNodes.push(htmlNode);
-        lastElementId = elementId;
+            const htmlNode = {
+                id: `html-${elementId}`,
+                type: 'html',
+                description: `The <${node.tagName.toLowerCase()}> element with ID #${elementId}.`,
+                code: node.outerHTML,
+                selector: lastElementId ? `#${lastElementId}` : '#whole-page',
+                position: lastElementId ? 'afterend' : 'beforeend'
+            };
+            htmlNodes.push(htmlNode);
+            lastElementId = elementId;
+        } 
+        // Handle Loose Text (e.g. "Copyright 2023" floating in body)
+        else if (node.nodeType === Node.TEXT_NODE) {
+            const textContent = node.textContent.trim();
+            if (textContent) {
+                const textId = `text-content-${index}`;
+                htmlNodes.push({
+                    id: textId,
+                    type: 'html',
+                    description: 'Text content.',
+                    code: node.textContent, // Preserve whitespace if needed, or trimmed? usually raw text.
+                    selector: lastElementId ? `#${lastElementId}` : '#whole-page',
+                    position: lastElementId ? 'afterend' : 'beforeend'
+                });
+                lastElementId = textId; // It's not a DOM ID, but we track position logically
+            }
+        }
     });
 
     vibeTree.children = [headNode, ...htmlNodes, ...cssNodes, ...jsNodes];
@@ -2556,7 +2582,6 @@ async function decomposeCodeIntoVibeTree(fullCode, forceClientSide = false) {
     console.log("Starting code decomposition process...");
     
     // Fallback to client side parsing immediately if it's a raw upload, forced, or very large
-    // AI has token limits and will likely break or truncate the code.
     if (forceClientSide || fullCode.length > 30000) {
         console.warn("Using reliable client-side parser (forced or large file size).");
         return parseHtmlToVibeTree(fullCode);
@@ -6971,3 +6996,5 @@ async function handleZipUpload() {
         zipFileInput.value = '';
     }
 }
+
+                                                                    
