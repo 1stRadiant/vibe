@@ -1,10 +1,3 @@
-import * as api from './api.js';
-
-// NOTE: DOM element references below are declared at module-load time.
-// Since this is an ES module, it is deferred by default, so the DOM
-// will be available when these run. Ensure you do NOT load this file
-// with the 'async' attribute.
-
 const startSel = document.getElementById('start-component-shorthand-select');
 const agentSel = document.getElementById('agent-component-shorthand-select');
 
@@ -35,7 +28,6 @@ const VIBE_JSON_LIBRARY = {
   "theme-switcher": { "id": "theme-switcher", "name": "Theme Switcher", "html": "...", "css": "...", "javascript": "..." }
 };
 
-
 // --- START OF LIVE VIEW PRE-BOOTSTRAPPER ---
 (function() {
     try {
@@ -54,9 +46,9 @@ const VIBE_JSON_LIBRARY = {
     }
 })();
 
+import * as api from './api.js';
 
 // --- START OF LIVE VIEW BOOTLOADER ---
-
 function compressProjectData(projectData) {
     try {
         const jsonString = JSON.stringify(projectData);
@@ -95,7 +87,6 @@ function decompressProjectData(dataString) {
     }
 }
 
-
 function generateFullCodeString(tree, userId, projectId) {
     let cssContent = '';
     let jsContent = '';
@@ -115,7 +106,6 @@ function generateFullCodeString(tree, userId, projectId) {
                 const innerHtml = buildHtmlRecursive(node.children);
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = finalCode;
-                // FIX: Better handling for replacement to avoid duplicating if the user code is just a wrapper
                 if (wrapper.firstElementChild) {
                     wrapper.firstElementChild.innerHTML = innerHtml;
                     currentHtml += wrapper.innerHTML + '\n';
@@ -140,7 +130,6 @@ function generateFullCodeString(tree, userId, projectId) {
             case 'javascript':
             case 'js-function':
             case 'declaration':
-                // FIX: No IIFE wrapping here to preserve global scope access
                 jsContent += node.code + '\n\n';
                 break;
         }
@@ -242,19 +231,13 @@ ${htmlContent.trim()}
 </html>`;
 }
 
-
 async function runLiveView(userId, projectId) {
     try {
         document.body.innerHTML = '<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #ccc; background-color: #282c34; height: 100vh; margin: 0;">Loading Project...</div>';
         const compressedData = await api.loadProject(userId, projectId);
         const projectTree = decompressProjectData(compressedData);
         
-        let fullHtml;
-        if (projectTree && projectTree.type === 'raw-html-container') {
-             fullHtml = projectTree.code || '';
-        } else {
-             fullHtml = generateFullCodeString(projectTree, userId, projectId);
-        }
+        let fullHtml = generateFullCodeString(projectTree, userId, projectId);
 
         document.open();
         document.write(fullHtml);
@@ -264,7 +247,6 @@ async function runLiveView(userId, projectId) {
         document.body.innerHTML = `<div style="font-family: sans-serif; text-align: center; padding-top: 20vh; color: #e06c75; background-color: #282c34; height: 100vh; margin: 0;"><h1>Error</h1><p>Could not load project.</p><p style="color: #999;">${e.message}</p></div>`;
     }
 }
-
 // --- END OF LIVE VIEW BOOTLOADER ---
 
 const authModal = document.getElementById('auth-modal');
@@ -282,7 +264,6 @@ const showSignupLink = document.getElementById('show-signup');
 const showLoginLink = document.getElementById('show-login');
 const userStatusText = document.getElementById('user-status-text');
 const logoutButton = document.getElementById('logout-button');
-
 
 const previewContainer = document.getElementById('website-preview');
 const editorContainer = document.getElementById('vibe-editor');
@@ -322,7 +303,6 @@ const githubPatInput = document.getElementById('github-pat-input');
 const saveGithubPatButton = document.getElementById('save-github-pat-button');
 const githubStatus = document.getElementById('github-status');
 const logoutGithubButton = document.getElementById('logout-github-button');
-
 
 const fullCodeEditor = document.getElementById('full-code-editor');
 const updateTreeFromCodeButton = document.getElementById('update-tree-from-code-button');
@@ -431,28 +411,6 @@ const closeSettingsModalButton = document.getElementById('close-settings-modal-b
 const startPageSettingsButton = document.getElementById('start-page-settings-button');
 const openSettingsModalButton = document.getElementById('open-settings-modal-button');
 
-const addNodeModal = document.getElementById('add-node-modal');
-const closeModalButton = document.querySelector('.close-button');
-const createNodeButton = document.getElementById('create-node-button');
-const addNodeParentIdInput = document.getElementById('add-node-parent-id');
-const newNodeIdInput = document.getElementById('new-node-id');
-const newNodeDescriptionInput = document.getElementById('new-node-description');
-const newNodeTypeInput = document.getElementById('new-node-type');
-const addNodeError = document.getElementById('add-node-error');
-const addNodeTargetIdInput = document.getElementById('add-node-target-id');
-const addNodePositionInput = document.getElementById('add-node-position');
-
-const editNodeModal = document.getElementById('edit-node-modal');
-const closeEditNodeModalButton = document.getElementById('close-edit-node-modal-button');
-const editNodeIdInput = document.getElementById('edit-node-id');
-const editNodeTypeInput = document.getElementById('edit-node-type');
-const editNodeDescriptionInput = document.getElementById('edit-node-description');
-const editNodeCodeInput = document.getElementById('edit-node-code');
-const saveEditNodeButton = document.getElementById('save-edit-node-button');
-const editNodeError = document.getElementById('edit-node-error');
-const aiImproveDescriptionButton = document.getElementById('ai-improve-description-button');
-const saveAsComponentButton = document.getElementById('save-as-component-button');
-
 const aiProjectEditModal = document.getElementById('ai-project-edit-modal');
 const aiProjectEditModalTitle = document.getElementById('ai-project-edit-modal-title');
 const aiProjectEditNodeIdInput = document.getElementById('ai-project-edit-node-id');
@@ -462,7 +420,7 @@ const aiProjectEditCloseButton = document.getElementById('ai-project-edit-close-
 const aiProjectEditError = document.getElementById('ai-project-edit-error');
 
 const COMPONENT_LIBRARY_KEY_PREFIX = '_vibe_component_library_';
-const getComponentLibraryKey = () => `${COMPONENT_LIBRARY_KEY_PREFIX}${currentUser.userId}`;
+const getComponentLibraryKey = () => `${COMPONENT_LIBRARY_KEY_PREFIX}${currentUser?.userId || 'guest'}`;
 
 function getComponentLibrary() {
     try {
@@ -496,6 +454,15 @@ function deleteComponent(componentId) {
     saveComponentLibrary(library);
 }
 
+// Helper to reliably extract raw code blocks without markdown wrapping
+function extractRawCode(text) {
+    let clean = text.trim();
+    const match = clean.match(/```(?:html)?\s*([\s\S]*?)\s*```/i);
+    if (match && match[1]) {
+        return match[1].trim();
+    }
+    return clean.replace(/^```\w*/, '').replace(/```$/, '').trim();
+}
 
 // --- Application State ---
 let currentUser = null; 
@@ -504,7 +471,6 @@ let taskQueue = [];
 let isTaskQueueRunning = false;
 let waitingForAgentConfirmation = false;
 let currentAgentTaskContext = ""; 
-let firstNodeToSwapId = null;
 
 const vibeEventBus = new EventTarget();
 const AUTO_PILOT_EVENTS = {
@@ -525,6 +491,7 @@ let geminiApiKey = '';
 let nscaleApiKey = '';
 const NSCALE_API_ENDPOINT = 'https://inference.api.nscale.com/v1/chat/completions';
 const NSCALE_MODEL = 'Qwen/Qwen3-235B-A22B';
+
 let vibeTree = {};
 const initialVibeTree = {
   id: "whole-page",
@@ -534,7 +501,7 @@ const initialVibeTree = {
     {
       id: "head-content",
       type: "head",
-      description: "Content for the <head> tag, including <title>, <meta>, and <link> tags. CSS from 'css' nodes will be added automatically.",
+      description: "Content for the <head> tag.",
       code: `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`
     }
   ]
@@ -810,7 +777,6 @@ const idbKV = {
             const request = store.get(key);
             
             request.onsuccess = () => {
-                // request.result is undefined if key not found
                 resolve(request.result ? request.result.value : null);
             };
             request.onerror = (event) => reject(event.target.error);
@@ -828,8 +794,6 @@ const idbKV = {
         });
     }
 }
-
-
 
 async function handleSignup() {
     const username = signupUsernameInput.value.trim();
@@ -875,7 +839,7 @@ function onLoginSuccess(userData) {
 }
 
 function handleLogout() {
-    clearSessionMetadata(); // Clear persistent session
+    clearSessionMetadata(); 
     currentUser = null;
     sessionStorage.removeItem('vibeUser');
     
@@ -1063,7 +1027,7 @@ function renderConsoleMessage(level, args) {
 function handleConsoleCommand(level, args) {
     switch (level) {
         case 'group':
-        case 'groupCollapsed': {
+        case 'groupCollapsed':
             const group = document.createElement('div');
             group.className = 'console-group';
             const details = document.createElement('details');
@@ -1085,7 +1049,6 @@ function handleConsoleCommand(level, args) {
             
             currentLogGroup = content;
             break;
-        }
         case 'groupEnd':
             if (currentLogGroup.parentElement && currentLogGroup.parentElement.closest('.console-group')) {
                 currentLogGroup = currentLogGroup.parentElement.closest('.console-group').parentElement;
@@ -1180,10 +1143,6 @@ let historyState = {
     isRestoring: false
 };
 
-function deepCloneTree(tree) {
-    return JSON.parse(JSON.stringify(tree));
-}
-
 function serializeTree(tree) {
     return JSON.stringify(tree);
 }
@@ -1258,11 +1217,6 @@ async function handleShareProject() {
         alert("Only projects saved to the cloud can be shared.");
         return;
     }
-    if (vibeTree && vibeTree.type === 'raw-html-container') {
-        alert("Sharing via live link is not available for raw HTML projects. Please download the project as a ZIP to share it.");
-        return;
-    }
-
     const url = `${window.location.origin}${window.location.pathname}?view=live&user=${encodeURIComponent(currentUser.userId)}&project=${encodeURIComponent(currentProjectId)}`;
     
     try {
@@ -1288,7 +1242,6 @@ async function handleShareProject() {
 // --- END: Share Project Button Logic ---
 
 // --- GITHUB INTEGRATION ---
-
 const GITHUB_API_BASE = 'https://api.github.com';
 const PROJECT_FILENAME = 'vibe-project.json';
 
@@ -1439,7 +1392,6 @@ async function populateGithubBranches() {
     }
 }
 
-
 async function handleLoadFromGithub() {
     const repoFullName = githubRepoSelect.value;
     const branch = githubBranchSelect.value;
@@ -1552,7 +1504,6 @@ function checkGithubLoginState() {
         updateGithubUiState();
     }
 }
-
 // --- END GITHUB INTEGRATION ---
 
 async function getNewProjectId(storageType, suggestedId) {
@@ -1648,7 +1599,6 @@ async function handleSaveToCloud() {
     }
 }
 
-
 async function handleSaveToLocal() {
     if (!currentProjectId || !vibeTree) return;
 
@@ -1698,7 +1648,6 @@ async function handleSaveToLocal() {
     }
 }
 
-
 function updateApiKeyVisibility() {
     if (currentAIProvider === 'gemini') {
         geminiSettingsContainer.style.display = 'block';
@@ -1710,7 +1659,6 @@ function updateApiKeyVisibility() {
 }
 
 function updateApiStatusDisplays() {
-    // Gemini Status
     if (geminiApiKey) {
         apiKeyInput.value = geminiApiKey;
         apiKeyStatus.textContent = 'Gemini API Key loaded from storage.';
@@ -1719,7 +1667,6 @@ function updateApiStatusDisplays() {
         apiKeyStatus.textContent = 'No Gemini API Key found.';
         apiKeyStatus.style.color = '#e5c07b';
     }
-    // nscale Status
     if (nscaleApiKey) {
         nscaleApiKeyInput.value = nscaleApiKey;
         nscaleApiKeyStatus.textContent = 'nscale API Key loaded from storage.';
@@ -1791,6 +1738,7 @@ function saveGeminiApiKey() {
     }
     updateApiStatusDisplays();
     updateFeatureAvailability();
+    autoSaveProject();
 }
 
 function saveNscaleApiKey() {
@@ -1806,10 +1754,10 @@ function saveNscaleApiKey() {
     }
     updateApiStatusDisplays();
     updateFeatureAvailability();
+    autoSaveProject();
 }
 
 function findNodeById(id, node = vibeTree) {
-    if (node && node.type === 'raw-html-container') return null;
     if (node.id === id) return node;
     if (node.children) {
         for (const child of node.children) {
@@ -1821,23 +1769,10 @@ function findNodeById(id, node = vibeTree) {
 }
 
 function renderEditor(node) {
-    if (node && node.type === 'raw-html-container') {
-        const placeholderEl = document.createElement('div');
-        placeholderEl.className = 'editor-placeholder';
-        placeholderEl.innerHTML = `
-            <h3>Raw Uploaded Project</h3>
-            <p>${node.description || 'This project was loaded directly from a file.'}</p>
-            <p>The Vibe Editor is disabled for this mode. Use the <strong>Full Code</strong> tab to view and edit the source code.</p>
-            <p>To enable the editor, use the "Process into Vibe Tree" button in the "Full Code" tab. This will use AI to structure your project.</p>
-        `;
-        return placeholderEl;
-    }
-
     const nodeEl = document.createElement('div');
     nodeEl.className = `vibe-node type-${node.type} collapsed`;
     nodeEl.dataset.nodeId = node.id;
 
-    const isContainer = node.type === 'container' || node.type === 'html';
     const showCodeButton = node.type !== 'container';
     const isHeadNode = node.type === 'head';
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
@@ -1845,7 +1780,6 @@ function renderEditor(node) {
 
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
-            <span class="drag-handle" title="Click to select for swap">✥</span>
             <span class="id">
                 ${hasChildren ? `<button class="collapse-toggle" aria-expanded="false" title="Expand/Collapse Children">▶</button>` : '<span class="collapse-placeholder"></span>'}
                 ${node.id}
@@ -1853,18 +1787,16 @@ function renderEditor(node) {
             <span class="type">${node.type}</span>
         </div>
         <div class="vibe-node-content">
-            <textarea class="description-input" rows="3" placeholder="Describe the purpose of this component...">${node.description}</textarea>
+            <textarea class="description-input" rows="3" placeholder="Describe the purpose of this component...">${node.description || ''}</textarea>
             <div class="button-group">
                 <button class="update-button ai-powered-button" data-id="${node.id}">Update Vibe</button>
                 <button class="ai-edit-project-button ai-powered-button" data-id="${node.id}" title="Use this node as context for an AI command to edit the whole project">AI Edit Project</button>
                 <button class="generate-controls-button ai-powered-button" data-id="${node.id}" title="Let AI generate editable controls for this element">⚙️ Controls</button>
-                ${isContainer ? `<button class="add-child-button" data-id="${node.id}">+ Add Child</button>` : ''}
                 ${isSaveable ? `<button class="save-as-component-button ai-powered-button" data-id="${node.id}" title="Save as reusable component">⊕ Save</button>` : ''}
                 ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
-                ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
             </div>
             <div class="vibe-node-controls" id="controls-for-${node.id}"></div>
-            ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;"></textarea>` : ''}
+            ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;" readonly></textarea>` : ''}
         </div>
     `;
     
@@ -1891,16 +1823,12 @@ async function toggleCodeEditor(event) {
     const button = event.target;
     const nodeId = button.dataset.id;
     const codeTextarea = document.getElementById(`editor-${nodeId}`);
-    const saveButton = button.nextElementSibling; 
     if (!codeTextarea) return;
 
     const isVisible = codeTextarea.style.display === 'block';
 
     if (isVisible) {
         codeTextarea.style.display = 'none';
-        if (saveButton && saveButton.classList.contains('save-code-button')) {
-            saveButton.style.display = 'none';
-        }
         button.textContent = 'View Code';
     } else {
         const node = findNodeById(nodeId);
@@ -1910,112 +1838,43 @@ async function toggleCodeEditor(event) {
             console.error(`Node not found for editor: ${nodeId}`);
             codeTextarea.value = `Error: Could not find code for node ${nodeId}.`;
         }
-        
         codeTextarea.style.display = 'block';
-        if (saveButton && saveButton.classList.contains('save-code-button')) {
-            saveButton.style.display = 'inline-block';
-        }
         button.textContent = 'Hide Code';
     }
-}
-
-async function handleSaveCode(event) {
-    const button = event.target;
-    const nodeId = button.dataset.id;
-    const node = findNodeById(nodeId);
-    const codeTextarea = document.getElementById(`editor-${nodeId}`);
-
-    if (!node || !codeTextarea) {
-        console.error(`handleSaveCode failed: Could not find node or textarea for ID ${nodeId}`);
-        return;
-    }
-
-    const newCode = codeTextarea.value;
-    if (node.code === newCode) {
-        console.log(`Code for node ${nodeId} has not changed. Hiding editor.`);
-        const toggleButton = button.parentElement.querySelector('.toggle-code-button');
-        if (toggleButton) toggleButton.click();
-        return;
-    }
-
-    recordHistory(`Save code for ${nodeId}`);
-
-    node.code = newCode;
-    console.log(`Code for node '${nodeId}' was manually saved.`);
-    
-    const originalText = button.textContent;
-    button.textContent = 'Saved!';
-    button.disabled = true;
-
-    applyVibes();
-
-    setTimeout(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-        const toggleButton = button.parentElement.querySelector('.toggle-code-button');
-        if (toggleButton) toggleButton.click();
-    }, 1500);
-    autoSaveProject();
 }
 
 async function handleUpdate(event) {
     const button = event.target;
     const nodeId = button.dataset.id;
-    const node = findNodeById(nodeId);
     const textarea = button.parentElement.previousElementSibling;
     const newDescription = textarea.value;
 
-    if (!node) {
-        console.error(`handleUpdate failed: Could not find node with ID ${nodeId}`);
-        return;
-    }
-    if (node.description === newDescription && node.type !== 'container' && node.type !== 'head') return;
-
-    recordHistory(`Update description for ${nodeId}`);
-
     button.disabled = true;
     button.innerHTML = 'Updating... <div class="loading-spinner"></div>';
-    console.log(`Updating node: ${nodeId}`);
     
-    node.description = newDescription;
-
     try {
-        if (node.type === 'container') {
-            console.log(`Regenerating complete subtree for container: ${node.id}`);
-            const newChildren = await generateCompleteSubtree(node);
-            node.children = newChildren;
-            refreshAllUI();
-        } else {
-            console.log(`Triggering systemic update for node: ${node.id}`);
-            
-            const systemPrompt = getAgentSystemPrompt();
-            const fullTreeString = JSON.stringify(vibeTree, null, 2);
-            const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
-            
-            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const systemPrompt = `You are an expert AI web developer. The user has updated the description/intent for a specific component in their project.
+Your task is to rewrite the ENTIRE HTML file to incorporate this change, modifying HTML, CSS, or JS as necessary.
 
-Full Vibe Tree context:
-\`\`\`json
-${fullTreeString}
-\`\`\`
+CRITICAL RULES:
+1. Output ONLY the raw, complete, valid HTML code for the entire file.
+2. Do NOT wrap your response in markdown code blocks (e.g., \`\`\`html). Just return the raw code string.
+3. Do NOT include any explanations or conversational text.`;
 
-Full Generated Code context:
+        const userPrompt = `Focus Component ID: "${nodeId}"
+New Intent/Description: "${newDescription}"
+
+Current Full Code:
 \`\`\`html
 ${fullCurrentCode}
 \`\`\``;
 
-            const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
-            
-            executeAgentPlan(agentDecision, (message, type) => {
-                const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
-                const logFunc = console[type] || console.log;
-                logFunc(`[UpdateEngine] ${cleanMessage}`);
-            });
-        }
-        
-        switchToTab('preview');
+        let newFullCode = await callAI(systemPrompt, userPrompt, false);
+        newFullCode = extractRawCode(newFullCode);
 
+        await processCodeAndRefreshUI(newFullCode);
+        switchToTab('preview');
     } catch (error) {
         console.error("Failed to update vibes:", error);
         alert(`An error occurred during the update: ${error.message}. Check the console for details.`);
@@ -2044,7 +1903,7 @@ function refreshAllUI() {
     editorContainer.innerHTML = '';
     editorContainer.appendChild(renderEditor(vibeTree));
 
-    if (expandedNodeStates.size > 0 && !(vibeTree && vibeTree.type === 'raw-html-container')) {
+    if (expandedNodeStates.size > 0) {
         expandedNodeStates.forEach((state, nodeId) => {
             const nodeEl = editorContainer.querySelector(`.vibe-node[data-node-id="${nodeId}"]`);
             if (nodeEl) {
@@ -2152,61 +2011,23 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
 
     const augmentedSystemPrompt = systemPrompt + libraryContext;
     const model = geminiModelSelect.value;
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-
-    const requestBody = {
-        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: augmentedSystemPrompt }] },
-        generationConfig: forJson ? { responseMimeType: "application/json" } : {}
-    };
-
-    const response = await fetch(endpoint, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(requestBody) 
-    });
     
-    if (!response.ok) throw new Error(await response.text());
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
-}
-
-
-async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
-    if (!geminiApiKey) {
-        throw new Error("Gemini API key is not set.");
-    }
-
-    const model = geminiModelSelect.value;
     const useStreaming = typeof streamCallback === 'function';
     const endpoint = useStreaming 
         ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}`
         : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
     const requestBody = {
-        contents: [
-            {
-                role: "user",
-                parts: [{ text: userPrompt }]
-            }
-        ],
-        systemInstruction: {
-            parts: [{ text: systemPrompt }]
-        },
-        generationConfig: {}
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: augmentedSystemPrompt }] },
+        generationConfig: (forJson && !useStreaming) ? { responseMimeType: "application/json" } : {}
     };
 
-    if (forJson && !useStreaming) {
-        requestBody.generationConfig.responseMimeType = "application/json";
-    }
-
     try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody)
+        const response = await fetch(endpoint, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(requestBody) 
         });
         
         if (!response.ok) {
@@ -2229,8 +2050,7 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
                         const textChunk = parsed.text;
                         fullResponseText += textChunk;
                         streamCallback(textChunk);
-                    } catch (e) {
-                    }
+                    } catch (e) {}
                 }
             };
             
@@ -2251,16 +2071,11 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
                     boundary = buffer.indexOf('\n');
                 }
             }
-            
-            originalConsole.log('Full Raw Gemini Response (Streamed)', fullResponseText);
             return fullResponseText;
         }
 
         const data = await response.json();
-        console.log('--- Gemini Response Received ---');
-        originalConsole.log('Raw Gemini Response', JSON.stringify(data, null, 2));
-
-
+        
         if (!data.candidates || data.candidates.length === 0) {
              throw new Error('Invalid response from Gemini API: The response contained no valid candidates.');
         }
@@ -2275,92 +2090,10 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
              throw new Error('Invalid response structure from Gemini API: The response candidate is missing the expected text content.');
         }
 
-        const content = candidate.content.parts[0].text;
-        
-        if (document.getElementById('code').classList.contains('active')) {
-            showFullCode();
-        }
-        return content;
+        return candidate.content.parts[0].text;
     } catch(e) {
         console.error("Error calling Gemini AI:", e);
         throw new Error(`Gemini AI communication failed: ${e.message}`);
-    }
-}
-
-async function generateCompleteSubtree(parentNode, streamCallback = null) {
-    console.log(`Generating subtree for parent: ${parentNode.id}`);
-
-    const systemPrompt = `You are an expert UI/UX designer and frontend architect. 
-
-    **YOUR GOAL:** Create a visually stunning, modern website component hierarchy.
-    
-    **DESIGN GUIDELINES:**
-    1.  **Visuals:** Use modern trends (Glassmorphism, Bento grids, gradients, clean typography). Avoid "browser default" looks.
-    2.  **Structure:** 
-        - Generate 'html' nodes for structure.
-        - **MANDATORY:** You MUST generate a separate 'css' node to style the HTML you create. Do not rely on inline styles.
-        - Ensure CSS selectors exactly match the IDs and Classes in your HTML.
-    3.  **Responsive:** Use Flexbox/Grid and media queries for mobile responsiveness.
-    4.  **Content:** Use realistic text and images (via Pollinations AI), not Lorem Ipsum.
-    5.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked.
-
-    **TASK:** Generate a valid JSON array of "vibe nodes" that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
-
-${getVibeDbInstructionsForAI()}
-${getImageGenerationInstructions()}
-
-**JSON SCHEMA for the array:**
-[
-  {
-    "id": "unique-section-id",
-    "type": "html",
-    "description": "The HTML structure.",
-    "code": "<section id='unique-section-id' class='modern-section'>...</section>",
-    "selector": "#parent-id",
-    "position": "beforeend"
-  },
-  {
-    "id": "section-styles",
-    "type": "css",
-    "description": "Styles for the section.",
-    "code": "#unique-section-id { ... } .modern-section { ... }"
-  }
-]
-`;
-
-    const userPrompt = `Generate the child components for the following parent container:
-{
-    "parentId": "${parentNode.id}",
-    "newDescription": "${parentNode.description}"
-}`;
-
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback);
-    
-    try {
-        let jsonResponse = rawResponse.trim();
-        
-        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2].trim();
-        }
-
-        const startIndex = jsonResponse.indexOf('[');
-        const endIndex = jsonResponse.lastIndexOf(']');
-
-        if (startIndex !== -1 && endIndex > startIndex) {
-            jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
-        }
-
-        const childrenArray = JSON.parse(jsonResponse);
-        if (!Array.isArray(childrenArray)) {
-            throw new Error("AI did not return a valid JSON array.");
-        }
-        console.log("Successfully parsed generated subtree from AI.");
-        
-        return childrenArray;
-    } catch (e) {
-        console.error("Failed to parse subtree JSON from AI:", rawResponse);
-        throw new Error(`AI returned invalid JSON for the component structure. Original response logged in console. Error: ${e.message}`);
     }
 }
 
@@ -2393,14 +2126,12 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         }
 
         const data = await response.json();
-        console.log('--- nscale Response Received ---');
 
         if (!data.choices ||!Array.isArray(data.choices) || data.choices.length === 0 || !data.choices[0].message) {
             throw new Error('Invalid response structure from nscale API.');
         }
 
         let content = data.choices[0].message.content;
-        originalConsole.log('Raw nscale Response', content);
 
         if (forJson) {
             const jsonMatch = content.match(/```json\n([\s\S]*?)\n```/);
@@ -2410,7 +2141,6 @@ async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
         }
 
         return content;
-
     } catch (e) {
         console.error("Error calling nscale AI:", e);
         throw new Error(`nscale AI communication failed: ${e.message}`);
@@ -2434,14 +2164,8 @@ function parseHtmlToVibeTree(fullCode) {
     const jsNodes = [];
     let headNode = null;
 
-    // 1. Extract ALL <style> tags
     const styleTags = Array.from(doc.querySelectorAll('style'));
     styleTags.forEach((styleTag, index) => {
-        // Only extract if it's a direct child of head or body (prevents breaking scoped styles inside components)
-        // FIX: Allow extraction if it's top-level, otherwise keep it inside HTML.
-        // For simplicity in Vibe, we usually extract all styles to CSS tab, 
-        // but if the user complains about "changing code", we should be careful.
-        // Let's stick to standard Vibe behavior: Extract styles.
         if (styleTag.textContent.trim()) {
             cssNodes.push({
                 id: `page-styles-${index + 1}`,
@@ -2450,29 +2174,19 @@ function parseHtmlToVibeTree(fullCode) {
                 code: styleTag.textContent.trim()
             });
         }
-        styleTag.remove(); // Remove from DOM
+        styleTag.remove();
     });
 
-    // 2. Extract Script Tags
     const scriptTags = Array.from(doc.querySelectorAll('script'));
     scriptTags.forEach((scriptTag, index) => {
-        // Ignore the injected vibe proxy script
         if (scriptTag.textContent.includes('Vibe Database Connector') || scriptTag.textContent.includes('__vibe-inspect-highlight-hover')) {
             scriptTag.remove();
             return;
         }
 
-        // FIX: Only extract script tags that are direct children of body or head.
-        // This preserves logic for scripts embedded deeply inside components.
-        const isTopLevel = (scriptTag.parentNode === doc.body || scriptTag.parentNode === doc.head);
-        
-        // Also respect attributes like type="module" or src. 
-        // If it has attributes but no src, and it's top level, we might want to extract it but keep attributes?
-        // Current Vibe JS nodes are just text. 
-        // Strategy: Only extract "simple" inline scripts at top level.
-        const isSimpleInline = !scriptTag.src && scriptTag.attributes.length === 0;
+        const isSimpleInlineScript = !scriptTag.src && !scriptTag.type && scriptTag.attributes.length === 0;
 
-        if (isTopLevel && isSimpleInline && scriptTag.textContent.trim()) {
+        if (isSimpleInlineScript && scriptTag.textContent.trim()) {
             jsNodes.push({
                 id: `script-${index + 1}`,
                 type: 'javascript',
@@ -2481,13 +2195,10 @@ function parseHtmlToVibeTree(fullCode) {
             });
             scriptTag.remove();
         } 
-        // Else: leave it in the DOM. It will be captured by the HTML node.
     });
 
-    // 3. Extract Head content
     const headContent = [];
     
-    // Preserve html/body attributes
     if (doc.documentElement.attributes.length > 0) {
         const htmlAttrsObj = {};
         Array.from(doc.documentElement.attributes).forEach(attr => {
@@ -2531,107 +2242,36 @@ function parseHtmlToVibeTree(fullCode) {
         code: headContent.join('\n')
     };
 
-    // 4. Extract Body children (Handling Text Nodes now)
-    // FIX: Use childNodes to capture loose text that isn't wrapped in elements.
-    const bodyChildren = Array.from(doc.body.childNodes);
+    const bodyChildren = Array.from(doc.body.children);
     let lastElementId = null;
 
-    bodyChildren.forEach((node, index) => {
-        // Handle Elements
-        if (node.nodeType === Node.ELEMENT_NODE) {
-            let elementId = node.id;
-            if (!elementId) {
-                elementId = `${node.tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-section-${index}`;
-                node.id = elementId;
-            }
-
-            const htmlNode = {
-                id: `html-${elementId}`,
-                type: 'html',
-                description: `The <${node.tagName.toLowerCase()}> element with ID #${elementId}.`,
-                code: node.outerHTML,
-                selector: lastElementId ? `#${lastElementId}` : '#whole-page',
-                position: lastElementId ? 'afterend' : 'beforeend'
-            };
-            htmlNodes.push(htmlNode);
-            lastElementId = elementId;
-        } 
-        // Handle Loose Text (e.g. "Copyright 2023" floating in body)
-        else if (node.nodeType === Node.TEXT_NODE) {
-            const textContent = node.textContent.trim();
-            if (textContent) {
-                const textId = `text-content-${index}`;
-                htmlNodes.push({
-                    id: textId,
-                    type: 'html',
-                    description: 'Text content.',
-                    code: node.textContent, // Preserve whitespace if needed, or trimmed? usually raw text.
-                    selector: lastElementId ? `#${lastElementId}` : '#whole-page',
-                    position: lastElementId ? 'afterend' : 'beforeend'
-                });
-                lastElementId = textId; // It's not a DOM ID, but we track position logically
-            }
+    bodyChildren.forEach((element, index) => {
+        let elementId = element.id;
+        if (!elementId) {
+            elementId = `${element.tagName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-section-${index}`;
+            element.id = elementId;
         }
+
+        const htmlNode = {
+            id: `html-${elementId}`,
+            type: 'html',
+            description: `The <${element.tagName.toLowerCase()}> element with ID #${elementId}.`,
+            code: element.outerHTML,
+            selector: index === 0 ? '#whole-page' : `#${lastElementId}`,
+            position: index === 0 ? 'beforeend' : 'afterend'
+        };
+        htmlNodes.push(htmlNode);
+        lastElementId = elementId;
     });
 
     vibeTree.children = [headNode, ...htmlNodes, ...cssNodes, ...jsNodes];
     
-    console.log("Client-side parsing complete. Generated Vibe Tree:", vibeTree);
+    console.log("Client-side parsing complete.");
     return vibeTree;
 }
 
-async function decomposeCodeIntoVibeTree(fullCode, forceClientSide = false) {
-    console.log("Starting code decomposition process...");
-    
-    // Fallback to client side parsing immediately if it's a raw upload, forced, or very large
-    if (forceClientSide || fullCode.length > 30000) {
-        console.warn("Using reliable client-side parser (forced or large file size).");
-        return parseHtmlToVibeTree(fullCode);
-    }
-    
-    const systemPrompt = `You are an expert system that deconstructs a complete HTML file into a specific hierarchical JSON structure called a "vibe tree". Your task is to accurately parse the provided code and represent it as a nested hierarchy of components.
-
-**INPUT:** A single string containing the full source code of a webpage (HTML, CSS in <style> tags, JS in <script> tags).
-
-**OUTPUT:** A single, valid JSON object representing the vibe tree. DO NOT include any explanatory text, comments, or markdown formatting outside of the JSON structure itself. The final output must be only the raw JSON.`;
-
-    const userPrompt = `Decompose the following code into the vibe tree JSON structure:\n\n\`\`\`html\n${fullCode}\n\`\`\``;
-
-    const rawResponse = await callAI(systemPrompt, userPrompt, true);
-
-    function tryParseVarious(text) {
-        try { return JSON.parse(text.trim()); } catch {}
-        const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-        if (fence && fence[1]) {
-            try { return JSON.parse(fence[1]); } catch {}
-        }
-        const firstBrace = text.indexOf('{');
-        const lastBrace = text.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-            try { return JSON.parse(text.slice(firstBrace, lastBrace + 1)); } catch {}
-        }
-        return null;
-    }
-
-    try {
-        const parsed = tryParseVarious(rawResponse);
-
-        if (!parsed) {
-            console.warn("AI did not return valid JSON. Falling back to client-side HTML parser.");
-            return parseHtmlToVibeTree(fullCode);
-        }
-
-        if (!parsed.id || parsed.type !== 'container' || !Array.isArray(parsed.children)) {
-            console.warn("AI JSON missing required root container fields. Falling back to client-side parser.");
-            return parseHtmlToVibeTree(fullCode);
-        }
-
-        console.log("Successfully parsed decomposed vibe tree from AI.");
-        return parsed;
-    } catch (e) {
-        console.warn("Failed to parse vibe tree JSON from AI, using client-side parser.", e);
-        return parseHtmlToVibeTree(fullCode);
-    }
+async function decomposeCodeIntoVibeTree(fullCode, forceClientSide = true) {
+    return parseHtmlToVibeTree(fullCode);
 }
 
 async function processCodeAndRefreshUI(fullCode) {
@@ -2639,33 +2279,22 @@ async function processCodeAndRefreshUI(fullCode) {
         alert("The code is empty. There is nothing to process.");
         return;
     }
-
-    const button = updateTreeFromCodeButton;
-    const originalButtonHtml = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = 'Processing... <div class="loading-spinner"></div>';
     
     try {
         recordHistory('Process full code (replace tree)');
-        // Mark as `true` to force deterministic client-side extraction to guarantee HTML retention.
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode, true);
         vibeTree = newVibeTree;
         refreshAllUI();
-        console.log("Update from code complete. UI refreshed.");
         switchToTab('preview');
         historyState.lastSnapshotSerialized = serializeTree(vibeTree);
         autoSaveProject();
     } catch (error) {
         console.error("Failed to update vibes from full code:", error);
         alert(`An error occurred during processing: ${error.message}. Check the console for details.`);
-    } finally {
-        button.disabled = false;
-        button.innerHTML = originalButtonHtml;
     }
 }
 
 async function handleUpdateTreeFromCode(codeOverride = null) {
-    // Determine source: Override (from merger) or Editor (manual)
     const fullCode = (typeof codeOverride === 'string') ? codeOverride : fullCodeEditor.value;
 
     if (!fullCode.trim()) {
@@ -2673,29 +2302,15 @@ async function handleUpdateTreeFromCode(codeOverride = null) {
         return;
     }
 
-    // Handle Raw HTML Container case
-    if (vibeTree && vibeTree.type === 'raw-html-container') {
-        vibeTree.code = fullCode;
-        recordHistory("Update raw HTML code");
-        applyVibes(); 
-        autoSaveProject();
-        if (!codeOverride) {
-            alert("Raw HTML preview has been updated. To enable the Vibe Editor, click 'Process into Vibe Tree'.");
-        } else {
-            console.log("Raw HTML updated via Merger tool.");
-        }
-        return; 
-    }
-
-    // Standard Vibe Tree Processing
     const button = updateTreeFromCodeButton;
-    const originalButtonHtml = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = 'Processing... <div class="loading-spinner"></div>';
+    const originalButtonHtml = button ? button.innerHTML : '';
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = 'Processing... <div class="loading-spinner"></div>';
+    }
     
     try {
         recordHistory('Process full code (replace tree)');
-        // Safely force client-side parsing to retain explicit file formats without AI intervention errors
         const newVibeTree = await decomposeCodeIntoVibeTree(fullCode, true);
         vibeTree = newVibeTree;
         refreshAllUI();
@@ -2710,11 +2325,12 @@ async function handleUpdateTreeFromCode(codeOverride = null) {
         console.error("Failed to update vibes from full code:", error);
         alert(`An error occurred during processing: ${error.message}. Check the console for details.`);
     } finally {
-        button.disabled = false;
-        button.innerHTML = originalButtonHtml;
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalButtonHtml;
+        }
     }
 }
-
 
 async function handleFullCodeAiUpdate() {
     const prompt = fullCodeAiPromptInput.value.trim();
@@ -2748,7 +2364,7 @@ Your goal is to rewrite the ENTIRE HTML file to incorporate the user's change.
 **INPUT:**
 1.  **User Request:** A natural language description of the desired change.
 2.  **Selected Code:** The specific snippet of code the user has highlighted. This is your primary area of focus.
-3.  **Full Vibe Tree:** A JSON object that describes the component structure of the code. Use this to understand the context of the selected code (e.g., which component it belongs to, its dependencies). If the vibeTree is a "raw-html-container", it means the project has not been structured yet; just modify the full code directly.
+3.  **Full Vibe Tree:** A JSON object that describes the component structure of the code. Use this to understand the context of the selected code (e.g., which component it belongs to, its dependencies).
 4.  **Full Current Code:** The complete HTML file content that you need to modify.
 
 **CRITICAL:** Your output must be ONLY the new, complete, and valid HTML code for the entire file. Do not provide explanations, diffs, snippets, or markdown formatting. Your entire response must be the raw HTML source code.
@@ -2773,19 +2389,14 @@ ${fullCode}
 \`\`\`
 `;
         console.log("Calling AI to update full code with vibe context...");
-        const newFullCode = await callAI(systemPrompt, userPrompt, false);
+        let newFullCode = await callAI(systemPrompt, userPrompt, false);
+        newFullCode = extractRawCode(newFullCode);
 
         if (!newFullCode || !newFullCode.trim().toLowerCase().includes('</html>')) {
             throw new Error("AI did not return valid HTML content.");
         }
 
-        if (vibeTree && vibeTree.type === 'raw-html-container') {
-             vibeTree.code = newFullCode;
-             recordHistory("AI update to raw HTML");
-             refreshAllUI();
-        } else {
-            await processCodeAndRefreshUI(newFullCode);
-        }
+        await processCodeAndRefreshUI(newFullCode);
 
         const originalScrollTop = (selectionStart / fullCode.length) * fullCodeEditor.scrollHeight;
         fullCodeEditor.scrollTop = originalScrollTop;
@@ -2802,7 +2413,6 @@ ${fullCode}
     }
 }
 
-
 async function handleFileUpload() {
     const file = htmlFileInput.files[0];
     if (!file) {
@@ -2817,14 +2427,11 @@ async function handleFileUpload() {
         try {
             const fileContent = event.target.result;
 
-            // Generate a safe, unique Project ID
             const baseId = file.name.replace(/\.(html|htm)$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
             let projectId = baseId || `html-project-${Date.now()}`;
             
-            // Switch logic to LOCAL immediately
             currentProjectStorageType = 'local';
             
-            // Ensure ID uniqueness
             const existing = await localApi.listProjects();
             let suffix = 1;
             while (existing.includes(projectId)) {
@@ -2832,32 +2439,21 @@ async function handleFileUpload() {
             }
             currentProjectId = projectId;
 
-            // Construct the Raw Vibe Tree
-            vibeTree = {
-                id: `raw-${currentProjectId}`,
-                type: 'raw-html-container',
-                description: `Raw HTML project uploaded from file: ${file.name}`,
-                code: fileContent,
-                children: []
-            };
+            vibeTree = await decomposeCodeIntoVibeTree(fileContent, true);
             
-            // Reset UI and History
             resetHistory();
             
-            // Critical: Update UI to reflect Local storage mode
             const localToggleBtn = document.querySelector('.storage-toggle button[data-storage="local"]');
             if (localToggleBtn) {
                 document.querySelectorAll('.storage-toggle button').forEach(b => b.classList.remove('active'));
                 localToggleBtn.classList.add('active');
             }
 
-            // Disable features not available in Raw mode
             updateSaveButtonStates();
             if(openAiStructureModalButton) openAiStructureModalButton.disabled = true;
             if(shareProjectButton) shareProjectButton.disabled = true;
 
-            // Save and Refresh
-            await localApi.saveProject(currentProjectId, vibeTree); // Explicit await
+            await localApi.saveProject(currentProjectId, vibeTree);
             saveSessionMetadata();
             
             refreshAllUI();
@@ -2933,9 +2529,6 @@ function rewriteCssUrls(cssText, resolverCb) {
     });
 }
 
-
-
-
 function buildHtmlBodyFromTree(tree = vibeTree) {
     const buildHtmlRecursive = (nodes) => {
         let currentHtml = '';
@@ -3009,13 +2602,6 @@ function nodeIdToFileName(id, ext) {
 }
 
 function assembleMultiFileBundle(tree = vibeTree) {
-    if (tree && tree.type === 'raw-html-container') {
-        const files = new Map();
-        files.set('index.html', tree.code || '');
-        files.set('project.json', JSON.stringify(tree, null, 2));
-        return { files, indexHtml: tree.code || '' };
-    }
-    
     const headContent = getHeadContentFromTree(tree);
     const bodyContent = buildHtmlBodyFromTree(tree);
     const { cssNodes, jsNodes } = collectCssJsNodes(tree);
@@ -3081,12 +2667,7 @@ async function handleDownloadProjectZip() {
             zip.file(path, content);
         }
 
-        let bundledHtmlContent;
-        if (vibeTree && vibeTree.type === 'raw-html-container') {
-             bundledHtmlContent = vibeTree.code || '';
-        } else {
-             bundledHtmlContent = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
-        }
+        const bundledHtmlContent = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
         zip.file("bundle.html", bundledHtmlContent);
 
         const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -3103,13 +2684,7 @@ function applyVibes() {
     try {
         iframeErrors = [];
         const doc = previewContainer.contentWindow.document;
-        let html;
-
-        if (vibeTree && vibeTree.type === 'raw-html-container') {
-            html = vibeTree.code || '';
-        } else {
-            html = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
-        }
+        let html = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
 
         const commsScriptText = `
 <script>
@@ -3182,7 +2757,7 @@ function applyVibes() {
     const timers = {};
     Object.keys(oConsole).forEach(level => {
         window.console[level] = (...args) => {
-            oConsole[level](...args); // keep native behavior
+            oConsole[level](...args); 
             let payload = args;
             if (level === 'count') {
                 const label = args[0] || 'default';
@@ -3194,7 +2769,7 @@ function applyVibes() {
                 payload = [\`\${label}: 0\`];
             } else if (level === 'time') {
                 timers[args[0] || 'default'] = performance.now();
-                return; // Do not log
+                return; 
             } else if (level === 'timeEnd') {
                 const label = args[0] || 'default';
                 const startTime = timers[label];
@@ -3236,106 +2811,17 @@ function applyVibes() {
     }
 }
 
-
 function showFullCode() {
-    let fullCode;
-    if (vibeTree && vibeTree.type === 'raw-html-container') {
-        fullCode = vibeTree.code || '';
-        if (updateTreeFromCodeButton) {
-             updateTreeFromCodeButton.innerHTML = '<i class="bi bi-magic"></i> Process into Vibe Tree';
-             updateTreeFromCodeButton.title = 'Use AI to analyze this code and convert it into the editable Vibe Tree structure. This will enable the Vibe Editor.';
-             updateTreeFromCodeButton.onclick = () => processCodeAndRefreshUI(fullCodeEditor.value);
-        }
-    } else {
-        fullCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
-         if (updateTreeFromCodeButton) {
-             updateTreeFromCodeButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Update from Code';
-             updateTreeFromCodeButton.title = 'Replace the current Vibe Tree with a new structure parsed from the code in this editor.';
-             updateTreeFromCodeButton.onclick = handleUpdateTreeFromCode;
-        }
+    let fullCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+    if (updateTreeFromCodeButton) {
+        updateTreeFromCodeButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Sync Changes';
+        updateTreeFromCodeButton.title = 'Update the Vibe Tree structure from the code in this editor.';
+        updateTreeFromCodeButton.onclick = () => handleUpdateTreeFromCode(null);
     }
     
     fullCodeEditor.value = fullCode;
     console.log('Displaying full website code.');
 }
-
-
-function hideFullCode() {
-}
-
-// --- START: Click-to-Swap Reordering Logic ---
-function handleClickToSwap(event) {
-    event.stopPropagation();
-    const handleEl = event.currentTarget;
-    const nodeEl = handleEl.closest('.vibe-node');
-    const nodeId = nodeEl.dataset.nodeId;
-
-    if (!firstNodeToSwapId) {
-        firstNodeToSwapId = nodeId;
-        nodeEl.classList.add('swap-selected');
-        console.log(`Selected '${nodeId}' for swap.`);
-    } else {
-        const secondNodeId = nodeId;
-        
-        const firstNodeEl = editorContainer.querySelector(`.vibe-node[data-node-id="${firstNodeToSwapId}"]`);
-        if (firstNodeEl) {
-            firstNodeEl.classList.remove('swap-selected');
-        }
-
-        if (firstNodeToSwapId === secondNodeId) {
-            console.log("Swap cancelled: Same node selected twice.");
-            firstNodeToSwapId = null;
-            return;
-        }
-
-        const firstResult = findNodeAndParentById(firstNodeToSwapId);
-        const secondResult = findNodeAndParentById(secondNodeId);
-
-        const originalFirstNodeId = firstNodeToSwapId;
-        firstNodeToSwapId = null; 
-        
-        if (!firstResult || !secondResult) {
-            console.error("Swap failed: One or both nodes not found in the tree.");
-            return;
-        }
-
-        if (!firstResult.parent || !secondResult.parent || firstResult.parent.id !== secondResult.parent.id) {
-            console.warn("Swap failed: Nodes are not siblings. Reordering is only supported between sibling nodes.");
-            alert("Reordering is only supported between nodes at the same level (siblings).");
-            return;
-        }
-
-        swapNodes(originalFirstNodeId, secondNodeId);
-    }
-}
-
-function swapNodes(nodeId1, nodeId2) {
-    const result1 = findNodeAndParentById(nodeId1);
-    if (!result1 || !result1.parent) {
-        console.error(`Cannot swap: Node '${nodeId1}' or its parent not found.`);
-        return;
-    }
-    
-    const parent = result1.parent;
-    const index1 = parent.children.findIndex(n => n.id === nodeId1);
-    const index2 = parent.children.findIndex(n => n.id === nodeId2);
-
-    if (index1 === -1 || index2 === -1) {
-        console.error("Cannot swap: One of the nodes was not found in the parent's children array.");
-        return;
-    }
-    
-    recordHistory(`Swap nodes ${nodeId1} and ${nodeId2}`);
-
-    [parent.children[index1], parent.children[index2]] = [parent.children[index2], parent.children[index1]];
-
-    console.log(`Swapped nodes '${nodeId1}' and '${nodeId2}'.`);
-    recalculateSelectors(parent);
-    refreshAllUI();
-    autoSaveProject();
-}
-// --- END: Click-to-Swap Reordering Logic ---
-
 
 function addEventListeners() {
     document.querySelectorAll('.update-button').forEach(button => {
@@ -3350,12 +2836,6 @@ function addEventListeners() {
     document.querySelectorAll('.toggle-code-button').forEach(button => {
         button.addEventListener('click', toggleCodeEditor);
     });
-    document.querySelectorAll('.add-child-button').forEach(button => {
-        button.addEventListener('click', handleAddChildClick);
-    });
-    document.querySelectorAll('.save-code-button').forEach(button => {
-        button.addEventListener('click', handleSaveCode);
-    });
     document.querySelectorAll('.save-as-component-button').forEach(button => {
         button.addEventListener('click', handleSaveNodeAsComponentFromEditor);
     });
@@ -3364,9 +2844,6 @@ function addEventListeners() {
     });
     document.querySelectorAll('.vibe-node-header').forEach(header => {
         header.addEventListener('click', handleNodeContentToggle);
-    });
-    document.querySelectorAll('.drag-handle').forEach(handle => {
-        handle.addEventListener('click', handleClickToSwap);
     });
 
     if (editorContainer) {
@@ -3411,44 +2888,17 @@ function getAgentSystemPrompt() {
     return `You are an expert AI web developer and designer.
 
 **ROLE:**
-1.  **Designer:** Create visually stunning, modern designs (Flexbox/Grid, responsive, ample whitespace).
-2.  **Implementer:** Convert natural language into specific JSON updates.
+Implement the user's request by providing the COMPLETE, updated source code for the entire project.
 
-**CRITICAL RULES FOR EDITING:**
-1.  **CSS Consistency:** If you change HTML IDs or Classes, you MUST update the corresponding CSS.
-2.  **Formatting:** When providing code, ensure it is properly indented and formatted.
-3.  **Completeness:** When updating a node (actionType: "update"), you MUST return the **FULL, COMPLETE CODE** for that node. Do not return diffs or partial snippets.
-4.  **Separation:** Prefer creating/updating specific 'css' nodes for styling. If you must put CSS in an 'html' node, wrap it in a <style> tag at the top of that node's code.
-5.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked. If updating JS, return the full code.
-
-**OUTPUT FORMAT:**
-Return ONLY a single, valid JSON object:
-{
-  "plan": "Briefly explain exactly what you are changing (e.g., 'Updating hero HTML and adding new CSS for the gradient background').",
-  "actions": [
-    {
-      "actionType": "create" | "update",
-      "nodeId": "id-of-node-to-act-on",
-      "parentId": "parent-id-if-create",
-      "newNode": {
-         "id": "unique-kebab-id",
-         "type": "html" | "css" | "javascript" | "js-function",
-         "description": "...",
-         "code": "FULL VALID CODE HERE",
-         "selector": "#prev-id", 
-         "position": "afterend"
-      },
-      "newDescription": "Updated description if updating",
-      "newCode": "FULL VALID CODE HERE if updating"
-    }
-  ]
-}
+**CRITICAL RULES:**
+1. If you need clarification from the user before proceeding, output ONLY a JSON object: {"question": "Your question here"}
+2. Otherwise, you MUST output ONLY the raw, complete, valid HTML code for the entire file.
+3. Do NOT wrap your code response in markdown formatting (like \`\`\`html). Output the raw text directly.
+4. Include all necessary HTML, CSS (in <style>), and JS (in <script>) in the single file.
 
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}`;
 }
-
-// START OF CHANGE: New and refactored functions for the Task Queue system
 
 function renderTaskQueue() {
     const queueListEl = document.getElementById('task-queue-list');
@@ -3716,23 +3166,28 @@ async function executeSingleTask(promptContext) {
     showAgentSpinner();
     try {
         const systemPrompt = getAgentSystemPrompt();
-        const fullTreeString = JSON.stringify(vibeTree, null, 2);
         const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
         
-        const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
+        const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Current Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const agentDecision = JSON.parse(rawResponse);
+        const rawResponse = await callAI(systemPrompt, userPrompt, false);
         
-        if (agentDecision.question) {
-            renderAgentQuestionUI(agentDecision.question);
-            currentAgentTaskContext += `\nAI: ${agentDecision.question}`;
-            waitingForAgentConfirmation = true;
-            hideGlobalAgentLoader(); 
-            return; 
+        try {
+            const agentDecision = JSON.parse(rawResponse);
+            if (agentDecision.question) {
+                renderAgentQuestionUI(agentDecision.question);
+                currentAgentTaskContext += `\nAI: ${agentDecision.question}`;
+                waitingForAgentConfirmation = true;
+                hideGlobalAgentLoader(); 
+                return; 
+            }
+        } catch (e) {
+            // Not JSON, continue as raw HTML
         }
 
-        executeAgentPlan(agentDecision, logToAgent);
+        let newCode = extractRawCode(rawResponse);
+        logToAgent(`<strong>Applying code updates...</strong>`, 'action');
+        await processCodeAndRefreshUI(newCode);
         waitingForAgentConfirmation = false; 
     } catch(e) {
         throw e;
@@ -3794,9 +3249,6 @@ function handleStopTaskQueue() {
     hideGlobalAgentLoader();
 }
 
-// END OF CHANGE
-
-
 async function handleFixError(errorMessage, fixButton) {
     fixButton.disabled = true;
     fixButton.innerHTML = 'Fixing... <div class="loading-spinner"></div>';
@@ -3820,60 +3272,6 @@ async function handleFixError(errorMessage, fixButton) {
     } else {
         logToAgent('Fix task has been added to the front of the running queue.', 'info');
     }
-}
-
-function executeAgentPlan(agentDecision, agentLogger) {
-    if (!agentDecision.plan || !Array.isArray(agentDecision.actions)) {
-        console.error("AI returned a malformed plan object. Check AI logs for details.");
-        throw new Error("AI returned a malformed plan object. Check console for details.");
-    }
-
-    recordHistory('Agent plan execution');
-
-    agentLogger(`<strong>Plan:</strong> ${agentDecision.plan}`, 'plan');
-
-    for (const action of agentDecision.actions) {
-        if (action.actionType === 'update') {
-            const { nodeId, newDescription, newCode } = action;
-            const nodeToUpdate = findNodeById(nodeId);
-
-            if (nodeToUpdate) {
-                if (nodeToUpdate.type === 'container') {
-                    agentLogger(`Warning: Agent tried to update container node \`${nodeId}\`, skipping.`, 'warn');
-                    continue;
-                }
-                agentLogger(`<strong>Updating Node:</strong> \`${nodeId}\` (${nodeToUpdate.type})`, 'action');
-                if (newDescription) nodeToUpdate.description = newDescription;
-                if (newCode !== undefined && newCode !== null) {
-                    nodeToUpdate.code = String(newCode); 
-                }
-            } else {
-                agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`, skipping.`, 'warn');
-            }
-        } else if (action.actionType === 'create') {
-            const { parentId, newNode } = action;
-            const parentNode = findNodeById(parentId);
-            if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
-                if (!newNode || !newNode.id || findNodeById(newNode.id)) {
-                     // Auto-fix ID collision
-                     if(newNode && newNode.id) newNode.id = newNode.id + '-' + Date.now();
-                     else {
-                        agentLogger(`Warning: Invalid node creation skipped.`, 'warn');
-                        continue;
-                     }
-                }
-                if (!parentNode.children) parentNode.children = [];
-                agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentId}\``, 'action');
-                parentNode.children.push(newNode);
-            } else {
-                agentLogger(`Warning: AI wanted to create node under invalid parent \`${parentId}\`. Skipping.`, 'warn');
-            }
-        } else {
-            agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType}\`. Skipping.`, 'warn');
-        }
-    }
-    
-    refreshAllUI();
 }
 
 // --- Chat Logic ---
@@ -3908,6 +3306,8 @@ function processChatCodeBlocks(parentElement) {
         if (!codeEl) return;
 
         const codeContent = codeEl.textContent || '';
+        const actionsContainer = document.createElement('div');
+        actionsContainer.className = 'chat-code-block-actions';
 
         const wrapper = document.createElement('div');
         wrapper.className = 'chat-code-block-wrapper';
@@ -4004,40 +3404,16 @@ async function handleInsertCodeIntoFile(filePath, codeContent, buttonElement) {
     }
 }
 
-async function buildCombinedHtmlFromDb(projectId) {
-    if (!projectId) throw new Error("Project ID is required.");
-    console.warn("buildCombinedHtmlFromDb is not implemented for the backend.");
-    return `<!DOCTYPE html><html><head><title>Error</title></head><body><h1>File system not implemented on backend.</h1></body></html>`;
-}
-
-
-async function rebuildAndRefreshFromFiles() {
-    console.log("File changed. Rebuilding Vibe Tree from source files...");
-    
-    try {
-        const combinedHtml = await buildCombinedHtmlFromDb(currentProjectId);
-        recordHistory('Rebuild tree from file change');
-        const newVibeTree = await decomposeCodeIntoVibeTree(combinedHtml);
-        vibeTree = newVibeTree;
-        refreshAllUI();
-        console.log("Vibe Tree rebuilt and UI refreshed successfully.");
-    } catch (error) {
-        console.error("Failed to rebuild Vibe Tree from files:", error);
-        alert(`An error occurred while synchronizing file changes: ${error.message}`);
-    }
-}
-
 function handleUseAgentToInsertSnippet(codeContent) {
     const lastUserMessage = chatConversationHistory.filter(m => m.role === 'user').pop();
     const context = lastUserMessage ? `Based on our last conversation about "${lastUserMessage.content}", please ` : 'Please ';
     
-    const agentPrompt = `${context}insert the following code snippet into the project where it makes the most sense. Analyze the existing code and create or update the necessary components.\n\nCode Snippet:\n\`\`\`\n${codeContent}\n\`\`\``;
+    const agentPrompt = `${context}insert the following code snippet into the project where it makes the most sense. Analyze the existing code and update the structure.\n\nCode Snippet:\n\`\`\`\n${codeContent}\n\`\`\``;
 
     agentPromptInput.value = agentPrompt;
     switchToTab('agent');
     handleAddTaskToQueue();
 }
-
 
 async function handleSendChatMessage() {
     const userPrompt = chatPromptInput.value.trim();
@@ -4045,9 +3421,8 @@ async function handleSendChatMessage() {
 
     const systemPrompt = chatSystemPromptInput.value.trim() || `You are an expert pair programmer. The user will provide you with the full content of their project files and a request to change them.
 1.  Analyze the user's request and the provided file context.
-2.  Identify which file(s) need to be modified.
-3.  When you provide code, you MUST return the **complete, updated content** of the file. Do not provide snippets, diffs, or partial code.
-4.  Enclose the full file content in a markdown code block, and use a language fence that includes the file path. For example: \`\`\`html:index.html ... complete file content ... \`\`\`
+2.  When you provide code, you MUST return the **complete, updated content** of the file. Do not provide snippets, diffs, or partial code.
+3.  Enclose the full file content in a markdown code block, and use a language fence that includes the file path. For example: \`\`\`html:index.html ... complete file content ... \`\`\`
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}`;
 
@@ -4087,153 +3462,6 @@ ${getImageGenerationInstructions()}`;
     }
 }
 
-function handleAddChildClick(event) {
-    const parentId = event.target.dataset.id;
-    addNodeParentIdInput.value = parentId;
-    addNodeTargetIdInput.value = '';
-    addNodePositionInput.value = '';
-    newNodeIdInput.value = '';
-    newNodeDescriptionInput.value = '';
-    newNodeTypeInput.value = 'html';
-    addNodeError.textContent = '';
-    addNodeModal.style.display = 'block';
-    newNodeIdInput.focus();
-}
-
-function closeModal() {
-    addNodeModal.style.display = 'none';
-}
-
-async function handleCreateNode() {
-    const parentId = addNodeParentIdInput.value;
-    const newNodeId = newNodeIdInput.value.trim();
-    const newNodeType = newNodeTypeInput.value;
-    const newDescription = newNodeDescriptionInput.value.trim() || `A new, empty ${newNodeType} component.`;
-    const targetId = addNodeTargetIdInput.value;
-    const position = addNodePositionInput.value;
-
-    addNodeError.textContent = '';
-
-    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(newNodeId)) {
-        addNodeError.textContent = 'Invalid ID. Use kebab-case (e.g., "my-new-id").';
-        return;
-    }
-
-    if (findNodeById(newNodeId)) {
-        addNodeError.textContent = 'This ID is already in use.';
-        return;
-    }
-
-    const parentNode = findNodeById(parentId);
-    if (!parentNode) {
-        addNodeError.textContent = 'Internal error: Parent node not found.';
-        return;
-    }
-
-    recordHistory(`Create node ${newNodeId}`);
-
-    if (!parentNode.children) parentNode.children = [];
-
-    const newNode = { id: newNodeId, type: newNodeType, description: newDescription, code: '' };
-    
-    let inserted = false;
-    if (targetId && position) {
-        const targetIndex = parentNode.children.findIndex(c => c.id === targetId);
-        if (targetIndex !== -1) {
-            if (position === 'before') {
-                parentNode.children.splice(targetIndex, 0, newNode);
-            } else { 
-                parentNode.children.splice(targetIndex + 1, 0, newNode);
-            }
-            inserted = true;
-        }
-    }
-    
-    if (!inserted) {
-        parentNode.children.push(newNode);
-    }
-    
-    recalculateSelectors(parentNode);
-    
-    console.log(`Added new node "${newNodeId}" to parent "${parentId}".`);
-    refreshAllUI();
-    closeModal();
-    autoSaveProject();
-}
-
-
-function openEditNodeModal(nodeId) {
-    const node = findNodeById(nodeId);
-    if (!node) {
-        console.error(`openEditNodeModal: Node not found: ${nodeId}`);
-        return;
-    }
-    editNodeError.textContent = '';
-    editNodeIdInput.value = node.id;
-    editNodeTypeInput.value = node.type;
-    editNodeDescriptionInput.value = node.description || '';
-    editNodeCodeInput.value = node.code || '';
-    const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
-    if (aiImproveDescriptionButton) {
-        aiImproveDescriptionButton.disabled = !keyIsAvailable;
-        aiImproveDescriptionButton.title = keyIsAvailable ? '' : 'Add an API key in Settings to use AI.';
-    }
-    if (saveAsComponentButton) {
-        const isSaveable = ['html', 'js-function', 'css'].includes(node.type);
-        saveAsComponentButton.style.display = isSaveable ? 'inline-block' : 'none';
-        saveAsComponentButton.disabled = !keyIsAvailable;
-        saveAsComponentButton.title = keyIsAvailable ? 'Save this node and its dependencies as a reusable component' : 'Add an API key in Settings to use this feature.';
-        saveAsComponentButton.dataset.nodeId = nodeId;
-    }
-    editNodeModal.style.display = 'block';
-}
-
-function closeEditNodeModal() {
-    editNodeModal.style.display = 'none';
-}
-
-function handleSaveEditedNode() {
-    const nodeId = editNodeIdInput.value;
-    const node = findNodeById(nodeId);
-    if (!node) {
-        editNodeError.textContent = 'Internal error: node not found.';
-        return;
-    }
-
-    const newDescription = editNodeDescriptionInput.value;
-    const newCode = editNodeCodeInput.value;
-
-    const descChanged = newDescription !== (node.description || '');
-    const codeChanged = newCode !== (node.code || '');
-
-    if (!descChanged && !codeChanged) {
-        closeEditNodeModal();
-        return;
-    }
-
-    const saveBtn = saveEditNodeButton;
-
-    (async () => {
-        try {
-            if (codeChanged) {
-                recordHistory(`Edit code in modal for ${nodeId}`);
-                node.code = newCode;
-            }
-            if (descChanged) {
-                if (!codeChanged) recordHistory(`Edit description in modal for ${nodeId}`);
-                await updateNodeByDescription(nodeId, newDescription, saveBtn);
-            } else {
-                refreshAllUI();
-            }
-            closeEditNodeModal();
-            console.log(`Node '${nodeId}' updated from Element Editor.`);
-            autoSaveProject();
-        } catch (e) {
-            editNodeError.textContent = e.message || 'Failed to update node.';
-        }
-    })();
-}
-
 let inspectEnabled = false;
 function toggleInspectMode() {
     inspectEnabled = !inspectEnabled;
@@ -4247,9 +3475,7 @@ function toggleInspectMode() {
 }
 
 // --- NEW: Inspector Tree Manipulation ---
-
 function findNodeAndParentById(id, node = vibeTree, parent = null) {
-    if (node && node.type === 'raw-html-container') return null;
     if (node.id === id) return { node, parent };
     if (node.children) {
         for (const child of node.children) {
@@ -4258,132 +3484,6 @@ function findNodeAndParentById(id, node = vibeTree, parent = null) {
         }
     }
     return null;
-}
-
-function deleteNode(nodeId) {
-    const result = findNodeAndParentById(nodeId);
-    if (!result || !result.parent) {
-        console.error(`Cannot delete node '${nodeId}': not found or is root.`);
-        return;
-    }
-    
-    if (confirm(`Are you sure you want to permanently delete the element "${nodeId}"?`)) {
-        recordHistory(`Delete node ${nodeId}`);
-        const { node, parent } = result;
-        const index = parent.children.indexOf(node);
-        if (index > -1) {
-            parent.children.splice(index, 1);
-            recalculateSelectors(parent);
-            console.log(`Node '${nodeId}' deleted.`);
-            refreshAllUI();
-        }
-    }
-}
-
-function moveNode(sourceNodeId, targetNodeId, position) {
-    const sourceResult = findNodeAndParentById(sourceNodeId);
-    const targetResult = findNodeAndParentById(targetNodeId);
-
-    if (!sourceResult || !targetResult) {
-        console.error('Move failed: source or target node not found.');
-        return;
-    }
-
-    const { node: sourceNode, parent: sourceParent } = sourceResult;
-    const { node: targetNode, parent: targetParent } = targetResult;
-    
-    let current = targetParent;
-    while(current) {
-        if (current.id === sourceNodeId) {
-            console.error('Move failed: cannot move a parent node into one of its children.');
-            return;
-        }
-        const result = findNodeAndParentById(current.id);
-        current = result ? result.parent : null;
-    }
-
-    recordHistory(`Move node ${sourceNodeId}`);
-
-    const sourceIndex = sourceParent.children.indexOf(sourceNode);
-    if (sourceIndex > -1) {
-        sourceParent.children.splice(sourceIndex, 1);
-    } else {
-        console.error('Move failed: source node not found in its parent.');
-        return;
-    }
-
-    if (position === 'inside') {
-        if (!targetNode.children) targetNode.children = [];
-        targetNode.children.push(sourceNode);
-        recalculateSelectors(targetNode);
-    } else {
-        const targetIndex = targetParent.children.indexOf(targetNode);
-        if (position === 'before') {
-            targetParent.children.splice(targetIndex, 0, sourceNode);
-        } else {
-            targetParent.children.splice(targetIndex + 1, 0, sourceNode);
-        }
-        recalculateSelectors(targetParent);
-    }
-    
-    if(sourceParent.id !== targetParent.id) {
-        recalculateSelectors(sourceParent);
-    }
-
-    console.log(`Moved node '${sourceNodeId}' ${position} '${targetNodeId}'.`);
-    refreshAllUI();
-}
-
-function recalculateSelectors(parentNode) {
-    if (!parentNode || !Array.isArray(parentNode.children)) return;
-
-    const htmlChildren = parentNode.children.filter(c => c.type === 'html');
-    let lastHtmlSiblingId = null;
-
-    htmlChildren.forEach((child, index) => {
-        child.selector = (index === 0) ? `#${parentNode.id}` : `#${lastHtmlSiblingId}`;
-        child.position = (index === 0) ? 'beforeend' : 'afterend';
-        
-        const idMatch = child.code.match(/id="([^"]+)"/);
-        if (idMatch && idMatch[1]) {
-            lastHtmlSiblingId = idMatch[1];
-        } else {
-            console.warn(`Node ${child.id} lacks an 'id' attribute, which may break layout.`);
-            lastHtmlSiblingId = child.id; 
-        }
-    });
-}
-
-function handleAddNodeFromInspect(targetNodeId, position) {
-    const targetResult = findNodeAndParentById(targetNodeId);
-    if (!targetResult) {
-        console.error(`Cannot add node: target '${targetNodeId}' not found.`);
-        return;
-    }
-
-    const { node: targetNode, parent: targetParent } = targetResult;
-    let parentForNewNode, targetForPositioning, positionForNewNode;
-
-    if (position === 'inside') {
-        parentForNewNode = targetNode;
-        targetForPositioning = null;
-        positionForNewNode = 'beforeend';
-    } else {
-        parentForNewNode = targetParent;
-        targetForPositioning = targetNode;
-        positionForNewNode = position;
-    }
-    
-    addNodeTargetIdInput.value = targetForPositioning ? targetForPositioning.id : '';
-    addNodePositionInput.value = positionForNewNode || '';
-    addNodeParentIdInput.value = parentForNewNode.id;
-    newNodeIdInput.value = '';
-    newNodeDescriptionInput.value = '';
-    newNodeTypeInput.value = 'html';
-    addNodeError.textContent = '';
-    
-    addNodeModal.style.display = 'block';
-    newNodeIdInput.focus();
 }
 
 function handleAiProjectEditClick(event) {
@@ -4426,12 +3526,12 @@ async function handleAiProjectEditExecute() {
 **INPUTS:**
 - **User Request:** The natural language command.
 - **Focus Node ID:** The ID of the component the user's request is about. This is your primary point of reference.
-- **Full Vibe Tree:** The JSON structure of the entire project. Use this to understand the relationships between the focus node and other components (like its CSS or JS dependencies).
+- **Full Vibe Tree:** The JSON structure of the entire project. Use this to understand the relationships between the focus node and other components.
 - **Full Current Code:** The complete HTML file you must edit.
 
 **RULES:**
 1.  Analyze the user's request in the context of the component identified by the \`Focus Node ID\`.
-2.  Your changes are **not limited** to the code of the focus node. You must modify any part of the \`Full Current Code\` necessary to achieve the goal. For example, if the user asks to style an HTML node, you should find the correct \`<style>\` block and add the CSS rules there.
+2.  Your changes are **not limited** to the code of the focus node. You must modify any part of the \`Full Current Code\` necessary to achieve the goal.
 3.  **CRITICAL:** Your output must be **only the new, complete, and valid HTML code for the entire file.** Do not provide explanations, diffs, snippets, or markdown formatting. Your entire response must be the raw HTML source code.
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}`;
@@ -4450,14 +3550,14 @@ ${fullCurrentCode}
 \`\`\`
 `;
         console.log(`Calling AI for project-wide edit, focusing on node '${focusNodeId}'...`);
-        const newFullCode = await callAI(systemPrompt, userPrompt, false);
+        let newFullCode = await callAI(systemPrompt, userPrompt, false);
+        newFullCode = extractRawCode(newFullCode);
 
         if (!newFullCode || !newFullCode.trim().toLowerCase().includes('</html>')) {
             throw new Error("AI did not return valid HTML content. It might have been a partial response. Please try again.");
         }
 
         await processCodeAndRefreshUI(newFullCode);
-
         closeAiProjectEditModal();
         
     } catch (error) {
@@ -4502,44 +3602,28 @@ async function handleAiStructureUpdate() {
     showGlobalAgentLoader('AI is restructuring the project...');
 
     try {
-        const systemPrompt = `You are an expert system that modifies a website's "vibe tree" JSON structure.
-    
+        const systemPrompt = `You are an expert system that modifies a website's structure.
+            
 **RULES:**
-1. **CSS Integrity:** If you add new HTML components, you MUST also add or update 'css' nodes to style them. Do not leave new elements unstyled.
-2. **Valid JSON:** Return ONLY the raw JSON object for the complete, modified vibe tree.
-3. **Structure:** HTML nodes need 'selector' and 'position' calculated relative to siblings.
-4. **Modern Design:** Ensure any new structures follow modern design principles (Flexbox, Grid, Responsive).
+1. Return ONLY the raw, complete, valid HTML code for the entire file.
+2. Do NOT wrap your response in markdown formatting (e.g., \`\`\`html). Just return the raw string.
+3. Incorporate the user's requested structural changes.
 
-Analyze the user's request and return the NEW, COMPLETE vibe tree JSON.`;
+Analyze the user's request and return the NEW, COMPLETE HTML code.`;
 
-        const userPrompt = `User Instructions: "${prompt}"
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const userPrompt = `User Instructions: "${prompt}"\n\nCurrent HTML Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
-Current Vibe Tree JSON:
-\`\`\`json
-${JSON.stringify(vibeTree, null, 2)}
-\`\`\``;
+        const rawResponse = await callAI(systemPrompt, userPrompt, false);
+        
+        const newCode = extractRawCode(rawResponse);
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        let newVibeTree;
-        try {
-            let jsonText = rawResponse.trim();
-            const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) {
-                jsonText = match[1];
-            }
-            newVibeTree = JSON.parse(jsonText);
-        } catch (e) {
-            console.error("Failed to parse AI response for structure update:", rawResponse);
-            throw new Error("The AI returned invalid JSON. Please try rephrasing your instructions.");
-        }
-
-        if (!newVibeTree || newVibeTree.id !== 'whole-page' || !Array.isArray(newVibeTree.children)) {
-            throw new Error("The AI returned an invalid Vibe Tree structure. The root 'id' must be 'whole-page' and it must have a 'children' array.");
+        if (!newCode || !newCode.toLowerCase().includes('</html>')) {
+            throw new Error("The AI did not return a valid complete HTML document.");
         }
 
         recordHistory('AI Structure Update');
-        vibeTree = newVibeTree;
-        refreshAllUI();
+        await processCodeAndRefreshUI(newCode);
         closeAiStructureModal();
         
     } catch (error) {
@@ -4552,38 +3636,32 @@ ${JSON.stringify(vibeTree, null, 2)}
     }
 }
 
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'apply-merged-code') {
+        console.log("Received merged code from Merger tool.");
+        const newCode = event.data.code;
+        
+        if(fullCodeEditor) fullCodeEditor.value = newCode;
+        handleUpdateTreeFromCode(newCode);
+    }
 
-    window.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'apply-merged-code') {
-            console.log("Received merged code from Merger tool.");
-            const newCode = event.data.code;
-            
-            // Update the hidden full code editor
-            if(fullCodeEditor) fullCodeEditor.value = newCode;
-            
-            // Update the tree and UI
-            handleUpdateTreeFromCode(newCode);
+    if (event.data && event.data.type === 'iframe-console') {
+        const { level, payload } = event.data;
+        if (typeof handleConsoleCommand === 'function') {
+            handleConsoleCommand(level, payload);
         }
+    }
 
-        // --- ADDED: Listen for iframe console and error logs ---
-        if (event.data && event.data.type === 'iframe-console') {
-            const { level, payload } = event.data;
-            if (typeof handleConsoleCommand === 'function') {
-                handleConsoleCommand(level, payload);
-            }
+    if (event.data && event.data.type === 'iframe-error') {
+        const errPayload = event.data.payload;
+        const errorObj = new Error(errPayload.message || 'Unknown runtime error in preview');
+        errorObj.name = errPayload.name || 'Error';
+        if (errPayload.stack) {
+            errorObj.stack = errPayload.stack;
         }
-
-        if (event.data && event.data.type === 'iframe-error') {
-            const errPayload = event.data.payload;
-            const errorObj = new Error(errPayload.message || 'Unknown runtime error in preview');
-            errorObj.name = errPayload.name || 'Error';
-            if (errPayload.stack) {
-                errorObj.stack = errPayload.stack;
-            }
-            // Passing it to console.error routes it through the Vibe proxy automatically
-            console.error(errorObj);
-        }
-    });
+        console.error(errorObj);
+    }
+});
 
 let searchState = {
     term: '',
@@ -4745,7 +3823,6 @@ function switchToTab(tabId) {
         return;
     }
 
-    // Save state to IndexedDB
     idbKV.set(SESSION_KEYS.TAB, tabId).catch(err => console.error("Failed to save tab state", err));
 
     const newContent = tabContents.querySelector(`#${tabId}`);
@@ -4782,14 +3859,12 @@ function switchToTab(tabId) {
         }
     }
     
-    // --- MERGE TAB LOGIC ---
     if (tabId === 'merge') {
         showFullCode(); 
         const currentCode = fullCodeEditor.value;
         const mergeFrame = newContent.querySelector('iframe');
         
         if (mergeFrame && mergeFrame.contentWindow) {
-            // Post the current code to the iframe
             mergeFrame.contentWindow.postMessage({
                 type: 'load-source-code',
                 code: currentCode
@@ -4822,7 +3897,6 @@ function handleTabSwitching() {
     });
 }
 
-
 function initializeMermaid() {
     if (typeof window.mermaid === 'undefined') {
         console.error("Mermaid library not found.");
@@ -4841,9 +3915,9 @@ function initializeMermaid() {
 }
 
 const DB_NAME = 'VibeLocalDB';
-const DB_VERSION = 2; // UPDATED: Incremented to trigger onupgradeneeded
+const DB_VERSION = 2; 
 const STORE_NAME = 'projects';
-const KV_STORE_NAME = 'appState'; // FIXED: Defined this missing variable
+const KV_STORE_NAME = 'appState'; 
 let dbPromise = null;
 
 function getDb() {
@@ -4857,13 +3931,9 @@ function getDb() {
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                
-                // Ensure 'projects' store exists
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
                 }
-
-                // Ensure 'appState' store exists (This previously caused the error)
                 if (!db.objectStoreNames.contains(KV_STORE_NAME)) {
                     db.createObjectStore(KV_STORE_NAME, { keyPath: 'key' });
                 }
@@ -5460,7 +4530,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         **ANALYSIS STEPS:**
         1.  **Find the HTML:** Locate the target node. Its \`code\` is the root of the component's HTML. If it has children, recursively combine their HTML to form the complete structure.
         2.  **Find the CSS:** Search all \`css\` nodes in the entire vibe tree. Extract any CSS rules that apply to the target node's HTML (e.g., by its ID, classes, or child element selectors). Combine these into a single CSS block.
-        3.  **Find the JavaScript:** Search all \`javascript\` and \`js-function\` nodes. Extract any code that references the target node's HTML (e.g., via \`document.getElementById\`, \`querySelector\`, or event listeners attached to its elements). Combine this logic into a single script.
+        3.  **Find the JavaScript:** Search all \`javascript\` and \`js-function\` nodes. Extract any code that references the target node's HTML. Combine this logic into a single script.
 
         **OUTPUT FORMAT:**
         You MUST respond with a single, valid JSON object and nothing else.
@@ -5486,7 +4556,6 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         
         console.log(`AI analysis complete. Please review and save the new component.`);
         
-        closeEditNodeModal();
         switchToTab('context');
         openComponentModal(null, extractedComponent);
 
@@ -5505,38 +4574,15 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
     }
 }
 
-async function handleSaveNodeAsComponent(event) {
-    const nodeId = event.target.dataset.nodeId;
-    await extractAndOpenComponentModal(nodeId, event.target);
-}
-
 async function handleSaveNodeAsComponentFromEditor(event) {
     const nodeId = event.target.dataset.id;
     await extractAndOpenComponentModal(nodeId, event.target);
 }
 
-
 let filesState = {
     selectedPath: null,
     clipboard: null
 };
-
-function buildFolderTree(paths) {
-    const root = { name: '', type: 'folder', children: new Map() };
-    for (const p of paths) {
-        const parts = p.split('/').filter(Boolean);
-        let cur = root;
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            const isLast = i === parts.length - 1;
-            if (!cur.children.has(part)) {
-                cur.children.set(part, isLast ? { name: part, type: 'file', path: parts.slice(0, i + 1).join('/') } : { name: part, type: 'folder', children: new Map() });
-            }
-            cur = cur.children.get(part);
-        }
-    }
-    return root;
-}
 
 function renderFileTree() {
     if (!filesTreeEl) return;
@@ -5550,63 +4596,18 @@ function renderFileTree() {
     return;
 }
 
-function selectFile(path, liEl) {
-    filesState.selectedPath = path;
-    filesTreeEl.querySelectorAll('li.selected').forEach(li => li.classList.remove('selected'));
-    if (liEl) liEl.classList.add('selected');
-    renderFilePreview(path);
-}
-
-async function renderFilePreview(path) {
-    if (!filesPreviewEl) return;
-    filesPreviewEl.innerHTML = '';
-    filesPreviewEl.innerHTML = '<div class="files-preview-placeholder">File preview not implemented with backend.</div>';
-}
-
-function ensureProjectForFiles() {
-    if (currentProjectId) return true;
-    alert('Please create or load a project before managing files.');
-    return false;
-}
-
-async function handleFilesUpload() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesNewFolder() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesNewFile() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesDownload() {
-    alert("File management not implemented with backend.");
-}
-function handleFilesCopy() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesPaste() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesRename() {
-    alert("File management not implemented with backend.");
-}
-async function handleFilesDelete() {
-    alert("File management not implemented with backend.");
-}
-
 // START: Dynamic Controls Feature
 function renderControl(control, nodeId) {
     const controlWrapper = document.createElement('div');
     controlWrapper.className = `control-wrapper type-${control.type}`;
     
-    // Checkbox labels usually go after the input, handled inside the switch for layout preference
     if (control.type !== 'checkbox') {
         controlWrapper.innerHTML = `<label for="control-${nodeId}-${control.id}">${control.label}</label>`;
     }
 
     let inputEl;
     switch (control.type) {
-        case 'slider': {
+        case 'slider':
             inputEl = document.createElement('div');
             inputEl.className = 'slider-container';
             const unit = control.unit || '';
@@ -5617,7 +4618,6 @@ function renderControl(control, nodeId) {
                 <span class="slider-value">${control.value}${unit}</span>
             `;
             break;
-        }
         case 'color':
             inputEl = document.createElement('input');
             inputEl.type = 'color';
@@ -5650,8 +4650,8 @@ function renderControl(control, nodeId) {
             inputEl.dataset.nodeId = nodeId;
             inputEl.dataset.controlId = control.id;
             break;
-        case 'checkbox': {
-            controlWrapper.innerHTML = ''; // Clear default label
+        case 'checkbox':
+            controlWrapper.innerHTML = ''; 
             const checkboxContainer = document.createElement('div');
             checkboxContainer.style.display = 'flex';
             checkboxContainer.style.alignItems = 'center';
@@ -5672,8 +4672,7 @@ function renderControl(control, nodeId) {
             checkboxContainer.appendChild(inputEl);
             checkboxContainer.appendChild(labelEl);
             controlWrapper.appendChild(checkboxContainer);
-            return controlWrapper; // Return early as we handled appending
-        }
+            return controlWrapper; 
         case 'text':
         case 'url':
         case 'image':
@@ -5688,7 +4687,6 @@ function renderControl(control, nodeId) {
             break;
     }
     
-    // For non-slider/non-checkbox inputs that were created above
     if (control.type !== 'slider' && control.type !== 'checkbox') {
         controlWrapper.appendChild(inputEl);
     } else if (control.type === 'slider') {
@@ -5792,13 +4790,18 @@ async function handleExecuteGenerateControls() {
         console.log(`Generated and merged ${newControls.length} controls for node ${nodeId}`);
         
         refreshAllUI();
-        // Update initially to ensure synchronization
+        
         newControls.forEach(control => {
             if (control.controlTarget === 'js') {
                 updateDynamicJsVariable(control);
             }
         });
         updateDynamicStyles();
+
+        // Sync changes back to the raw code editor
+        if (fullCodeEditor) {
+            fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        }
 
         autoSaveProject();
         closeGenerateControlsModal();
@@ -5825,12 +4828,11 @@ function handleControlChange(event) {
     const control = node.controls.find(c => c.id === controlId);
     if (!control) return;
 
-    // Handle Checkbox vs Value inputs
     let newValue;
     if (input.type === 'checkbox') {
-        newValue = input.checked; // Boolean
+        newValue = input.checked; 
     } else {
-        newValue = input.value; // String (even for number inputs usually)
+        newValue = input.value; 
     }
 
     if (String(control.value) === String(newValue)) return;
@@ -5850,9 +4852,13 @@ function handleControlChange(event) {
         updateDynamicStyles();
     }
     
+    // Sync raw code editor
+    if (fullCodeEditor) {
+        fullCodeEditor.value = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+    }
+
     autoSaveProject();
 }
-
 
 function updateDynamicJsVariable(control) {
     if (!control.targetJsNodeId || !control.targetJsVariable) {
@@ -5869,18 +4875,11 @@ function updateDynamicJsVariable(control) {
     const variableName = control.targetJsVariable;
     const rawValue = control.value;
     let replacementValue;
-
-    // --- SAFE VALUE FORMATTING ---
-    // We determine how to format the value in the JS code based on the control type.
     
     if (control.type === 'checkbox') {
-        // Boolean: true or false (no quotes)
-        // Handles if the value comes in as boolean true or string "true"
         replacementValue = String(rawValue === true || rawValue === 'true');
     } 
     else if (control.type === 'number' || control.type === 'slider') {
-        // Number: 10, 3.5 (no quotes)
-        // Handle edge cases where value might be empty or invalid
         if (rawValue === '' || rawValue === null || isNaN(Number(rawValue))) {
             replacementValue = '0';
         } else {
@@ -5888,12 +4887,9 @@ function updateDynamicJsVariable(control) {
         }
     } 
     else {
-        // Strings: "text", "color", "url" (needs quotes)
-        // We use String(rawValue) to safely handle any input type, then escape quotes
         const safeString = String(rawValue === null || rawValue === undefined ? '' : rawValue);
         replacementValue = `"${safeString.replace(/"/g, '\\"')}"`;
     }
-    // -----------------------------
 
     const patterns = [
         new RegExp(`(const|let|var)\\s+(${variableName})\\s*=\\s*([^;]+);`, 'g'),
@@ -5933,9 +4929,7 @@ function updateDynamicJsVariable(control) {
         targetNode.code = newCode;
         
         recordHistory(`Update JS variable ${variableName}`);
-        
         applyVibes();
-        autoSaveProject();
     }
 }
 
@@ -6009,9 +5003,7 @@ function bindEventListeners() {
     if (saveToLocalButton) saveToLocalButton.addEventListener('click', handleSaveToLocal);
     if (saveToGithubButton) saveToGithubButton.addEventListener('click', handleSaveToGitHub);
     if (updateTreeFromCodeButton) updateTreeFromCodeButton.addEventListener('click', handleUpdateTreeFromCode);
-    if (runFullCodeAiButton) {
-        runFullCodeAiButton.addEventListener('click', handleFullCodeAiUpdate);
-    }
+    if (runFullCodeAiButton) runFullCodeAiButton.addEventListener('click', handleFullCodeAiUpdate);
     if (fullCodeAiPromptInput) {
         fullCodeAiPromptInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -6025,16 +5017,7 @@ function bindEventListeners() {
     if (uploadZipButton) uploadZipButton.addEventListener('click', () => zipFileInput.click());
     if (zipFileInput) zipFileInput.addEventListener('change', handleZipUpload);
     if (downloadZipButton) downloadZipButton.addEventListener('click', handleDownloadProjectZip);
-    if (filesUploadButton) filesUploadButton.addEventListener('click', () => filesUploadInput.click());
-    if (filesUploadInput) filesUploadInput.addEventListener('change', handleFilesUpload);
-    if (filesNewFolderButton) filesNewFolderButton.addEventListener('click', handleFilesNewFolder);
-    if (filesNewFileButton) filesNewFileButton.addEventListener('click', handleFilesNewFile);
-    if (filesDownloadButton) filesDownloadButton.addEventListener('click', handleFilesDownload);
-    if (filesCopyButton) filesCopyButton.addEventListener('click', handleFilesCopy);
-    if (filesPasteButton) filesPasteButton.addEventListener('click', handleFilesPaste);
-    if (filesRenameButton) filesRenameButton.addEventListener('click', handleFilesRename);
-    if (filesDeleteButton) filesDeleteButton.addEventListener('click', handleFilesDelete);
-    if (searchInput) searchInput.addEventListener('input', handleSearchInput);
+    if (searchInput) searchInput.addEventListener('input', handleSearchInput());
     if (findNextButton) findNextButton.addEventListener('click', findNextMatch);
     if (findPrevButton) findPrevButton.addEventListener('click', findPrevMatch);
     if (aiEditorSearchButton) aiEditorSearchButton.addEventListener('click', handleAiEditorSearch);
@@ -6084,28 +5067,20 @@ function bindEventListeners() {
     if (closeComponentModalButton) closeComponentModalButton.addEventListener('click', closeComponentModal);
     if (deleteComponentButton) deleteComponentButton.addEventListener('click', handleDeleteComponentFromModal);
 
-
     if (generateComponentButton) generateComponentButton.addEventListener('click', handleAiGenerateComponent);
     if (downloadContextButton) downloadContextButton.addEventListener('click', handleDownloadContext);
     if (uploadContextButton) uploadContextButton.addEventListener('click', handleUploadContextTrigger);
     if (contextUploadInput) contextUploadInput.addEventListener('change', processContextUpload);
 
-    const addModalCloseBtn = addNodeModal ? addNodeModal.querySelector('.close-button') : null;
     if (openSettingsModalButton) openSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'block');
     if (startPageSettingsButton) startPageSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
     if (closeSettingsModalButton) closeSettingsModalButton.addEventListener('click', () => settingsModal.style.display = 'none');
-    if (createNodeButton) createNodeButton.addEventListener('click', handleCreateNode);
-    if (addModalCloseBtn) addModalCloseBtn.addEventListener('click', () => addNodeModal.style.display = 'none');
-    if (saveEditNodeButton) saveEditNodeButton.addEventListener('click', handleSaveEditedNode);
-    if (closeEditNodeModalButton) closeEditNodeModalButton.addEventListener('click', closeEditNodeModal);
-    if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
-    if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
+    
     if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
     if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
     if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
     if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
     
-    // Updated Logic here for new project
     if (newProjectButton) newProjectButton.addEventListener('click', () => {
         clearSessionMetadata();
         resetToStartPage();
@@ -6135,8 +5110,6 @@ function bindEventListeners() {
 
     window.addEventListener('click', (event) => {
         if (event.target === settingsModal) settingsModal.style.display = 'none';
-        if (event.target === addNodeModal) closeModal();
-        if (event.target === editNodeModal) closeEditNodeModal();
         if (event.target === contextComponentModal) closeComponentModal();
         if (event.target === aiProjectEditModal) closeAiProjectEditModal();
         if (event.target === aiStructureModal) closeAiStructureModal();
@@ -6203,52 +5176,6 @@ function resetToStartPage() {
     activeAutoPilotListeners = [];
 
     console.log("Ready for new project.");
-}
-
-async function buildAssetUrlMap() { return {}; }
-function injectAssetRewriterScript(doc, assetMap) {}
-
-async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) {
-    const node = findNodeById(nodeId);
-    if (!node) throw new Error(`Node not found: ${nodeId}`);
-
-    recordHistory(`Edit description for ${nodeId} (modal)`);
-    node.description = newDescription;
-
-    let originalHtml = '';
-    if (buttonEl) {
-        originalHtml = buttonEl.innerHTML;
-        buttonEl.disabled = true;
-        buttonEl.innerHTML = 'Updating... <div class="loading-spinner"></div>';
-    }
-
-    try {
-        if (node.type === 'container') {
-            const newChildren = await generateCompleteSubtree(node);
-            node.children = newChildren;
-            refreshAllUI();
-        } else {
-            const systemPrompt = getAgentSystemPrompt();
-            const fullTreeString = JSON.stringify(vibeTree, null, 2);
-            const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
-
-            const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
-            
-            if (agentDecision.question) {
-                alert(`AI Question: ${agentDecision.question}\n\n(Please provide clearer instructions in the description field and try again.)`);
-                return;
-            }
-
-            executeAgentPlan(agentDecision, (msg, t = 'info') => console.log(`[ModalUpdate] ${msg}`, t));
-        }
-        switchToTab('preview');
-    } finally {
-        if (buttonEl) {
-            buttonEl.disabled = false;
-            buttonEl.innerHTML = originalHtml || 'Save & Update Vibe';
-        }
-    }
 }
 
 function buildBasicMermaidFromTree(tree) {
@@ -6324,7 +5251,6 @@ async function handleGenerateFlowchart() {
     }
 }
 
-
 async function handleGenerateProject() {
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
@@ -6356,28 +5282,33 @@ async function handleGenerateProject() {
         generationStatusText.textContent = 'Generating your project...';
         liveCodeOutput.textContent = '';
 
-        vibeTree = { id: 'whole-page', type: 'container', description: prompt, children: [] };
-        vibeTree.children = await generateCompleteSubtree(vibeTree);
+        const systemPrompt = `You are an expert AI frontend developer. Your task is to generate a complete, stunning, fully functional HTML page from scratch based on the user's prompt.
+RULES:
+1. Output ONLY the raw, complete, valid HTML code for the entire file.
+2. Include all necessary CSS (in <style>) and JS (in <script>). Ensure modern, responsive design.
+3. Do NOT wrap your response in markdown formatting (e.g., \`\`\`html). Just return the raw code string.`;
+
+        const userPrompt = `Project Description: "${prompt}"`;
+        let newCode = await callAI(systemPrompt, userPrompt, false);
+        newCode = extractRawCode(newCode);
 
         currentProjectId = projectId;
         currentProjectStorageType = storageType;
         shareProjectButton.disabled = (storageType !== 'cloud');
         openAiStructureModalButton.disabled = (storageType !== 'cloud');
         updateSaveButtonStates();
-        resetHistory();
         
-        liveCodeOutput.textContent = generateFullCodeString(vibeTree, currentUser.userId, currentProjectId);
+        await processCodeAndRefreshUI(newCode);
+        
+        liveCodeOutput.textContent = newCode;
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
         autoSaveProject();
-        saveSessionMetadata(); // Save state
+        saveSessionMetadata(); 
 
         await populateProjectList(storageType);
-        
         storageToggleButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.storage === storageType));
 
-        refreshAllUI();
-        switchToTab('preview');
         console.log(`New project '${currentProjectId}' created in ${storageType} storage.`);
     } catch (e) {
         console.error('Project generation failed:', e);
@@ -6386,7 +5317,6 @@ async function handleGenerateProject() {
         newProjectContainer.style.display = 'block';
     }
 }
-
 
 async function handleStartIterativeProjectBuild() {
     try {
@@ -6423,7 +5353,7 @@ async function handleStartIterativeProjectBuild() {
         vibeTree = JSON.parse(JSON.stringify(initialVibeTree));
         vibeTree.description = prompt;
         autoSaveProject();
-        saveSessionMetadata(); // Save state
+        saveSessionMetadata(); 
 
         await populateProjectList(storageType);
         storageToggleButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.storage === storageType));
@@ -6444,85 +5374,6 @@ async function handleStartIterativeProjectBuild() {
     }
 }
 
-async function handleAiImproveDescription() {
-    const nodeId = editNodeIdInput.value;
-    const node = findNodeById(nodeId);
-    if (!node) {
-        editNodeError.textContent = 'Internal error: node not found.';
-        return;
-    }
-
-    const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
-    if (!keyIsAvailable) {
-        alert(`Please add your API Key in Settings to use AI features.`);
-        return;
-    }
-
-    const originalHtml = aiImproveDescriptionButton.innerHTML;
-    aiImproveDescriptionButton.disabled = true;
-    aiImproveDescriptionButton.innerHTML = 'Analyzing... <div class="loading-spinner"></div>';
-    editNodeError.textContent = '';
-
-    try {
-        const systemPrompt = `You are a senior frontend engineer and technical writer. Given a website component (its type, code, and context), write an improved, more detailed description in 2-5 concise sentences. Focus on intent, structure, behavior, interactions, and dependencies. Output plain text only.`;
-
-        const context = {
-            node: { id: node.id, type: node.type, currentDescription: node.description || '', code: node.code || '' },
-            parent: (() => {
-                const res = findNodeAndParentById(node.id);
-                return res && res.parent ? { id: res.parent.id, type: res.parent.type } : null;
-            })(),
-        };
-
-        const userPrompt = `Improve the component description.\n\nComponent Context (JSON):\n${JSON.stringify(context, null, 2)}`;
-        
-        let improved = (await callAI(systemPrompt, userPrompt, false)).trim();
-        const fenced = improved.match(/```([\s\S]*?)```/);
-        if (fenced && fenced[1]) {
-            improved = fenced[1].trim();
-        }
-
-        if (improved) {
-            editNodeDescriptionInput.value = improved;
-            console.log(`AI generated a richer description for "${node.id}".`);
-        } else {
-            editNodeError.textContent = 'AI returned an empty response.';
-        }
-    } catch (e) {
-        console.error('AI Improve Description failed:', e);
-        editNodeError.textContent = e.message || 'Failed to get improved description.';
-    } finally {
-        aiImproveDescriptionButton.disabled = false;
-        aiImproveDescriptionButton.innerHTML = originalHtml;
-    }
-}
-
-function handleCollapseToggle(event) {
-    event.stopPropagation();
-    const btn = event.currentTarget;
-    const childrenEl = btn.closest('.vibe-node').querySelector(':scope > .children');
-    if (!childrenEl) return;
-
-    const isCollapsed = childrenEl.classList.toggle('collapsed');
-    btn.setAttribute('aria-expanded', String(!isCollapsed));
-    btn.textContent = isCollapsed ? '▶' : '▼';
-}
-
-function handleNodeContentToggle(event) {
-    if (event.target.classList.contains('drag-handle')) {
-        return;
-    }
-    
-    if (event.target.closest('button, a, input, textarea')) {
-        return;
-    }
-    
-    const header = event.currentTarget;
-    header.closest('.vibe-node').classList.toggle('collapsed');
-}
-
-// --- Component Shorthand Logic ---
-
 function refreshShorthandDropdowns() {
     const components = listComponents();
     const dropdowns = [
@@ -6532,8 +5383,6 @@ function refreshShorthandDropdowns() {
 
     dropdowns.forEach(select => {
         if (!select) return;
-        
-        // Preserve selection if possible
         const currentVal = select.value;
         
         select.innerHTML = '<option value="">-- Insert Component Library (@) --</option>';
@@ -6550,7 +5399,6 @@ function refreshShorthandDropdowns() {
 }
 
 function initializeShorthandSystem() {
-    // 1. Automatic Seeding if empty
     const currentLibrary = getComponentLibrary();
     if (Object.keys(currentLibrary).length === 0) {
         console.log("Seeding component library from JSON...");
@@ -6559,7 +5407,6 @@ function initializeShorthandSystem() {
 
     refreshShorthandDropdowns();
 
-    // 2. Attach Listeners for Shorthand Buttons
     const agentBtn = document.getElementById('agent-insert-shorthand-button');
     if (agentBtn) {
         agentBtn.addEventListener('click', () => {
@@ -6598,7 +5445,6 @@ function initMainApp() {
     checkLoggedInState();
     checkGithubLoginState(); 
 
-    // Wait slightly for auth states to settle before restoring the project session
     setTimeout(restoreSession, 100);
 }
 
@@ -6615,47 +5461,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-
-window.vibeAPI = {
-    callAI: callAI, 
-    switchToTab: switchToTab,
-    getCurrentProject: () => ({ id: currentProjectId, tree: vibeTree }),
-    refreshUI: refreshAllUI,
-    handleQuickReply: handleQuickReply
-};
-
-console.log("Vibe Automation API exposed as window.vibeAPI");
-
-
-
-
 async function clearSessionMetadata() {
     try {
         await idbKV.remove(SESSION_KEYS.PROJECT_ID);
         await idbKV.remove(SESSION_KEYS.STORAGE_TYPE);
         await idbKV.remove(SESSION_KEYS.GITHUB_SOURCE);
-        // Note: We deliberately keep the TAB preference so the user stays on the same screen
     } catch (e) {
         console.error("Failed to clear session metadata:", e);
     }
 }
 
 async function restoreSession() {
-    // 1. Show loading state if UI elements exist
     if (generationStatusText && startPageGenerationOutput) {
         startPageGenerationOutput.style.display = 'block';
         generationStatusText.textContent = "Restoring previous session...";
     }
 
     try {
-        // 2. Restore Tab Preference (Async get)
         const lastTab = await idbKV.get(SESSION_KEYS.TAB);
-        
-        // 3. Check for saved project
         const pid = await idbKV.get(SESSION_KEYS.PROJECT_ID);
         const type = await idbKV.get(SESSION_KEYS.STORAGE_TYPE);
 
-        // If no project was saved, just handle the tab and exit
         if (!pid) {
             if (lastTab && lastTab !== 'start') {
                 switchToTab(lastTab);
@@ -6669,10 +5495,9 @@ async function restoreSession() {
         let restoredTree = null;
 
         if (type === 'cloud') {
-            // For cloud, we need to be logged in. 
             if (!currentUser) {
                 console.log("Session restore skipped: User not logged in for cloud project.");
-                await clearSessionMetadata(); // Clear stale data
+                await clearSessionMetadata(); 
                 if (startPageGenerationOutput) startPageGenerationOutput.style.display = 'none';
                 return;
             }
@@ -6702,12 +5527,10 @@ async function restoreSession() {
             currentProjectId = pid;
             currentProjectStorageType = type;
 
-            // Update UI State to match restored project
             if (shareProjectButton) shareProjectButton.disabled = (type !== 'cloud');
             if (openAiStructureModalButton) openAiStructureModalButton.disabled = (type !== 'cloud');
             updateSaveButtonStates();
             
-            // Re-populate project lists and toggle active buttons
             await populateProjectList(type);
             if (storageToggleButtons) {
                 storageToggleButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.storage === type));
@@ -6716,10 +5539,8 @@ async function restoreSession() {
             refreshAllUI();
             resetHistory(); 
             
-            // Hide loading text
             if (startPageGenerationOutput) startPageGenerationOutput.style.display = 'none';
 
-            // Finally switch to the last active tab or preview
             if (lastTab) {
                 switchToTab(lastTab);
             } else {
@@ -6735,6 +5556,7 @@ async function restoreSession() {
         resetToStartPage();
     }
 }
+
 async function saveSessionMetadata() {
     if (currentProjectId) {
         try {
@@ -6747,7 +5569,6 @@ async function saveSessionMetadata() {
                 await idbKV.remove(SESSION_KEYS.GITHUB_SOURCE);
             }
             
-            // Save current tab as well
             const activeTab = document.querySelector('.tab-button.active');
             if (activeTab) {
                 await idbKV.set(SESSION_KEYS.TAB, activeTab.dataset.tab);
@@ -6758,9 +5579,6 @@ async function saveSessionMetadata() {
     }
 }
 
-
-
-// New helper to convert binary data to Base64 Data URI
 function arrayBufferToDataUri(buffer, mimeType) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
@@ -6771,90 +5589,105 @@ function arrayBufferToDataUri(buffer, mimeType) {
     return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
-// Helper to clean up paths for matching
 function normalizePath(path) {
     return path.replace(/^[./]+/, '').replace(/^\/+/, '');
 }
 
-// Robust function to flatten zip into a single HTML string with Data URIs
 async function buildCombinedHtmlFromZip(jszip) {
-    const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
-    if (!keyIsAvailable) {
-        throw new Error("AI API Key is missing. Please add it in Settings to process ZIP files using AI.");
-    }
-
     const fileNames = Object.keys(jszip.files);
-    const textFiles = {};
-    const binaryAssets = {};
+    const htmlCandidates = fileNames.filter(n => !jszip.files[n].dir && n.toLowerCase().endsWith('index.html'));
+    
+    if (htmlCandidates.length === 0) {
+        const anyHtml = fileNames.find(n => !jszip.files[n].dir && n.toLowerCase().endsWith('.html'));
+        if (anyHtml) htmlCandidates.push(anyHtml);
+        else throw new Error('No index.html found in ZIP.');
+    }
+    
+    htmlCandidates.sort((a, b) => a.length - b.length);
+    const indexPath = htmlCandidates[0];
+    const indexDir = indexPath.includes('/') ? indexPath.substring(0, indexPath.lastIndexOf('/') + 1) : '';
 
+    console.log(`Processing ZIP with entry point: ${indexPath}`);
+
+    const assetMap = {};
+    
     for (const name of fileNames) {
         const file = jszip.files[name];
-        if (file.dir) continue;
+        if (file.dir || name === indexPath) continue;
 
         const mime = guessMimeType(name);
-        const normalizedName = normalizePath(name);
+        const normalizedName = normalizePath(name); 
 
-        // Ignore system/hidden files
-        if (normalizedName.includes('__MACOSX') || normalizedName.endsWith('.DS_Store')) continue;
+        const content = await file.async('uint8array');
+        const dataUri = arrayBufferToDataUri(content, mime);
+        assetMap[normalizedName] = dataUri;
+    }
 
-        if (mime.startsWith('text/') || mime === 'application/javascript' || mime === 'application/json' || normalizedName.endsWith('.html') || normalizedName.endsWith('.css') || normalizedName.endsWith('.js')) {
-            textFiles[normalizedName] = await file.async('text');
-        } else {
-            const content = await file.async('uint8array');
-            binaryAssets[normalizedName] = arrayBufferToDataUri(content, mime);
+    let htmlContent = await jszip.files[indexPath].async('text');
+    
+    const resolveAndReplace = (content, currentFileDir) => {
+        return content.replace(/(src="|href="|url\(['"]?)([^'"()]+)(['"]?\))/g, (match, prefix, url, suffix) => {
+            if (url.startsWith('data:') || url.startsWith('http') || url.startsWith('#')) return match;
+            
+            let fullPathInZip = (currentFileDir + url).replace(/\/+/g, '/');
+            
+            const parts = fullPathInZip.split('/');
+            const stack = [];
+            for(let part of parts) {
+                if(part === '..') stack.pop();
+                else if(part !== '.') stack.push(part);
+            }
+            fullPathInZip = stack.join('/');
+            
+            const normalizedTarget = normalizePath(fullPathInZip);
+            
+            if (assetMap[normalizedTarget]) {
+                return `${prefix}${assetMap[normalizedTarget]}${suffix}`;
+            }
+            
+            return match; 
+        });
+    };
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+
+    const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
+    for (const link of links) {
+        const href = link.getAttribute('href');
+        if (href) {
+            const resolvedPath = normalizePath(resolveZipPath(indexDir, href));
+            const zipFile = jszip.files[resolvedPath];
+            if (zipFile) {
+                let cssText = await zipFile.async('text');
+                const cssDir = resolvedPath.includes('/') ? resolvedPath.substring(0, resolvedPath.lastIndexOf('/') + 1) : '';
+                cssText = resolveAndReplace(cssText, cssDir);
+                
+                const style = document.createElement('style');
+                style.textContent = cssText;
+                link.replaceWith(style);
+            }
         }
     }
 
-    if (Object.keys(textFiles).length === 0) {
-        throw new Error('No HTML, CSS, or JS files found in the ZIP.');
+    const scripts = Array.from(doc.querySelectorAll('script[src]'));
+    for (const script of scripts) {
+        const src = script.getAttribute('src');
+        if (src) {
+            const resolvedPath = normalizePath(resolveZipPath(indexDir, src));
+            const zipFile = jszip.files[resolvedPath];
+            if (zipFile) {
+                const jsText = await zipFile.async('text');
+                script.removeAttribute('src');
+                script.textContent = jsText;
+            }
+        }
     }
 
-    showGlobalAgentLoader('AI is analyzing and combining ZIP contents...');
+    htmlContent = new XMLSerializer().serializeToString(doc);
+    htmlContent = resolveAndReplace(htmlContent, indexDir);
 
-    const systemPrompt = `You are an expert web developer and frontend architect. 
-The user has uploaded a ZIP archive containing a web project. I will provide a JSON object where the keys are file paths and the values are the text contents of those files (HTML, CSS, JS).
-
-YOUR TASK:
-Merge ALL of these files into a SINGLE, perfectly structured, valid HTML document.
-
-RULES:
-1. Identify the main entry point (usually index.html).
-2. Inline ALL CSS code into <style> tags within the <head>.
-3. Inline ALL JavaScript code into <script> tags right before the closing </body> tag.
-4. Preserve all class names, IDs, HTML structure, and JavaScript logic.
-5. DO NOT change any image, font, or asset paths (src, href, url). Keep the original relative paths exactly as they are (the system will automatically replace them with Base64 Data URIs later).
-6. CRITICAL: Return ONLY the raw combined HTML code. Do not use markdown code blocks (like \`\`\`html), do not explain your steps. Your output must start with <!DOCTYPE html> and end with </html>.`;
-
-    const userPrompt = `Here are the extracted text files from the ZIP:\n\n\`\`\`json\n${JSON.stringify(textFiles)}\n\`\`\``;
-
-    let combinedHtml = '';
-    try {
-        combinedHtml = await callAI(systemPrompt, userPrompt, false);
-    } catch (e) {
-        console.error("AI ZIP Processing failed:", e);
-        throw new Error(`AI failed to process the ZIP: ${e.message}`);
-    } finally {
-        hideGlobalAgentLoader();
-    }
-
-    combinedHtml = combinedHtml.trim();
-    const match = combinedHtml.match(/```(?:html)?\s*([\s\S]*?)\s*```/i);
-    if (match && match[1]) {
-        combinedHtml = match[1].trim();
-    }
-
-    // Post-process to inject binary Data URIs for images, fonts, etc.
-    for (const [path, dataUri] of Object.entries(binaryAssets)) {
-        const fileName = path.split('/').pop();
-        if (!fileName) continue;
-        const escapedFileName = fileName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        
-        // Matches href="something/filename.png", src="something/filename.png", url("something/filename.png")
-        const regex = new RegExp(`(src=["']|href=["']|url\\(["']?)([^"'()]*?${escapedFileName})(["']?\\)?)`, 'gi');
-        combinedHtml = combinedHtml.replace(regex, `$1${dataUri}$3`);
-    }
-
-    return combinedHtml;
+    return htmlContent;
 }
 
 async function handleZipUpload() {
@@ -6873,15 +5706,11 @@ async function handleZipUpload() {
         if (!window.JSZip) throw new Error('JSZip library failed to load.');
 
         const jszip = await JSZip.loadAsync(file);
-        
-        // Use the new builder that embeds assets
         const combinedHtml = await buildCombinedHtmlFromZip(jszip);
 
-        // Generate ID
         const derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         let projectId = derivedId || `zip-project-${Date.now()}`;
         
-        // Switch to Local Storage
         currentProjectStorageType = 'local';
         const existing = await localApi.listProjects();
         let suffix = 1;
@@ -6890,7 +5719,6 @@ async function handleZipUpload() {
         }
         currentProjectId = projectId;
         
-        // Update UI State
         const localToggleBtn = document.querySelector('.storage-toggle button[data-storage="local"]');
         if (localToggleBtn) {
             document.querySelectorAll('.storage-toggle button').forEach(b => b.classList.remove('active'));
@@ -6901,16 +5729,8 @@ async function handleZipUpload() {
         if(shareProjectButton) shareProjectButton.disabled = true;
         if(openAiStructureModalButton) openAiStructureModalButton.disabled = true;
 
-        // Create Tree
-        vibeTree = {
-            id: `raw-${currentProjectId}`,
-            type: 'raw-html-container',
-            description: `Raw project uploaded from ZIP file: ${file.name}`,
-            code: combinedHtml,
-            children: []
-        };
+        vibeTree = await decomposeCodeIntoVibeTree(combinedHtml, true);
 
-        // Save
         await localApi.saveProject(currentProjectId, vibeTree);
         saveSessionMetadata();
         
@@ -6925,9 +5745,16 @@ async function handleZipUpload() {
     } finally {
         uploadZipButton.disabled = false;
         uploadZipButton.innerHTML = originalText;
-        // Reset file input so change event triggers again if same file selected
         zipFileInput.value = '';
     }
 }
 
-                                                                    
+window.vibeAPI = {
+    callAI: callAI, 
+    switchToTab: switchToTab,
+    getCurrentProject: () => ({ id: currentProjectId, tree: vibeTree }),
+    refreshUI: refreshAllUI,
+    handleQuickReply: handleQuickReply
+};
+
+console.log("Vibe Automation API exposed as window.vibeAPI");
