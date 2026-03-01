@@ -1,14 +1,6 @@
 const startSel = document.getElementById('start-component-shorthand-select');
 const agentSel = document.getElementById('agent-component-shorthand-select');
 
-// --- UPDATED DATABASE CONFIGURATION & HELPER ---
-/*const DB_NAME = 'VibeLocalDB';
-const DB_VERSION = 2; // Increased version to create the new store
-const STORE_NAME = 'projects';
-const KV_STORE_NAME = 'appState'; // New store for session metadata
-
-let dbPromise = null;
-*/
 const VIBE_JSON_LIBRARY = {
   "responsive-navbar": { "id": "responsive-navbar", "name": "Responsive Navbar", "description": "A sleek, modern navigation bar.", "html": "<nav class=\"vibe-nav\">...</nav>", "css": ".vibe-nav{...}", "javascript": "..." },
   "mega-menu": { "id": "mega-menu", "name": "Mega Menu", "html": "...", "css": "...", "javascript": "" },
@@ -55,8 +47,6 @@ const VIBE_JSON_LIBRARY = {
     }
 })();
 
-
-// app.js
 
 import * as api from './api.js';
 
@@ -145,7 +135,7 @@ function generateFullCodeString(tree, userId, projectId) {
             case 'js-function':
             case 'declaration':
                 // FIX: Do not wrap in IIFE here, otherwise global functions break.
-                // Just accumulate the code.
+                // Just accumulate the code directly.
                 jsContent += node.code + '\n\n';
                 break;
         }
@@ -233,7 +223,6 @@ const vibeDbScript = `
 <\/script>
     `;
 
-    // FIX: Removed the IIFE (function(){ ... })() wrapper around jsContent to preserve global scope.
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6144,7 +6133,7 @@ function bindEventListeners() {
             if (currentProjectStorageType === 'cloud' && saveToCloudButton && !saveToCloudButton.disabled) {
                 handleSaveToCloud();
             } else if (currentProjectStorageType === 'github' && saveToGithubButton && !saveToGithubButton.disabled) {
-                handleSaveToGitHub();
+                handleSaveToGithub();
             } else if (saveToLocalButton && !saveToLocalButton.disabled) {
                 handleSaveToLocal();
             }
@@ -6185,7 +6174,6 @@ function resetToStartPage() {
     if(flowchartOutput) flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     if(consoleOutput) consoleOutput.innerHTML = '';
     if(fullCodeEditor) fullCodeEditor.value = '';
-    }
 
     const cloudToggle = document.querySelector('.storage-toggle button[data-storage="cloud"]');
     if (cloudToggle) {
@@ -6982,4 +6970,4 @@ async function handleZipUpload() {
         // Reset file input so change event triggers again if same file selected
         zipFileInput.value = '';
     }
-          }
+}
