@@ -64,8 +64,6 @@ import * as api from './api.js';
 
 function compressProjectData(projectData) {
     try {
-        // Optimization: Use native browser capabilities to handle large strings 
-        // without looping through every single byte manually.
         const jsonString = JSON.stringify(projectData);
         return btoa(encodeURIComponent(jsonString).replace(/%([0-9A-F]{2})/g,
             function toSolidBytes(match, p1) {
@@ -80,12 +78,10 @@ function compressProjectData(projectData) {
 function decompressProjectData(dataString) {
     if (!dataString) return null;
 
-    // 1. If it's already an object (fetch sometimes auto-parses JSON)
     if (typeof dataString === 'object') {
         return dataString;
     }
 
-    // 2. If it's a raw JSON string (New Cloud format)
     if (typeof dataString === 'string' && (dataString.trim().startsWith('{') || dataString.trim().startsWith('['))) {
         try {
             return JSON.parse(dataString);
@@ -94,7 +90,6 @@ function decompressProjectData(dataString) {
         }
     }
 
-    // 3. Fallback to decoding Base64 (LocalDB or Legacy Cloud format)
     try {
         return JSON.parse(decodeURIComponent(atob(dataString).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -149,6 +144,8 @@ function generateFullCodeString(tree, userId, projectId) {
             case 'javascript':
             case 'js-function':
             case 'declaration':
+                // FIX: Do not wrap in IIFE here, otherwise global functions break.
+                // Just accumulate the code.
                 jsContent += node.code + '\n\n';
                 break;
         }
@@ -175,7 +172,6 @@ const vibeDbScript = `
         return;
     }
 
-    // Modern POST request to bypass CORS and size limits
     async function postRequest(action, payload) {
         const response = await fetch(APPS_SCRIPT_URL, {
             method: 'POST',
@@ -237,6 +233,7 @@ const vibeDbScript = `
 <\/script>
     `;
 
+    // FIX: Removed the IIFE (function(){ ... })() wrapper around jsContent to preserve global scope.
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -246,7 +243,7 @@ const vibeDbScript = `
 <body>
 ${htmlContent.trim()}
     ${(userId && projectId) ? vibeDbScript.trim() : ''}
-    <script>(function() {${jsContent.trim()}})();<\/script>
+    <script>${jsContent.trim()}<\/script>
 </body>
 </html>`;
 }
@@ -2312,6 +2309,7 @@ async function generateCompleteSubtree(parentNode, streamCallback = null) {
         - Ensure CSS selectors exactly match the IDs and Classes in your HTML.
     3.  **Responsive:** Use Flexbox/Grid and media queries for mobile responsiveness.
     4.  **Content:** Use realistic text and images (via Pollinations AI), not Lorem Ipsum.
+    5.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked.
 
     **TASK:** Generate a valid JSON array of "vibe nodes" that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
 
@@ -2466,20 +2464,25 @@ function parseHtmlToVibeTree(fullCode) {
             return;
         }
 
-        if (!scriptTag.src && scriptTag.textContent.trim()) {
+        // FIX: If a script tag has a type (like module) or attributes other than src,
+        // it is safer to leave it in the HTML structure so attributes aren't lost,
+        // unless it is a purely inline classic script.
+        const isSimpleInlineScript = !scriptTag.src && !scriptTag.type && scriptTag.attributes.length === 0;
+
+        if (isSimpleInlineScript && scriptTag.textContent.trim()) {
             jsNodes.push({
                 id: `script-${index + 1}`,
                 type: 'javascript',
                 description: 'JavaScript extracted from the document.',
                 code: scriptTag.textContent.trim()
             });
-        }
-        
-        // Remove scripts without src to avoid duplicate execution
-        // Leave scripts WITH src so they still load external libraries in the body/head
-        if (!scriptTag.src) {
             scriptTag.remove();
+        } 
+        else if (!scriptTag.src) {
+            // It's an inline script but has attributes (like type="module").
+            // We do NOT remove it. It stays in the HTML body/head.
         }
+        // If it has src, we leave it alone (it stays in HTML).
     });
 
     // 3. Extract Head content
@@ -3412,6 +3415,7 @@ function getAgentSystemPrompt() {
 2.  **Formatting:** When providing code, ensure it is properly indented and formatted.
 3.  **Completeness:** When updating a node (actionType: "update"), you MUST return the **FULL, COMPLETE CODE** for that node. Do not return diffs or partial snippets.
 4.  **Separation:** Prefer creating/updating specific 'css' nodes for styling. If you must put CSS in an 'html' node, wrap it in a <style> tag at the top of that node's code.
+5.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked. If updating JS, return the full code.
 
 **OUTPUT FORMAT:**
 Return ONLY a single, valid JSON object:
@@ -6181,6 +6185,7 @@ function resetToStartPage() {
     if(flowchartOutput) flowchartOutput.innerHTML = '<div class="flowchart-placeholder">Click "Generate Flowchart" to create a diagram.</div>';
     if(consoleOutput) consoleOutput.innerHTML = '';
     if(fullCodeEditor) fullCodeEditor.value = '';
+    }
 
     const cloudToggle = document.querySelector('.storage-toggle button[data-storage="cloud"]');
     if (cloudToggle) {
@@ -6977,4 +6982,4 @@ async function handleZipUpload() {
         // Reset file input so change event triggers again if same file selected
         zipFileInput.value = '';
     }
-      }
+          }
