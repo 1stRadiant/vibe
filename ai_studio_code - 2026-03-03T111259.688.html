@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>APUI // Infinite Vibe Engine</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600&family=Fira+Code&display=swap" rel="stylesheet">
+<!-- PrismJS for Code Highlighting -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+<style>
+    :root {
+        --primary: #4169e1;
+        --secondary: #87CEEB;
+        --bg-dark: #0f1219;
+        --bg-panel: rgba(22, 33, 62, 0.95);
+        --text: #e6e6ff;
+        --ai-glow: #ff00ff;
+        --ai-edit: #00ffcc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: 'Rajdhani', sans-serif;
+        margin: 0; padding: 0;
+        background-color: var(--bg-dark);
+        height: 100vh; width: 100vw;
+        overflow: hidden; 
+        color: var(--text);
+        touch-action: none; 
+        overscroll-behavior: none;
+    }
+
+    /* --- Particle Canvas Background --- */
+    #bg-canvas {
+        position: fixed; top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        z-index: -1; pointer-events: none;
+    }
+
+    /* --- Navbar --- */
+    .navbar {
+        position: fixed; top: 0; left: 0; right: 0; height: 60px;
+        background: rgba(15, 21, 36, 0.85); backdrop-filter: blur(10px);
+        display: flex; align-items: center; padding: 0 15px;
+        z-index: 10000; border-bottom: 1px solid rgba(65, 105, 225, 0.5);
+        box-shadow: 0 0 20px rgba(65, 105, 225, 0.2);
+    }
+
+    .btn-icon {
+        background: transparent; border: none; color: var(--text);
+        font-size: 1.6rem; cursor: pointer; margin-right: 15px; padding: 0;
+        display: flex; align-items: center; transition: 0.2s;
+    }
+    .btn-icon:hover { color: var(--secondary); text-shadow: 0 0 10px var(--primary); }
+
+    .navbar-brand {
+        font-family: 'Orbitron', sans-serif; font-size: 1.2rem;
+        color: var(--secondary); font-weight: bold;
+        margin-right: 15px; text-shadow: 0 0 10px var(--primary);
+        letter-spacing: 1px;
+    }
+
+    .navbar-input-area { flex: 1; display: flex; gap: 8px; max-width: 600px; }
+
+    #user-input {
+        flex: 1; background: rgba(0,0,0,0.5); border: 1px solid #333;
+        color: var(--secondary); padding: 8px 10px; border-radius: 4px;
+        font-family: 'Fira Code', monospace; font-size: 16px; 
+    }
+    #user-input:focus { outline: none; border-color: var(--primary); }
+
+    .btn-main {
+        background: var(--primary); border: none; color: white;
+        padding: 0 15px; border-radius: 4px; cursor: pointer;
+        font-family: 'Rajdhani', sans-serif; font-weight: bold;
+        text-transform: uppercase; height: 35px; white-space: nowrap;
+        transition: 0.2s;
+    }
+    .btn-main:hover { background: #2848c8; box-shadow: 0 0 10px var(--primary); }
+
+    @media (max-width: 768px) {
+        .navbar-brand { font-size: 1.1rem; margin-right: 10px; display: block; }
+        .btn-main { padding: 0 10px; font-size: 0.8rem; }
+        .btn-icon { margin-right: 10px; }
+    }
+
+    /* --- Sidebar --- */
+    #sidebar {
+        position: fixed; top: 60px; left: 0; bottom: 0; width: 250px;
+        background: rgba(15, 21, 36, 0.95); border-right: 1px solid var(--primary);
+        z-index: 9000; transform: translateX(-100%);
+        transition: transform 0.3s ease; display: flex; flex-direction: column;
+    }
+    #sidebar.open { transform: translateX(0); }
+    .sidebar-header {
+        padding: 15px; border-bottom: 1px solid #333;
+        font-weight: bold; color: var(--secondary); text-transform: uppercase;
+    }
+    .sidebar-action-area {
+        padding: 10px 15px; border-bottom: 1px solid #333;
+    }
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 10px; }
+    .sidebar-item {
+        padding: 10px; background: rgba(0,0,0,0.3); margin-bottom: 5px;
+        border-radius: 4px; cursor: pointer; border: 1px solid transparent;
+        transition: 0.2s; font-size: 0.9rem;
+    }
+    .sidebar-item:hover { border-color: var(--primary); background: rgba(65, 105, 225, 0.1); }
+
+    /* --- OS Menu Styles (Animated Logo) --- */
+    #os-menu-container {
+        position: fixed;
+        bottom: 2rem;
+        left: 2rem;
+        z-index: 20000;
+        width: 80px;
+        height: 80px;
+        cursor: grab;
+        touch-action: none;
+    }
+    #os-menu-container.dragging {
+        cursor: grabbing;
+    }
+
+    .os-logo-container {
+        width: 100%; height: 100%;
+        position: relative; cursor: pointer; z-index: 2;
+        background: rgba(15, 21, 36, 0.7);
+        border-radius: 50%;
+        box-shadow: 0 0 15px rgba(65, 105, 225, 0.5), inset 0 0 10px rgba(135, 206, 235, 0.3);
+        transition: all 0.3s ease;
+    }
+    .os-logo-container:hover {
+        box-shadow: 0 0 25px rgba(65, 105, 225, 0.9), inset 0 0 15px rgba(135, 206, 235, 0.6);
+    }
+    .os-logo-container .center-image {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 75%; height: 75%;
+        object-fit: contain; z-index: 1; pointer-events: none;
+        filter: drop-shadow(0 0 8px rgba(135, 206, 235, 0.8));
+    }
+    .os-logo-container .overlay {
+        position: absolute; top: 0; left: 0;
+        width: 100%; height: 100%;
+        z-index: 2; pointer-events: none;
+    }
+    .os-logo-container .circle-segment {
+        stroke-dasharray: 30;
+        animation: os-logo-rotate 4s linear infinite; opacity: 0.8;
+    }
+    @keyframes os-logo-rotate { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 60; } }
+    .os-logo-container .outer-circle { animation: os-logo-pulse 2s ease-in-out infinite; }
+    @keyframes os-logo-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+
+    .os-menu-btn {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0; pointer-events: none;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        background: rgba(22, 33, 62, 0.95);
+        color: var(--secondary); border: 1px solid var(--primary);
+        border-radius: 8px; padding: 8px 14px;
+        display: flex; align-items: center; gap: 6px;
+        font-family: 'Rajdhani', sans-serif; font-weight: bold; text-transform: uppercase;
+        box-shadow: 0 0 10px rgba(65, 105, 225, 0.5);
+        white-space: nowrap; cursor: pointer; z-index: 1;
+        backdrop-filter: blur(5px);
+    }
+    .os-menu-btn:hover {
+        background: var(--primary); color: white;
+        box-shadow: 0 0 20px var(--secondary);
+    }
+
+    #os-menu-container.open .os-menu-btn { opacity: 1; pointer-events: auto; }
+    
+    /* Radial expansion mapping */
+    #os-menu-container.open .btn-1 { transform: translate(65px, -10px) scale(1); }
+    #os-menu-container.open .btn-2 { transform: translate(55px, -60px) scale(1); }
+    #os-menu-container.open .btn-3 { transform: translate(15px, -90px) scale(1); }
+    #os-menu-container.open .btn-4 { transform: translate(-35px, -100px) scale(1); }
+    #os-menu-container.open .btn-5 { transform: translate(-80px, -80px) scale(1); }
+
+    @media (max-width: 768px) {
+        #os-menu-container.open .btn-1 { transform: translate(50px, -10px) scale(0.9); }
+        #os-menu-container.open .btn-2 { transform: translate(45px, -50px) scale(0.9); }
+        #os-menu-container.open .btn-3 { transform: translate(10px, -75px) scale(0.9); }
+        #os-menu-container.open .btn-4 { transform: translate(-30px, -80px) scale(0.9); }
+        #os-menu-container.open .btn-5 { transform: translate(-70px, -60px) scale(0.9); }
+    }
+
+
+    /* --- Viewport & World --- */
+    #viewport {
+        position: fixed; top: 60px; left: 0; width: 100vw; height: calc(100vh - 60px);
+        overflow: hidden; cursor: grab; touch-action: none;
+    }
+    #world {
+        position: absolute; top: 0; left: 0; width: 0; height: 0;
+        transform-origin: 0 0; will-change: transform;
+    }
+    #connector-svg { position: absolute; overflow: visible; pointer-events: none; z-index: 0; }
+
+    .ai-laser {
+        stroke: var(--ai-glow) !important; stroke-width: 4 !important;
+        opacity: 0.8 !important; filter: drop-shadow(0 0 6px var(--ai-glow));
+        transition: all 0.3s ease;
+    }
+
+    /* --- Nodes --- */
+    .node {
+        position: absolute; width: min(380px, 90vw); height: 300px; 
+        background: var(--bg-panel); border: 1px solid var(--primary);
+        border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        display: flex; flex-direction: column; z-index: 10;
+        backdrop-filter: blur(5px); resize: both; overflow: hidden; 
+        transition: box-shadow 0.2s, border-color 0.2s; 
+    }
+
+    .node.animating-bounds { transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s !important; }
+    .node.fullscreen-mode { resize: none !important; z-index: 9999 !important; }
+    .node:hover { border-color: var(--secondary); box-shadow: 0 0 25px rgba(65, 105, 225, 0.4); }
+    
+    .node.ai-scanning { border-color: var(--ai-glow) !important; box-shadow: 0 0 40px rgba(255, 0, 255, 0.6), inset 0 0 20px rgba(255, 0, 255, 0.3) !important; }
+    .node.ai-updating { border-color: var(--ai-edit) !important; box-shadow: 0 0 40px rgba(0, 255, 204, 0.6), inset 0 0 20px rgba(0, 255, 204, 0.3) !important; }
+
+    .node.hidden { display: none !important; } 
+    .node.out-of-view { display: none !important; } 
+    .node.minimized { height: 45px !important; width: 200px !important; resize: none; }
+    .node.minimized .node-content, .node.minimized .node-footer { display: none; }
+
+    .node-header {
+        height: 45px; min-height: 45px; padding: 0 15px;
+        background: rgba(65, 105, 225, 0.15); border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+        display: flex; justify-content: space-between; align-items: center;
+        cursor: pointer; user-select: none; touch-action: none;
+    }
+
+    .node-title { font-weight: 700; color: var(--secondary); text-transform: uppercase; font-size: 0.9rem; pointer-events: none;}
+    .node-type-badge { font-size: 0.7em; background: #000; padding: 2px 6px; border-radius: 3px; color: #aaa; margin-left: 8px; }
+
+    .node-controls { display: flex; gap: 8px; }
+    .win-btn { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer; }
+    .btn-min { background: #ffbd2e; } .btn-close { background: #ff4444; }
+
+    .node-content { flex: 1; position: relative; background: #0d1117; overflow: hidden; }
+
+    /* Code Highlighting */
+    .editor-container { position: relative; width: 100%; height: 100%; background: #0d1117; }
+    .code-editor, .code-highlight {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        font-family: 'Fira Code', monospace; font-size: 14px; line-height: 1.5;
+        padding: 10px; margin: 0; border: none; white-space: pre; 
+        overflow-wrap: normal; overflow-x: auto; overflow-y: auto; tab-size: 4;
+    }
+    .code-editor { color: transparent; background: transparent; caret-color: white; z-index: 2; resize: none; outline: none; touch-action: pan-x pan-y; }
+    .code-highlight { z-index: 1; pointer-events: none; color: #ccc; }
+
+    /* AI Stream Chat UI */
+    .chat-output { height: 100%; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .chat-msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; max-width: 90%; word-wrap: break-word; font-family: 'Rajdhani', sans-serif; animation: popIn 0.3s ease-out forwards; }
+    .msg-user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+    .msg-ai { align-self: flex-start; background: rgba(0, 255, 204, 0.15); border: 1px solid var(--ai-edit); color: var(--text); border-bottom-left-radius: 2px; }
+    .msg-system { align-self: center; font-size: 12px; color: #aaa; background: transparent; padding: 4px; text-align: center; }
+    @keyframes popIn { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+
+    .preview-iframe { width: 100%; height: 100%; border: none; background: white; }
+    .console-output { height: 100%; padding: 10px; overflow-y: auto; font-family: 'Fira Code', monospace; font-size: 12px; touch-action: pan-y; }
+    .log-entry { margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+    .log-error { color: #ff6b6b; } .log-success { color: #4caf50; } .log-ai { color: var(--ai-glow); }
+
+    .settings-panel { padding: 15px; height: 100%; overflow-y: auto; touch-action: pan-y;}
+    .settings-panel label { display: block; margin-top: 10px; color: var(--secondary); font-size: 0.9rem;}
+    .settings-panel input { width: 100%; background: #000; border: 1px solid #444; color: white; padding: 8px; margin-top: 5px; border-radius: 4px; font-family: monospace;}
+
+    .node-footer {
+        padding: 8px; background: rgba(0,0,0,0.5); border-top: 1px solid #333;
+        display: flex; justify-content: flex-end; gap: 5px; flex-wrap: wrap;
+    }
+    .action-btn {
+        background: transparent; border: 1px solid var(--primary); color: var(--secondary);
+        padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.75rem; transition: 0.2s;
+    }
+    .action-btn:hover { background: var(--primary); color: white; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="navbar">
+    <button class="btn-icon" title="Toggle Sidebar" onclick="toggleSidebar()">☰</button>
+    <div class="navbar-brand">APUI</div>
+    <div class="navbar-input-area">
+        <input type="text" id="user-input" placeholder="Prompt AI or enter command (settings, clean)...">
+        <button class="btn-main" onclick="handleCommand()">RUN</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn-main" style="background: #4caf50;" onclick="downloadProject()">SAVE</button>
+</div>
+
+<div id="sidebar">
+    <div class="sidebar-header">APUI Dashboard</div>
+    <div class="sidebar-action-area">
+        <button class="btn-main" style="width: 100%; text-align: center;" onclick="document.getElementById('file-input').click(); if(window.innerWidth < 768) toggleSidebar();">UPLOAD HTML</button>
+    </div>
+    <div class="sidebar-header" style="border-top: none;">Project Structure</div>
+    <div class="sidebar-list" id="sidebar-list"></div>
+</div>
+
+<input type="file" id="file-input" style="display: none" accept=".html,.htm">
+
+<div id="viewport">
+    <div id="world">
+        <svg id="connector-svg"></svg>
+    </div>
+</div>
+
+<!-- Draggable APUI OS Menu -->
+<div id="os-menu-container">
+    <div class="os-logo-container">
+        <img src="/1737295468100.png" alt="APUI" class="center-image">
+        <svg class="overlay" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="85" class="circle-segment" stroke="var(--secondary)" stroke-width="4" fill="none"></circle>
+            <circle cx="100" cy="100" r="75" class="circle-segment" stroke="var(--ai-edit)" stroke-width="2" fill="none" style="animation-direction: reverse;"></circle>
+            <g class="outer-circle" stroke="var(--primary)" stroke-width="3" fill="none">
+                <path d="M100,15 L100,30"></path>
+                <path d="M100,170 L100,185"></path>
+                <path d="M15,100 L30,100"></path>
+                <path d="M170,100 L185,100"></path>
+            </g>
+        </svg>
+    </div>
+    <button class="os-menu-btn btn-1" onclick="handleCommand('chat')">💬 AI Chat</button>
+    <button class="os-menu-btn btn-2" onclick="handleCommand('preview')">👁️ Preview</button>
+    <button class="os-menu-btn btn-3" onclick="handleCommand('settings')">⚙️ Settings</button>
+    <button class="os-menu-btn btn-4" onclick="handleCommand('console')">🖥️ Console</button>
+    <button class="os-menu-btn btn-5" onclick="handleCommand('clean')">🧹 Clean All</button>
+</div>
+
+<script>
+/**
+ * APUI Infinite Engine 10.2
+ * Features: Draggable OS Menu Logo, Fluid Node Repulsion Physics, Dynamic Canvas Background, 
+ * AI Activity Stream Chat, Smart Workspace Limits, Universal Prompt Bar,
+ * Enhanced Sidebar UI Layout.
+ */
+
+/* --- STATE --- */
+const AppState = {
+    vibeTree: { id: "root", type: "container", children: [] }, 
+    nodes: new Map(), 
+    connections: [],
+    mru: [], 
+    
+    pan: { x: 0, y: 0 },
+    scale: 1,
+    isPanning: false,
+    draggingNode: null,
+    fullscreenNode: null, 
+    
+    activePointers: new Map(),
+    initialPinchDist: null,
+    initialScale: 1,
+    initialPan: { x: 0, y: 0 },
+    pinchCenter: { x: 0, y: 0 },
+    
+    pointerStart: { x: 0, y: 0 },
+    panStart: { x: 0, y: 0 },
+    nodeStart: { x: 0, y: 0 },
+    
+    zIndexCounter: 100,
+    settings: {
+        apiKey: localStorage.getItem('apui_gemini_key') || '',
+        model: localStorage.getItem('apui_model') || 'gemini-1.5-pro'
+    },
+    resizeObserver: null
+};
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+const viewport = document.getElementById('viewport');
+const world = document.getElementById('world');
+const svgLayer = document.getElementById('connector-svg');
+const userInput = document.getElementById('user-input');
+const sidebar = document.getElementById('sidebar');
+const sidebarList = document.getElementById('sidebar-list');
+
+document.addEventListener('DOMContentLoaded', () => {
+    initParticles();
+    initPointerSystem();
+    initWheelZoom();
+    initFileUpload();
+    initResponsiveResize();
+    initOsMenuDrag(); // Initialize OS Menu interactions
+    startPhysicsLoop();
+    
+    AppState.resizeObserver = new ResizeObserver(() => requestAnimationFrame(drawConnections));
+
+    userInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') handleCommand();
+    });
+
+    createNode('chat', 'AI Activity Stream', 'chat', '', 50, 100);
+    createNode('console', 'System Console', 'console', '', 50, 450);
+    createNode('settings', 'AI Settings', 'settings', '', 50, 800);
+    createNode('preview', 'Live Preview', 'preview', '', 1400, 100);
+
+    loadDefaultGranularProject();
+    logToConsole(`System ready. Model: ${AppState.settings.model}`, 'success');
+    logToChat('system', 'APUI AI Engine initialized. Type prompts in the top bar to begin building.');
+    enforceNodeLimit('preview'); 
+
+    // Global click listener to close OS menu when clicking away
+    document.addEventListener('click', e => {
+        const menuContainer = document.getElementById('os-menu-container');
+        if (menuContainer && menuContainer.classList.contains('open') && !menuContainer.contains(e.target)) {
+            menuContainer.classList.remove('open');
+        }
+    });
+});
+
+/* --- OS MENU LOGO DRAGGING --- */
+let osMenuMoved = false;
+
+function initOsMenuDrag() {
+    const osMenu = document.getElementById('os-menu-container');
+    if (!osMenu) return;
+
+    let isDraggingOsMenu = false;
+    let osMenuStartX, osMenuStartY, osMenuInitialLeft, osMenuInitialTop;
+    const OS_MOVEMENT_THRESHOLD = 5;
+
+    const getPointerCoords = e => {
+        if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+    };
+
+    const onDragStart = e => {
+        if (e.target.closest('.os-menu-btn')) return;
+        
+        isDraggingOsMenu = true;
+        osMenuMoved = false;
+        
+        const coords = getPointerCoords(e);
+        osMenuStartX = coords.x;
+        osMenuStartY = coords.y;
+
+        const rect = osMenu.getBoundingClientRect();
+        osMenuInitialLeft = rect.left;
+        osMenuInitialTop = rect.top;
+
+        osMenu.classList.add('dragging');
+
+        document.addEventListener('pointermove', onDragMove, { passive: false });
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('pointerup', onDragEnd);
+        document.addEventListener('touchend', onDragEnd);
+    };
+
+    const onDragMove = e => {
+        if (!isDraggingOsMenu) return;
+        e.preventDefault();
+
+        const coords = getPointerCoords(e);
+        const dx = coords.x - osMenuStartX;
+        const dy = coords.y - osMenuStartY;
+
+        if (!osMenuMoved && (Math.abs(dx) > OS_MOVEMENT_THRESHOLD || Math.abs(dy) > OS_MOVEMENT_THRESHOLD)) {
+            osMenuMoved = true;
+            if (osMenu.classList.contains('open')) osMenu.classList.remove('open');
+        }
+
+        if (osMenuMoved) {
+            let newLeft = osMenuInitialLeft + dx;
+            let newTop = osMenuInitialTop + dy;
+
+            const menuWidth = osMenu.offsetWidth;
+            const menuHeight = osMenu.offsetHeight;
+            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - menuWidth));
+            newTop = Math.max(0, Math.min(newTop, window.innerHeight - menuHeight));
+
+            osMenu.style.left = `${newLeft}px`;
+            osMenu.style.top = `${newTop}px`;
+            osMenu.style.bottom = 'auto';
+            osMenu.style.right = 'auto';
+        }
+    };
+
+    const onDragEnd = () => {
+        if (!isDraggingOsMenu) return;
+        isDraggingOsMenu = false;
+        osMenu.classList.remove('dragging');
+
+        document.removeEventListener('pointermove', onDragMove);
+        document.removeEventListener('touchmove', onDragMove);
+        document.removeEventListener('pointerup', onDragEnd);
+        document.removeEventListener('touchend', onDragEnd);
+
+        setTimeout(() => { if (!isDraggingOsMenu) osMenuMoved = false; }, 50);
+    };
+
+    osMenu.addEventListener('pointerdown', onDragStart);
+    osMenu.addEventListener('touchstart', onDragStart, { passive: true });
+
+    const osLogo = osMenu.querySelector('.os-logo-container');
+    if (osLogo) {
+        osLogo.onclick = (event) => {
+            event.stopPropagation();
+            if (osMenuMoved) return; // Prevent triggering if we were just dragging it
+            osMenu.classList.toggle('open');
+        };
+    }
+}
+
+/* --- FLUID NODE PHYSICS ENGINE --- */
+function startPhysicsLoop() {
+    function update() {
+        resolveCollisions();
+        requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
+
+function resolveCollisions() {
+    const padding = 30; 
+    const activeNodes = Array.from(AppState.nodes.values()).filter(n => 
+        !n.classList.contains('hidden') && 
+        !n.classList.contains('out-of-view') && 
+        !n.classList.contains('fullscreen-mode') &&
+        !n.classList.contains('animating-bounds')
+    );
+
+    let moved = false;
+
+    for (let i = 0; i < activeNodes.length; i++) {
+        for (let j = i + 1; j < activeNodes.length; j++) {
+            const n1 = activeNodes[i];
+            const n2 = activeNodes[j];
+
+            const rect1 = { x: parseFloat(n1.style.left) || 0, y: parseFloat(n1.style.top) || 0, w: n1.offsetWidth, h: n1.offsetHeight };
+            const rect2 = { x: parseFloat(n2.style.left) || 0, y: parseFloat(n2.style.top) || 0, w: n2.offsetWidth, h: n2.offsetHeight };
+
+            let cx1 = rect1.x + rect1.w / 2;
+            let cy1 = rect1.y + rect1.h / 2;
+            let cx2 = rect2.x + rect2.w / 2;
+            let cy2 = rect2.y + rect2.h / 2;
+
+            if (Math.abs(cx1 - cx2) < 1 && Math.abs(cy1 - cy2) < 1) {
+                cx1 += Math.random() * 2 - 1;
+                cy1 += Math.random() * 2 - 1;
+            }
+
+            const overlapX = (rect1.w + rect2.w) / 2 + padding - Math.abs(cx1 - cx2);
+            const overlapY = (rect1.h + rect2.h) / 2 + padding - Math.abs(cy1 - cy2);
+
+            if (overlapX > 0 && overlapY > 0) {
+                moved = true;
+                let push1 = 0.5;
+                let push2 = 0.5;
+
+                if (AppState.draggingNode === n1) { push1 = 0; push2 = 1; }
+                else if (AppState.draggingNode === n2) { push1 = 1; push2 = 0; }
+
+                const pushSpeed = 0.15; 
+
+                if (overlapX < overlapY) {
+                    const dir = cx1 < cx2 ? -1 : 1;
+                    rect1.x += dir * overlapX * push1 * pushSpeed;
+                    rect2.x -= dir * overlapX * push2 * pushSpeed;
+                } else {
+                    const dir = cy1 < cy2 ? -1 : 1;
+                    rect1.y += dir * overlapY * push1 * pushSpeed;
+                    rect2.y -= dir * overlapY * push2 * pushSpeed;
+                }
+
+                if (push1 > 0) { n1.style.left = `${rect1.x}px`; n1.style.top = `${rect1.y}px`; }
+                if (push2 > 0) { n2.style.left = `${rect2.x}px`; n2.style.top = `${rect2.y}px`; }
+            }
+        }
+    }
+    if (moved) drawConnections();
+}
+
+/* --- DYNAMIC PARTICLE BACKGROUND --- */
+function initParticles() {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let width, height, particles;
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        particles = [];
+        const count = Math.floor((width * height) / 12000); 
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                radius: Math.random() * 1.5 + 0.5
+            });
+        }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function animate() {
+        ctx.clearRect(0, 0, width, height);
+        for(let i=0; i<particles.length; i++) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            if(p.x < 0 || p.x > width) p.vx *= -1;
+            if(p.y < 0 || p.y > height) p.vy *= -1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(135, 206, 235, 0.8)';
+            ctx.fill();
+
+            for(let j=i+1; j<particles.length; j++) {
+                let p2 = particles[j];
+                let dx = p.x - p2.x, dy = p.y - p2.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if(dist < 120) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(65, 105, 225, ${0.4 * (1 - dist/120)})`;
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+/* --- SMART WORKSPACE MANAGER --- */
+function touchNode(id) {
+    if (!id) return;
+    AppState.mru = AppState.mru.filter(n => n !== id);
+    AppState.mru.unshift(id);
+}
+
+function enforceNodeLimit(targetId) {
+    if (!targetId) return;
+    touchNode(targetId);
+
+    const visibleSet = new Set();
+    visibleSet.add(targetId);
+
+    if (AppState.nodes.has('preview') && !AppState.nodes.get('preview').classList.contains('hidden')) visibleSet.add('preview');
+    if (AppState.nodes.has('chat') && !AppState.nodes.get('chat').classList.contains('hidden')) visibleSet.add('chat');
+
+    AppState.connections.forEach(c => {
+        if (c.from === targetId && AppState.nodes.has(c.to)) visibleSet.add(c.to);
+        if (c.to === targetId && AppState.nodes.has(c.from)) visibleSet.add(c.from);
+    });
+
+    for (const id of AppState.mru) {
+        if (visibleSet.size >= 6) break;
+        if (AppState.nodes.has(id) && !AppState.nodes.get(id).classList.contains('hidden')) visibleSet.add(id);
+    }
+
+    AppState.nodes.forEach((node, id) => {
+        if (visibleSet.has(id)) node.classList.remove('out-of-view');
+        else node.classList.add('out-of-view');
+    });
+
+    drawConnections();
+}
+
+/* --- DEFAULT GRANULAR PROJECT --- */
+function loadDefaultGranularProject() {
+    addVibeNode('html-nav', 'Navbar (HTML)', 'html', `<nav id="main-nav">\n  <h2>Modular Vibe</h2>\n  <ul><li>Home</li></ul>\n</nav>`);
+    addVibeNode('html-hero', 'Hero Section (HTML)', 'html', `<section id="hero">\n  <h1>Welcome to the Future</h1>\n  <button id="action-btn">Initialize Sequence</button>\n</section>`);
+    addVibeNode('css-main', 'Global Styles (CSS)', 'css', `body {\n  font-family: 'Rajdhani', sans-serif;\n  background: #111;\n  color: #fff;\n  margin: 0;\n}\n#main-nav { background: #222; padding: 15px; border-bottom: 2px solid #4169e1; }\n#hero { padding: 50px; text-align: center; }\nbutton { padding: 10px 20px; background: #4169e1; color: white; border: none; cursor: pointer; border-radius: 4px; }`);
+    addVibeNode('js-init', 'App Init (JS)', 'javascript', `function initApp() {\n  console.log('Core functions initialized.');\n  bindEvents();\n}`);
+    addVibeNode('js-events', 'Event Listeners (JS)', 'javascript', `function bindEvents() {\n  document.getElementById('action-btn').addEventListener('click', () => {\n    alert('Sequence Engaged!');\n  });\n}\n\ninitApp();`);
+
+    arrangeNodes();
+    updatePreview();
+}
+
+/* --- ANIMATION ENGINE --- */
+let animationFrameId = null;
+function animateTo(targetPanX, targetPanY, targetScale, duration = 400) {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    const startPanX = AppState.pan.x;
+    const startPanY = AppState.pan.y;
+    const startScale = AppState.scale;
+    const startTime = performance.now();
+
+    function step(time) {
+        let elapsed = time - startTime;
+        let progress = Math.min(elapsed / duration, 1);
+        let ease = 1 - Math.pow(1 - progress, 3);
+
+        AppState.pan.x = startPanX + (targetPanX - startPanX) * ease;
+        AppState.pan.y = startPanY + (targetPanY - startPanY) * ease;
+        AppState.scale = startScale + (targetScale - startScale) * ease;
+
+        updateWorldTransform();
+
+        if (progress < 1) animationFrameId = requestAnimationFrame(step);
+        else animationFrameId = null;
+    }
+    animationFrameId = requestAnimationFrame(step);
+}
+
+function updateWorldTransform() {
+    world.style.transform = `translate(${AppState.pan.x}px, ${AppState.pan.y}px) scale(${AppState.scale})`;
+    drawConnections();
+}
+
+function centerOnNode(id, duration = 500) {
+    enforceNodeLimit(id); 
+
+    const node = AppState.nodes.get(id);
+    if (!node) return;
+    
+    bringToFront(node);
+    node.classList.remove('hidden'); 
+
+    const nx = parseFloat(node.style.left) || 0;
+    const ny = parseFloat(node.style.top) || 0;
+    const nw = node.offsetWidth;
+    const nh = node.offsetHeight;
+
+    const targetX = nx + nw/2;
+    const targetY = ny + nh/2;
+    
+    const targetScale = AppState.scale;
+    const targetPanX = (window.innerWidth / 2) - (targetX * targetScale);
+    const targetPanY = ((window.innerHeight + 60) / 2) - (targetY * targetScale);
+
+    animateTo(targetPanX, targetPanY, targetScale, duration);
+}
+
+/* --- POINTER & ZOOM SYSTEM --- */
+function initPointerSystem() {
+    let pointerDownPos = { x: 0, y: 0 };
+
+    viewport.addEventListener('pointerdown', (e) => {
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+        AppState.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (AppState.activePointers.size === 2) {
+            if (AppState.fullscreenNode) toggleNodeFullscreen(AppState.fullscreenNode);
+            const pts = Array.from(AppState.activePointers.values());
+            AppState.initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            AppState.initialScale = AppState.scale;
+            AppState.initialPan = { x: AppState.pan.x, y: AppState.pan.y };
+            AppState.pinchCenter = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
+            return;
+        }
+
+        if (e.target.closest('input, textarea, button, select, .code-editor, .settings-panel, .console-output, .chat-output')) return;
+
+        e.preventDefault(); 
+        const nodeHeader = e.target.closest('.node-header');
+        const nodeBody = e.target.closest('.node');
+
+        if (nodeHeader) {
+            const id = nodeHeader.closest('.node').dataset.id;
+            enforceNodeLimit(id);
+            startNodeDrag(e, AppState.nodes.get(id));
+        } else if (nodeBody) {
+            const id = nodeBody.dataset.id;
+            enforceNodeLimit(id);
+            bringToFront(nodeBody);
+        } else {
+            startWorldPan(e);
+        }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (AppState.activePointers.has(e.pointerId)) AppState.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (AppState.activePointers.size === 2) {
+            e.preventDefault();
+            const pts = Array.from(AppState.activePointers.values());
+            const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            let newScale = Math.max(0.1, Math.min(AppState.initialScale * (currentDist / AppState.initialPinchDist), 3.0));
+            
+            AppState.scale = newScale;
+            AppState.pan.x = AppState.pinchCenter.x - (AppState.pinchCenter.x - AppState.initialPan.x) * (newScale / AppState.initialScale);
+            AppState.pan.y = AppState.pinchCenter.y - (AppState.pinchCenter.y - AppState.initialPan.y) * (newScale / AppState.initialScale);
+            updateWorldTransform();
+            return;
+        }
+
+        if (AppState.draggingNode) { e.preventDefault(); dragNode(e); } 
+        else if (AppState.isPanning) { e.preventDefault(); panWorld(e); }
+    });
+
+    const pointerUp = (e) => {
+        if (AppState.draggingNode && AppState.activePointers.size <= 1) {
+            if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) < 5) toggleNodeFullscreen(AppState.draggingNode);
+        }
+        AppState.activePointers.delete(e.pointerId);
+        if (AppState.activePointers.size === 1) {
+            const remaining = Array.from(AppState.activePointers.values())[0];
+            AppState.pointerStart = { x: remaining.x, y: remaining.y };
+            AppState.panStart = { x: AppState.pan.x, y: AppState.pan.y };
+        }
+        if (AppState.activePointers.size < 2) AppState.initialPinchDist = null;
+        stopInteraction();
+    };
+
+    window.addEventListener('pointerup', pointerUp);
+    window.addEventListener('pointercancel', pointerUp);
+}
+
+function initWheelZoom() {
+    viewport.addEventListener('wheel', (e) => {
+        if (e.target.closest('.node-content')) return; 
+        e.preventDefault();
+
+        if (e.deltaY > 0 && AppState.fullscreenNode) { toggleNodeFullscreen(AppState.fullscreenNode); return; }
+
+        const newScale = Math.max(0.1, Math.min(AppState.scale * (1 + (-e.deltaY * 0.002)), 3.0));
+        AppState.pan.x = e.clientX - (e.clientX - AppState.pan.x) * (newScale / AppState.scale);
+        AppState.pan.y = e.clientY - (e.clientY - AppState.pan.y) * (newScale / AppState.scale);
+        AppState.scale = newScale;
+        
+        if(animationFrameId) cancelAnimationFrame(animationFrameId);
+        updateWorldTransform();
+    }, { passive: false });
+}
+
+function initResponsiveResize() {
+    window.addEventListener('resize', () => {
+        if (AppState.fullscreenNode) {
+            AppState.fullscreenNode.style.width = window.innerWidth + 'px';
+            AppState.fullscreenNode.style.height = (window.innerHeight - 60) + 'px';
+            AppState.pan.x = -parseFloat(AppState.fullscreenNode.style.left);
+            AppState.pan.y = -parseFloat(AppState.fullscreenNode.style.top);
+            updateWorldTransform();
+        }
+    });
+}
+
+function toggleNodeFullscreen(node) {
+    bringToFront(node);
+    node.classList.add('animating-bounds');
+    
+    const start = performance.now();
+    function animateLines(time) { drawConnections(); if (time - start < 400) requestAnimationFrame(animateLines); }
+    requestAnimationFrame(animateLines);
+    setTimeout(() => node.classList.remove('animating-bounds'), 400);
+
+    if (node.classList.contains('fullscreen-mode')) {
+        node.style.width = node.dataset.origW; node.style.height = node.dataset.origH;
+        animateTo(parseFloat(node.dataset.origPanX), parseFloat(node.dataset.origPanY), parseFloat(node.dataset.origScale), 400);
+        node.classList.remove('fullscreen-mode');
+        if (AppState.fullscreenNode === node) AppState.fullscreenNode = null;
+    } else {
+        if (AppState.fullscreenNode && AppState.fullscreenNode !== node) {
+            const old = AppState.fullscreenNode;
+            old.style.width = old.dataset.origW; old.style.height = old.dataset.origH;
+            old.classList.remove('fullscreen-mode');
+        }
+
+        node.dataset.origW = node.style.width || node.offsetWidth + 'px';
+        node.dataset.origH = node.style.height || node.offsetHeight + 'px';
+        node.dataset.origX = node.style.left; node.dataset.origY = node.style.top;
+        node.dataset.origPanX = AppState.pan.x; node.dataset.origPanY = AppState.pan.y;
+        node.dataset.origScale = AppState.scale;
+        
+        node.style.width = window.innerWidth + 'px'; node.style.height = (window.innerHeight - 60) + 'px';
+        animateTo(-parseFloat(node.dataset.origX), -parseFloat(node.dataset.origY), 1, 400);
+        node.classList.add('fullscreen-mode'); AppState.fullscreenNode = node;
+    }
+}
+
+function startWorldPan(e) {
+    if (AppState.activePointers.size > 1) return;
+    AppState.isPanning = true;
+    AppState.pointerStart = { x: e.clientX, y: e.clientY };
+    AppState.panStart = { x: AppState.pan.x, y: AppState.pan.y };
+    viewport.style.cursor = 'grabbing';
+}
+
+function panWorld(e) {
+    if (!AppState.isPanning || AppState.activePointers.size > 1) return;
+    AppState.pan.x = AppState.panStart.x + (e.clientX - AppState.pointerStart.x);
+    AppState.pan.y = AppState.panStart.y + (e.clientY - AppState.pointerStart.y);
+    if(animationFrameId) cancelAnimationFrame(animationFrameId); 
+    updateWorldTransform();
+}
+
+function startNodeDrag(e, nodeEl) {
+    if (AppState.activePointers.size > 1) return;
+    AppState.draggingNode = nodeEl; bringToFront(nodeEl);
+    AppState.pointerStart = { x: e.clientX, y: e.clientY };
+    AppState.nodeStart = { x: parseFloat(nodeEl.style.left) || 0, y: parseFloat(nodeEl.style.top) || 0 };
+    nodeEl.classList.add('dragging'); 
+}
+
+function dragNode(e) {
+    if (!AppState.draggingNode || AppState.activePointers.size > 1) return;
+    AppState.draggingNode.style.left = `${AppState.nodeStart.x + (e.clientX - AppState.pointerStart.x) / AppState.scale}px`;
+    AppState.draggingNode.style.top = `${AppState.nodeStart.y + (e.clientY - AppState.pointerStart.y) / AppState.scale}px`;
+    requestAnimationFrame(drawConnections); 
+}
+
+function stopInteraction() {
+    if (AppState.draggingNode) { AppState.draggingNode.classList.remove('dragging'); AppState.draggingNode = null; }
+    if (AppState.isPanning) { AppState.isPanning = false; viewport.style.cursor = 'grab'; }
+}
+
+function bringToFront(node) { AppState.zIndexCounter++; node.style.zIndex = AppState.zIndexCounter; }
+
+/* --- LOGIC & SYSTEM HELPERS --- */
+function escapeHTML(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function toggleSidebar() { sidebar.classList.toggle('open'); }
+
+function updateSidebar() {
+    sidebarList.innerHTML = '';
+    AppState.nodes.forEach((el, id) => {
+        if (el.classList.contains('hidden')) return; 
+        const type = el.dataset.type;
+        const div = document.createElement('div');
+        div.className = 'sidebar-item';
+        div.innerHTML = `<strong>${id}</strong> <span style="font-size:0.7em; color:#aaa;">[${type}]</span>`;
+        div.onclick = () => { centerOnNode(id); if (window.innerWidth < 768) toggleSidebar(); };
+        sidebarList.appendChild(div);
+    });
+}
+
+function handleCommand(specificCmd = null) {
+    const val = specificCmd || userInput.value.trim();
+    if (!val && !specificCmd) return;
+    const cmd = val.toLowerCase();
+
+    // Close OS menu if triggered from there
+    const menuContainer = document.getElementById('os-menu-container');
+    if (menuContainer && menuContainer.classList.contains('open')) menuContainer.classList.remove('open');
+
+    const spawnX = (-AppState.pan.x + window.innerWidth/2) / AppState.scale - 175;
+    const spawnY = (-AppState.pan.y + window.innerHeight/2) / AppState.scale - 100;
+
+    if (cmd === 'preview') { createNode('preview', 'Live Preview', 'preview', '', spawnX, spawnY); enforceNodeLimit('preview'); centerOnNode('preview', 400); }
+    else if (cmd === 'settings') { createNode('settings', 'AI Settings', 'settings', '', spawnX, spawnY); enforceNodeLimit('settings'); centerOnNode('settings', 400); }
+    else if (cmd === 'console') { createNode('console', 'Console', 'console', '', spawnX, spawnY); enforceNodeLimit('console'); centerOnNode('console', 400); }
+    else if (cmd === 'chat') { createNode('chat', 'AI Activity Stream', 'chat', '', spawnX, spawnY); enforceNodeLimit('chat'); centerOnNode('chat', 400); }
+    else if (cmd === 'clean') {
+        AppState.nodes.forEach((el, id) => { if (!['preview', 'console', 'settings', 'chat'].includes(id)) removeNode(id); });
+        AppState.vibeTree.children = []; drawConnections(); enforceNodeLimit('preview');
+        logToConsole('Workspace purged.', 'success');
+    } else { 
+        if (!AppState.nodes.has('chat')) createNode('chat', 'AI Activity Stream', 'chat', '', spawnX, spawnY);
+        enforceNodeLimit('chat');
+        centerOnNode('chat', 400);
+        aiEditProject('root', val); 
+    }
+    if(!specificCmd) userInput.value = '';
+}
+
+/* --- NODE CREATION & CODE HIGHLIGHTING --- */
+function createNode(id, title, type, content = '', x, y, parentId = null) {
+    if (AppState.nodes.has(id)) { bringToFront(AppState.nodes.get(id)); enforceNodeLimit(id); return; }
+
+    const node = document.createElement('div');
+    node.className = 'node'; node.id = `node-${id}`; node.dataset.id = id; node.dataset.type = type;
+    if (parentId) node.dataset.parent = parentId;
+    node.style.left = `${x}px`; node.style.top = `${y}px`;
+
+    let innerHTML = '';
+    if (['html', 'css', 'javascript'].includes(type)) {
+        const lang = type === 'javascript' ? 'javascript' : type === 'css' ? 'css' : 'markup';
+        innerHTML = `
+            <div class="editor-container">
+                <pre class="code-highlight" aria-hidden="true"><code class="language-${lang}" id="hl-${id}">${escapeHTML(content)}</code></pre>
+                <textarea class="code-editor" id="ed-${id}" spellcheck="false" 
+                    oninput="syncEditor('${id}')" onscroll="syncScroll('${id}')">${escapeHTML(content)}</textarea>
+            </div>
+        `;
+    } else if (type === 'chat') {
+        innerHTML = `<div class="chat-output" id="ai-chat-box"></div>`;
+    } else if (type === 'text') { 
+        innerHTML = `<div class="editor-container"><textarea class="code-editor" id="ed-${id}" spellcheck="false" readonly style="color:#e6e6ff; background:#0d1117; z-index:3; padding:15px; width:100%; height:100%; white-space:pre-wrap;">${escapeHTML(content)}</textarea></div>`;
+    } else if (type === 'preview') {
+        innerHTML = `<iframe class="preview-iframe" id="preview-frame"></iframe>`;
+    } else if (type === 'console') {
+        innerHTML = `<div class="console-output" id="sys-console"></div>`;
+    } else if (type === 'settings') {
+        innerHTML = `
+            <div class="settings-panel">
+                <label>Gemini API Key</label>
+                <input type="password" id="set-key" value="${AppState.settings.apiKey}" onchange="saveSettings()">
+                <label>AI Model</label>
+                <input type="text" id="set-model" value="${AppState.settings.model}" onchange="saveSettings()">
+                <br><br><button class="btn-main" onclick="saveSettings()">Save Configuration</button>
+            </div>
+        `;
+    }
+
+    let footerBtns = `<button class="action-btn" onclick="askAIGeneral('${id}')">Ask AI</button>`;
+    if (['html', 'css', 'javascript'].includes(type)) {
+        footerBtns += `
+            <button class="action-btn" style="border-color:var(--ai-edit); color:var(--ai-edit);" onclick="aiEditProject('${id}')">AI Edit Project</button>
+        `;
+    } else if (type === 'text') {
+        footerBtns = `<button class="action-btn" onclick="removeNode('${id}')">Discard Output</button>`;
+    }
+
+    node.innerHTML = `
+        <div class="node-header" ondblclick="toggleChildren('${id}')">
+            <div class="node-title">${title} <span class="node-type-badge">${type}</span></div>
+            <div class="node-controls">
+                <button class="win-btn btn-min" onclick="toggleMin('${id}')" title="Minimize"></button>
+                <button class="win-btn btn-close" onclick="removeNode('${id}')" title="Close"></button>
+            </div>
+        </div>
+        <div class="node-content">${innerHTML}</div>
+        ${!['preview', 'console', 'settings', 'chat'].includes(type) ? `<div class="node-footer">${footerBtns}</div>` : ''}
+    `;
+
+    world.appendChild(node);
+    AppState.nodes.set(id, node);
+    AppState.resizeObserver.observe(node);
+    bringToFront(node);
+    
+    enforceNodeLimit(id);
+    updateSidebar();
+
+    if (['html', 'css', 'javascript'].includes(type)) setTimeout(() => Prism.highlightElement(document.getElementById(`hl-${id}`)), 10);
+}
+
+function syncEditor(id) {
+    const editor = document.getElementById(`ed-${id}`);
+    const codeEl = document.getElementById(`hl-${id}`);
+    if (codeEl && editor) { 
+        codeEl.innerHTML = escapeHTML(editor.value); 
+        Prism.highlightElement(codeEl); 
+        handleCodeUpdate(id, editor.value);
+    }
+}
+
+function syncScroll(id) {
+    const editor = document.getElementById(`ed-${id}`);
+    const highlight = document.getElementById(`hl-${id}`);
+    if (highlight && editor) {
+        highlight.parentElement.scrollTop = editor.scrollTop;
+        highlight.parentElement.scrollLeft = editor.scrollLeft;
+    }
+}
+
+function saveSettings() {
+    AppState.settings.apiKey = document.getElementById('set-key').value;
+    AppState.settings.model = document.getElementById('set-model').value;
+    localStorage.setItem('apui_gemini_key', AppState.settings.apiKey);
+    localStorage.setItem('apui_model', AppState.settings.model);
+    logToConsole('Settings saved successfully.', 'success');
+}
+
+function toggleChildren(parentId) {
+    let toggled = false;
+    AppState.nodes.forEach((el, id) => {
+        if (el.dataset.parent === parentId) { el.classList.toggle('hidden'); toggled = true; }
+    });
+    if(toggled) { drawConnections(); updatePreview(); updateSidebar(); }
+}
+
+function removeNode(id) {
+    const node = AppState.nodes.get(id);
+    if(node) {
+        if (AppState.fullscreenNode === node) AppState.fullscreenNode = null;
+        AppState.resizeObserver.unobserve(node); node.remove(); AppState.nodes.delete(id);
+        AppState.mru = AppState.mru.filter(n => n !== id);
+        AppState.vibeTree.children = AppState.vibeTree.children.filter(n => n.id !== id);
+        AppState.connections = AppState.connections.filter(c => c.from !== id && c.to !== id);
+        
+        enforceNodeLimit('preview');
+        updatePreview(); updateSidebar();
+    }
+}
+function toggleMin(id) { AppState.nodes.get(id)?.classList.toggle('minimized'); drawConnections(); }
+
+/* --- GRANULAR FILE PARSING --- */
+function initFileUpload() {
+    document.getElementById('file-input').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => loadGranularProject(ev.target.result);
+        reader.readAsText(file);
+    });
+}
+
+function loadGranularProject(htmlStr) {
+    handleCommand('clean');
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlStr, 'text/html');
+    
+    doc.querySelectorAll('style').forEach((s, i) => addVibeNode(`css-${i}`, 'CSS Styles', 'css', s.innerHTML));
+    
+    let jsIdx = 0;
+    doc.querySelectorAll('script').forEach(s => {
+        const jsText = s.innerHTML.trim();
+        if(!jsText) return;
+        const blocks = jsText.split(/(?=^(?:async\s+)?function |^(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:function|\([^)]*\)\s*=>))/m);
+        blocks.forEach(b => { if(b.trim()) addVibeNode(`js-${jsIdx++}`, 'JS Block', 'javascript', b.trim()); });
+    });
+
+    let htmlIdx = 0;
+    Array.from(doc.body.children).forEach(el => {
+        if(el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
+        const title = el.id ? `HTML (#${el.id})` : `HTML (<${el.tagName.toLowerCase()}>)`;
+        addVibeNode(`html-${htmlIdx++}`, title, 'html', el.outerHTML);
+    });
+    
+    logToConsole('Project parsed into granular block nodes.', 'success');
+    arrangeNodes(); updatePreview(); enforceNodeLimit('preview');
+}
+
+function addVibeNode(id, title, type, code) {
+    AppState.vibeTree.children.push({ id, title, type, code });
+    AppState.connections.push({ from: id, to: 'preview' });
+}
+
+function arrangeNodes() {
+    let x = (-AppState.pan.x + 50) / AppState.scale; 
+    let y = (-AppState.pan.y + 100) / AppState.scale;
+    
+    AppState.vibeTree.children.forEach(n => {
+        createNode(n.id, n.title, n.type, n.code, x, y);
+        x += 420; if(x > 1500) { x = (-AppState.pan.x + 50) / AppState.scale; y += 350; }
+    });
+    drawConnections();
+}
+
+/* --- LOGGING & PREVIEW REASSEMBLY --- */
+function logToChat(role, msg) {
+    const box = document.getElementById('ai-chat-box');
+    if(!box) return;
+    const d = document.createElement('div');
+    d.className = `chat-msg msg-${role}`; d.textContent = msg;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+
+function logToConsole(msg, type='info') {
+    const con = document.getElementById('sys-console');
+    if(!con) return;
+    const d = document.createElement('div');
+    d.className = `log-entry log-${type}`; d.textContent = `> ${msg}`;
+    con.appendChild(d); con.scrollTop = con.scrollHeight;
+}
+
+window.addEventListener('message', e => { if(e.data.type === 'console') logToConsole(e.data.msg, e.data.level); });
+
+function handleCodeUpdate(id, newCode) {
+    const node = AppState.vibeTree.children.find(n => n.id === id);
+    if(node) {
+        node.code = newCode;
+        if(window.updateTimer) clearTimeout(window.updateTimer);
+        window.updateTimer = setTimeout(updatePreview, 1000); 
+    }
+}
+
+function resolveActiveNodes() {
+    const activeData = [];
+    AppState.vibeTree.children.forEach(n => {
+        const domNode = AppState.nodes.get(n.id);
+        if(domNode && !domNode.classList.contains('hidden')) activeData.push(n);
+    });
+    return activeData;
+}
+
+function updatePreview() {
+    const iframe = document.getElementById('preview-frame');
+    if(!iframe) return;
+    
+    let css = '', js = '', html = '';
+    const active = resolveActiveNodes();
+    
+    active.forEach(n => {
+        if (n.type === 'css') css += n.code + '\n';
+        if (n.type === 'javascript') js += n.code + '\n';
+        if (n.type === 'html') html += n.code + '\n';
+    });
+    
+    const proxy = `<script>
+    (function(){
+        const send = (lvl, msg) => window.parent.postMessage({type:'console', level:lvl, msg}, '*');
+        console.log = (...a) => send('info', a.join(' '));
+        console.error = (...a) => send('error', a.join(' '));
+        window.onerror = (m,u,l) => send('error', m + ' line:' + l);
+    })();
+    <\/script>`;
+    
+    iframe.srcdoc = `<html><head><style>${css}</style></head><body>${html}${proxy}<script>${js}<\/script></body></html>`;
+}
+
+function drawConnections() {
+    svgLayer.innerHTML = '';
+    AppState.connections.forEach(conn => {
+        const n1 = AppState.nodes.get(conn.from); const n2 = AppState.nodes.get(conn.to);
+        
+        if(!n1 || !n2 || n1.classList.contains('hidden') || n2.classList.contains('hidden')) return;
+        if(n1.classList.contains('out-of-view') || n2.classList.contains('out-of-view')) return;
+        
+        const x1 = parseFloat(n1.style.left) + n1.offsetWidth/2; const y1 = parseFloat(n1.style.top) + n1.offsetHeight/2;
+        const x2 = parseFloat(n2.style.left) + n2.offsetWidth/2; const y2 = parseFloat(n2.style.top) + n2.offsetHeight/2;
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#4169e1'); line.setAttribute('stroke-width', '2');
+        line.setAttribute('opacity', '0.4');
+        line.setAttribute('data-from', conn.from); line.setAttribute('data-to', conn.to);
+        svgLayer.appendChild(line);
+    });
+}
+
+function downloadProject() {
+    let css = '', js = '', html = '';
+    resolveActiveNodes().forEach(n => {
+        if (n.type === 'css') css += n.code + '\n';
+        if (n.type === 'javascript') js += n.code + '\n';
+        if (n.type === 'html') html += n.code + '\n';
+    });
+    const fullCode = `<!DOCTYPE html>\n<html lang="en">\n<head>\n<style>${css}</style>\n</head>\n<body>\n${html}\n<script>${js}<\/script>\n</body>\n</html>`;
+    const blob = new Blob([fullCode], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "apui_modular_export.html"; a.click();
+    logToChat('system', 'Project compiled and exported successfully.');
+}
+
+/* --- AI VISUAL TRAVERSAL & MULTI-NODE EDITING --- */
+
+async function callGemini(sysPrompt, userPrompt, forceJson = false) {
+    if(!AppState.settings.apiKey) throw new Error("Missing API Key. Add it in the Settings node.");
+    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${AppState.settings.model}:generateContent?key=${AppState.settings.apiKey}`;
+    const body = { contents: [{ role: "user", parts: [{ text: `${sysPrompt}\n\n${userPrompt}` }] }] };
+    if (forceJson) body.generationConfig = { responseMimeType: "application/json" };
+
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    
+    if (data.error) throw new Error(data.error.message);
+    if (!data.candidates || !data.candidates[0].content) throw new Error("AI returned an empty or invalid response.");
+    
+    return data.candidates[0].content.parts[0].text;
+}
+
+async function simulateThinking(triggerId) {
+    const path = ['settings', 'preview', triggerId].filter(id => AppState.nodes.has(id));
+    for (let i = 0; i < path.length; i++) {
+        const id = path[i];
+        if (id === 'root') continue; 
+        centerOnNode(id, 300); 
+        AppState.nodes.get(id).classList.add('ai-scanning');
+        
+        const lines = document.querySelectorAll(`line[data-from="${id}"], line[data-to="${id}"]`);
+        lines.forEach(l => l.classList.add('ai-laser'));
+        
+        logToChat('system', `AI Context Gathering: Scanning [${id}]...`);
+        await delay(400); 
+        
+        AppState.nodes.get(id).classList.remove('ai-scanning');
+        lines.forEach(l => l.classList.remove('ai-laser'));
+    }
+}
+
+async function askAIGeneral(id) {
+    if (!AppState.settings.apiKey) { logToChat('system', 'Error: Missing API Key.'); centerOnNode('settings', 500); return; }
+
+    const nodeData = AppState.vibeTree.children.find(n => n.id === id);
+    const req = prompt("Ask AI a question about this block:");
+    if(!req) return;
+
+    if (!AppState.nodes.has('chat')) createNode('chat', 'AI Activity Stream', 'chat', '', 50, 100);
+    enforceNodeLimit('chat');
+    logToChat('user', `Query regarding [${id}]: ${req}`);
+
+    try {
+        await simulateThinking(id);
+        const sys = "You are a helpful coding assistant. Keep answers concise, technical, and formatted cleanly.";
+        const user = `Node Code:\n${nodeData ? nodeData.code : 'No code'}\n\nQuestion: ${req}`;
+        
+        logToChat('system', 'Awaiting Gemini response...');
+        const reply = await callGemini(sys, user, false); 
+        
+        const childId = `${id}-ai-${Date.now().toString().slice(-4)}`;
+        const parentDom = AppState.nodes.get(id);
+        let px = window.innerWidth / 2; let py = window.innerHeight / 2;
+        if (parentDom) { px = parseFloat(parentDom.style.left) + 60; py = parseFloat(parentDom.style.top) + parentDom.offsetHeight + 40; }
+        
+        createNode(childId, 'AI Guidance', 'text', reply, px, py, id);
+        AppState.connections.push({ from: id, to: childId }); 
+        
+        centerOnNode(childId, 500);
+        logToChat('system', `AI Guidance ready.`);
+    } catch(e) { 
+        logToChat('system', `AI Error: ${e.message}`); 
+        centerOnNode('console', 600);
+    }
+}
+
+/* THE CORE MULTI-NODE EDITING ENGINE */
+async function aiEditProject(triggerId, explicitReq = null) {
+    if (!AppState.settings.apiKey) { logToChat('system', 'Error: Missing API Key.'); centerOnNode('settings', 500); return; }
+
+    const req = explicitReq || prompt("What feature should AI build/edit across the app?");
+    if(!req) return;
+
+    if (!AppState.nodes.has('chat')) createNode('chat', 'AI Activity Stream', 'chat', '', 50, 100);
+    enforceNodeLimit('chat');
+    logToChat('user', `${req}`);
+
+    try {
+        await simulateThinking(triggerId);
+        
+        const activeContext = resolveActiveNodes().map(n => ({ id: n.id, type: n.type, title: n.title, code: n.code }));
+
+        const sys = `You are an expert multi-file application architect editing a modular application. 
+You MUST return ONLY a valid JSON array.
+
+Your JSON must exactly match this structure:
+[
+  { "action": "update", "id": "EXISTING_NODE_ID", "code": "entire complete new raw code for this node" },
+  { "action": "create", "type": "html"|"css"|"javascript", "title": "Short descriptive title", "code": "entire raw code" }
+]
+
+CRITICAL RULES:
+1. For "update", you MUST provide the FULL updated code for that node. Do not truncate or use placeholders!
+2. Prefer updating existing nodes over creating new ones. Only use "create" if adding a completely isolated logic block or structural section.`;
+
+        const triggerContext = triggerId === 'root' ? 'Global App Scope' : triggerId;
+        const user = `CURRENT APP ARCHITECTURE:\n${JSON.stringify(activeContext, null, 2)}\n\nUSER REQUEST: "${req}"\n(Triggered context: ${triggerContext})\n\nReturn the JSON array now.`;
+        
+        logToChat('system', `Drafting changes with Gemini Architect...`);
+        let rawText = await callGemini(sys, user, true); 
+        
+        let changes;
+        try { changes = JSON.parse(rawText); } 
+        catch (err) { logToChat('system', `JSON Parse Failed.`); throw err; }
+        
+        logToChat('ai', `I have drafted ${changes.length} modifications to the project. Executing now.`);
+
+        for (const change of changes) {
+            if (change.action === 'update') {
+                const domNode = AppState.nodes.get(change.id);
+                if (!domNode) { logToChat('system', `Warning: Node [${change.id}] not found.`); continue; }
+
+                centerOnNode(change.id, 500);
+                await delay(600); 
+
+                logToChat('system', `Writing code to [${change.id}]...`);
+                domNode.classList.add('ai-updating');
+                
+                const editor = document.getElementById(`ed-${change.id}`);
+                if (editor) editor.value = change.code;
+                
+                const nodeData = AppState.vibeTree.children.find(n => n.id === change.id);
+                if(nodeData) nodeData.code = change.code;
+                
+                syncEditor(change.id);
+
+                await delay(800); 
+                domNode.classList.remove('ai-updating');
+
+            } else if (change.action === 'create') {
+                const newId = `ai-gen-${Date.now().toString().slice(-4)}`;
+                const baseNode = AppState.nodes.get(triggerId);
+                
+                let px = window.innerWidth / 2; let py = window.innerHeight / 2;
+                if (baseNode) { px = parseFloat(baseNode.style.left) + baseNode.offsetWidth + 60; py = parseFloat(baseNode.style.top); }
+                
+                AppState.vibeTree.children.push({ id: newId, title: change.title, type: change.type, code: change.code });
+                AppState.connections.push({ from: newId, to: 'preview' });
+                
+                createNode(newId, change.title, change.type, change.code, px, py);
+                
+                centerOnNode(newId, 500);
+                await delay(600); 
+                
+                const newDom = AppState.nodes.get(newId);
+                newDom.classList.add('ai-updating');
+                logToChat('system', `Generating new block [${change.title}]...`);
+                
+                await delay(800);
+                newDom.classList.remove('ai-updating');
+            }
+        }
+        
+        logToChat('ai', `Execution complete. Recompiling the application context.`);
+        updatePreview();
+        
+        if(AppState.nodes.has('preview')) {
+            await delay(400);
+            centerOnNode('preview', 600);
+            AppState.nodes.get('preview').classList.add('ai-updating');
+            setTimeout(() => AppState.nodes.get('preview').classList.remove('ai-updating'), 1200);
+        }
+
+    } catch (e) { 
+        logToChat('system', `Task Failed: ${e.message}`); 
+        console.error(e);
+        centerOnNode('console', 600); 
+    }
+}
+</script>
+</body>
+</html>
