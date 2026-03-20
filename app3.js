@@ -6744,104 +6744,162 @@ function escapeHtml(str) {
 async function runFlowTrace() {
     if (flowTracerState.isRunning) return;
 
-    var triggerType = (document.getElementById('ft-trigger-type') || {}).value || 'click';
+    var triggerType    = (document.getElementById('ft-trigger-type')    || {}).value || 'click';
     var targetSelector = ((document.getElementById('ft-target-selector') || {}).value || '').trim();
-    var inputValue = ((document.getElementById('ft-input-value') || {}).value || '').trim();
-    var depth = (document.getElementById('ft-depth') || {}).value || 'deep';
+    var inputValue     = ((document.getElementById('ft-input-value')     || {}).value || '').trim();
+    var depth          = (document.getElementById('ft-depth')           || {}).value || 'deep';
 
-    var flowOutput = document.getElementById('ft-flow-output');
+    // Canvas-based UI elements (no ft-flow-output — that was the old text layout)
+    var placeholder = document.getElementById('ft-placeholder');
+    var wrapper     = document.getElementById('ft-canvas-wrapper');
     var stepCountEl = document.getElementById('ft-step-count');
-    if (!flowOutput) return;
+    var runBtn      = document.getElementById('ft-run-button');
+    var replayBtn   = document.getElementById('ft-replay-button');
 
-    if (!vibeTree || !vibeTree.id) {
-        flowOutput.innerHTML = '<div class="ft-flow-placeholder">Load a project before running a trace.</div>';
+    if (!wrapper) { console.error('Flow Tracer: ft-canvas-wrapper not found'); return; }
+
+    // Pre-flight: check an API key is configured
+    var keyOk = (currentAIProvider === 'gemini' && !!geminiApiKey) ||
+                (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if (!keyOk) {
+        if (placeholder) {
+            placeholder.innerHTML =
+                '<span style="color:#e5c07b;font-weight:700">⚠ No API key set</span><br>' +
+                '<span style="font-size:0.78rem;color:#7f848e">Add your API key in Settings before running a trace.</span>';
+            placeholder.style.display = '';
+        }
         return;
     }
 
-    // Show loading state
-    flowTracerState.isRunning = true;
-    flowOutput.innerHTML =
-        '<div class="ft-loading">' +
-        '<div class="ft-loading-dot"></div><div class="ft-loading-dot"></div><div class="ft-loading-dot"></div>' +
-        '<span>AI is tracing the execution flow...</span></div>';
-    if (stepCountEl) stepCountEl.textContent = '';
+    if (!vibeTree || !vibeTree.id) {
+        if (placeholder) {
+            placeholder.innerHTML =
+                '<span style="color:#e5c07b;font-weight:700">⚠ No project loaded</span><br>' +
+                '<span style="font-size:0.78rem;color:#7f848e">Load or create a project first.</span>';
+            placeholder.style.display = '';
+        }
+        return;
+    }
 
-    var runBtn = document.getElementById('ft-run-button');
-    if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Tracing...'; }
+    // ── Loading state ──────────────────────────────────────────────
+    flowTracerState.isRunning = true;
+    stopCanvasAnimation();
+    clearCanvas();
+
+    // Show a loading overlay on the canvas
+    var loadOverlay = document.getElementById('ft-loading-overlay');
+    if (!loadOverlay) {
+        loadOverlay = document.createElement('div');
+        loadOverlay.id        = 'ft-loading-overlay';
+        loadOverlay.className = 'ft-loading-overlay';
+        loadOverlay.innerHTML = '<div class="ft-loading-ring"></div><span>Analysing flow…</span>';
+        wrapper.appendChild(loadOverlay);
+    }
+    loadOverlay.style.display = 'flex';
+    if (placeholder) placeholder.style.display = 'none';
+    if (stepCountEl) stepCountEl.textContent = '';
+    if (replayBtn)   replayBtn.style.display  = 'none';
+    if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Tracing…'; }
+
+    // Close detail drawer while loading
+    var drawer = document.getElementById('ft-detail-drawer');
+    if (drawer) drawer.classList.remove('ft-drawer-open');
 
     try {
-        // Build a compact project summary for the AI
         var projectSummary = buildProjectSummaryForTrace();
 
-        var systemPrompt = 'You are an expert JavaScript debugger and code flow analyst.\n\n' +
-'Your job is to perform a STATIC ANALYSIS trace of a web project\'s execution flow when a specific user interaction occurs.\n\n' +
-'**INPUT:** A summary of the project\'s Vibe Tree nodes (HTML structure, CSS, and JavaScript logic).\n\n' +
-'**TASK:** Trace exactly what happens from the moment the trigger fires to the final output or state change.\n\n' +
-'**OUTPUT FORMAT:** Return ONLY a valid JSON object with this exact shape:\n' +
-'{\n' +
-'  "summary": "One sentence describing what this interaction does overall.",\n' +
-'  "steps": [\n' +
-'    {\n' +
-'      "type": "trigger|handler|dom|network|state|output|error",\n' +
-'      "title": "Short title for this step",\n' +
-'      "detail": "Explanation of what happens at this step",\n' +
-'      "codeSnippet": "Relevant code excerpt (optional, max 3 lines)",\n' +
-'      "nodeId": "The vibeTree node ID where this code lives (or null)",\n' +
-'      "affectedElement": "CSS selector of DOM element affected (or null)"\n' +
-'    }\n' +
-'  ]\n' +
-'}\n\n' +
-'**STEP TYPES:**\n' +
-'- trigger: The initial user event\n' +
-'- handler: A JavaScript function or event listener that runs\n' +
-'- dom: A DOM read or write (classList, innerHTML, setAttribute, etc.)\n' +
-'- network: A fetch/XHR/API call\n' +
-'- state: A variable or state change\n' +
-'- output: Final visible result (UI update, alert, navigation, etc.)\n' +
-'- error: An error condition or validation failure\n\n' +
-'Be specific and trace every function call. If the depth is "full", also include DOM mutations and async operations.\n' +
-'If the selector doesn\'t exist, note that as an error step.\n' +
-'Always end with an "output" or "error" step showing the final result the user would see.';
+        var systemPrompt =
+'You are an expert JavaScript debugger and code flow analyst.
 
-        var userPrompt = 'Project structure:\n' + projectSummary + '\n\n' +
-'Trace this interaction:\n' +
-'- Event type: ' + triggerType + '\n' +
-'- Target selector: ' + (targetSelector || '(not specified — use most likely interactive element)') + '\n' +
-'- Input value: ' + (inputValue || '(none)') + '\n' +
-'- Trace depth: ' + depth + '\n\n' +
-'Produce the full execution flow trace as JSON.';
+' +
+'Perform a STATIC ANALYSIS trace of a web project execution flow for a specific user interaction.
+
+' +
+'**OUTPUT FORMAT:** Return ONLY a valid JSON object — no markdown, no prose:
+' +
+'{
+' +
+'  "summary": "One sentence describing what this interaction does.",
+' +
+'  "steps": [
+' +
+'    {
+' +
+'      "type": "trigger|handler|dom|network|state|output|error",
+' +
+'      "title": "Short label (max 6 words)",
+' +
+'      "detail": "What happens at this step (1-2 sentences)",
+' +
+'      "codeSnippet": "Relevant 1-3 line code excerpt or null",
+' +
+'      "nodeId": "vibeTree node ID containing this code or null"
+' +
+'    }
+' +
+'  ]
+' +
+'}
+
+' +
+'Rules:
+' +
+'- Produce 4–12 steps. Start with type "trigger", end with "output" or "error".
+' +
+'- Be specific: name actual functions, variables, DOM selectors from the code.
+' +
+'- If no project code is loaded, produce a generic illustrative trace anyway.
+' +
+'- Return RAW JSON only. No ```json fences, no explanations outside the JSON.';
+
+        var userPrompt =
+'Project:
+' + projectSummary + '
+
+' +
+'Trace: ' + triggerType + ' on "' + (targetSelector || 'most interactive element') + '"' +
+(inputValue ? ' with value "' + inputValue + '"' : '') +
+' (depth: ' + depth + ')
+
+' +
+'Return the JSON trace.';
 
         var rawResponse = await callAI(systemPrompt, userPrompt, true);
 
         var traceData;
         try {
             var jsonText = rawResponse.trim();
+            // Strip any accidental markdown fences
             var fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (fence && fence[1]) jsonText = fence[1];
-            var start = jsonText.indexOf('{');
-            var end = jsonText.lastIndexOf('}');
-            if (start !== -1 && end > start) jsonText = jsonText.substring(start, end + 1);
+            if (fence && fence[1]) jsonText = fence[1].trim();
+            // Find outermost { }
+            var s = jsonText.indexOf('{');
+            var e = jsonText.lastIndexOf('}');
+            if (s !== -1 && e > s) jsonText = jsonText.substring(s, e + 1);
             traceData = JSON.parse(jsonText);
-        } catch(e) {
-            throw new Error('AI returned invalid JSON. Try again with a more specific selector.');
+        } catch (parseErr) {
+            console.error('Flow Tracer parse error. Raw response:', rawResponse);
+            throw new Error('AI returned invalid JSON. Check the console for the raw response.');
         }
 
-        if (!traceData.steps || !Array.isArray(traceData.steps)) {
-            throw new Error('No steps returned from analysis.');
+        if (!Array.isArray(traceData.steps) || traceData.steps.length === 0) {
+            throw new Error('AI returned no steps. Try being more specific about the selector or interaction.');
         }
 
         renderFlowTrace(traceData, triggerType, targetSelector);
-        flowTracerState.lastTrace = traceData;
 
-    } catch(e) {
-        flowOutput.innerHTML =
-            '<div class="ft-step ft-step-error">' +
-            '<div class="ft-step-connector"><div class="ft-step-dot"></div></div>' +
-            '<div class="ft-step-body"><div class="ft-step-title">Trace Failed</div>' +
-            '<div class="ft-step-detail">' + escapeHtml(e.message) + '</div></div></div>';
-        console.error('Flow Tracer error:', e);
+    } catch (err) {
+        console.error('Flow Tracer error:', err);
+        // Show error on the canvas placeholder
+        if (placeholder) {
+            placeholder.innerHTML =
+                '<span style="color:#e06c75;font-weight:700">✗ Trace failed</span><br>' +
+                '<span style="font-size:0.78rem;color:#7f848e">' + escapeHtml(err.message) + '</span>';
+            placeholder.style.display = '';
+        }
     } finally {
         flowTracerState.isRunning = false;
+        if (loadOverlay) loadOverlay.style.display = 'none';
         if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶ Run Trace'; }
     }
 }
