@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -560,141 +559,181 @@
         .ft-trigger-chip .ft-chip-icon { font-size: 0.9rem; }
         .ft-trigger-chip .ft-chip-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #abb2bf; }
         .ft-trigger-chip .ft-chip-type { font-size: 0.68rem; color: #5c6370; background: #282c34; padding: 1px 5px; border-radius: 3px; }
+        /* ── Flow Tracer: Canvas visual output ── */
+        .ft-flow-header-right { display: flex; align-items: center; gap: 10px; }
         .ft-step-count { font-size: 0.78rem; color: #5c6370; }
-        .ft-flow-output {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-        }
-        .ft-flow-placeholder { color: #5c6370; font-style: italic; font-size: 0.85rem; text-align: center; padding: 40px 20px; }
-        /* Flow steps */
-        .ft-step {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 2px;
-            position: relative;
-        }
-        .ft-step-connector {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-shrink: 0;
-            width: 28px;
-        }
-        .ft-step-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 2px solid;
-            flex-shrink: 0;
-            margin-top: 4px;
-            position: relative;
-            z-index: 1;
-        }
-        .ft-step-line {
-            width: 2px;
-            flex: 1;
-            min-height: 20px;
-            margin-top: 2px;
-        }
-        .ft-step-body {
-            flex: 1;
-            min-width: 0;
-            padding-bottom: 16px;
-        }
-        .ft-step-title {
-            font-size: 0.83rem;
-            font-weight: 700;
-            margin-bottom: 3px;
-        }
-        .ft-step-detail {
-            font-size: 0.77rem;
-            color: #7f848e;
-            line-height: 1.5;
-        }
-        .ft-step-code {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.75rem;
-            background: #21252b;
-            border: 1px solid #2d333b;
-            border-radius: 4px;
-            padding: 8px 10px;
-            margin-top: 6px;
-            white-space: pre-wrap;
-            word-break: break-all;
+        .ft-icon-btn {
+            background: transparent;
+            border: 1px solid #3e4451;
             color: #abb2bf;
+            border-radius: 4px;
+            padding: 3px 9px;
+            font-size: 0.75rem;
             cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
         }
-        .ft-step-code:hover { border-color: #61afef; }
-        .ft-step-node-link {
+        .ft-icon-btn:hover { border-color: #c678dd; color: #c678dd; }
+        .ft-speed-label {
             font-size: 0.72rem;
-            color: #61afef;
-            cursor: pointer;
-            text-decoration: underline;
-            margin-top: 4px;
-            display: inline-block;
-        }
-        .ft-step-node-link:hover { color: #88c0d0; }
-        /* Step type colours */
-        .ft-step-trigger .ft-step-dot { border-color: #c678dd; background: #c678dd; }
-        .ft-step-trigger .ft-step-line { background: #3d2b4a; }
-        .ft-step-trigger .ft-step-title { color: #c678dd; }
-        .ft-step-handler .ft-step-dot { border-color: #e5c07b; background: #21252b; }
-        .ft-step-handler .ft-step-line { background: #2d333b; }
-        .ft-step-handler .ft-step-title { color: #e5c07b; }
-        .ft-step-dom .ft-step-dot { border-color: #61afef; background: #21252b; }
-        .ft-step-dom .ft-step-line { background: #2d333b; }
-        .ft-step-dom .ft-step-title { color: #61afef; }
-        .ft-step-network .ft-step-dot { border-color: #56b6c2; background: #21252b; }
-        .ft-step-network .ft-step-line { background: #2d333b; }
-        .ft-step-network .ft-step-title { color: #56b6c2; }
-        .ft-step-state .ft-step-dot { border-color: #98c379; background: #21252b; }
-        .ft-step-state .ft-step-line { background: #2d333b; }
-        .ft-step-state .ft-step-title { color: #98c379; }
-        .ft-step-output .ft-step-dot { border-color: #98c379; background: #98c379; }
-        .ft-step-output .ft-step-line { background: transparent; }
-        .ft-step-output .ft-step-title { color: #98c379; }
-        .ft-step-error .ft-step-dot { border-color: #e06c75; background: #e06c75; }
-        .ft-step-error .ft-step-line { background: #3d2020; }
-        .ft-step-error .ft-step-title { color: #e06c75; }
-        .ft-loading {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #c678dd;
-            font-size: 0.85rem;
-            padding: 20px;
-        }
-        @keyframes ft-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        .ft-loading-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: #c678dd;
-            animation: ft-pulse 1s ease-in-out infinite;
-        }
-        .ft-loading-dot:nth-child(2) { animation-delay: 0.2s; }
-        .ft-loading-dot:nth-child(3) { animation-delay: 0.4s; }
-        .ft-summary-bar {
-            display: flex;
-            gap: 14px;
-            padding: 10px 16px;
-            border-top: 1px solid #2d333b;
-            flex-shrink: 0;
-            flex-wrap: wrap;
-        }
-        .ft-summary-item {
+            color: #5c6370;
             display: flex;
             align-items: center;
             gap: 5px;
-            font-size: 0.75rem;
-            color: #5c6370;
         }
-        .ft-summary-dot {
-            width: 8px; height: 8px;
+        .ft-speed-select {
+            background: #21252b;
+            border: 1px solid #3e4451;
+            color: #abb2bf;
+            border-radius: 3px;
+            padding: 2px 5px;
+            font-size: 0.72rem;
+        }
+        .ft-canvas-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+            background: #161a1f;
+        }
+        .ft-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: default;
+        }
+        .ft-flow-placeholder {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #3e4451;
+            font-size: 0.85rem;
+            text-align: center;
+            pointer-events: none;
+            width: 80%;
+            line-height: 1.6;
+        }
+        /* Tooltip that follows hover on canvas */
+        .ft-node-tooltip {
+            position: absolute;
+            background: #282c34;
+            border: 1px solid #3e4451;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            color: #abb2bf;
+            pointer-events: none;
+            z-index: 10;
+            max-width: 240px;
+            line-height: 1.5;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+        .ft-node-tooltip .tt-title {
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+        .ft-node-tooltip .tt-type {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-bottom: 5px;
+            display: inline-block;
+        }
+        .ft-node-tooltip .tt-detail { color: #7f848e; font-size: 0.75rem; }
+        .ft-node-tooltip .tt-code {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.72rem;
+            background: #1e2227;
+            padding: 4px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #98c379;
+        }
+        /* Detail drawer */
+        .ft-detail-drawer {
+            flex-shrink: 0;
+            height: 0;
+            overflow: hidden;
+            border-top: 1px solid transparent;
+            transition: height 0.25s ease, border-color 0.25s;
+            background: #1e2227;
+        }
+        .ft-detail-drawer.ft-drawer-open {
+            height: 160px;
+            border-top-color: #2d333b;
+            overflow-y: auto;
+        }
+        .ft-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px 6px;
+            border-bottom: 1px solid #2d333b;
+            flex-shrink: 0;
+        }
+        .ft-detail-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #abb2bf;
+        }
+        .ft-detail-body {
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            color: #7f848e;
+            line-height: 1.55;
+        }
+        .ft-detail-body code {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.72rem;
+            background: #21252b;
+            border: 1px solid #2d333b;
+            border-radius: 3px;
+            padding: 3px 6px;
+            display: block;
+            margin-top: 6px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #98c379;
+            cursor: pointer;
+        }
+        .ft-detail-body code:hover { border-color: #61afef; }
+        .ft-detail-node-link {
+            display: inline-block;
+            margin-top: 6px;
+            font-size: 0.73rem;
+            color: #61afef;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        /* Loading overlay on canvas */
+        @keyframes ft-spin { to { transform: rotate(360deg); } }
+        .ft-loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: rgba(22,26,31,0.85);
+            color: #c678dd;
+            font-size: 0.85rem;
+            z-index: 5;
+        }
+        .ft-loading-ring {
+            width: 32px; height: 32px;
+            border: 3px solid #2d333b;
+            border-top-color: #c678dd;
             border-radius: 50%;
+            animation: ft-spin 0.8s linear infinite;
+        }
+        /* Mobile: stack canvas below config */
+        @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+            .ft-canvas-wrapper { min-height: 280px; }
+            .ft-detail-drawer.ft-drawer-open { height: 130px; }
         }
     </style>
     <!-- Libraries -->
@@ -1130,10 +1169,32 @@
                                     <div class="ft-right-panel">
                                         <div class="ft-flow-header">
                                             <span class="ft-section-label">Execution Flow</span>
-                                            <span id="ft-step-count" class="ft-step-count"></span>
+                                            <div class="ft-flow-header-right">
+                                                <span id="ft-step-count" class="ft-step-count"></span>
+                                                <button id="ft-replay-button" class="ft-icon-btn" title="Replay animation" style="display:none;">⟳ Replay</button>
+                                                <label class="ft-speed-label">
+                                                    Speed
+                                                    <select id="ft-speed-select" class="ft-speed-select">
+                                                        <option value="2">Slow</option>
+                                                        <option value="1" selected>Normal</option>
+                                                        <option value="0.4">Fast</option>
+                                                    </select>
+                                                </label>
+                                            </div>
                                         </div>
-                                        <div id="ft-flow-output" class="ft-flow-output">
-                                            <div class="ft-flow-placeholder">Configure a trigger and click "Run Trace" to visualise the execution flow.</div>
+                                        <!-- Canvas for the animated flow graph -->
+                                        <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
+                                            <canvas id="ft-canvas" class="ft-canvas"></canvas>
+                                            <div id="ft-tooltip" class="ft-node-tooltip" style="display:none;"></div>
+                                            <div id="ft-placeholder" class="ft-flow-placeholder">Configure a trigger and click ▶ Run Trace</div>
+                                        </div>
+                                        <!-- Detail drawer that slides up when a node is clicked -->
+                                        <div id="ft-detail-drawer" class="ft-detail-drawer">
+                                            <div class="ft-detail-header">
+                                                <span id="ft-detail-title" class="ft-detail-title"></span>
+                                                <button id="ft-detail-close" class="ft-icon-btn">✕</button>
+                                            </div>
+                                            <div id="ft-detail-body" class="ft-detail-body"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -1570,4 +1631,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-</html>
+                    </html>
