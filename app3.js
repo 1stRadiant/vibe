@@ -6928,31 +6928,38 @@ function clearFlowTrace() {
 // CANVAS ANIMATION ENGINE
 // ─────────────────────────────────────────────────────────────────
 
+
+// ─────────────────────────────────────────────────────────────────
+// CANVAS ANIMATION ENGINE — visual flow tracer
+// ─────────────────────────────────────────────────────────────────
+
 var ftCanvas = null;
 var ftCtx = null;
 var ftAnimFrame = null;
-var ftGraphNodes = [];   // { id, x, y, w, h, label, type, step, color, glowColor, state:'idle'|'active'|'done' }
-var ftGraphEdges = [];   // { from, to, color }
-var ftParticles = [];    // { x, y, vx, vy, progress, edgeIdx, color, size, trail[] }
-var ftActiveEdgeIdx = 0;
-var ftAnimStartTime = 0;
+var ftGraphNodes = [];
+var ftGraphEdges = [];
+var ftParticles = [];
 var ftSpeedMultiplier = 1;
 var ftHoveredNode = null;
 var ftClickedNode = null;
+var ftPulseTime = 0;
 
 var FT_COLORS = {
-    trigger:    { node: '#c678dd', glow: 'rgba(198,120,221,0.35)', text: '#1e2227' },
-    handler:    { node: '#e5c07b', glow: 'rgba(229,192,123,0.28)', text: '#1e2227' },
-    dom:        { node: '#61afef', glow: 'rgba(97,175,239,0.28)',  text: '#1e2227' },
-    network:    { node: '#56b6c2', glow: 'rgba(86,182,194,0.28)',  text: '#1e2227' },
-    state:      { node: '#98c379', glow: 'rgba(152,195,121,0.28)', text: '#1e2227' },
-    output:     { node: '#98c379', glow: 'rgba(152,195,121,0.5)',  text: '#1e2227' },
-    error:      { node: '#e06c75', glow: 'rgba(224,108,117,0.4)',  text: '#fff'    },
+    trigger:  { node: '#c678dd', glow: 'rgba(198,120,221,0.5)',  text: '#fff',     track: 'rgba(198,120,221,0.12)' },
+    handler:  { node: '#e5c07b', glow: 'rgba(229,192,123,0.4)', text: '#1a1c1f',  track: 'rgba(229,192,123,0.1)'  },
+    dom:      { node: '#61afef', glow: 'rgba(97,175,239,0.4)',   text: '#fff',     track: 'rgba(97,175,239,0.1)'   },
+    network:  { node: '#56b6c2', glow: 'rgba(86,182,194,0.4)',   text: '#fff',     track: 'rgba(86,182,194,0.1)'   },
+    state:    { node: '#98c379', glow: 'rgba(152,195,121,0.4)',  text: '#1a1c1f',  track: 'rgba(152,195,121,0.1)'  },
+    output:   { node: '#98c379', glow: 'rgba(152,195,121,0.65)', text: '#1a1c1f',  track: 'rgba(152,195,121,0.15)' },
+    error:    { node: '#e06c75', glow: 'rgba(224,108,117,0.6)',  text: '#fff',     track: 'rgba(224,108,117,0.15)' },
 };
 
 function getStepColor(type) {
-    return FT_COLORS[type] || { node: '#7f848e', glow: 'rgba(127,132,142,0.2)', text: '#1e2227' };
+    return FT_COLORS[type] || { node: '#7f848e', glow: 'rgba(127,132,142,0.3)', text: '#fff', track: 'rgba(127,132,142,0.1)' };
 }
+
+var TYPE_ICONS = { trigger:'⚡', handler:'ƒ()', dom:'⬜', network:'↑↓', state:'◈', output:'✓', error:'✗' };
+var TYPE_LABELS = { trigger:'TRIGGER', handler:'HANDLER', dom:'DOM', network:'NETWORK', state:'STATE', output:'OUTPUT', error:'ERROR' };
 
 function stopCanvasAnimation() {
     if (ftAnimFrame) { cancelAnimationFrame(ftAnimFrame); ftAnimFrame = null; }
@@ -6966,14 +6973,13 @@ function clearCanvas() {
     ftGraphNodes = [];
     ftGraphEdges = [];
     ftParticles = [];
-    ftActiveEdgeIdx = 0;
     ftHoveredNode = null;
+    ftClickedNode = null;
 }
 
 function buildAndAnimateGraph(steps) {
     stopCanvasAnimation();
     ftParticles = [];
-    ftActiveEdgeIdx = 0;
     ftHoveredNode = null;
     ftClickedNode = null;
 
@@ -6981,287 +6987,450 @@ function buildAndAnimateGraph(steps) {
     var wrapper = document.getElementById('ft-canvas-wrapper');
     if (!canvas || !wrapper) return;
 
-    // Size canvas to wrapper
-    var W = wrapper.clientWidth;
+    var dpr = window.devicePixelRatio || 1;
+    var W = wrapper.clientWidth || 400;
     var H = wrapper.clientHeight || 400;
-    canvas.width = W * window.devicePixelRatio;
-    canvas.height = H * window.devicePixelRatio;
-    canvas.style.width = W + 'px';
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
     canvas.style.height = H + 'px';
     ftCtx = canvas.getContext('2d');
-    ftCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ftCtx.scale(dpr, dpr);
+    ftCanvas = canvas;
 
-    // Layout: vertical chain with slight horizontal offsets for variety
-    var nodeW = Math.min(200, W * 0.42);
-    var nodeH = 48;
-    var gapY = 72;
-    var totalH = steps.length * (nodeH + gapY) - gapY;
-    var startY = Math.max(30, (H - totalH) / 2);
-    var centerX = W / 2;
+    // ── Layout: smart column grouping ──────────────────────────────
+    // Group nodes into rows of up to 3; alternate column offsets for variety
+    var PADDING   = 24;
+    var NODE_W    = Math.min(Math.max(160, W * 0.38), 220);
+    var NODE_H    = 56;
+    var GAP_Y     = 64;
+    var GAP_X     = Math.min(40, W * 0.08);
+    var COLS      = W < 420 ? 1 : W < 640 ? 1 : 2;  // mostly single column; 2 cols on wide
+
+    // Assign (col, row) to each step
+    var positions = [];
+    if (COLS === 1) {
+        // Pure vertical chain with slight zigzag
+        steps.forEach(function(step, i) {
+            var zz = (i % 2 === 0) ? 0 : (W > 380 ? 24 : 0);
+            positions.push({ col: 0, row: i, zz: zz });
+        });
+    } else {
+        // Two-column: left=input/trigger/handler, right=dom/network/state/output/error
+        var leftRow = 0, rightRow = 0;
+        steps.forEach(function(step) {
+            var t = step.type || 'handler';
+            if (t === 'trigger' || t === 'handler') {
+                positions.push({ col: 0, row: leftRow++ });
+            } else {
+                positions.push({ col: 1, row: rightRow++ });
+            }
+        });
+    }
+
+    var maxRow    = positions.reduce(function(m, p) { return Math.max(m, p.row); }, 0);
+    var totalH    = (maxRow + 1) * (NODE_H + GAP_Y) - GAP_Y;
+    var startY    = Math.max(PADDING, (H - totalH) / 2);
+
+    // Column x-centres
+    function colX(col, zz) {
+        if (COLS === 1) return W / 2 + (zz || 0);
+        var colW = (W - 2 * PADDING - GAP_X) / 2;
+        return PADDING + col * (colW + GAP_X) + colW / 2;
+    }
 
     ftGraphNodes = steps.map(function(step, i) {
-        var col = getStepColor(step.type || 'handler');
-        // Slight zigzag for visual interest
-        var offsetX = (i % 2 === 0 ? -1 : 1) * (steps.length > 1 ? Math.min(30, W * 0.06) : 0);
+        var col = positions[i].col || 0;
+        var row = positions[i].row;
+        var zz  = positions[i].zz  || 0;
+        var col_c = getStepColor(step.type || 'handler');
         return {
-            id: i,
-            x: centerX + offsetX,
-            y: startY + i * (nodeH + gapY) + nodeH / 2,
-            w: nodeW,
-            h: nodeH,
-            label: step.title || step.type,
-            type: step.type || 'handler',
-            step: step,
-            color: col.node,
-            glowColor: col.glow,
-            textColor: col.text,
-            state: 'idle'   // idle | active | done
+            id:        i,
+            x:         colX(col, zz),
+            y:         startY + row * (NODE_H + GAP_Y) + NODE_H / 2,
+            w:         NODE_W,
+            h:         NODE_H,
+            label:     step.title || step.type || 'step',
+            type:      step.type  || 'handler',
+            step:      step,
+            color:     col_c.node,
+            glowColor: col_c.glow,
+            trackColor:col_c.track,
+            textColor: col_c.text,
+            col:       col,
+            row:       row,
+            state:     'idle',   // idle | queued | active | done
+            pulsePhase:i * 0.4   // stagger pulse rings
         };
     });
 
-    // Edges: sequential chain
+    // Edges: sequential chain 0→1→2→...
     ftGraphEdges = [];
     for (var i = 0; i < ftGraphNodes.length - 1; i++) {
-        var col = getStepColor(ftGraphNodes[i].type);
-        ftGraphEdges.push({ from: i, to: i + 1, color: col.node });
+        ftGraphEdges.push({
+            from:  i,
+            to:    i + 1,
+            color: ftGraphNodes[i].color,
+            label: getEdgeLabel(ftGraphNodes[i].type, ftGraphNodes[i + 1].type),
+            progress: 0  // 0..1 animated fill
+        });
     }
 
-    // Speed
+    // Speed multiplier
     var speedEl = document.getElementById('ft-speed-select');
     ftSpeedMultiplier = speedEl ? parseFloat(speedEl.value) : 1;
 
-    // Mark first node active immediately
-    if (ftGraphNodes.length > 0) ftGraphNodes[0].state = 'active';
+    // Mark first node immediately
+    ftGraphNodes[0].state = 'active';
 
-    ftAnimStartTime = performance.now();
-    ftActiveEdgeIdx = 0;
+    // Animate nodes activating in sequence
+    steps.forEach(function(step, i) {
+        var delay = i * 700 * ftSpeedMultiplier;
+        setTimeout(function() {
+            if (i > 0 && ftGraphNodes[i]) ftGraphNodes[i].state = 'active';
+            if (i > 0 && ftGraphNodes[i - 1]) ftGraphNodes[i - 1].state = 'done';
+            if (i < ftGraphEdges.length) {
+                animateEdgeFill(i, 500 * ftSpeedMultiplier);
+                spawnParticlesForEdge(i);
+            }
+            // Final node
+            if (i === steps.length - 1) {
+                setTimeout(function() {
+                    if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done';
+                }, 600 * ftSpeedMultiplier);
+            }
+        }, delay);
+    });
 
-    ftCanvas = canvas;
-    scheduleNextParticle(0);
+    ftPulseTime = 0;
     ftAnimFrame = requestAnimationFrame(drawFrame);
 }
 
-function scheduleNextParticle(edgeIdx) {
-    if (edgeIdx >= ftGraphEdges.length) return;
-    var delay = 600 * ftSpeedMultiplier;
-    // Immediately fire first particle
-    if (edgeIdx === 0) delay = 400 * ftSpeedMultiplier;
-    setTimeout(function() {
-        spawnParticlesForEdge(edgeIdx);
-        // Mark the destination node active
-        var destId = ftGraphEdges[edgeIdx] ? ftGraphEdges[edgeIdx].to : -1;
-        setTimeout(function() {
-            if (ftGraphNodes[destId]) ftGraphNodes[destId].state = 'active';
-            // Mark source as done
-            var srcId = ftGraphEdges[edgeIdx] ? ftGraphEdges[edgeIdx].from : -1;
-            if (ftGraphNodes[srcId]) ftGraphNodes[srcId].state = 'done';
-            scheduleNextParticle(edgeIdx + 1);
-        }, 500 * ftSpeedMultiplier);
-    }, delay);
+function getEdgeLabel(fromType, toType) {
+    var map = {
+        'trigger-handler': 'fires',
+        'handler-dom':     'updates',
+        'handler-network': 'calls',
+        'handler-state':   'sets',
+        'network-state':   'returns',
+        'state-dom':       'renders',
+        'dom-output':      'shows',
+        'handler-output':  'produces',
+        'state-output':    'displays',
+    };
+    return map[fromType + '-' + toType] || '';
+}
+
+function animateEdgeFill(edgeIdx, duration) {
+    var edge = ftGraphEdges[edgeIdx];
+    if (!edge) return;
+    var start = performance.now();
+    function step(now) {
+        var t = Math.min(1, (now - start) / duration);
+        edge.progress = t;
+        if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
 }
 
 function spawnParticlesForEdge(edgeIdx) {
     var edge = ftGraphEdges[edgeIdx];
     if (!edge) return;
-    var fromNode = ftGraphNodes[edge.from];
-    var toNode = ftGraphNodes[edge.to];
-    if (!fromNode || !toNode) return;
-
-    // Spawn 3 particles in quick succession
-    for (var k = 0; k < 3; k++) {
-        (function(offset) {
+    // 4 particles in a burst
+    for (var k = 0; k < 4; k++) {
+        (function(k) {
             setTimeout(function() {
                 ftParticles.push({
-                    edgeIdx: edgeIdx,
+                    edgeIdx:  edgeIdx,
                     progress: 0,
-                    speed: (0.018 + Math.random() * 0.006) / ftSpeedMultiplier,
-                    color: edge.color,
-                    size: 5 + Math.random() * 3,
-                    trail: [],
-                    done: false
+                    speed:    (0.015 + Math.random() * 0.008) / ftSpeedMultiplier,
+                    color:    edge.color,
+                    size:     4 + Math.random() * 3,
+                    trail:    [],
+                    done:     false
                 });
-            }, offset * 120 * ftSpeedMultiplier);
+            }, k * 90 * ftSpeedMultiplier);
         })(k);
     }
 }
 
 function drawFrame(now) {
     if (!ftCtx || !ftCanvas) return;
-    var W = ftCanvas.width / window.devicePixelRatio;
-    var H = ftCanvas.height / window.devicePixelRatio;
+    var dpr = window.devicePixelRatio || 1;
+    var W   = ftCanvas.width  / dpr;
+    var H   = ftCanvas.height / dpr;
     var ctx = ftCtx;
+    ftPulseTime = now * 0.001;
 
     ctx.clearRect(0, 0, W, H);
 
-    // Draw edges (dim lines)
+    // Background grid (subtle)
+    drawGrid(ctx, W, H);
+
+    // Edges first
     drawEdges(ctx);
 
-    // Update and draw particles
+    // Particles
     ftParticles.forEach(function(p) {
         if (p.done) return;
         var edge = ftGraphEdges[p.edgeIdx];
         if (!edge) return;
-        var fromNode = ftGraphNodes[edge.from];
-        var toNode = ftGraphNodes[edge.to];
-        if (!fromNode || !toNode) return;
+        var fn = ftGraphNodes[edge.from];
+        var tn = ftGraphNodes[edge.to];
+        if (!fn || !tn) return;
 
-        var x0 = fromNode.x, y0 = fromNode.y;
-        var x1 = toNode.x,   y1 = toNode.y;
-
+        var cp = getBezierControlPoint(fn, tn);
         p.progress = Math.min(1, p.progress + p.speed);
+        var t = p.progress, mt = 1 - t;
+        var px = mt*mt*fn.x + 2*mt*t*cp.x + t*t*tn.x;
+        var py = mt*mt*fn.y + 2*mt*t*cp.y + t*t*tn.y;
 
-        // Cubic bezier for curved paths
-        var cx = (x0 + x1) / 2 + (x1 > x0 ? 20 : -20);
-        var cy = (y0 + y1) / 2;
-        var t = p.progress;
-        var mt = 1 - t;
-        var px = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
-        var py = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
-
-        // Trail
         p.trail.push({ x: px, y: py });
-        if (p.trail.length > 14) p.trail.shift();
+        if (p.trail.length > 16) p.trail.shift();
 
-        // Draw trail
-        for (var ti = 0; ti < p.trail.length; ti++) {
-            var alpha = (ti / p.trail.length) * 0.7;
-            var r = p.size * (ti / p.trail.length) * 0.8;
+        // Draw trail glow
+        for (var ti = 0; ti < p.trail.length - 1; ti++) {
+            var a  = (ti / p.trail.length) * 0.6;
+            var r  = p.size * (ti / p.trail.length) * 0.7;
             ctx.beginPath();
-            ctx.arc(p.trail[ti].x, p.trail[ti].y, r, 0, Math.PI * 2);
-            ctx.fillStyle = hexToRgba(p.color, alpha);
+            ctx.arc(p.trail[ti].x, p.trail[ti].y, Math.max(0.5, r), 0, Math.PI * 2);
+            ctx.fillStyle = hexToRgba(p.color, a);
             ctx.fill();
         }
-
-        // Draw particle head
+        // Particle head with bloom
+        ctx.shadowBlur  = 14;
+        ctx.shadowColor = p.color;
         ctx.beginPath();
         ctx.arc(px, py, p.size, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = p.color;
         ctx.fill();
         ctx.shadowBlur = 0;
 
         if (p.progress >= 1) p.done = true;
     });
-
-    // Remove done particles
     ftParticles = ftParticles.filter(function(p) { return !p.done; });
 
-    // Draw nodes on top
-    drawNodes(ctx);
+    // Nodes on top
+    drawNodes(ctx, W, H);
 
     ftAnimFrame = requestAnimationFrame(drawFrame);
 }
 
+function drawGrid(ctx, W, H) {
+    var step = 40;
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    ctx.lineWidth   = 1;
+    for (var x = 0; x < W; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (var y = 0; y < H; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+}
+
+function getBezierControlPoint(fn, tn) {
+    // Bezier curves that route between columns gracefully
+    var midY = (fn.y + tn.y) / 2;
+    var dx   = tn.x - fn.x;
+    return {
+        x: fn.x + dx * 0.5,
+        y: midY
+    };
+}
+
 function drawEdges(ctx) {
-    ftGraphEdges.forEach(function(edge, i) {
-        var fromNode = ftGraphNodes[edge.from];
-        var toNode = ftGraphNodes[edge.to];
-        if (!fromNode || !toNode) return;
+    ftGraphEdges.forEach(function(edge) {
+        var fn = ftGraphNodes[edge.from];
+        var tn = ftGraphNodes[edge.to];
+        if (!fn || !tn) return;
 
-        var x0 = fromNode.x, y0 = fromNode.y;
-        var x1 = toNode.x,   y1 = toNode.y;
-        var cx = (x0 + x1) / 2 + (x1 > x0 ? 20 : -20);
-        var cy = (y0 + y1) / 2;
+        var cp = getBezierControlPoint(fn, tn);
 
+        // Track (dim background path)
         ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.quadraticCurveTo(cx, cy, x1, y1);
-        ctx.strokeStyle = hexToRgba(edge.color, 0.18);
-        ctx.lineWidth = 2;
+        ctx.moveTo(fn.x, fn.y);
+        ctx.quadraticCurveTo(cp.x, cp.y, tn.x, tn.y);
+        ctx.strokeStyle = hexToRgba(edge.color, 0.12);
+        ctx.lineWidth   = 3;
         ctx.setLineDash([6, 5]);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // Filled portion (animated)
+        if (edge.progress > 0) {
+            ctx.beginPath();
+            // Approximate the partial bezier by sampling
+            var pts = [];
+            var steps = 30;
+            for (var s = 0; s <= steps * edge.progress; s++) {
+                var t = s / steps;
+                var mt = 1 - t;
+                pts.push({
+                    x: mt*mt*fn.x + 2*mt*t*cp.x + t*t*tn.x,
+                    y: mt*mt*fn.y + 2*mt*t*cp.y + t*t*tn.y
+                });
+            }
+            if (pts.length > 1) {
+                ctx.moveTo(pts[0].x, pts[0].y);
+                for (var j = 1; j < pts.length; j++) {
+                    ctx.lineTo(pts[j].x, pts[j].y);
+                }
+                ctx.strokeStyle = hexToRgba(edge.color, 0.55);
+                ctx.lineWidth   = 2.5;
+                ctx.stroke();
+            }
+        }
+
+        // Arrowhead at destination
+        if (edge.progress >= 0.85) {
+            drawArrow(ctx, cp, tn, edge.color);
+        }
+
+        // Edge label
+        if (edge.label && edge.progress > 0.5) {
+            var midT = 0.5;
+            var mmt = 1 - midT;
+            var lx = mmt*mmt*fn.x + 2*mmt*midT*cp.x + midT*midT*tn.x;
+            var ly = mmt*mmt*fn.y + 2*mmt*midT*cp.y + midT*midT*tn.y;
+            ctx.fillStyle   = hexToRgba(edge.color, 0.65);
+            ctx.font        = '9px Inter, sans-serif';
+            ctx.textAlign   = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(edge.label, lx + 12, ly);
+        }
     });
 }
 
-function drawNodes(ctx) {
-    ftGraphNodes.forEach(function(n) {
-        var x = n.x - n.w / 2;
-        var y = n.y - n.h / 2;
-        var r = 10;
+function drawArrow(ctx, cp, toNode, color) {
+    var tx = toNode.x;
+    var ty = toNode.y - toNode.h / 2 - 2;
+    var angle = Math.atan2(ty - cp.y, tx - cp.x);
+    var len   = 9;
+    ctx.fillStyle = hexToRgba(color, 0.8);
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - len * Math.cos(angle - 0.4), ty - len * Math.sin(angle - 0.4));
+    ctx.lineTo(tx - len * Math.cos(angle + 0.4), ty - len * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fill();
+}
 
+function drawNodes(ctx, W, H) {
+    ftGraphNodes.forEach(function(n) {
+        var x  = n.x - n.w / 2;
+        var y  = n.y - n.h / 2;
+        var r  = 12;
         var isHovered = ftHoveredNode && ftHoveredNode.id === n.id;
         var isClicked = ftClickedNode && ftClickedNode.id === n.id;
+        var isActive  = n.state === 'active';
+        var isDone    = n.state === 'done';
 
-        // Glow for active/hovered
-        if (n.state === 'active' || isHovered || isClicked) {
-            ctx.shadowBlur = isClicked ? 28 : 18;
+        // Pulse ring for active nodes
+        if (isActive) {
+            var pulse = (Math.sin(ftPulseTime * 3 + n.pulsePhase) + 1) / 2; // 0..1
+            var pulseR = n.w * 0.55 + pulse * 18;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = hexToRgba(n.color, 0.08 + pulse * 0.12);
+            ctx.lineWidth   = 2 + pulse * 3;
+            ctx.stroke();
+        }
+
+        // Shadow/glow
+        if (isActive || isHovered || isClicked) {
+            ctx.shadowBlur  = isClicked ? 32 : isActive ? 22 : 14;
             ctx.shadowColor = n.glowColor;
         }
 
-        // Background fill
-        var bgAlpha = n.state === 'idle' ? 0.08 : n.state === 'done' ? 0.55 : 0.88;
+        // Fill
+        var bgAlpha = n.state === 'idle' ? 0.07 : isDone ? 0.45 : 0.82;
         ctx.fillStyle = hexToRgba(n.color, bgAlpha);
         roundRect(ctx, x, y, n.w, n.h, r);
         ctx.fill();
         ctx.shadowBlur = 0;
 
         // Border
-        ctx.strokeStyle = hexToRgba(n.color, n.state === 'idle' ? 0.25 : 0.85);
-        ctx.lineWidth = isClicked ? 2.5 : isHovered ? 2 : 1.5;
+        var borderAlpha = n.state === 'idle' ? 0.2 : isDone ? 0.6 : 1.0;
+        ctx.strokeStyle = hexToRgba(n.color, borderAlpha);
+        ctx.lineWidth   = isClicked ? 2.5 : isActive ? 2 : 1.5;
         roundRect(ctx, x, y, n.w, n.h, r);
         ctx.stroke();
 
-        // Type icon
-        var TYPE_ICONS = { trigger:'⚡', handler:'ƒ', dom:'◻', network:'⟳', state:'◈', output:'✓', error:'✗' };
-        var icon = TYPE_ICONS[n.type] || '●';
-
-        // Icon circle
-        var iconX = x + 20, iconY = n.y;
-        ctx.beginPath();
-        ctx.arc(iconX, iconY, 11, 0, Math.PI * 2);
-        ctx.fillStyle = n.state === 'idle' ? hexToRgba(n.color, 0.15) : n.color;
+        // Left colour stripe
+        ctx.fillStyle   = hexToRgba(n.color, n.state === 'idle' ? 0.25 : 0.9);
+        roundRect(ctx, x, y, 4, n.h, { tl: r, tr: 0, br: 0, bl: r });
         ctx.fill();
 
-        ctx.fillStyle = n.state === 'idle' ? hexToRgba(n.color, 0.6) : n.textColor;
-        ctx.font = 'bold 11px Inter, sans-serif';
-        ctx.textAlign = 'center';
+        // Type icon in a circle
+        var iconX  = x + 22;
+        var iconY  = n.y;
+        var iconR  = 13;
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, iconR, 0, Math.PI * 2);
+        ctx.fillStyle   = n.state === 'idle' ? hexToRgba(n.color, 0.15) : hexToRgba(n.color, 0.95);
+        ctx.fill();
+        ctx.fillStyle   = n.state === 'idle' ? hexToRgba(n.color, 0.7)  : n.textColor;
+        ctx.font        = 'bold 10px Inter, sans-serif';
+        ctx.textAlign   = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(icon, iconX, iconY);
+        ctx.fillText(TYPE_ICONS[n.type] || '●', iconX, iconY);
 
-        // Label
-        var labelX = x + 38, labelMaxW = n.w - 44;
-        ctx.fillStyle = n.state === 'idle' ? 'rgba(127,132,142,0.7)' : '#e6e8ec';
-        ctx.font = (n.state === 'active' ? 'bold' : '') + ' 12px Inter, sans-serif';
-        ctx.textAlign = 'left';
+        // Main label
+        var labelX   = x + 42;
+        var labelMaxW = n.w - 50;
+        ctx.fillStyle   = n.state === 'idle' ? 'rgba(127,132,142,0.55)' : '#e8eaed';
+        ctx.font        = (isActive ? 'bold ' : '') + '12px Inter, sans-serif';
+        ctx.textAlign   = 'left';
         ctx.textBaseline = 'middle';
         var label = n.label;
         if (ctx.measureText(label).width > labelMaxW) {
-            while (label.length > 3 && ctx.measureText(label + '…').width > labelMaxW) {
-                label = label.slice(0, -1);
-            }
+            while (label.length > 3 && ctx.measureText(label + '…').width > labelMaxW) label = label.slice(0,-1);
             label += '…';
         }
-        ctx.fillText(label, labelX, n.y - 6);
+        ctx.fillText(label, labelX, n.y - 8);
 
-        // Type tag
-        ctx.fillStyle = hexToRgba(n.color, n.state === 'idle' ? 0.35 : 0.7);
-        ctx.font = '10px Inter, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(n.type, labelX, n.y + 9);
+        // Type tag below label
+        ctx.fillStyle   = hexToRgba(n.color, n.state === 'idle' ? 0.3 : 0.75);
+        ctx.font        = '9px Inter, sans-serif';
+        ctx.fillText(TYPE_LABELS[n.type] || n.type.toUpperCase(), labelX, n.y + 8);
 
-        // Step number badge
-        ctx.fillStyle = hexToRgba(n.color, 0.45);
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'right';
+        // Step number (top-right corner)
+        ctx.fillStyle   = hexToRgba(n.color, 0.4);
+        ctx.font        = 'bold 8px monospace';
+        ctx.textAlign   = 'right';
         ctx.textBaseline = 'top';
-        ctx.fillText((n.id + 1), x + n.w - 6, y + 4);
+        ctx.fillText(String(n.id + 1), x + n.w - 7, y + 5);
         ctx.textBaseline = 'middle';
+
+        // Done checkmark overlay
+        if (isDone && !isActive) {
+            ctx.fillStyle   = hexToRgba(n.color, 0.55);
+            ctx.font        = 'bold 11px sans-serif';
+            ctx.textAlign   = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('✓', x + n.w - 7, y + n.h - 5);
+        }
     });
 }
 
+// Custom roundRect that accepts per-corner radii object OR single number
 function roundRect(ctx, x, y, w, h, r) {
+    var tl, tr, br, bl;
+    if (typeof r === 'object') {
+        tl = r.tl || 0; tr = r.tr || 0; br = r.br || 0; bl = r.bl || 0;
+    } else {
+        tl = tr = br = bl = r;
+    }
     ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+    ctx.lineTo(x + w, y + h - br);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+    ctx.lineTo(x + bl, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+    ctx.lineTo(x, y + tl);
+    ctx.quadraticCurveTo(x, y, x + tl, y);
     ctx.closePath();
 }
 
@@ -7274,12 +7443,10 @@ function hexToRgba(hex, alpha) {
 }
 
 function getNodeAtPoint(mx, my) {
-    for (var i = 0; i < ftGraphNodes.length; i++) {
+    for (var i = ftGraphNodes.length - 1; i >= 0; i--) {
         var n = ftGraphNodes[i];
         if (mx >= n.x - n.w/2 && mx <= n.x + n.w/2 &&
-            my >= n.y - n.h/2 && my <= n.y + n.h/2) {
-            return n;
-        }
+            my >= n.y - n.h/2 && my <= n.y + n.h/2) return n;
     }
     return null;
 }
@@ -7288,22 +7455,23 @@ function showNodeTooltip(node, mx, my) {
     var tooltip = document.getElementById('ft-tooltip');
     if (!tooltip) return;
     var step = node.step;
-    var col = getStepColor(node.type);
+    var col  = getStepColor(node.type);
     var html = '<div class="tt-title">' + escapeHtml(node.label) + '</div>';
-    html += '<span class="tt-type" style="background:' + hexToRgba(col.node, 0.2) + ';color:' + col.node + '">' + escapeHtml(node.type) + '</span>';
-    if (step.detail) html += '<div class="tt-detail">' + escapeHtml(step.detail) + '</div>';
-    if (step.codeSnippet) html += '<div class="tt-code">' + escapeHtml(step.codeSnippet) + '</div>';
+    html += '<span class="tt-type" style="background:' + hexToRgba(col.node,0.2) + ';color:' + col.node + '">' + escapeHtml(node.type) + '</span>';
+    if (step.detail) html += '<div class="tt-detail">' + escapeHtml(step.detail.substring(0,120)) + (step.detail.length > 120 ? '…' : '') + '</div>';
+    if (step.codeSnippet) html += '<div class="tt-code">' + escapeHtml(step.codeSnippet.substring(0,80)) + '</div>';
+    html += '<div style="font-size:0.68rem;color:#5c6370;margin-top:5px">Tap/click for details</div>';
     tooltip.innerHTML = html;
     tooltip.style.display = 'block';
 
     var wrapper = document.getElementById('ft-canvas-wrapper');
     var wRect = wrapper.getBoundingClientRect();
-    var tw = tooltip.offsetWidth || 200;
+    var tw = tooltip.offsetWidth  || 200;
     var th = tooltip.offsetHeight || 80;
-    var tx = mx + 14;
-    var ty = my - 10;
-    if (tx + tw > wRect.width - 10) tx = mx - tw - 10;
+    var tx = mx + 14, ty = my - 10;
+    if (tx + tw > wRect.width  - 10) tx = mx - tw - 10;
     if (ty + th > wRect.height - 10) ty = wRect.height - th - 10;
+    if (ty < 4) ty = 4;
     tooltip.style.left = tx + 'px';
     tooltip.style.top  = ty + 'px';
 }
@@ -7321,16 +7489,17 @@ function openDetailDrawer(node) {
 
     ftClickedNode = node;
     var step = node.step;
-    var col = getStepColor(node.type);
+    var col  = getStepColor(node.type);
 
-    title.innerHTML = '<span style="color:' + col.node + '">' + escapeHtml(node.label) + '</span>' +
+    title.innerHTML =
+        '<span style="color:' + col.node + '">' + escapeHtml(node.label) + '</span>' +
         ' <span style="font-size:0.7rem;color:#5c6370;font-weight:400">' + escapeHtml(node.type) + '</span>';
 
     var html = '';
     if (flowTracerState.summary && node.id === 0) {
-        html += '<div style="margin-bottom:8px;color:#abb2bf;font-style:italic;">' + escapeHtml(flowTracerState.summary) + '</div>';
+        html += '<div style="margin-bottom:8px;color:#abb2bf;font-style:italic;font-size:0.8rem">' + escapeHtml(flowTracerState.summary) + '</div>';
     }
-    if (step.detail) html += '<div style="margin-bottom:6px;">' + escapeHtml(step.detail) + '</div>';
+    if (step.detail)  html += '<div style="margin-bottom:6px;">' + escapeHtml(step.detail) + '</div>';
     if (step.codeSnippet) {
         html += '<code data-snippet="' + escapeHtml(step.codeSnippet) + '" data-node-id="' + escapeHtml(step.nodeId||'') + '">' +
             escapeHtml(step.codeSnippet) + '</code>';
@@ -7340,11 +7509,10 @@ function openDetailDrawer(node) {
     }
     body.innerHTML = html;
 
-    // Wire code clicks
     body.querySelectorAll('code').forEach(function(el) {
         el.addEventListener('click', function() {
             var nid = el.dataset.nodeId;
-            if (nid && nid !== 'null') jumpToNodeInCode(nid);
+            if (nid && nid !== 'null' && nid !== '') jumpToNodeInCode(nid);
             else searchAndJumpToSnippet(el.dataset.snippet || '');
         });
     });
@@ -7354,113 +7522,6 @@ function openDetailDrawer(node) {
 
     drawer.classList.add('ft-drawer-open');
 }
-
-function bindFlowTracerEvents() {
-    var runBtn = document.getElementById('ft-run-button');
-    var clearBtn = document.getElementById('ft-clear-button');
-    var scanBtn = document.getElementById('ft-scan-button');
-    var replayBtn = document.getElementById('ft-replay-button');
-    var detailClose = document.getElementById('ft-detail-close');
-
-    if (runBtn) runBtn.addEventListener('click', runFlowTrace);
-    if (clearBtn) clearBtn.addEventListener('click', clearFlowTrace);
-    if (scanBtn) scanBtn.addEventListener('click', renderFlowTriggerList);
-    if (replayBtn) replayBtn.addEventListener('click', function() {
-        if (flowTracerState.lastTrace) {
-            buildAndAnimateGraph(flowTracerState.lastTrace.steps || []);
-        }
-    });
-    if (detailClose) detailClose.addEventListener('click', function() {
-        var drawer = document.getElementById('ft-detail-drawer');
-        if (drawer) drawer.classList.remove('ft-drawer-open');
-        ftClickedNode = null;
-    });
-
-    // Allow Enter in target selector to run trace
-    var selectorInput = document.getElementById('ft-target-selector');
-    if (selectorInput) {
-        selectorInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') runFlowTrace();
-        });
-    }
-
-    // Canvas mouse/touch events
-    var canvas = document.getElementById('ft-canvas');
-    if (canvas) {
-        canvas.addEventListener('mousemove', function(e) {
-            var rect = canvas.getBoundingClientRect();
-            var mx = e.clientX - rect.left;
-            var my = e.clientY - rect.top;
-            var node = getNodeAtPoint(mx, my);
-            ftHoveredNode = node;
-            if (node) {
-                canvas.style.cursor = 'pointer';
-                showNodeTooltip(node, mx, my);
-            } else {
-                canvas.style.cursor = 'default';
-                hideTooltip();
-            }
-        });
-        canvas.addEventListener('mouseleave', function() {
-            ftHoveredNode = null;
-            hideTooltip();
-        });
-        canvas.addEventListener('click', function(e) {
-            var rect = canvas.getBoundingClientRect();
-            var mx = e.clientX - rect.left;
-            var my = e.clientY - rect.top;
-            var node = getNodeAtPoint(mx, my);
-            if (node) openDetailDrawer(node);
-        });
-        // Touch support
-        canvas.addEventListener('touchend', function(e) {
-            e.preventDefault();
-            var touch = e.changedTouches[0];
-            var rect = canvas.getBoundingClientRect();
-            var mx = touch.clientX - rect.left;
-            var my = touch.clientY - rect.top;
-            var node = getNodeAtPoint(mx, my);
-            if (node) openDetailDrawer(node);
-        }, { passive: false });
-    }
-
-    // Resize: rebuild graph if trace exists
-    window.addEventListener('resize', function() {
-        if (flowTracerState.lastTrace && flowTracerState.lastTrace.steps) {
-            stopCanvasAnimation();
-            setTimeout(function() {
-                buildAndAnimateGraph(flowTracerState.lastTrace.steps);
-            }, 100);
-        }
-    });
-
-    // Mobile: toggle the config panel open/closed
-    var configToggle = document.getElementById('ft-config-toggle');
-    var leftPanel = document.getElementById('ft-left-panel');
-    if (configToggle && leftPanel) {
-        configToggle.addEventListener('click', function() {
-            var isOpen = leftPanel.classList.toggle('ft-config-open');
-            configToggle.classList.toggle('ft-open', isOpen);
-            var arrow = configToggle.querySelector('.ft-mobile-config-arrow');
-            if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
-            var label = configToggle.querySelector('.ft-mobile-config-label');
-            if (label) label.textContent = isOpen ? '⚙ Hide Config' : '⚙ Configure Trigger';
-        });
-        window.addEventListener('resize', function() {
-            var isMobileLayout = window.innerWidth <= 640 ||
-                (window.innerHeight <= 500 && window.innerWidth > window.innerHeight);
-            if (isMobileLayout && !leftPanel.classList.contains('ft-config-open')) {
-                leftPanel.classList.add('ft-config-open');
-                configToggle.classList.add('ft-open');
-                var arrow = configToggle.querySelector('.ft-mobile-config-arrow');
-                if (arrow) arrow.textContent = '▲';
-                var label = configToggle.querySelector('.ft-mobile-config-label');
-                if (label) label.textContent = '⚙ Hide Config';
-            }
-        });
-    }
-}
-
 
 
 function buildBasicMermaidFromTree(tree) {
