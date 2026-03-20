@@ -7523,6 +7523,82 @@ function openDetailDrawer(node) {
     drawer.classList.add('ft-drawer-open');
 }
 
+function bindFlowTracerEvents() {
+    var runBtn      = document.getElementById('ft-run-button');
+    var clearBtn    = document.getElementById('ft-clear-button');
+    var scanBtn     = document.getElementById('ft-scan-button');
+    var replayBtn   = document.getElementById('ft-replay-button');
+    var detailClose = document.getElementById('ft-detail-close');
+
+    if (runBtn)      runBtn.addEventListener('click', runFlowTrace);
+    if (clearBtn)    clearBtn.addEventListener('click', clearFlowTrace);
+    if (scanBtn)     scanBtn.addEventListener('click', renderFlowTriggerList);
+    if (replayBtn)   replayBtn.addEventListener('click', function() {
+        if (flowTracerState.lastTrace) buildAndAnimateGraph(flowTracerState.lastTrace.steps || []);
+    });
+    if (detailClose) detailClose.addEventListener('click', function() {
+        var drawer = document.getElementById('ft-detail-drawer');
+        if (drawer) drawer.classList.remove('ft-drawer-open');
+        ftClickedNode = null;
+    });
+
+    // Enter key in selector input triggers trace
+    var selectorInput = document.getElementById('ft-target-selector');
+    if (selectorInput) {
+        selectorInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') runFlowTrace();
+        });
+    }
+
+    // Canvas mouse/touch events
+    var canvas = document.getElementById('ft-canvas');
+    if (canvas) {
+        canvas.addEventListener('mousemove', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left;
+            var my = e.clientY - rect.top;
+            var node = getNodeAtPoint(mx, my);
+            ftHoveredNode = node;
+            if (node) { canvas.style.cursor = 'pointer'; showNodeTooltip(node, mx, my); }
+            else       { canvas.style.cursor = 'default'; hideTooltip(); }
+        });
+        canvas.addEventListener('mouseleave', function() { ftHoveredNode = null; hideTooltip(); });
+        canvas.addEventListener('click', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var node = getNodeAtPoint(e.clientX - rect.left, e.clientY - rect.top);
+            if (node) openDetailDrawer(node);
+        });
+        canvas.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            var touch = e.changedTouches[0];
+            var rect  = canvas.getBoundingClientRect();
+            var node  = getNodeAtPoint(touch.clientX - rect.left, touch.clientY - rect.top);
+            if (node) openDetailDrawer(node);
+        }, { passive: false });
+    }
+
+    // Resize: rebuild graph if a trace exists
+    window.addEventListener('resize', function() {
+        if (flowTracerState.lastTrace && flowTracerState.lastTrace.steps) {
+            stopCanvasAnimation();
+            setTimeout(function() { buildAndAnimateGraph(flowTracerState.lastTrace.steps); }, 120);
+        }
+    });
+
+    // Mobile: toggle config panel open/closed
+    var configToggle = document.getElementById('ft-config-toggle');
+    var leftPanel    = document.getElementById('ft-left-panel');
+    if (configToggle && leftPanel) {
+        configToggle.addEventListener('click', function() {
+            var isOpen = leftPanel.classList.toggle('ft-config-open');
+            configToggle.classList.toggle('ft-open', isOpen);
+            var arrow = configToggle.querySelector('.ft-mobile-config-arrow');
+            var lbl   = configToggle.querySelector('.ft-mobile-config-label');
+            if (arrow) arrow.textContent = isOpen ? '▲' : '▼';
+            if (lbl)   lbl.textContent   = isOpen ? '⚙ Hide Config' : '⚙ Configure Trigger';
+        });
+    }
+}
 
 function buildBasicMermaidFromTree(tree) {
     if (tree && tree.type === 'raw-html-container') {
