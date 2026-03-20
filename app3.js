@@ -6872,71 +6872,19 @@ function buildProjectSummaryForTrace() {
 }
 
 function renderFlowTrace(traceData, triggerType, targetSelector) {
-    var flowOutput = document.getElementById('ft-flow-output');
     var stepCountEl = document.getElementById('ft-step-count');
-    if (!flowOutput) return;
+    var placeholder = document.getElementById('ft-placeholder');
+    var replayBtn = document.getElementById('ft-replay-button');
+    if (placeholder) placeholder.style.display = 'none';
+    if (replayBtn) replayBtn.style.display = '';
 
     var steps = traceData.steps || [];
-    if (stepCountEl) stepCountEl.textContent = steps.length + ' step' + (steps.length !== 1 ? 's' : '');
+    if (stepCountEl) stepCountEl.textContent = steps.length + ' node' + (steps.length !== 1 ? 's' : '');
 
-    var html = '';
+    flowTracerState.lastTrace = traceData;
+    flowTracerState.summary = traceData.summary || '';
 
-    // Summary bar at the top
-    if (traceData.summary) {
-        html += '<div style="background:#21252b;border:1px solid #2d333b;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:0.82rem;color:#abb2bf;">' +
-            '<strong style="color:#c678dd;">📋 Summary:</strong> ' + escapeHtml(traceData.summary) + '</div>';
-    }
-
-    // Render each step
-    var typeCounts = {};
-    steps.forEach(function(step, i) {
-        var type = step.type || 'handler';
-        typeCounts[type] = (typeCounts[type] || 0) + 1;
-        var isLast = i === steps.length - 1;
-
-        html += '<div class="ft-step ft-step-' + escapeHtml(type) + '">';
-        html += '<div class="ft-step-connector">';
-        html += '<div class="ft-step-dot"></div>';
-        if (!isLast) html += '<div class="ft-step-line"></div>';
-        html += '</div>';
-        html += '<div class="ft-step-body">';
-        html += '<div class="ft-step-title">' + escapeHtml(step.title || type) + '</div>';
-        if (step.detail) {
-            html += '<div class="ft-step-detail">' + escapeHtml(step.detail) + '</div>';
-        }
-        if (step.codeSnippet) {
-            html += '<div class="ft-step-code" title="Click to jump to this code" data-node-id="' + escapeHtml(step.nodeId || '') + '" data-snippet="' + escapeHtml(step.codeSnippet) + '">' +
-                escapeHtml(step.codeSnippet) + '</div>';
-        }
-        if (step.nodeId) {
-            html += '<span class="ft-step-node-link" data-node-id="' + escapeHtml(step.nodeId) + '">→ ' + escapeHtml(step.nodeId) + '</span>';
-        }
-        html += '</div></div>';
-    });
-
-    // Type summary footer
-    var summaryItems = Object.entries(typeCounts).map(function(e) {
-        var COLORS = { trigger:'#c678dd', handler:'#e5c07b', dom:'#61afef', network:'#56b6c2', state:'#98c379', output:'#98c379', error:'#e06c75' };
-        return '<div class="ft-summary-item"><div class="ft-summary-dot" style="background:' + (COLORS[e[0]] || '#5c6370') + '"></div>' + e[1] + ' ' + e[0] + '</div>';
-    });
-    html += '<div class="ft-summary-bar">' + summaryItems.join('') + '</div>';
-
-    flowOutput.innerHTML = html;
-
-    // Wire up code snippet clicks → jump to wiki/code
-    flowOutput.querySelectorAll('.ft-step-code, .ft-step-node-link').forEach(function(el) {
-        el.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var nodeId = el.dataset.nodeId;
-            if (nodeId && nodeId !== 'null' && nodeId !== '') {
-                jumpToNodeInCode(nodeId);
-            } else {
-                // Try to find by snippet text in full code
-                var snippet = el.dataset.snippet;
-                if (snippet) searchAndJumpToSnippet(snippet);
-            }
-        });
-    });
+    buildAndAnimateGraph(steps);
 }
 
 function searchAndJumpToSnippet(snippet) {
@@ -6947,10 +6895,7 @@ function searchAndJumpToSnippet(snippet) {
         var code = fullCodeEditor.value;
         var searchFor = snippet.replace(/\s+/g, ' ').trim().substring(0, 40);
         var idx = code.indexOf(searchFor);
-        if (idx === -1) {
-            // Try first 20 chars
-            idx = code.indexOf(searchFor.substring(0, 20));
-        }
+        if (idx === -1) idx = code.indexOf(searchFor.substring(0, 20));
         if (idx !== -1) {
             var lineNum = code.substring(0, idx).split('\n').length;
             var lineHeight = parseInt(window.getComputedStyle(fullCodeEditor).lineHeight) || 18;
@@ -6962,10 +6907,16 @@ function searchAndJumpToSnippet(snippet) {
 }
 
 function clearFlowTrace() {
-    var flowOutput = document.getElementById('ft-flow-output');
+    var placeholder = document.getElementById('ft-placeholder');
     var stepCountEl = document.getElementById('ft-step-count');
-    if (flowOutput) flowOutput.innerHTML = '<div class="ft-flow-placeholder">Configure a trigger and click "Run Trace" to visualise the execution flow.</div>';
+    var replayBtn = document.getElementById('ft-replay-button');
+    var drawer = document.getElementById('ft-detail-drawer');
+    if (placeholder) placeholder.style.display = '';
     if (stepCountEl) stepCountEl.textContent = '';
+    if (replayBtn) replayBtn.style.display = 'none';
+    if (drawer) drawer.classList.remove('ft-drawer-open');
+    stopCanvasAnimation();
+    clearCanvas();
     var targetSelectorEl = document.getElementById('ft-target-selector');
     var inputValueEl = document.getElementById('ft-input-value');
     if (targetSelectorEl) targetSelectorEl.value = '';
@@ -6973,14 +6924,457 @@ function clearFlowTrace() {
     flowTracerState.lastTrace = null;
 }
 
+// ─────────────────────────────────────────────────────────────────
+// CANVAS ANIMATION ENGINE
+// ─────────────────────────────────────────────────────────────────
+
+var ftCanvas = null;
+var ftCtx = null;
+var ftAnimFrame = null;
+var ftGraphNodes = [];   // { id, x, y, w, h, label, type, step, color, glowColor, state:'idle'|'active'|'done' }
+var ftGraphEdges = [];   // { from, to, color }
+var ftParticles = [];    // { x, y, vx, vy, progress, edgeIdx, color, size, trail[] }
+var ftActiveEdgeIdx = 0;
+var ftAnimStartTime = 0;
+var ftSpeedMultiplier = 1;
+var ftHoveredNode = null;
+var ftClickedNode = null;
+
+var FT_COLORS = {
+    trigger:    { node: '#c678dd', glow: 'rgba(198,120,221,0.35)', text: '#1e2227' },
+    handler:    { node: '#e5c07b', glow: 'rgba(229,192,123,0.28)', text: '#1e2227' },
+    dom:        { node: '#61afef', glow: 'rgba(97,175,239,0.28)',  text: '#1e2227' },
+    network:    { node: '#56b6c2', glow: 'rgba(86,182,194,0.28)',  text: '#1e2227' },
+    state:      { node: '#98c379', glow: 'rgba(152,195,121,0.28)', text: '#1e2227' },
+    output:     { node: '#98c379', glow: 'rgba(152,195,121,0.5)',  text: '#1e2227' },
+    error:      { node: '#e06c75', glow: 'rgba(224,108,117,0.4)',  text: '#fff'    },
+};
+
+function getStepColor(type) {
+    return FT_COLORS[type] || { node: '#7f848e', glow: 'rgba(127,132,142,0.2)', text: '#1e2227' };
+}
+
+function stopCanvasAnimation() {
+    if (ftAnimFrame) { cancelAnimationFrame(ftAnimFrame); ftAnimFrame = null; }
+}
+
+function clearCanvas() {
+    var c = document.getElementById('ft-canvas');
+    if (!c) return;
+    var ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+    ftGraphNodes = [];
+    ftGraphEdges = [];
+    ftParticles = [];
+    ftActiveEdgeIdx = 0;
+    ftHoveredNode = null;
+}
+
+function buildAndAnimateGraph(steps) {
+    stopCanvasAnimation();
+    ftParticles = [];
+    ftActiveEdgeIdx = 0;
+    ftHoveredNode = null;
+    ftClickedNode = null;
+
+    var canvas = document.getElementById('ft-canvas');
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    if (!canvas || !wrapper) return;
+
+    // Size canvas to wrapper
+    var W = wrapper.clientWidth;
+    var H = wrapper.clientHeight || 400;
+    canvas.width = W * window.devicePixelRatio;
+    canvas.height = H * window.devicePixelRatio;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ftCtx = canvas.getContext('2d');
+    ftCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    // Layout: vertical chain with slight horizontal offsets for variety
+    var nodeW = Math.min(200, W * 0.42);
+    var nodeH = 48;
+    var gapY = 72;
+    var totalH = steps.length * (nodeH + gapY) - gapY;
+    var startY = Math.max(30, (H - totalH) / 2);
+    var centerX = W / 2;
+
+    ftGraphNodes = steps.map(function(step, i) {
+        var col = getStepColor(step.type || 'handler');
+        // Slight zigzag for visual interest
+        var offsetX = (i % 2 === 0 ? -1 : 1) * (steps.length > 1 ? Math.min(30, W * 0.06) : 0);
+        return {
+            id: i,
+            x: centerX + offsetX,
+            y: startY + i * (nodeH + gapY) + nodeH / 2,
+            w: nodeW,
+            h: nodeH,
+            label: step.title || step.type,
+            type: step.type || 'handler',
+            step: step,
+            color: col.node,
+            glowColor: col.glow,
+            textColor: col.text,
+            state: 'idle'   // idle | active | done
+        };
+    });
+
+    // Edges: sequential chain
+    ftGraphEdges = [];
+    for (var i = 0; i < ftGraphNodes.length - 1; i++) {
+        var col = getStepColor(ftGraphNodes[i].type);
+        ftGraphEdges.push({ from: i, to: i + 1, color: col.node });
+    }
+
+    // Speed
+    var speedEl = document.getElementById('ft-speed-select');
+    ftSpeedMultiplier = speedEl ? parseFloat(speedEl.value) : 1;
+
+    // Mark first node active immediately
+    if (ftGraphNodes.length > 0) ftGraphNodes[0].state = 'active';
+
+    ftAnimStartTime = performance.now();
+    ftActiveEdgeIdx = 0;
+
+    ftCanvas = canvas;
+    scheduleNextParticle(0);
+    ftAnimFrame = requestAnimationFrame(drawFrame);
+}
+
+function scheduleNextParticle(edgeIdx) {
+    if (edgeIdx >= ftGraphEdges.length) return;
+    var delay = 600 * ftSpeedMultiplier;
+    // Immediately fire first particle
+    if (edgeIdx === 0) delay = 400 * ftSpeedMultiplier;
+    setTimeout(function() {
+        spawnParticlesForEdge(edgeIdx);
+        // Mark the destination node active
+        var destId = ftGraphEdges[edgeIdx] ? ftGraphEdges[edgeIdx].to : -1;
+        setTimeout(function() {
+            if (ftGraphNodes[destId]) ftGraphNodes[destId].state = 'active';
+            // Mark source as done
+            var srcId = ftGraphEdges[edgeIdx] ? ftGraphEdges[edgeIdx].from : -1;
+            if (ftGraphNodes[srcId]) ftGraphNodes[srcId].state = 'done';
+            scheduleNextParticle(edgeIdx + 1);
+        }, 500 * ftSpeedMultiplier);
+    }, delay);
+}
+
+function spawnParticlesForEdge(edgeIdx) {
+    var edge = ftGraphEdges[edgeIdx];
+    if (!edge) return;
+    var fromNode = ftGraphNodes[edge.from];
+    var toNode = ftGraphNodes[edge.to];
+    if (!fromNode || !toNode) return;
+
+    // Spawn 3 particles in quick succession
+    for (var k = 0; k < 3; k++) {
+        (function(offset) {
+            setTimeout(function() {
+                ftParticles.push({
+                    edgeIdx: edgeIdx,
+                    progress: 0,
+                    speed: (0.018 + Math.random() * 0.006) / ftSpeedMultiplier,
+                    color: edge.color,
+                    size: 5 + Math.random() * 3,
+                    trail: [],
+                    done: false
+                });
+            }, offset * 120 * ftSpeedMultiplier);
+        })(k);
+    }
+}
+
+function drawFrame(now) {
+    if (!ftCtx || !ftCanvas) return;
+    var W = ftCanvas.width / window.devicePixelRatio;
+    var H = ftCanvas.height / window.devicePixelRatio;
+    var ctx = ftCtx;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw edges (dim lines)
+    drawEdges(ctx);
+
+    // Update and draw particles
+    ftParticles.forEach(function(p) {
+        if (p.done) return;
+        var edge = ftGraphEdges[p.edgeIdx];
+        if (!edge) return;
+        var fromNode = ftGraphNodes[edge.from];
+        var toNode = ftGraphNodes[edge.to];
+        if (!fromNode || !toNode) return;
+
+        var x0 = fromNode.x, y0 = fromNode.y;
+        var x1 = toNode.x,   y1 = toNode.y;
+
+        p.progress = Math.min(1, p.progress + p.speed);
+
+        // Cubic bezier for curved paths
+        var cx = (x0 + x1) / 2 + (x1 > x0 ? 20 : -20);
+        var cy = (y0 + y1) / 2;
+        var t = p.progress;
+        var mt = 1 - t;
+        var px = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
+        var py = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
+
+        // Trail
+        p.trail.push({ x: px, y: py });
+        if (p.trail.length > 14) p.trail.shift();
+
+        // Draw trail
+        for (var ti = 0; ti < p.trail.length; ti++) {
+            var alpha = (ti / p.trail.length) * 0.7;
+            var r = p.size * (ti / p.trail.length) * 0.8;
+            ctx.beginPath();
+            ctx.arc(p.trail[ti].x, p.trail[ti].y, r, 0, Math.PI * 2);
+            ctx.fillStyle = hexToRgba(p.color, alpha);
+            ctx.fill();
+        }
+
+        // Draw particle head
+        ctx.beginPath();
+        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = p.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (p.progress >= 1) p.done = true;
+    });
+
+    // Remove done particles
+    ftParticles = ftParticles.filter(function(p) { return !p.done; });
+
+    // Draw nodes on top
+    drawNodes(ctx);
+
+    ftAnimFrame = requestAnimationFrame(drawFrame);
+}
+
+function drawEdges(ctx) {
+    ftGraphEdges.forEach(function(edge, i) {
+        var fromNode = ftGraphNodes[edge.from];
+        var toNode = ftGraphNodes[edge.to];
+        if (!fromNode || !toNode) return;
+
+        var x0 = fromNode.x, y0 = fromNode.y;
+        var x1 = toNode.x,   y1 = toNode.y;
+        var cx = (x0 + x1) / 2 + (x1 > x0 ? 20 : -20);
+        var cy = (y0 + y1) / 2;
+
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo(cx, cy, x1, y1);
+        ctx.strokeStyle = hexToRgba(edge.color, 0.18);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    });
+}
+
+function drawNodes(ctx) {
+    ftGraphNodes.forEach(function(n) {
+        var x = n.x - n.w / 2;
+        var y = n.y - n.h / 2;
+        var r = 10;
+
+        var isHovered = ftHoveredNode && ftHoveredNode.id === n.id;
+        var isClicked = ftClickedNode && ftClickedNode.id === n.id;
+
+        // Glow for active/hovered
+        if (n.state === 'active' || isHovered || isClicked) {
+            ctx.shadowBlur = isClicked ? 28 : 18;
+            ctx.shadowColor = n.glowColor;
+        }
+
+        // Background fill
+        var bgAlpha = n.state === 'idle' ? 0.08 : n.state === 'done' ? 0.55 : 0.88;
+        ctx.fillStyle = hexToRgba(n.color, bgAlpha);
+        roundRect(ctx, x, y, n.w, n.h, r);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Border
+        ctx.strokeStyle = hexToRgba(n.color, n.state === 'idle' ? 0.25 : 0.85);
+        ctx.lineWidth = isClicked ? 2.5 : isHovered ? 2 : 1.5;
+        roundRect(ctx, x, y, n.w, n.h, r);
+        ctx.stroke();
+
+        // Type icon
+        var TYPE_ICONS = { trigger:'⚡', handler:'ƒ', dom:'◻', network:'⟳', state:'◈', output:'✓', error:'✗' };
+        var icon = TYPE_ICONS[n.type] || '●';
+
+        // Icon circle
+        var iconX = x + 20, iconY = n.y;
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, 11, 0, Math.PI * 2);
+        ctx.fillStyle = n.state === 'idle' ? hexToRgba(n.color, 0.15) : n.color;
+        ctx.fill();
+
+        ctx.fillStyle = n.state === 'idle' ? hexToRgba(n.color, 0.6) : n.textColor;
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(icon, iconX, iconY);
+
+        // Label
+        var labelX = x + 38, labelMaxW = n.w - 44;
+        ctx.fillStyle = n.state === 'idle' ? 'rgba(127,132,142,0.7)' : '#e6e8ec';
+        ctx.font = (n.state === 'active' ? 'bold' : '') + ' 12px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        var label = n.label;
+        if (ctx.measureText(label).width > labelMaxW) {
+            while (label.length > 3 && ctx.measureText(label + '…').width > labelMaxW) {
+                label = label.slice(0, -1);
+            }
+            label += '…';
+        }
+        ctx.fillText(label, labelX, n.y - 6);
+
+        // Type tag
+        ctx.fillStyle = hexToRgba(n.color, n.state === 'idle' ? 0.35 : 0.7);
+        ctx.font = '10px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(n.type, labelX, n.y + 9);
+
+        // Step number badge
+        ctx.fillStyle = hexToRgba(n.color, 0.45);
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText((n.id + 1), x + n.w - 6, y + 4);
+        ctx.textBaseline = 'middle';
+    });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function hexToRgba(hex, alpha) {
+    if (!hex || hex[0] !== '#') return 'rgba(127,132,142,' + alpha + ')';
+    var r = parseInt(hex.slice(1,3),16);
+    var g = parseInt(hex.slice(3,5),16);
+    var b = parseInt(hex.slice(5,7),16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function getNodeAtPoint(mx, my) {
+    for (var i = 0; i < ftGraphNodes.length; i++) {
+        var n = ftGraphNodes[i];
+        if (mx >= n.x - n.w/2 && mx <= n.x + n.w/2 &&
+            my >= n.y - n.h/2 && my <= n.y + n.h/2) {
+            return n;
+        }
+    }
+    return null;
+}
+
+function showNodeTooltip(node, mx, my) {
+    var tooltip = document.getElementById('ft-tooltip');
+    if (!tooltip) return;
+    var step = node.step;
+    var col = getStepColor(node.type);
+    var html = '<div class="tt-title">' + escapeHtml(node.label) + '</div>';
+    html += '<span class="tt-type" style="background:' + hexToRgba(col.node, 0.2) + ';color:' + col.node + '">' + escapeHtml(node.type) + '</span>';
+    if (step.detail) html += '<div class="tt-detail">' + escapeHtml(step.detail) + '</div>';
+    if (step.codeSnippet) html += '<div class="tt-code">' + escapeHtml(step.codeSnippet) + '</div>';
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    var wRect = wrapper.getBoundingClientRect();
+    var tw = tooltip.offsetWidth || 200;
+    var th = tooltip.offsetHeight || 80;
+    var tx = mx + 14;
+    var ty = my - 10;
+    if (tx + tw > wRect.width - 10) tx = mx - tw - 10;
+    if (ty + th > wRect.height - 10) ty = wRect.height - th - 10;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top  = ty + 'px';
+}
+
+function hideTooltip() {
+    var tooltip = document.getElementById('ft-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+function openDetailDrawer(node) {
+    var drawer = document.getElementById('ft-detail-drawer');
+    var title  = document.getElementById('ft-detail-title');
+    var body   = document.getElementById('ft-detail-body');
+    if (!drawer || !title || !body) return;
+
+    ftClickedNode = node;
+    var step = node.step;
+    var col = getStepColor(node.type);
+
+    title.innerHTML = '<span style="color:' + col.node + '">' + escapeHtml(node.label) + '</span>' +
+        ' <span style="font-size:0.7rem;color:#5c6370;font-weight:400">' + escapeHtml(node.type) + '</span>';
+
+    var html = '';
+    if (flowTracerState.summary && node.id === 0) {
+        html += '<div style="margin-bottom:8px;color:#abb2bf;font-style:italic;">' + escapeHtml(flowTracerState.summary) + '</div>';
+    }
+    if (step.detail) html += '<div style="margin-bottom:6px;">' + escapeHtml(step.detail) + '</div>';
+    if (step.codeSnippet) {
+        html += '<code data-snippet="' + escapeHtml(step.codeSnippet) + '" data-node-id="' + escapeHtml(step.nodeId||'') + '">' +
+            escapeHtml(step.codeSnippet) + '</code>';
+    }
+    if (step.nodeId) {
+        html += '<span class="ft-detail-node-link" data-node-id="' + escapeHtml(step.nodeId) + '">→ Jump to ' + escapeHtml(step.nodeId) + ' in code</span>';
+    }
+    body.innerHTML = html;
+
+    // Wire code clicks
+    body.querySelectorAll('code').forEach(function(el) {
+        el.addEventListener('click', function() {
+            var nid = el.dataset.nodeId;
+            if (nid && nid !== 'null') jumpToNodeInCode(nid);
+            else searchAndJumpToSnippet(el.dataset.snippet || '');
+        });
+    });
+    body.querySelectorAll('.ft-detail-node-link').forEach(function(el) {
+        el.addEventListener('click', function() { jumpToNodeInCode(el.dataset.nodeId); });
+    });
+
+    drawer.classList.add('ft-drawer-open');
+}
+
 function bindFlowTracerEvents() {
     var runBtn = document.getElementById('ft-run-button');
     var clearBtn = document.getElementById('ft-clear-button');
     var scanBtn = document.getElementById('ft-scan-button');
+    var replayBtn = document.getElementById('ft-replay-button');
+    var detailClose = document.getElementById('ft-detail-close');
 
     if (runBtn) runBtn.addEventListener('click', runFlowTrace);
     if (clearBtn) clearBtn.addEventListener('click', clearFlowTrace);
     if (scanBtn) scanBtn.addEventListener('click', renderFlowTriggerList);
+    if (replayBtn) replayBtn.addEventListener('click', function() {
+        if (flowTracerState.lastTrace) {
+            buildAndAnimateGraph(flowTracerState.lastTrace.steps || []);
+        }
+    });
+    if (detailClose) detailClose.addEventListener('click', function() {
+        var drawer = document.getElementById('ft-detail-drawer');
+        if (drawer) drawer.classList.remove('ft-drawer-open');
+        ftClickedNode = null;
+    });
 
     // Allow Enter in target selector to run trace
     var selectorInput = document.getElementById('ft-target-selector');
@@ -6989,6 +7383,56 @@ function bindFlowTracerEvents() {
             if (e.key === 'Enter') runFlowTrace();
         });
     }
+
+    // Canvas mouse/touch events
+    var canvas = document.getElementById('ft-canvas');
+    if (canvas) {
+        canvas.addEventListener('mousemove', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left;
+            var my = e.clientY - rect.top;
+            var node = getNodeAtPoint(mx, my);
+            ftHoveredNode = node;
+            if (node) {
+                canvas.style.cursor = 'pointer';
+                showNodeTooltip(node, mx, my);
+            } else {
+                canvas.style.cursor = 'default';
+                hideTooltip();
+            }
+        });
+        canvas.addEventListener('mouseleave', function() {
+            ftHoveredNode = null;
+            hideTooltip();
+        });
+        canvas.addEventListener('click', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left;
+            var my = e.clientY - rect.top;
+            var node = getNodeAtPoint(mx, my);
+            if (node) openDetailDrawer(node);
+        });
+        // Touch support
+        canvas.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            var touch = e.changedTouches[0];
+            var rect = canvas.getBoundingClientRect();
+            var mx = touch.clientX - rect.left;
+            var my = touch.clientY - rect.top;
+            var node = getNodeAtPoint(mx, my);
+            if (node) openDetailDrawer(node);
+        }, { passive: false });
+    }
+
+    // Resize: rebuild graph if trace exists
+    window.addEventListener('resize', function() {
+        if (flowTracerState.lastTrace && flowTracerState.lastTrace.steps) {
+            stopCanvasAnimation();
+            setTimeout(function() {
+                buildAndAnimateGraph(flowTracerState.lastTrace.steps);
+            }, 100);
+        }
+    });
 
     // Mobile: toggle the config panel open/closed
     var configToggle = document.getElementById('ft-config-toggle');
@@ -7002,9 +7446,7 @@ function bindFlowTracerEvents() {
             var label = configToggle.querySelector('.ft-mobile-config-label');
             if (label) label.textContent = isOpen ? '⚙ Hide Config' : '⚙ Configure Trigger';
         });
-
-        // On mobile, open config by default so users know it exists
-        function checkMobile() {
+        window.addEventListener('resize', function() {
             var isMobileLayout = window.innerWidth <= 640 ||
                 (window.innerHeight <= 500 && window.innerWidth > window.innerHeight);
             if (isMobileLayout && !leftPanel.classList.contains('ft-config-open')) {
@@ -7015,13 +7457,10 @@ function bindFlowTracerEvents() {
                 var label = configToggle.querySelector('.ft-mobile-config-label');
                 if (label) label.textContent = '⚙ Hide Config';
             }
-        }
-
-        // Check on tab switch
-        var origSwitchToTab = typeof switchToTab === 'function' ? switchToTab : null;
-        window.addEventListener('resize', checkMobile);
+        });
     }
 }
+
 
 
 function buildBasicMermaidFromTree(tree) {
