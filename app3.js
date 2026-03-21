@@ -6592,1105 +6592,619 @@ function jumpToNodeInCode(nodeId) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// FLOW TRACER
+// FLOW TRACER — Live Code Execution Streamer
 // ══════════════════════════════════════════════════════════════════
 
-var flowTracerState = {
-    isRunning: false,
-    lastTrace: null
+var ftState = {
+    isRunning:  false,
+    isPaused:   false,
+    stepMode:   false,     // true = wait for user to press Step
+    stepResolve:null,      // resolve fn for current step promise
+    delay:      400,       // ms between lines
+    lines:      [],        // [{nodeId, lineNum, code, lineEl}]
+    lineIndex:  0,
+    vars:       {},        // live variable snapshot {name: {value, type, changed}}
+    callStack:  [],        // [{fn, nodeId}]
+    startTime:  0,
+    errorCount: 0,
 };
 
-/**
- * Scan the vibeTree for interactive elements and event handlers.
- * Returns an array of { selector, eventType, nodeId, snippet }
- */
-function scanProjectForInteractions() {
-    var interactions = [];
-    if (!vibeTree) return interactions;
+// ── Helpers ──────────────────────────────────────────────────────
 
-    function walkNode(node) {
-        if (!node) return;
+function ftEscapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-        var code = node.code || '';
-        var nodeId = node.id;
+function ftNow() {
+    var ms = Date.now() - ftState.startTime;
+    return (ms / 1000).toFixed(3) + 's';
+}
 
-        // HTML nodes: look for event attributes and form elements
-        if (node.type === 'html' || node.type === 'container') {
-            // onclick, onsubmit, onchange, etc.
-            var evtAttrRe = /\bon(click|submit|change|input|keydown|keyup|focus|blur|mouseover|mouseout)\s*=/gi;
-            var m;
-            while ((m = evtAttrRe.exec(code)) !== null) {
-                interactions.push({
-                    eventType: m[1].toLowerCase(),
-                    selector: extractIdFromCode(code) || '#' + nodeId,
-                    nodeId: nodeId,
-                    snippet: extractSnippetAround(code, m.index, 60)
-                });
-            }
-            // <button>, <a>, <input type="submit"> elements
-            var btnRe = /<(button|a)\b([^>]*)>/gi;
-            while ((m = btnRe.exec(code)) !== null) {
-                var attrs = m[2];
-                var idMatch = attrs.match(/id="([^"]+)"/);
-                var selector = idMatch ? '#' + idMatch[1] : m[1];
-                interactions.push({
-                    eventType: 'click',
-                    selector: selector,
-                    nodeId: nodeId,
-                    snippet: m[0].length > 80 ? m[0].substring(0, 80) + '...' : m[0]
-                });
-            }
-            // <form> submits
-            var formRe = /<form\b([^>]*)>/gi;
-            while ((m = formRe.exec(code)) !== null) {
-                var attrs = m[1];
-                var idMatch = attrs.match(/id="([^"]+)"/);
-                interactions.push({
-                    eventType: 'submit',
-                    selector: idMatch ? '#' + idMatch[1] : 'form',
-                    nodeId: nodeId,
-                    snippet: m[0].length > 80 ? m[0].substring(0, 80) + '...' : m[0]
-                });
-            }
-        }
+function ftSetStatus(text, cls) {
+    var el = document.getElementById('ft-exec-status');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'ft-exec-status ' + (cls || '');
+}
 
-        // JS nodes: look for addEventListener calls
-        if (node.type === 'javascript' || node.type === 'js-function' || node.type === 'declaration') {
-            var addEvtRe = /\.addEventListener\s*\(\s*['"](\w+)['"]\s*,/g;
-            var m;
-            while ((m = addEvtRe.exec(code)) !== null) {
-                // Try to find what element this is attached to
-                var beforeCall = code.substring(Math.max(0, m.index - 80), m.index);
-                var elMatch = beforeCall.match(/(?:getElementById|querySelector)\s*\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*$/) ||
-                              beforeCall.match(/([\w$]+)\s*\.\s*$/);
-                var selector = elMatch ? (elMatch[1].startsWith('#') ? elMatch[1] : '#' + elMatch[1]) : '(element)';
-                interactions.push({
-                    eventType: m[1].toLowerCase(),
-                    selector: selector,
-                    nodeId: nodeId,
-                    snippet: extractSnippetAround(code, m.index, 60)
-                });
-            }
-        }
+function ftSetNodeLabel(label) {
+    var el = document.getElementById('ft-node-label');
+    if (el) el.textContent = label || '—';
+}
 
-        if (node.children) node.children.forEach(walkNode);
+function ftLog(msg, cls) {
+    var log = document.getElementById('ft-log');
+    if (!log) return;
+    var entry = document.createElement('div');
+    entry.className = 'ft-log-entry log-' + (cls || 'info');
+    entry.innerHTML = '<span class="ft-log-time">' + ftNow() + '</span>' +
+                      '<span class="ft-log-msg">' + ftEscapeHtml(msg) + '</span>';
+    log.appendChild(entry);
+    var scroll = document.getElementById('ft-log-scroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+}
+
+function ftUpdateLineCounter() {
+    var el = document.getElementById('ft-line-counter');
+    if (el) el.textContent = 'Line ' + (ftState.lineIndex + 1) + ' / ' + ftState.lines.length;
+}
+
+// ── Variable Inspector ────────────────────────────────────────────
+
+function ftUpdateVar(name, value, type) {
+    var changed = ftState.vars[name] && JSON.stringify(ftState.vars[name].value) !== JSON.stringify(value);
+    ftState.vars[name] = { value: value, type: type || typeof value, changed: changed };
+    renderVars();
+}
+
+function renderVars() {
+    var list = document.getElementById('ft-vars-list');
+    var cnt  = document.getElementById('ft-var-count');
+    if (!list) return;
+
+    var names = Object.keys(ftState.vars);
+    if (cnt) cnt.textContent = names.length + ' var' + (names.length !== 1 ? 's' : '');
+    if (names.length === 0) {
+        list.innerHTML = '<div class="ft-vars-placeholder">No variables captured yet.</div>';
+        return;
     }
 
-    walkNode(vibeTree);
+    names.forEach(function(name) {
+        var v   = ftState.vars[name];
+        var row = document.getElementById('ftvar-' + name);
+        if (!row) {
+            row = document.createElement('div');
+            row.id        = 'ftvar-' + name;
+            row.className = 'ft-var-row';
+            list.appendChild(row);
+        }
 
-    // Deduplicate by selector+eventType
-    var seen = new Set();
-    return interactions.filter(function(i) {
-        var key = i.eventType + '::' + i.selector;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
+        var valStr;
+        try { valStr = JSON.stringify(v.value, null, 1); } catch(e) { valStr = String(v.value); }
+        if (valStr && valStr.length > 120) valStr = valStr.substring(0, 117) + '…';
+
+        row.innerHTML =
+            '<div class="ft-var-name-row">' +
+            '  <span class="name">' + ftEscapeHtml(name) + '</span>' +
+            '  <span class="type">' + ftEscapeHtml(v.type) + '</span>' +
+            '</div>' +
+            '<div class="ft-var-value">' + ftEscapeHtml(valStr) + '</div>';
+
+        if (v.changed) {
+            row.classList.add('ft-var-changed');
+            setTimeout(function() { row.classList.remove('ft-var-changed'); }, 800);
+            v.changed = false;
+        }
     });
 }
 
-function extractIdFromCode(code) {
-    var m = code.match(/id="([^"]+)"/);
-    return m ? '#' + m[1] : null;
+// ── Call Stack ────────────────────────────────────────────────────
+
+function ftPushStack(fn, nodeId) {
+    ftState.callStack.push({ fn: fn, nodeId: nodeId });
+    renderCallStack();
 }
 
-function extractSnippetAround(code, index, len) {
-    var start = Math.max(0, index - 10);
-    var end = Math.min(code.length, index + len);
-    return code.substring(start, end).replace(/\s+/g, ' ').trim();
+function ftPopStack() {
+    ftState.callStack.pop();
+    renderCallStack();
+}
+
+function renderCallStack() {
+    var el = document.getElementById('ft-callstack');
+    if (!el) return;
+    if (!ftState.callStack.length) {
+        el.innerHTML = '<div class="ft-vars-placeholder">—</div>';
+        return;
+    }
+    var html = '';
+    ftState.callStack.slice().reverse().forEach(function(frame, i) {
+        html += '<div class="ft-stack-frame' + (i === 0 ? ' active' : '') + '">' +
+            ftEscapeHtml(frame.fn) +
+            (frame.nodeId ? ' <span style="color:#5c6370;font-size:0.65rem">(' + ftEscapeHtml(frame.nodeId) + ')</span>' : '') +
+            '</div>';
+    });
+    el.innerHTML = html;
+}
+
+// ── Code Instrumenter ─────────────────────────────────────────────
+// Wraps each line with a __ftHook(lineIndex, snapshot_fn) call
+// so we can pause, capture vars, and stream output.
+
+function instrumentCode(src, nodeId) {
+    var lines  = src.split('\n');
+    var result = [];
+    // Inject a per-line hook: __ftHook(idx, fn) where fn returns {vars}
+    lines.forEach(function(line, i) {
+        var trimmed = line.trim();
+        // Skip blank lines and pure comment lines
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+            result.push(line);
+            return;
+        }
+        // Insert hook BEFORE the line using a comma expression trick
+        // We wrap in an async immediately-invoked form so await works
+        result.push('await __ftHook(' + i + ', ' + JSON.stringify(nodeId) + ', (function(){try{return __ftCapture();}catch(e){return {};}})());');
+        result.push(line);
+    });
+    return result.join('\n');
+}
+
+// ── Sandbox runner ────────────────────────────────────────────────
+// We build a full HTML page, inject it into the hidden iframe,
+// and listen for postMessage events back.
+
+function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlCode) {
+    // The sandbox page runs the instrumented code and messages back each step
+    var sandboxScript = [
+        'var __ftLines = [];',
+        'var __ftPaused = false;',
+        'var __ftStepResolve = null;',
+        'var __ftVars = {};',
+        'var __ftCallStack = [];',
+        '',
+        'function __ftCapture() {',
+        '  // Capture all vars in current scope — we do this via a with-eval trick,',
+        '  // but since we cannot enumerate locals, we track via __ftSetVar calls.',
+        '  return JSON.parse(JSON.stringify(__ftVars));',
+        '}',
+        '',
+        'function __ftSetVar(name, value) {',
+        '  try {',
+        '    var type = Array.isArray(value) ? "array" : typeof value;',
+        '    var safe = JSON.parse(JSON.stringify(value === undefined ? "undefined" : value === null ? "null" : value));',
+        '    __ftVars[name] = { value: safe, type: type };',
+        '  } catch(e) { __ftVars[name] = { value: String(value), type: typeof value }; }',
+        '}',
+        '',
+        'async function __ftHook(lineIdx, nodeId, vars) {',
+        '  Object.assign(__ftVars, vars);',
+        '  window.parent.postMessage({ type: "ft-line", lineIdx: lineIdx, nodeId: nodeId, vars: __ftVars }, "*");',
+        '  if (__ftPaused) {',
+        '    await new Promise(function(res) { __ftStepResolve = res; });',
+        '  }',
+        '}',
+        '',
+        'window.addEventListener("message", function(e) {',
+        '  if (e.data.type === "ft-resume") { __ftPaused = false; if (__ftStepResolve) { __ftStepResolve(); __ftStepResolve = null; } }',
+        '  if (e.data.type === "ft-pause")  { __ftPaused = true; }',
+        '  if (e.data.type === "ft-step")   { if (__ftStepResolve) { __ftPaused = true; __ftStepResolve(); __ftStepResolve = null; } }',
+        '});',
+        '',
+        '// Override console to forward to parent',
+        '["log","warn","error","info"].forEach(function(m) {',
+        '  var orig = console[m].bind(console);',
+        '  console[m] = function() {',
+        '    var args = Array.from(arguments).map(function(a){ try{return JSON.stringify(a);}catch(e){return String(a);} });',
+        '    window.parent.postMessage({ type: "ft-console", level: m, args: args }, "*");',
+        '    orig.apply(console, arguments);',
+        '  };',
+        '});',
+        '',
+        '// Catch unhandled errors',
+        'window.addEventListener("error", function(e) {',
+        '  window.parent.postMessage({ type: "ft-error", message: e.message, line: e.lineno, col: e.colno }, "*");',
+        '});',
+        'window.addEventListener("unhandledrejection", function(e) {',
+        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason) }, "*");',
+        '});',
+    ].join('\n');
+
+    // The actual user code (instrumented), wrapped in an async IIFE
+    var userCode = [
+        '(async function __ftMain() {',
+        '  window.parent.postMessage({ type: "ft-start" }, "*");',
+        '  try {',
+        jsCode,
+        '  } catch(__ftErr) {',
+        '    window.parent.postMessage({ type: "ft-error", message: __ftErr.message, stack: __ftErr.stack }, "*");',
+        '  } finally {',
+        '    window.parent.postMessage({ type: "ft-done" }, "*");',
+        '  }',
+        '})();',
+    ].join('\n');
+
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' +
+        (htmlCode ? htmlCode : '') +
+        '<script>\n' + sandboxScript + '\n</script>\n' +
+        '<script>\n' + userCode + '\n</script>' +
+        '</body></html>';
+}
+
+// ── Trigger detection ─────────────────────────────────────────────
+
+function scanProjectForInteractions() {
+    var interactions = [];
+    if (!vibeTree) return interactions;
+    function walkNode(node) {
+        if (!node) return;
+        var code = node.code || '', nodeId = node.id;
+        if (node.type === 'html' || node.type === 'container') {
+            var btnRe = /<(button|a|input)\b([^>]*)>/gi, m;
+            while ((m = btnRe.exec(code)) !== null) {
+                var attrs = m[2], idMatch = attrs.match(/id="([^"]+)"/);
+                if (idMatch) interactions.push({ eventType:'click', selector:'#'+idMatch[1], nodeId:nodeId, snippet:m[0].substring(0,60) });
+            }
+            var formRe = /<form\b([^>]*)>/gi;
+            while ((m = formRe.exec(code)) !== null) {
+                var idMatch = m[1].match(/id="([^"]+)"/);
+                interactions.push({ eventType:'submit', selector: idMatch?'#'+idMatch[1]:'form', nodeId:nodeId, snippet:m[0].substring(0,60) });
+            }
+        }
+        if (node.type === 'javascript' || node.type === 'js-function' || node.type === 'declaration') {
+            var re = /\.addEventListener\s*\(\s*['"](\w+)['"]/g, m;
+            while ((m = re.exec(code)) !== null) {
+                var before = code.substring(Math.max(0,m.index-60), m.index);
+                var elM = before.match(/getElementById\s*\(\s*['"]([^'"]+)['"]\s*\)/) ||
+                          before.match(/querySelector\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+                var sel = elM ? (elM[1].startsWith('#')||elM[1].startsWith('.')? elM[1]:'#'+elM[1]) : '(element)';
+                interactions.push({ eventType:m[1].toLowerCase(), selector:sel, nodeId:nodeId, snippet:m[0] });
+            }
+        }
+        if (node.children) node.children.forEach(walkNode);
+    }
+    walkNode(vibeTree);
+    var seen = new Set();
+    return interactions.filter(function(i) {
+        var k = i.eventType+'::'+i.selector;
+        if (seen.has(k)) return false; seen.add(k); return true;
+    });
 }
 
 function renderFlowTriggerList() {
-    var listEl = document.getElementById('ft-trigger-list');
-    if (!listEl) return;
-    if (!vibeTree || !vibeTree.id) {
-        listEl.innerHTML = '<div class="ft-trigger-placeholder">Load a project first.</div>';
-        return;
-    }
-
+    var listEl = document.getElementById('ft-trigger-list'); if (!listEl) return;
+    if (!vibeTree || !vibeTree.id) { listEl.innerHTML = '<div class="ft-trigger-placeholder">Load a project first.</div>'; return; }
     var interactions = scanProjectForInteractions();
-    if (interactions.length === 0) {
-        listEl.innerHTML = '<div class="ft-trigger-placeholder">No interactive elements detected.</div>';
-        return;
-    }
-
-    var ICONS = { click: '🖱️', submit: '📨', input: '⌨️', change: '⌨️', keydown: '⌨️', focus: '👁️', load: '📄' };
+    if (!interactions.length) { listEl.innerHTML = '<div class="ft-trigger-placeholder">No interactive elements detected.</div>'; return; }
+    var ICONS = { click:'🖱',submit:'📨',input:'⌨',change:'⌨',keydown:'⌨',focus:'👁',load:'📄' };
     listEl.innerHTML = '';
-    interactions.slice(0, 20).forEach(function(inter) {
+    interactions.slice(0,25).forEach(function(inter) {
         var chip = document.createElement('div');
         chip.className = 'ft-trigger-chip';
-        chip.innerHTML =
-            '<span class="ft-chip-icon">' + (ICONS[inter.eventType] || '⚡') + '</span>' +
-            '<span class="ft-chip-label">' + escapeHtml(inter.selector) + '</span>' +
-            '<span class="ft-chip-type">' + inter.eventType + '</span>';
+        chip.innerHTML = '<span class="ft-chip-icon">'+(ICONS[inter.eventType]||'⚡')+'</span>' +
+            '<span class="ft-chip-label">'+ftEscapeHtml(inter.selector)+'</span>' +
+            '<span class="ft-chip-type">'+inter.eventType+'</span>';
         chip.addEventListener('click', function() {
-            var triggerTypeEl = document.getElementById('ft-trigger-type');
-            var targetSelectorEl = document.getElementById('ft-target-selector');
-            if (triggerTypeEl) triggerTypeEl.value = inter.eventType;
-            if (targetSelectorEl) targetSelectorEl.value = inter.selector;
+            var t = document.getElementById('ft-trigger-type'), s = document.getElementById('ft-target-selector');
+            if (t) t.value = inter.eventType; if (s) s.value = inter.selector;
         });
         listEl.appendChild(chip);
     });
 }
 
-function escapeHtml(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// ── Collect all JS nodes into an ordered list of {nodeId, lines[]} ──
 
-/**
- * Build a flow trace by analysing the vibeTree for the given trigger.
- * This is a static analysis approach — we don't actually execute code,
- * we trace what WOULD happen based on the code structure.
- */
-async function runFlowTrace() {
-    if (flowTracerState.isRunning) return;
-
-    var triggerType    = (document.getElementById('ft-trigger-type')    || {}).value || 'click';
-    var targetSelector = ((document.getElementById('ft-target-selector') || {}).value || '').trim();
-    var inputValue     = ((document.getElementById('ft-input-value')     || {}).value || '').trim();
-    var depth          = (document.getElementById('ft-depth')           || {}).value || 'deep';
-
-    // Canvas-based UI elements (no ft-flow-output — that was the old text layout)
-    var placeholder = document.getElementById('ft-placeholder');
-    var wrapper     = document.getElementById('ft-canvas-wrapper');
-    var stepCountEl = document.getElementById('ft-step-count');
-    var runBtn      = document.getElementById('ft-run-button');
-    var replayBtn   = document.getElementById('ft-replay-button');
-
-    if (!wrapper) { console.error('Flow Tracer: ft-canvas-wrapper not found'); return; }
-
-    // Pre-flight: check an API key is configured
-    var keyOk = (currentAIProvider === 'gemini' && !!geminiApiKey) ||
-                (currentAIProvider === 'nscale' && !!nscaleApiKey);
-    if (!keyOk) {
-        if (placeholder) {
-            placeholder.innerHTML =
-                '<span style="color:#e5c07b;font-weight:700">⚠ No API key set</span><br>' +
-                '<span style="font-size:0.78rem;color:#7f848e">Add your API key in Settings before running a trace.</span>';
-            placeholder.style.display = '';
-        }
-        return;
-    }
-
-    if (!vibeTree || !vibeTree.id) {
-        if (placeholder) {
-            placeholder.innerHTML =
-                '<span style="color:#e5c07b;font-weight:700">⚠ No project loaded</span><br>' +
-                '<span style="font-size:0.78rem;color:#7f848e">Load or create a project first.</span>';
-            placeholder.style.display = '';
-        }
-        return;
-    }
-
-    // ── Loading state ──────────────────────────────────────────────
-    flowTracerState.isRunning = true;
-    stopCanvasAnimation();
-    clearCanvas();
-
-    // Show a loading overlay on the canvas
-    var loadOverlay = document.getElementById('ft-loading-overlay');
-    if (!loadOverlay) {
-        loadOverlay = document.createElement('div');
-        loadOverlay.id        = 'ft-loading-overlay';
-        loadOverlay.className = 'ft-loading-overlay';
-        loadOverlay.innerHTML = '<div class="ft-loading-ring"></div><span>Analysing flow…</span>';
-        wrapper.appendChild(loadOverlay);
-    }
-    loadOverlay.style.display = 'flex';
-    if (placeholder) placeholder.style.display = 'none';
-    if (stepCountEl) stepCountEl.textContent = '';
-    if (replayBtn)   replayBtn.style.display  = 'none';
-    if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Tracing…'; }
-
-    // Close detail drawer while loading
-    var drawer = document.getElementById('ft-detail-drawer');
-    if (drawer) drawer.classList.remove('ft-drawer-open');
-
-    try {
-        var projectSummary = buildProjectSummaryForTrace();
-
-        var systemPrompt = [
-            'You are an expert JavaScript runtime analyser performing deep static analysis.',
-            '',
-            'Your job: trace the COMPLETE domino-effect execution of a user interaction — every',
-            'function call, condition check, variable mutation, DOM change, and side effect.',
-            '',
-            'Return ONLY a raw JSON object — no markdown, no prose, no ```fences```.',
-            '',
-            'JSON SHAPE:',
-            '{',
-            '  "summary": "One sentence — what does this interaction accomplish end-to-end?",',
-            '  "steps": [',
-            '    {',
-            '      "type": "trigger|handler|condition|mutation|dom|network|state|output|error",',
-            '      "title": "Function or action name (max 8 words)",',
-            '      "detail": "Precisely what happens here — which function runs, what it checks, what it returns",',
-            '      "codeSnippet": "The actual relevant 1-4 lines of code from the project",',
-            '      "nodeId": "The vibeTree JS/HTML node ID containing this code or null",',
-            '      "variables": [',
-            '        { "name": "variableName", "before": "value before", "after": "value after" }',
-            '      ],',
-            '      "condition": "If this is a branch — the exact condition checked e.g. if (data.length > 0)",',
-            '      "conditionResult": true,',
-            '      "sideEffects": ["DOM: #element.innerHTML changed", "localStorage.setItem called", etc],',
-            '      "returns": "What this function/step returns or resolves to"',
-            '    }',
-            '  ]',
-            '}',
-            '',
-            'STEP TYPE GUIDE:',
-            '  trigger   = the raw user event (click, submit, keydown etc)',
-            '  handler   = a function or event listener that fires',
-            '  condition = an if/else/switch branch — show which path is taken and why',
-            '  mutation  = a variable or state value being changed',
-            '  dom       = a DOM read or write (querySelector, innerHTML, classList, setAttribute)',
-            '  network   = a fetch/XHR/WebSocket call — show URL, method, payload',
-            '  state     = application-level state change (not just a local var)',
-            '  output    = the final visible result the user sees',
-            '  error     = an exception, rejection, or failed validation',
-            '',
-            'RULES:',
-            '- Produce 6-20 steps. Be exhaustive — trace EVERY branch, EVERY variable change.',
-            '- For each condition step, show exactly which branch is taken and why.',
-            '- For each mutation step, show the variable name, old value, new value.',
-            '- For network steps, show the URL, method, and what the response triggers next.',
-            '- codeSnippet must quote REAL code from the project source, not invented code.',
-            '- variables, sideEffects, condition, conditionResult, returns are ALL optional fields.',
-            '  Only include them when they apply to that specific step.',
-            '- Start with type "trigger", end with "output" or "error".',
-            '- Return RAW JSON only. Absolutely nothing outside the { } object.'
-        ].join('\n');
-
-        var userPrompt = 'Project:\n' + projectSummary + '\n\n' +
-            'Trace: ' + triggerType + ' on "' + (targetSelector || 'most interactive element') + '"' +
-            (inputValue ? ' with value "' + inputValue + '"' : '') +
-            ' (depth: ' + depth + ')\n\nReturn the JSON trace.';
-
-        var rawResponse = await callAI(systemPrompt, userPrompt, true);
-
-        var traceData;
-        try {
-            var jsonText = rawResponse.trim();
-            // Strip any accidental markdown fences
-            var fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (fence && fence[1]) jsonText = fence[1].trim();
-            // Find outermost { }
-            var s = jsonText.indexOf('{');
-            var e = jsonText.lastIndexOf('}');
-            if (s !== -1 && e > s) jsonText = jsonText.substring(s, e + 1);
-            traceData = JSON.parse(jsonText);
-        } catch (parseErr) {
-            console.error('Flow Tracer parse error. Raw response:', rawResponse);
-            throw new Error('AI returned invalid JSON. Check the console for the raw response.');
-        }
-
-        if (!Array.isArray(traceData.steps) || traceData.steps.length === 0) {
-            throw new Error('AI returned no steps. Try being more specific about the selector or interaction.');
-        }
-
-        renderFlowTrace(traceData, triggerType, targetSelector);
-
-    } catch (err) {
-        console.error('Flow Tracer error:', err);
-        // Show error on the canvas placeholder
-        if (placeholder) {
-            placeholder.innerHTML =
-                '<span style="color:#e06c75;font-weight:700">✗ Trace failed</span><br>' +
-                '<span style="font-size:0.78rem;color:#7f848e">' + escapeHtml(err.message) + '</span>';
-            placeholder.style.display = '';
-        }
-    } finally {
-        flowTracerState.isRunning = false;
-        if (loadOverlay) loadOverlay.style.display = 'none';
-        if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶ Run Trace'; }
-    }
-}
-
-function buildProjectSummaryForTrace() {
-    // Send FULL code of JS/logic nodes so the AI can trace variable values precisely
-    var sections = [];
+function collectExecutableCode() {
+    var result = []; // [{nodeId, src}]
     function walk(node) {
         if (!node) return;
         if (node.type === 'javascript' || node.type === 'js-function' || node.type === 'declaration') {
-            sections.push('=== JS NODE: ' + node.id + ' ===');
-            sections.push(node.description || '');
-            sections.push(node.code || '');
-            sections.push('');
-        } else if (node.type === 'html') {
-            // For HTML, send the full markup so the AI knows selector targets
-            sections.push('=== HTML NODE: ' + node.id + ' ===');
-            sections.push(node.description || '');
-            sections.push((node.code || '').substring(0, 600));
-            sections.push('');
+            if (node.code && node.code.trim()) result.push({ nodeId: node.id, src: node.code });
         }
         if (node.children) node.children.forEach(walk);
     }
     walk(vibeTree);
-    var full = sections.join('\n');
-    // Cap at 8000 chars — generous for deep analysis
-    if (full.length > 8000) full = full.substring(0, 8000) + '\n...(truncated for length)';
-    return full;
+    return result;
 }
 
-function renderFlowTrace(traceData, triggerType, targetSelector) {
-    var stepCountEl = document.getElementById('ft-step-count');
-    var placeholder = document.getElementById('ft-placeholder');
-    var replayBtn = document.getElementById('ft-replay-button');
-    if (placeholder) placeholder.style.display = 'none';
-    if (replayBtn) replayBtn.style.display = '';
+// ── Render code lines into the code panel ────────────────────────
 
-    var steps = traceData.steps || [];
-    if (stepCountEl) stepCountEl.textContent = steps.length + ' node' + (steps.length !== 1 ? 's' : '');
+function renderCodeLines(nodeBlocks) {
+    var pre = document.getElementById('ft-code-pre'); if (!pre) return;
+    pre.innerHTML = '';
+    ftState.lines = [];
 
-    flowTracerState.lastTrace = traceData;
-    flowTracerState.summary = traceData.summary || '';
+    nodeBlocks.forEach(function(block) {
+        // Section header
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'padding:6px 8px 2px;color:#5c6370;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-top:1px solid #2d333b;margin-top:4px;';
+        hdr.textContent = '// ' + block.nodeId;
+        pre.appendChild(hdr);
 
-    buildAndAnimateGraph(steps);
+        var lines = block.src.split('\n');
+        lines.forEach(function(lineCode, i) {
+            var lineEl = document.createElement('div');
+            lineEl.className = 'ft-line';
+            lineEl.id = 'ftline-' + ftState.lines.length;
+            lineEl.innerHTML =
+                '<span class="ft-line-num">' + (i + 1) + '</span>' +
+                '<span class="ft-line-code">' + ftEscapeHtml(lineCode) + '</span>' +
+                '<span class="ft-line-inline-val" id="ftlineval-' + ftState.lines.length + '"></span>';
+            pre.appendChild(lineEl);
+            ftState.lines.push({ nodeId: block.nodeId, lineNum: i, code: lineCode, el: lineEl, globalIdx: ftState.lines.length });
+        });
+    });
 }
 
-function searchAndJumpToSnippet(snippet) {
-    showFullCode();
-    switchToTab('code');
-    setTimeout(function() {
-        if (!fullCodeEditor) return;
-        var code = fullCodeEditor.value;
-        var searchFor = snippet.replace(/\s+/g, ' ').trim().substring(0, 40);
-        var idx = code.indexOf(searchFor);
-        if (idx === -1) idx = code.indexOf(searchFor.substring(0, 20));
-        if (idx !== -1) {
-            var lineNum = code.substring(0, idx).split('\n').length;
-            var lineHeight = parseInt(window.getComputedStyle(fullCodeEditor).lineHeight) || 18;
-            fullCodeEditor.scrollTop = Math.max(0, (lineNum - 3) * lineHeight);
-            fullCodeEditor.focus();
-            fullCodeEditor.setSelectionRange(idx, Math.min(idx + searchFor.length, code.length));
+// ── Main run function ────────────────────────────────────────────
+
+async function runFlowTrace() {
+    if (ftState.isRunning) return;
+
+    // Check API key — needed? No! We're actually executing code, no AI needed.
+    // Check project
+    if (!vibeTree || !vibeTree.id || vibeTree.type === 'raw-html-container') {
+        ftLog('No structured project loaded. Load a Vibe Tree project first.', 'error');
+        return;
+    }
+
+    var triggerType    = (document.getElementById('ft-trigger-type')    || {}).value || 'load';
+    var targetSelector = ((document.getElementById('ft-target-selector') || {}).value || '').trim();
+    var inputValue     = ((document.getElementById('ft-input-value')     || {}).value || '').trim();
+    var speedRange     = document.getElementById('ft-speed-range');
+    ftState.delay      = speedRange ? parseInt(speedRange.value) : 400;
+
+    // Collect all executable JS from the vibe tree
+    var nodeBlocks = collectExecutableCode();
+    if (!nodeBlocks.length) {
+        ftLog('No JavaScript nodes found in this project.', 'error');
+        return;
+    }
+
+    // Also collect HTML for DOM context
+    var htmlCode = '';
+    function collectHtml(node) {
+        if (!node) return;
+        if (node.type === 'html') htmlCode += (node.code || '') + '\n';
+        if (node.children) node.children.forEach(collectHtml);
+    }
+    collectHtml(vibeTree);
+
+    // Reset state
+    ftState.isRunning  = true;
+    ftState.isPaused   = false;
+    ftState.stepMode   = false;
+    ftState.vars       = {};
+    ftState.callStack  = [];
+    ftState.lineIndex  = 0;
+    ftState.errorCount = 0;
+    ftState.startTime  = Date.now();
+
+    // Reset UI
+    var log = document.getElementById('ft-log');
+    if (log) log.innerHTML = '';
+    var varsList = document.getElementById('ft-vars-list');
+    if (varsList) varsList.innerHTML = '<div class="ft-vars-placeholder">Waiting…</div>';
+    renderCallStack();
+    updateFtButtons();
+
+    ftSetStatus('Running', 'running');
+    ftSetNodeLabel('Initialising…');
+    ftLog('Trace started · ' + nodeBlocks.length + ' JS node(s) · trigger: ' + triggerType + (targetSelector ? ' on ' + targetSelector : ''), 'info');
+
+    // Render all code lines
+    renderCodeLines(nodeBlocks);
+
+    // Build a line-index map: nodeId+lineNum → globalIdx
+    // (used to map sandbox messages back to line elements)
+    var lineMap = {}; // key: nodeId+'::'+lineNum → globalIdx
+    ftState.lines.forEach(function(l) { lineMap[l.nodeId + '::' + l.lineNum] = l.globalIdx; });
+
+    // Instrument all JS
+    var instrumentedParts = nodeBlocks.map(function(b) {
+        return '// === ' + b.nodeId + ' ===\n' + instrumentCode(b.src, b.nodeId);
+    });
+
+    // If trigger is not 'load', wrap in an event listener
+    var allCode = instrumentedParts.join('\n\n');
+    if (triggerType !== 'load' && targetSelector) {
+        var evtSetup = [
+            '// Wait for DOM then attach trigger',
+            'document.addEventListener("DOMContentLoaded", function() {',
+            '  var __ftEl = document.querySelector(' + JSON.stringify(targetSelector) + ');',
+            '  if (!__ftEl) { window.parent.postMessage({type:"ft-error",message:"Element not found: ' + targetSelector + '"}, "*"); return; }',
+            inputValue ? '  __ftEl.value = ' + JSON.stringify(inputValue) + ';' : '',
+            '  __ftEl.dispatchEvent(new Event(' + JSON.stringify(triggerType) + ', {bubbles:true, cancelable:true}));',
+            '});',
+        ].join('\n');
+        allCode = evtSetup + '\n\n' + allCode;
+    }
+
+    // Build and inject sandbox
+    var sandboxHtml = buildSandboxHtml(allCode, triggerType, targetSelector, inputValue, htmlCode);
+    var sandbox = document.getElementById('ft-sandbox');
+    if (!sandbox) { ftLog('Sandbox iframe missing.', 'error'); ftState.isRunning = false; updateFtButtons(); return; }
+
+    // Listen for sandbox messages
+    var activeLine = -1;
+
+    function handleSandboxMessage(e) {
+        var d = e.data;
+        if (!d || !d.type || !d.type.startsWith('ft-')) return;
+
+        if (d.type === 'ft-start') {
+            ftLog('Sandbox executing…', 'info');
+            ftPushStack('__ftMain', '(root)');
         }
-    }, 200);
+
+        else if (d.type === 'ft-line') {
+            // Deactivate previous line
+            if (activeLine >= 0 && ftState.lines[activeLine]) {
+                ftState.lines[activeLine].el.classList.remove('ft-line-active');
+                ftState.lines[activeLine].el.classList.add('ft-line-done');
+            }
+            // Find the global line index
+            var key = d.nodeId + '::' + d.lineNum;
+            var gIdx = lineMap[key];
+            activeLine = (gIdx !== undefined) ? gIdx : activeLine + 1;
+            if (activeLine >= 0 && activeLine < ftState.lines.length) {
+                var lineEntry = ftState.lines[activeLine];
+                lineEntry.el.classList.add('ft-line-active');
+                // Scroll to it
+                lineEntry.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                ftSetNodeLabel(d.nodeId);
+                ftUpdateLineCounter();
+                // Update vars from snapshot
+                if (d.vars && typeof d.vars === 'object') {
+                    Object.keys(d.vars).forEach(function(name) {
+                        var v = d.vars[name];
+                        ftUpdateVar(name, v.value, v.type);
+                    });
+                }
+            }
+            ftState.lineIndex = activeLine;
+
+            // Apply step delay via sandbox control
+            if (ftState.delay > 0) {
+                sandbox.contentWindow.postMessage({ type: 'ft-pause' }, '*');
+                setTimeout(function() {
+                    if (ftState.isRunning) {
+                        if (ftState.stepMode) { /* wait for user Step button */ }
+                        else { sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*'); }
+                    }
+                }, ftState.delay);
+            }
+        }
+
+        else if (d.type === 'ft-console') {
+            var levelMap = { log:'info', warn:'var', error:'error', info:'info' };
+            ftLog('[console.' + d.level + '] ' + (d.args || []).join(' '), levelMap[d.level] || 'info');
+            if (d.level === 'error') ftState.errorCount++;
+        }
+
+        else if (d.type === 'ft-error') {
+            // Mark the current line as errored
+            if (activeLine >= 0 && ftState.lines[activeLine]) {
+                ftState.lines[activeLine].el.classList.add('ft-line-error');
+                ftState.lines[activeLine].el.classList.remove('ft-line-active');
+            }
+            ftLog('ERROR: ' + d.message + (d.stack ? '\n' + d.stack.split('\n')[1] : ''), 'error');
+            ftSetStatus('Error', 'error');
+            ftState.errorCount++;
+        }
+
+        else if (d.type === 'ft-done') {
+            window.removeEventListener('message', handleSandboxMessage);
+            // Mark last active line as done
+            if (activeLine >= 0 && ftState.lines[activeLine]) {
+                ftState.lines[activeLine].el.classList.remove('ft-line-active');
+                ftState.lines[activeLine].el.classList.add('ft-line-done');
+            }
+            ftState.isRunning = false;
+            ftState.isPaused  = false;
+            ftSetStatus(ftState.errorCount > 0 ? 'Finished with errors' : 'Done ✓', ftState.errorCount > 0 ? 'error' : 'done');
+            ftLog('Trace complete in ' + ftNow() + (ftState.errorCount ? ' · ' + ftState.errorCount + ' error(s)' : ''), ftState.errorCount ? 'error' : 'return');
+            ftPopStack();
+            updateFtButtons();
+        }
+    }
+
+    window.addEventListener('message', handleSandboxMessage);
+
+    // Load sandbox
+    var blob = new Blob([sandboxHtml], { type: 'text/html' });
+    sandbox.src = URL.createObjectURL(blob);
+}
+
+// ── Controls ──────────────────────────────────────────────────────
+
+function pauseFlowTrace() {
+    if (!ftState.isRunning || ftState.isPaused) return;
+    ftState.isPaused = true;
+    var sandbox = document.getElementById('ft-sandbox');
+    if (sandbox && sandbox.contentWindow) sandbox.contentWindow.postMessage({ type: 'ft-pause' }, '*');
+    ftSetStatus('Paused', 'paused');
+    ftLog('⏸ Paused — press Step to advance or Resume to continue.', 'branch');
+    updateFtButtons();
+}
+
+function stepFlowTrace() {
+    if (!ftState.isRunning) return;
+    ftState.isPaused = true;
+    var sandbox = document.getElementById('ft-sandbox');
+    if (sandbox && sandbox.contentWindow) sandbox.contentWindow.postMessage({ type: 'ft-step' }, '*');
+    ftLog('⏭ Step', 'branch');
+}
+
+function resumeFlowTrace() {
+    if (!ftState.isRunning || !ftState.isPaused) return;
+    ftState.isPaused = false;
+    var sandbox = document.getElementById('ft-sandbox');
+    if (sandbox && sandbox.contentWindow) sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*');
+    ftSetStatus('Running', 'running');
+    updateFtButtons();
 }
 
 function clearFlowTrace() {
-    var placeholder = document.getElementById('ft-placeholder');
-    var stepCountEl = document.getElementById('ft-step-count');
-    var replayBtn = document.getElementById('ft-replay-button');
-    var drawer = document.getElementById('ft-detail-drawer');
-    if (placeholder) placeholder.style.display = '';
-    if (stepCountEl) stepCountEl.textContent = '';
-    if (replayBtn) replayBtn.style.display = 'none';
-    if (drawer) drawer.classList.remove('ft-drawer-open');
-    stopCanvasAnimation();
-    clearCanvas();
-    var targetSelectorEl = document.getElementById('ft-target-selector');
-    var inputValueEl = document.getElementById('ft-input-value');
-    if (targetSelectorEl) targetSelectorEl.value = '';
-    if (inputValueEl) inputValueEl.value = '';
-    flowTracerState.lastTrace = null;
+    ftState.isRunning = false;
+    ftState.isPaused  = false;
+    // Kill sandbox
+    var sandbox = document.getElementById('ft-sandbox');
+    if (sandbox) sandbox.src = 'about:blank';
+    // Clear UI
+    var pre = document.getElementById('ft-code-pre');
+    if (pre) pre.innerHTML = '<span class="ft-code-placeholder">Run a trace to see code execute line by line.</span>';
+    var log = document.getElementById('ft-log');
+    if (log) log.innerHTML = '';
+    var varsList = document.getElementById('ft-vars-list');
+    if (varsList) varsList.innerHTML = '<div class="ft-vars-placeholder">Variables will appear here as the code runs.</div>';
+    var cs = document.getElementById('ft-callstack');
+    if (cs) cs.innerHTML = '<div class="ft-vars-placeholder">—</div>';
+    ftSetStatus('', '');
+    ftSetNodeLabel('—');
+    var lc = document.getElementById('ft-line-counter');
+    if (lc) lc.textContent = '';
+    ftState.vars = {}; ftState.callStack = []; ftState.lines = [];
+    updateFtButtons();
 }
 
-// ─────────────────────────────────────────────────────────────────
-// CANVAS ANIMATION ENGINE
-// ─────────────────────────────────────────────────────────────────
-
-
-
-// ─────────────────────────────────────────────────────────────────
-// CANVAS ANIMATION ENGINE — deep visual flow tracer
-// ─────────────────────────────────────────────────────────────────
-
-var ftCanvas = null;
-var ftCtx    = null;
-var ftAnimFrame   = null;
-var ftGraphNodes  = [];
-var ftGraphEdges  = [];
-var ftParticles   = [];
-var ftSpeedMultiplier = 1;
-var ftHoveredNode = null;
-var ftClickedNode = null;
-var ftPulseTime   = 0;
-var ftScrollY     = 0;          // vertical pan for tall graphs
-var ftPanX        = 0;          // horizontal pan (zoom-dependent)
-var ftScale       = 1.0;        // zoom level
-var ftDragStart   = null;
-var ftPinchDist0  = null;       // initial pinch distance for touch zoom
-var ftPinchScale0 = null;       // scale at start of pinch
-var FT_SCALE_MIN  = 0.25;
-var FT_SCALE_MAX  = 3.0;
-
-var FT_COLORS = {
-    trigger:   { node: '#c678dd', glow: 'rgba(198,120,221,0.55)', text: '#fff',    dim: 'rgba(198,120,221,0.08)' },
-    handler:   { node: '#e5c07b', glow: 'rgba(229,192,123,0.45)', text: '#1a1c1f', dim: 'rgba(229,192,123,0.08)' },
-    condition: { node: '#d19a66', glow: 'rgba(209,154,102,0.45)', text: '#1a1c1f', dim: 'rgba(209,154,102,0.08)' },
-    mutation:  { node: '#e06c75', glow: 'rgba(224,108,117,0.45)', text: '#fff',    dim: 'rgba(224,108,117,0.08)' },
-    dom:       { node: '#61afef', glow: 'rgba(97,175,239,0.45)',  text: '#fff',    dim: 'rgba(97,175,239,0.08)'  },
-    network:   { node: '#56b6c2', glow: 'rgba(86,182,194,0.45)', text: '#fff',    dim: 'rgba(86,182,194,0.08)'  },
-    state:     { node: '#98c379', glow: 'rgba(152,195,121,0.45)', text: '#1a1c1f', dim: 'rgba(152,195,121,0.08)' },
-    output:    { node: '#98c379', glow: 'rgba(152,195,121,0.65)', text: '#1a1c1f', dim: 'rgba(152,195,121,0.1)'  },
-    error:     { node: '#e06c75', glow: 'rgba(224,108,117,0.65)', text: '#fff',    dim: 'rgba(224,108,117,0.1)'  },
-};
-function getStepColor(type) {
-    return FT_COLORS[type] || { node:'#7f848e', glow:'rgba(127,132,142,0.3)', text:'#fff', dim:'rgba(127,132,142,0.07)' };
-}
-
-var TYPE_ICONS  = { trigger:'⚡',handler:'ƒ',condition:'?',mutation:'✎',dom:'⬡',network:'⇅',state:'◈',output:'✓',error:'✗' };
-var TYPE_LABELS = { trigger:'TRIGGER',handler:'HANDLER',condition:'CONDITION',mutation:'MUTATION',dom:'DOM',network:'NETWORK',state:'STATE',output:'OUTPUT',error:'ERROR' };
-
-// ── Measure how tall a node needs to be given its step data ────────
-function measureNodeHeight(step, W) {
-    var BASE    = 62;   // header row
-    var ROW_H   = 18;   // each sub-row
-    var CODE_H  = 0;
-    if (step.codeSnippet) {
-        var lines = step.codeSnippet.split('\n').length;
-        CODE_H = Math.max(36, lines * 15 + 12);
-    }
-    var VARS_H  = Array.isArray(step.variables)  ? step.variables.length  * ROW_H + 8 : 0;
-    var SE_H    = Array.isArray(step.sideEffects) ? step.sideEffects.length * ROW_H + 8 : 0;
-    var COND_H  = step.condition ? ROW_H + 8 : 0;
-    var RET_H   = step.returns   ? ROW_H + 8 : 0;
-    return BASE + CODE_H + VARS_H + SE_H + COND_H + RET_H;
-}
-
-function stopCanvasAnimation() {
-    if (ftAnimFrame) { cancelAnimationFrame(ftAnimFrame); ftAnimFrame = null; }
-}
-
-function clearCanvas() {
-    var c = document.getElementById('ft-canvas');
-    if (!c) return;
-    c.getContext('2d').clearRect(0, 0, c.width, c.height);
-    ftGraphNodes = []; ftGraphEdges = []; ftParticles = [];
-    ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
-}
-
-function buildAndAnimateGraph(steps) {
-    stopCanvasAnimation();
-    ftParticles = []; ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
-
-    var canvas  = document.getElementById('ft-canvas');
-    var wrapper = document.getElementById('ft-canvas-wrapper');
-    if (!canvas || !wrapper) return;
-
-    var dpr = window.devicePixelRatio || 1;
-    var W   = wrapper.clientWidth  || 420;
-    var H   = wrapper.clientHeight || 500;
-    canvas.width  = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W+'px'; canvas.style.height = H+'px';
-    ftCtx = canvas.getContext('2d');
-    ftCtx.scale(dpr, dpr);
-    ftCanvas = canvas;
-
-    var PAD    = 20;
-    var NODE_W = Math.min(W - PAD * 2, 460);
-    var GAP_Y  = 36;
-
-    // Calculate each node's height based on its rich data
-    var nodeHeights = steps.map(function(s) { return measureNodeHeight(s, NODE_W); });
-
-    // Stack nodes vertically
-    var yPositions = [];
-    var cur = PAD;
-    nodeHeights.forEach(function(h) { yPositions.push(cur + h / 2); cur += h + GAP_Y; });
-    var totalH = cur;
-
-    var col_c_arr = steps.map(function(s) { return getStepColor(s.type || 'handler'); });
-
-    ftGraphNodes = steps.map(function(step, i) {
-        return {
-            id:         i,
-            x:          W / 2,
-            y:          yPositions[i],
-            w:          NODE_W,
-            h:          nodeHeights[i],
-            label:      step.title || step.type || 'step',
-            type:       step.type  || 'handler',
-            step:       step,
-            color:      col_c_arr[i].node,
-            glowColor:  col_c_arr[i].glow,
-            dimColor:   col_c_arr[i].dim,
-            textColor:  col_c_arr[i].text,
-            state:      'idle',
-            pulsePhase: i * 0.35
-        };
-    });
-
-    ftGraphEdges = [];
-    for (var i = 0; i < ftGraphNodes.length - 1; i++) {
-        ftGraphEdges.push({ from: i, to: i + 1, color: ftGraphNodes[i].color, progress: 0 });
-    }
-
-    var speedEl = document.getElementById('ft-speed-select');
-    ftSpeedMultiplier = speedEl ? parseFloat(speedEl.value) : 1;
-
-    if (ftGraphNodes.length > 0) ftGraphNodes[0].state = 'active';
-
-    // Animate each node activating in sequence
-    steps.forEach(function(_, i) {
-        setTimeout(function() {
-            if (i > 0 && ftGraphNodes[i])     ftGraphNodes[i].state     = 'active';
-            if (i > 0 && ftGraphNodes[i - 1]) ftGraphNodes[i - 1].state = 'done';
-            if (i < ftGraphEdges.length) { animateEdgeFill(i, 450 * ftSpeedMultiplier); spawnParticles(i); }
-            if (i === steps.length - 1) setTimeout(function() { if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done'; }, 550 * ftSpeedMultiplier);
-            // Auto-scroll to keep active node visible
-            var n = ftGraphNodes[i];
-            if (n) {
-                var nodeBottom = n.y + n.h / 2 + ftScrollY;
-                var nodeTop    = n.y - n.h / 2 + ftScrollY;
-                if (nodeBottom > H - 30) ftScrollY = Math.min(0, H - n.y - n.h / 2 - 30);
-                if (nodeTop    < 30)     ftScrollY = Math.min(0, 30 - n.y + n.h / 2);
-            }
-        }, i * 800 * ftSpeedMultiplier);
-    });
-
-    ftPulseTime = 0;
-    ftAnimFrame = requestAnimationFrame(drawFrame);
-}
-
-function animateEdgeFill(idx, dur) {
-    var edge = ftGraphEdges[idx]; if (!edge) return;
-    var t0 = performance.now();
-    function tick(now) { edge.progress = Math.min(1, (now - t0) / dur); if (edge.progress < 1) requestAnimationFrame(tick); }
-    requestAnimationFrame(tick);
-}
-
-function spawnParticles(edgeIdx) {
-    var edge = ftGraphEdges[edgeIdx]; if (!edge) return;
-    for (var k = 0; k < 5; k++) {
-        (function(k) { setTimeout(function() {
-            ftParticles.push({ edgeIdx: edgeIdx, progress: 0, speed: (0.014 + Math.random() * 0.007) / ftSpeedMultiplier, color: edge.color, size: 4 + Math.random() * 3, trail: [], done: false });
-        }, k * 80 * ftSpeedMultiplier); })(k);
+function updateFtButtons() {
+    var runBtn   = document.getElementById('ft-run-button');
+    var pauseBtn = document.getElementById('ft-pause-button');
+    var stepBtn  = document.getElementById('ft-step-button');
+    if (runBtn)   { runBtn.disabled   = ftState.isRunning; runBtn.textContent = ftState.isRunning ? '⏳ Running…' : '▶ Run'; }
+    if (pauseBtn) { pauseBtn.disabled = !ftState.isRunning || ftState.isPaused; pauseBtn.textContent = ftState.isPaused ? '▶ Resume' : '⏸ Pause'; }
+    if (stepBtn)  { stepBtn.disabled  = !ftState.isRunning; }
+    // Wire pause button to toggle between pause/resume
+    if (pauseBtn) {
+        pauseBtn.onclick = ftState.isPaused ? resumeFlowTrace : pauseFlowTrace;
     }
 }
 
-function drawFrame(now) {
-    if (!ftCtx || !ftCanvas) return;
-    var dpr = window.devicePixelRatio || 1;
-    var W = ftCanvas.width / dpr, H = ftCanvas.height / dpr;
-    var ctx = ftCtx;
-    ftPulseTime = now * 0.001;
-
-    ctx.clearRect(0, 0, W, H);
-    ctx.save();
-    // Apply zoom centred on canvas centre, then pan
-    ctx.translate(W / 2 + ftPanX, H / 2);
-    ctx.scale(ftScale, ftScale);
-    ctx.translate(-W / 2, -H / 2 + ftScrollY / ftScale);
-
-    drawGrid(ctx, W, H);
-    drawEdges(ctx);
-
-    // Particles
-    ftParticles.forEach(function(p) {
-        if (p.done) return;
-        var e  = ftGraphEdges[p.edgeIdx]; if (!e) return;
-        var fn = ftGraphNodes[e.from], tn = ftGraphNodes[e.to]; if (!fn || !tn) return;
-        var cy = (fn.y + tn.y) / 2;
-        p.progress = Math.min(1, p.progress + p.speed);
-        var t = p.progress, mt = 1 - t;
-        var px = mt*mt*fn.x + 2*mt*t*fn.x + t*t*tn.x;
-        var py = mt*mt*(fn.y+fn.h/2+4) + 2*mt*t*cy + t*t*(tn.y-tn.h/2-4);
-        p.trail.push({x:px,y:py}); if (p.trail.length > 18) p.trail.shift();
-        for (var ti = 0; ti < p.trail.length; ti++) {
-            var a = (ti/p.trail.length)*0.65, r = p.size*(ti/p.trail.length)*0.75;
-            ctx.beginPath(); ctx.arc(p.trail[ti].x, p.trail[ti].y, Math.max(0.5,r), 0, Math.PI*2);
-            ctx.fillStyle = hexToRgba(p.color, a); ctx.fill();
-        }
-        ctx.shadowBlur = 16; ctx.shadowColor = p.color;
-        ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI*2);
-        ctx.fillStyle = p.color; ctx.fill(); ctx.shadowBlur = 0;
-        if (p.progress >= 1) p.done = true;
-    });
-    ftParticles = ftParticles.filter(function(p){return !p.done;});
-
-    drawNodes(ctx, W, H);
-    ctx.restore();
-
-    // Scroll indicator
-    drawScrollHint(ctx, W, H);
-
-    ftAnimFrame = requestAnimationFrame(drawFrame);
-}
-
-function drawGrid(ctx, W, H) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
-    for (var x = 0; x < W; x += 44) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-    for (var y = 0; y < H+Math.abs(ftScrollY); y += 44) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-}
-
-function drawEdges(ctx) {
-    ftGraphEdges.forEach(function(edge) {
-        var fn = ftGraphNodes[edge.from], tn = ftGraphNodes[edge.to]; if (!fn||!tn) return;
-        var x  = fn.x;
-        var y0 = fn.y + fn.h / 2;
-        var y1 = tn.y - tn.h / 2;
-        var cy = (y0 + y1) / 2;
-
-        // Track
-        ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1);
-        ctx.strokeStyle = hexToRgba(edge.color, 0.1); ctx.lineWidth = 3;
-        ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
-
-        // Filled progress
-        if (edge.progress > 0) {
-            var fillY = y0 + (y1 - y0) * edge.progress;
-            ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, fillY);
-            ctx.strokeStyle = hexToRgba(edge.color, 0.6); ctx.lineWidth = 2.5; ctx.stroke();
-            // Arrow tip
-            if (edge.progress > 0.8) {
-                ctx.fillStyle = hexToRgba(edge.color, 0.8);
-                ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x-6, y1-10); ctx.lineTo(x+6, y1-10); ctx.closePath(); ctx.fill();
-            }
-        }
-    });
-}
-
-function drawNodes(ctx, W, H) {
-    ftGraphNodes.forEach(function(n) {
-        var x    = n.x - n.w / 2;
-        var y    = n.y - n.h / 2;
-        var r    = 10;
-        var isA  = n.state === 'active';
-        var isD  = n.state === 'done';
-        var isH  = ftHoveredNode && ftHoveredNode.id === n.id;
-        var isC  = ftClickedNode && ftClickedNode.id === n.id;
-        var step = n.step;
-
-        // Pulse ring
-        if (isA) {
-            var pulse = (Math.sin(ftPulseTime * 2.8 + n.pulsePhase) + 1) / 2;
-            ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2 * 0.54 + pulse*20, 0, Math.PI*2);
-            ctx.strokeStyle = hexToRgba(n.color, 0.06 + pulse*0.1); ctx.lineWidth = 2+pulse*4; ctx.stroke();
-        }
-
-        // Shadow/glow
-        if (isA || isH || isC) { ctx.shadowBlur = isC?36:isA?22:14; ctx.shadowColor = n.glowColor; }
-
-        // Background
-        var bgA = n.state==='idle' ? 0.06 : isD ? 0.38 : 0.78;
-        ctx.fillStyle = hexToRgba(n.color, bgA);
-        roundRect(ctx, x, y, n.w, n.h, r); ctx.fill(); ctx.shadowBlur = 0;
-
-        // Border
-        ctx.strokeStyle = hexToRgba(n.color, n.state==='idle'?0.18:isD?0.55:1);
-        ctx.lineWidth   = isC?2.5:isA?2:1.5;
-        roundRect(ctx, x, y, n.w, n.h, r); ctx.stroke();
-
-        // Left accent stripe
-        ctx.fillStyle = hexToRgba(n.color, n.state==='idle'?0.2:0.9);
-        roundRect(ctx, x, y, 5, n.h, {tl:r,tr:0,br:0,bl:r}); ctx.fill();
-
-        // ── Header row ──────────────────────────────────────────────
-        var hdr   = 48;
-        var iconX = x + 24, iconY = y + hdr / 2;
-        // Icon circle
-        ctx.beginPath(); ctx.arc(iconX, iconY, 14, 0, Math.PI*2);
-        ctx.fillStyle = n.state==='idle' ? hexToRgba(n.color,0.15) : hexToRgba(n.color,0.9); ctx.fill();
-        ctx.fillStyle = n.state==='idle' ? hexToRgba(n.color,0.7)  : n.textColor;
-        ctx.font = 'bold 12px Inter,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(TYPE_ICONS[n.type]||'●', iconX, iconY);
-
-        // Title
-        var tx = x + 46, tmaxW = n.w - 60;
-        ctx.fillStyle   = n.state==='idle' ? 'rgba(127,132,142,0.55)' : '#e8eaed';
-        ctx.font        = (isA?'bold ':'') + '13px Inter,sans-serif';
-        ctx.textAlign   = 'left'; ctx.textBaseline = 'middle';
-        var lbl = n.label;
-        if (ctx.measureText(lbl).width > tmaxW) { while(lbl.length>3 && ctx.measureText(lbl+'…').width>tmaxW) lbl=lbl.slice(0,-1); lbl+='…'; }
-        ctx.fillText(lbl, tx, iconY - 6);
-
-        // Type tag
-        ctx.fillStyle = hexToRgba(n.color, n.state==='idle'?0.3:0.75);
-        ctx.font      = '9px Inter,sans-serif';
-        ctx.fillText(TYPE_LABELS[n.type]||n.type.toUpperCase(), tx, iconY+9);
-
-        // Step badge (top right)
-        ctx.fillStyle = hexToRgba(n.color, 0.45); ctx.font='bold 8px monospace';
-        ctx.textAlign='right'; ctx.textBaseline='top';
-        ctx.fillText(String(n.id+1), x+n.w-8, y+6); ctx.textBaseline='middle';
-
-        // ── Rich detail rows (only when not idle) ────────────────────
-        if (n.state !== 'idle') {
-            var ry = y + hdr + 4;
-
-            // Code snippet
-            if (step.codeSnippet) {
-                ry = drawCodeBlock(ctx, step.codeSnippet, x+8, ry, n.w-16, n.color);
-            }
-
-            // Condition
-            if (step.condition) {
-                ry = drawInfoRow(ctx, '?', step.condition + ' → ' + (step.conditionResult===false?'FALSE':'TRUE'),
-                    step.conditionResult===false?'#e06c75':'#98c379', x+8, ry, n.w-16);
-            }
-
-            // Variable mutations
-            if (Array.isArray(step.variables) && step.variables.length > 0) {
-                step.variables.forEach(function(v) {
-                    var val = v.name + ': ' + truncate(String(v.before||'?'), 18) + ' → ' + truncate(String(v.after||'?'), 18);
-                    ry = drawInfoRow(ctx, '✎', val, '#e5c07b', x+8, ry, n.w-16);
-                });
-            }
-
-            // Return value
-            if (step.returns) {
-                ry = drawInfoRow(ctx, '↩', 'returns: ' + truncate(String(step.returns), 40), '#98c379', x+8, ry, n.w-16);
-            }
-
-            // Side effects
-            if (Array.isArray(step.sideEffects) && step.sideEffects.length > 0) {
-                step.sideEffects.forEach(function(se) {
-                    ry = drawInfoRow(ctx, '⇒', truncate(se, 52), '#56b6c2', x+8, ry, n.w-16);
-                });
-            }
-
-            // Done tick
-            if (isD) {
-                ctx.fillStyle = hexToRgba(n.color, 0.5); ctx.font='bold 10px sans-serif';
-                ctx.textAlign='right'; ctx.textBaseline='bottom';
-                ctx.fillText('✓', x+n.w-8, y+n.h-6); ctx.textAlign='left'; ctx.textBaseline='middle';
-            }
-        }
-    });
-}
-
-function drawCodeBlock(ctx, code, x, y, maxW, accentColor) {
-    var lines   = code.split('\n');
-    var lineH   = 15;
-    var padX    = 8, padY = 6;
-    var bh      = lines.length * lineH + padY * 2;
-    // Background box
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    roundRect(ctx, x, y, maxW, bh, 4); ctx.fill();
-    ctx.strokeStyle = hexToRgba(accentColor, 0.25); ctx.lineWidth=1;
-    roundRect(ctx, x, y, maxW, bh, 4); ctx.stroke();
-    // Code text
-    ctx.fillStyle = '#98c379'; ctx.font = '10px "Roboto Mono",monospace';
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    lines.forEach(function(line, li) {
-        var trimmed = line.substring(0, 60);
-        ctx.fillText(trimmed, x+padX, y+padY+li*lineH);
-    });
-    ctx.textBaseline = 'middle';
-    return y + bh + 5;
-}
-
-function drawInfoRow(ctx, icon, text, color, x, y, maxW) {
-    var ROW = 18;
-    // Icon badge
-    ctx.fillStyle = hexToRgba(color, 0.18); roundRect(ctx, x, y+1, 18, ROW-2, 3); ctx.fill();
-    ctx.fillStyle = color; ctx.font='bold 9px sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(icon, x+9, y+ROW/2);
-    // Text
-    ctx.fillStyle = 'rgba(200,210,220,0.85)'; ctx.font='10px Inter,sans-serif';
-    ctx.textAlign='left'; ctx.textBaseline='middle';
-    var safe = truncate(text, 70);
-    ctx.fillText(safe, x+22, y+ROW/2);
-    return y + ROW + 2;
-}
-
-function drawScrollHint(ctx, W, H) {
-    // Show a subtle scroll indicator when content is taller than the canvas
-    if (ftGraphNodes.length === 0) return;
-    var lastN  = ftGraphNodes[ftGraphNodes.length-1];
-    var bottom = lastN.y + lastN.h/2 + ftScrollY;
-    if (bottom > H - 10) {
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath(); ctx.moveTo(W/2-16,H-18); ctx.lineTo(W/2+16,H-18); ctx.lineTo(W/2,H-6); ctx.closePath(); ctx.fill();
-    }
-    if (ftScrollY < 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath(); ctx.moveTo(W/2-16,14); ctx.lineTo(W/2+16,14); ctx.lineTo(W/2,2); ctx.closePath(); ctx.fill();
-    }
-}
-
-function truncate(str, n) { return str.length > n ? str.substring(0,n)+'…' : str; }
-
-function roundRect(ctx, x, y, w, h, r) {
-    var tl,tr,br,bl;
-    if (typeof r==='object') { tl=r.tl||0;tr=r.tr||0;br=r.br||0;bl=r.bl||0; } else { tl=tr=br=bl=r; }
-    ctx.beginPath();
-    ctx.moveTo(x+tl,y); ctx.lineTo(x+w-tr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+tr);
-    ctx.lineTo(x+w,y+h-br); ctx.quadraticCurveTo(x+w,y+h,x+w-br,y+h);
-    ctx.lineTo(x+bl,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-bl);
-    ctx.lineTo(x,y+tl); ctx.quadraticCurveTo(x,y,x+tl,y); ctx.closePath();
-}
-
-function hexToRgba(hex, a) {
-    if (!hex||hex[0]!=='#') return 'rgba(127,132,142,'+a+')';
-    var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-    return 'rgba('+r+','+g+','+b+','+a+')';
-}
-
-function screenToWorld(sx, sy) {
-    // Inverse of the transform in drawFrame
-    var dpr = window.devicePixelRatio || 1;
-    var W = ftCanvas ? ftCanvas.width / dpr : 400;
-    var H = ftCanvas ? ftCanvas.height / dpr : 400;
-    // Undo: translate(W/2+ftPanX, H/2) scale(ftScale) translate(-W/2, -H/2+scrollAdj)
-    var wx = (sx - W / 2 - ftPanX) / ftScale + W / 2;
-    var wy = (sy - H / 2) / ftScale + H / 2 - ftScrollY / ftScale;
-    return { x: wx, y: wy };
-}
-
-function getNodeAtPoint(mx, my) {
-    var w = screenToWorld(mx, my);
-    for (var i = ftGraphNodes.length - 1; i >= 0; i--) {
-        var n = ftGraphNodes[i];
-        if (w.x >= n.x-n.w/2 && w.x <= n.x+n.w/2 && w.y >= n.y-n.h/2 && w.y <= n.y+n.h/2) return n;
-    }
-    return null;
-}
-
-function showNodeTooltip(node, mx, my) {
-    var tt = document.getElementById('ft-tooltip'); if (!tt) return;
-    var col = getStepColor(node.type);
-    var h   = '<div class="tt-title">'+escapeHtml(node.label)+'</div>';
-    h += '<span class="tt-type" style="background:'+hexToRgba(col.node,0.2)+';color:'+col.node+'">'+escapeHtml(node.type)+'</span>';
-    if (node.step.detail) h += '<div class="tt-detail">'+escapeHtml(node.step.detail.substring(0,140))+'</div>';
-    h += '<div style="font-size:0.66rem;color:#5c6370;margin-top:4px">Click for full details</div>';
-    tt.innerHTML = h; tt.style.display = 'block';
-    var wr = document.getElementById('ft-canvas-wrapper').getBoundingClientRect();
-    var tw = tt.offsetWidth||200, th = tt.offsetHeight||80;
-    var tx = mx+14, ty = my-10;
-    if (tx+tw > wr.width-10)  tx = mx-tw-10;
-    if (ty+th > wr.height-10) ty = wr.height-th-10;
-    if (ty<4) ty=4;
-    tt.style.left=tx+'px'; tt.style.top=ty+'px';
-}
-
-function hideTooltip() {
-    var tt = document.getElementById('ft-tooltip'); if (tt) tt.style.display='none';
-}
-
-function openDetailDrawer(node) {
-    var drawer = document.getElementById('ft-detail-drawer');
-    var title  = document.getElementById('ft-detail-title');
-    var body   = document.getElementById('ft-detail-body');
-    if (!drawer||!title||!body) return;
-    ftClickedNode = node;
-    var step = node.step, col = getStepColor(node.type);
-
-    title.innerHTML = '<span style="color:'+col.node+'">'+escapeHtml(node.label)+'</span>'+
-        ' <span style="font-size:0.7rem;color:#5c6370">'+escapeHtml(node.type)+'</span>';
-
-    var h = '';
-    if (flowTracerState.summary && node.id===0) {
-        h += '<p style="color:#abb2bf;font-style:italic;margin-bottom:8px">'+escapeHtml(flowTracerState.summary)+'</p>';
-    }
-    if (step.detail) h += '<p>'+escapeHtml(step.detail)+'</p>';
-
-    if (step.codeSnippet) {
-        h += '<div class="ft-drawer-section-label">Code</div>';
-        h += '<code data-snippet="'+escapeHtml(step.codeSnippet)+'" data-node-id="'+escapeHtml(step.nodeId||'')+'" style="cursor:pointer">'+escapeHtml(step.codeSnippet)+'</code>';
-    }
-    if (step.condition) {
-        h += '<div class="ft-drawer-section-label">Condition</div>';
-        h += '<div class="ft-drawer-row" style="color:'+(step.conditionResult===false?'#e06c75':'#98c379')+'">'+
-            escapeHtml(step.condition)+' → <strong>'+(step.conditionResult===false?'FALSE':'TRUE')+'</strong></div>';
-    }
-    if (Array.isArray(step.variables) && step.variables.length) {
-        h += '<div class="ft-drawer-section-label">Variables</div>';
-        step.variables.forEach(function(v) {
-            h += '<div class="ft-drawer-row"><span class="ft-var-name">'+escapeHtml(v.name)+'</span>'+
-                ' <span class="ft-var-before">'+escapeHtml(String(v.before||'?'))+'</span>'+
-                ' <span class="ft-var-arrow">→</span>'+
-                ' <span class="ft-var-after">'+escapeHtml(String(v.after||'?'))+'</span></div>';
-        });
-    }
-    if (step.returns) {
-        h += '<div class="ft-drawer-section-label">Returns</div>';
-        h += '<div class="ft-drawer-row" style="color:#98c379">'+escapeHtml(String(step.returns))+'</div>';
-    }
-    if (Array.isArray(step.sideEffects) && step.sideEffects.length) {
-        h += '<div class="ft-drawer-section-label">Side Effects</div>';
-        step.sideEffects.forEach(function(se) {
-            h += '<div class="ft-drawer-row">⇒ '+escapeHtml(se)+'</div>';
-        });
-    }
-    if (step.nodeId) {
-        h += '<span class="ft-detail-node-link" data-node-id="'+escapeHtml(step.nodeId)+'">→ Jump to '+escapeHtml(step.nodeId)+' in code</span>';
-    }
-    body.innerHTML = h;
-
-    body.querySelectorAll('code').forEach(function(el) {
-        el.addEventListener('click', function() {
-            var nid = el.dataset.nodeId;
-            if (nid && nid!=='null' && nid!=='') jumpToNodeInCode(nid);
-            else searchAndJumpToSnippet(el.dataset.snippet||'');
-        });
-    });
-    body.querySelectorAll('.ft-detail-node-link').forEach(function(el) {
-        el.addEventListener('click', function() { jumpToNodeInCode(el.dataset.nodeId); });
-    });
-    drawer.classList.add('ft-drawer-open');
-}
-
+// ── Event wiring ──────────────────────────────────────────────────
 
 function bindFlowTracerEvents() {
-    var runBtn      = document.getElementById('ft-run-button');
-    var clearBtn    = document.getElementById('ft-clear-button');
-    var scanBtn     = document.getElementById('ft-scan-button');
-    var replayBtn   = document.getElementById('ft-replay-button');
-    var detailClose = document.getElementById('ft-detail-close');
+    var runBtn   = document.getElementById('ft-run-button');
+    var stepBtn  = document.getElementById('ft-step-button');
+    var clearBtn = document.getElementById('ft-clear-button');
+    var scanBtn  = document.getElementById('ft-scan-button');
+    var range    = document.getElementById('ft-speed-range');
+    var rangeVal = document.getElementById('ft-speed-val');
 
-    if (runBtn)      runBtn.addEventListener('click', runFlowTrace);
-    if (clearBtn)    clearBtn.addEventListener('click', clearFlowTrace);
-    if (scanBtn)     scanBtn.addEventListener('click', renderFlowTriggerList);
-    if (replayBtn)   replayBtn.addEventListener('click', function() {
-        if (flowTracerState.lastTrace) buildAndAnimateGraph(flowTracerState.lastTrace.steps || []);
-    });
-    if (detailClose) detailClose.addEventListener('click', function() {
-        var drawer = document.getElementById('ft-detail-drawer');
-        if (drawer) drawer.classList.remove('ft-drawer-open');
-        ftClickedNode = null;
-    });
+    if (runBtn)   runBtn.addEventListener('click',  runFlowTrace);
+    if (stepBtn)  stepBtn.addEventListener('click',  stepFlowTrace);
+    if (clearBtn) clearBtn.addEventListener('click', clearFlowTrace);
+    if (scanBtn)  scanBtn.addEventListener('click',  renderFlowTriggerList);
+
+    if (range && rangeVal) {
+        range.addEventListener('input', function() {
+            ftState.delay = parseInt(range.value);
+            rangeVal.textContent = range.value + 'ms';
+        });
+    }
 
     var selectorInput = document.getElementById('ft-target-selector');
     if (selectorInput) selectorInput.addEventListener('keydown', function(e) { if (e.key==='Enter') runFlowTrace(); });
-
-    var canvas = document.getElementById('ft-canvas');
-
-    // Zoom helper — zooms towards a focal point (canvas-relative px coords)
-    function applyZoom(newScale, focalX, focalY) {
-        var dpr = window.devicePixelRatio || 1;
-        var W   = canvas.width  / dpr;
-        var H   = canvas.height / dpr;
-        newScale = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, newScale));
-        // Adjust pan so the focal point stays fixed under the cursor
-        var oldScale = ftScale;
-        var scaleDelta = newScale / oldScale;
-        ftPanX  = focalX - scaleDelta * (focalX - ftPanX);
-        ftScrollY = (focalY - H / 2) - scaleDelta * ((focalY - H / 2) - ftScrollY);
-        ftScale = newScale;
-        updateZoomLabel();
-    }
-
-    function updateZoomLabel() {
-        var lbl = document.getElementById('ft-zoom-label');
-        if (lbl) lbl.textContent = Math.round(ftScale * 100) + '%';
-    }
-
-    function fitToScreen() {
-        if (!ftGraphNodes.length) { ftScale = 1; ftScrollY = 0; ftPanX = 0; updateZoomLabel(); return; }
-        var dpr = window.devicePixelRatio || 1;
-        var W   = canvas.width  / dpr;
-        var H   = canvas.height / dpr;
-        var lastN  = ftGraphNodes[ftGraphNodes.length - 1];
-        var totalH = lastN.y + lastN.h / 2 + 20;
-        var maxW   = ftGraphNodes.reduce(function(m,n){return Math.max(m,n.w);}, 0) + 40;
-        var scaleH = (H - 40) / totalH;
-        var scaleW = (W - 40) / maxW;
-        ftScale   = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, Math.min(scaleH, scaleW)));
-        ftScrollY = 0;
-        ftPanX    = 0;
-        updateZoomLabel();
-    }
-
-    // Wire zoom buttons
-    var zoomInBtn  = document.getElementById('ft-zoom-in');
-    var zoomOutBtn = document.getElementById('ft-zoom-out');
-    var fitBtn     = document.getElementById('ft-zoom-fit');
-    if (zoomInBtn)  zoomInBtn.addEventListener('click',  function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*1.25, cx, cy); });
-    if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*0.8,  cx, cy); });
-    if (fitBtn)     fitBtn.addEventListener('click',     fitToScreen);
-
-    if (canvas) {
-        canvas.addEventListener('mousemove', function(e) {
-            var rect = canvas.getBoundingClientRect();
-            var mx = e.clientX - rect.left, my = e.clientY - rect.top;
-            if (ftDragStart && ftDragStart.type === 'pan') {
-                var dx = mx - ftDragStart.startX, dy = my - ftDragStart.startY;
-                ftPanX    = ftDragStart.panX0  + dx;
-                ftScrollY = ftDragStart.scrollY0 + dy;
-                canvas.style.cursor = 'grabbing';
-                return;
-            }
-            var node = getNodeAtPoint(mx, my);
-            ftHoveredNode = node;
-            if (node) { canvas.style.cursor='pointer'; showNodeTooltip(node, mx, my); }
-            else       { canvas.style.cursor='default'; hideTooltip(); }
-        });
-        canvas.addEventListener('mouseleave', function() { ftHoveredNode=null; hideTooltip(); ftDragStart=null; });
-        canvas.addEventListener('mousedown', function(e) {
-            if (e.button === 1 || (e.button === 0 && e.altKey)) {
-                // Middle-click or Alt+drag = pan
-                e.preventDefault();
-                var rect = canvas.getBoundingClientRect();
-                ftDragStart = { type:'pan', startX: e.clientX-rect.left, startY: e.clientY-rect.top, panX0: ftPanX, scrollY0: ftScrollY };
-            }
-        });
-        canvas.addEventListener('mouseup', function(e) {
-            if (ftDragStart && ftDragStart.type === 'pan') { ftDragStart=null; canvas.style.cursor='default'; return; }
-            var rect = canvas.getBoundingClientRect();
-            var node = getNodeAtPoint(e.clientX-rect.left, e.clientY-rect.top);
-            if (node) openDetailDrawer(node);
-        });
-
-        // Ctrl+Wheel = zoom, plain Wheel = scroll
-        canvas.addEventListener('wheel', function(e) {
-            e.preventDefault();
-            var rect = canvas.getBoundingClientRect();
-            var mx = e.clientX - rect.left, my = e.clientY - rect.top;
-            if (e.ctrlKey || e.metaKey) {
-                // Zoom towards cursor
-                var delta = e.deltaY > 0 ? 0.9 : 1.11;
-                applyZoom(ftScale * delta, mx, my);
-            } else {
-                // Scroll / pan
-                ftScrollY -= e.deltaY * 0.85 / ftScale;
-                ftPanX    -= e.deltaX * 0.85 / ftScale;
-            }
-        }, { passive: false });
-
-        // Touch: single finger pan, two finger pinch-to-zoom
-        canvas.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 2) {
-                var dx = e.touches[0].clientX - e.touches[1].clientX;
-                var dy = e.touches[0].clientY - e.touches[1].clientY;
-                ftPinchDist0  = Math.sqrt(dx*dx + dy*dy);
-                ftPinchScale0 = ftScale;
-                ftDragStart   = null;
-            } else if (e.touches.length === 1) {
-                ftDragStart = { type:'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX0: ftPanX, scrollY0: ftScrollY };
-                ftPinchDist0 = null;
-            }
-        }, { passive: true });
-
-        canvas.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2 && ftPinchDist0 !== null) {
-                var dx = e.touches[0].clientX - e.touches[1].clientX;
-                var dy = e.touches[0].clientY - e.touches[1].clientY;
-                var dist = Math.sqrt(dx*dx + dy*dy);
-                var rect = canvas.getBoundingClientRect();
-                var cx   = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
-                var cy   = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
-                applyZoom(ftPinchScale0 * (dist / ftPinchDist0), cx, cy);
-            } else if (e.touches.length === 1 && ftDragStart) {
-                var dx = e.touches[0].clientX - ftDragStart.startX;
-                var dy = e.touches[0].clientY - ftDragStart.startY;
-                ftPanX    = ftDragStart.panX0    + dx;
-                ftScrollY = ftDragStart.scrollY0 + dy;
-            }
-        }, { passive: true });
-
-        canvas.addEventListener('touchend', function(e) {
-            if (e.touches.length < 2) { ftPinchDist0 = null; }
-            if (e.touches.length === 0 && ftDragStart) {
-                var movedX = Math.abs(e.changedTouches[0].clientX - ftDragStart.startX);
-                var movedY = Math.abs(e.changedTouches[0].clientY - ftDragStart.startY);
-                if (movedX < 8 && movedY < 8) {
-                    var rect  = canvas.getBoundingClientRect();
-                    var touch = e.changedTouches[0];
-                    var node  = getNodeAtPoint(touch.clientX-rect.left, touch.clientY-rect.top);
-                    if (node) openDetailDrawer(node);
-                }
-                ftDragStart = null;
-            }
-        }, { passive: true });
-    }
-
-    window.addEventListener('resize', function() {
-        if (flowTracerState.lastTrace && flowTracerState.lastTrace.steps) {
-            stopCanvasAnimation();
-            setTimeout(function() { buildAndAnimateGraph(flowTracerState.lastTrace.steps); }, 120);
-        }
-    });
 
     var configToggle = document.getElementById('ft-config-toggle');
     var leftPanel    = document.getElementById('ft-left-panel');
@@ -8618,4 +8132,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-        }
+}
