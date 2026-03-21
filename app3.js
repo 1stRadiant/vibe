@@ -7004,8 +7004,14 @@ var ftSpeedMultiplier = 1;
 var ftHoveredNode = null;
 var ftClickedNode = null;
 var ftPulseTime   = 0;
-var ftScrollY     = 0;          // vertical pan offset for tall graphs
+var ftScrollY     = 0;          // vertical pan for tall graphs
+var ftPanX        = 0;          // horizontal pan (zoom-dependent)
+var ftScale       = 1.0;        // zoom level
 var ftDragStart   = null;
+var ftPinchDist0  = null;       // initial pinch distance for touch zoom
+var ftPinchScale0 = null;       // scale at start of pinch
+var FT_SCALE_MIN  = 0.25;
+var FT_SCALE_MAX  = 3.0;
 
 var FT_COLORS = {
     trigger:   { node: '#c678dd', glow: 'rgba(198,120,221,0.55)', text: '#fff',    dim: 'rgba(198,120,221,0.08)' },
@@ -7050,12 +7056,12 @@ function clearCanvas() {
     if (!c) return;
     c.getContext('2d').clearRect(0, 0, c.width, c.height);
     ftGraphNodes = []; ftGraphEdges = []; ftParticles = [];
-    ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0;
+    ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
 }
 
 function buildAndAnimateGraph(steps) {
     stopCanvasAnimation();
-    ftParticles = []; ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0;
+    ftParticles = []; ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
 
     var canvas  = document.getElementById('ft-canvas');
     var wrapper = document.getElementById('ft-canvas-wrapper');
@@ -7161,9 +7167,12 @@ function drawFrame(now) {
 
     ctx.clearRect(0, 0, W, H);
     ctx.save();
-    ctx.translate(0, ftScrollY);
+    // Apply zoom centred on canvas centre, then pan
+    ctx.translate(W / 2 + ftPanX, H / 2);
+    ctx.scale(ftScale, ftScale);
+    ctx.translate(-W / 2, -H / 2 + ftScrollY / ftScale);
 
-    drawGrid(ctx, W, H - ftScrollY);
+    drawGrid(ctx, W, H);
     drawEdges(ctx);
 
     // Particles
@@ -7408,11 +7417,22 @@ function hexToRgba(hex, a) {
     return 'rgba('+r+','+g+','+b+','+a+')';
 }
 
+function screenToWorld(sx, sy) {
+    // Inverse of the transform in drawFrame
+    var dpr = window.devicePixelRatio || 1;
+    var W = ftCanvas ? ftCanvas.width / dpr : 400;
+    var H = ftCanvas ? ftCanvas.height / dpr : 400;
+    // Undo: translate(W/2+ftPanX, H/2) scale(ftScale) translate(-W/2, -H/2+scrollAdj)
+    var wx = (sx - W / 2 - ftPanX) / ftScale + W / 2;
+    var wy = (sy - H / 2) / ftScale + H / 2 - ftScrollY / ftScale;
+    return { x: wx, y: wy };
+}
+
 function getNodeAtPoint(mx, my) {
-    var ay = my - ftScrollY;  // adjust for scroll
-    for (var i=ftGraphNodes.length-1; i>=0; i--) {
-        var n=ftGraphNodes[i];
-        if (mx>=n.x-n.w/2&&mx<=n.x+n.w/2&&ay>=n.y-n.h/2&&ay<=n.y+n.h/2) return n;
+    var w = screenToWorld(mx, my);
+    for (var i = ftGraphNodes.length - 1; i >= 0; i--) {
+        var n = ftGraphNodes[i];
+        if (w.x >= n.x-n.w/2 && w.x <= n.x+n.w/2 && w.y >= n.y-n.h/2 && w.y <= n.y+n.h/2) return n;
     }
     return null;
 }
@@ -7525,45 +7545,143 @@ function bindFlowTracerEvents() {
     if (selectorInput) selectorInput.addEventListener('keydown', function(e) { if (e.key==='Enter') runFlowTrace(); });
 
     var canvas = document.getElementById('ft-canvas');
+
+    // Zoom helper — zooms towards a focal point (canvas-relative px coords)
+    function applyZoom(newScale, focalX, focalY) {
+        var dpr = window.devicePixelRatio || 1;
+        var W   = canvas.width  / dpr;
+        var H   = canvas.height / dpr;
+        newScale = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, newScale));
+        // Adjust pan so the focal point stays fixed under the cursor
+        var oldScale = ftScale;
+        var scaleDelta = newScale / oldScale;
+        ftPanX  = focalX - scaleDelta * (focalX - ftPanX);
+        ftScrollY = (focalY - H / 2) - scaleDelta * ((focalY - H / 2) - ftScrollY);
+        ftScale = newScale;
+        updateZoomLabel();
+    }
+
+    function updateZoomLabel() {
+        var lbl = document.getElementById('ft-zoom-label');
+        if (lbl) lbl.textContent = Math.round(ftScale * 100) + '%';
+    }
+
+    function fitToScreen() {
+        if (!ftGraphNodes.length) { ftScale = 1; ftScrollY = 0; ftPanX = 0; updateZoomLabel(); return; }
+        var dpr = window.devicePixelRatio || 1;
+        var W   = canvas.width  / dpr;
+        var H   = canvas.height / dpr;
+        var lastN  = ftGraphNodes[ftGraphNodes.length - 1];
+        var totalH = lastN.y + lastN.h / 2 + 20;
+        var maxW   = ftGraphNodes.reduce(function(m,n){return Math.max(m,n.w);}, 0) + 40;
+        var scaleH = (H - 40) / totalH;
+        var scaleW = (W - 40) / maxW;
+        ftScale   = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, Math.min(scaleH, scaleW)));
+        ftScrollY = 0;
+        ftPanX    = 0;
+        updateZoomLabel();
+    }
+
+    // Wire zoom buttons
+    var zoomInBtn  = document.getElementById('ft-zoom-in');
+    var zoomOutBtn = document.getElementById('ft-zoom-out');
+    var fitBtn     = document.getElementById('ft-zoom-fit');
+    if (zoomInBtn)  zoomInBtn.addEventListener('click',  function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*1.25, cx, cy); });
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*0.8,  cx, cy); });
+    if (fitBtn)     fitBtn.addEventListener('click',     fitToScreen);
+
     if (canvas) {
         canvas.addEventListener('mousemove', function(e) {
             var rect = canvas.getBoundingClientRect();
-            var node = getNodeAtPoint(e.clientX-rect.left, e.clientY-rect.top);
+            var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            if (ftDragStart && ftDragStart.type === 'pan') {
+                var dx = mx - ftDragStart.startX, dy = my - ftDragStart.startY;
+                ftPanX    = ftDragStart.panX0  + dx;
+                ftScrollY = ftDragStart.scrollY0 + dy;
+                canvas.style.cursor = 'grabbing';
+                return;
+            }
+            var node = getNodeAtPoint(mx, my);
             ftHoveredNode = node;
-            if (node) { canvas.style.cursor='pointer'; showNodeTooltip(node, e.clientX-rect.left, e.clientY-rect.top); }
+            if (node) { canvas.style.cursor='pointer'; showNodeTooltip(node, mx, my); }
             else       { canvas.style.cursor='default'; hideTooltip(); }
         });
-        canvas.addEventListener('mouseleave', function() { ftHoveredNode=null; hideTooltip(); });
-        canvas.addEventListener('click', function(e) {
+        canvas.addEventListener('mouseleave', function() { ftHoveredNode=null; hideTooltip(); ftDragStart=null; });
+        canvas.addEventListener('mousedown', function(e) {
+            if (e.button === 1 || (e.button === 0 && e.altKey)) {
+                // Middle-click or Alt+drag = pan
+                e.preventDefault();
+                var rect = canvas.getBoundingClientRect();
+                ftDragStart = { type:'pan', startX: e.clientX-rect.left, startY: e.clientY-rect.top, panX0: ftPanX, scrollY0: ftScrollY };
+            }
+        });
+        canvas.addEventListener('mouseup', function(e) {
+            if (ftDragStart && ftDragStart.type === 'pan') { ftDragStart=null; canvas.style.cursor='default'; return; }
             var rect = canvas.getBoundingClientRect();
             var node = getNodeAtPoint(e.clientX-rect.left, e.clientY-rect.top);
             if (node) openDetailDrawer(node);
         });
-        // Wheel scroll
+
+        // Ctrl+Wheel = zoom, plain Wheel = scroll
         canvas.addEventListener('wheel', function(e) {
             e.preventDefault();
-            if (!ftGraphNodes.length) return;
-            var lastN    = ftGraphNodes[ftGraphNodes.length-1];
-            var minScroll = Math.min(0, canvas.getBoundingClientRect().height - (lastN.y + lastN.h/2 + 30));
-            ftScrollY = Math.max(minScroll, Math.min(0, ftScrollY - e.deltaY * 0.85));
+            var rect = canvas.getBoundingClientRect();
+            var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom towards cursor
+                var delta = e.deltaY > 0 ? 0.9 : 1.11;
+                applyZoom(ftScale * delta, mx, my);
+            } else {
+                // Scroll / pan
+                ftScrollY -= e.deltaY * 0.85 / ftScale;
+                ftPanX    -= e.deltaX * 0.85 / ftScale;
+            }
         }, { passive: false });
-        // Touch pan
+
+        // Touch: single finger pan, two finger pinch-to-zoom
         canvas.addEventListener('touchstart', function(e) {
-            ftDragStart = { y: ftScrollY, startY: e.touches[0].clientY };
+            if (e.touches.length === 2) {
+                var dx = e.touches[0].clientX - e.touches[1].clientX;
+                var dy = e.touches[0].clientY - e.touches[1].clientY;
+                ftPinchDist0  = Math.sqrt(dx*dx + dy*dy);
+                ftPinchScale0 = ftScale;
+                ftDragStart   = null;
+            } else if (e.touches.length === 1) {
+                ftDragStart = { type:'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX0: ftPanX, scrollY0: ftScrollY };
+                ftPinchDist0 = null;
+            }
         }, { passive: true });
+
         canvas.addEventListener('touchmove', function(e) {
-            if (!ftDragStart) return;
-            var dy = e.touches[0].clientY - ftDragStart.startY;
-            var lastN = ftGraphNodes[ftGraphNodes.length-1];
-            var minScroll = lastN ? Math.min(0, canvas.getBoundingClientRect().height-(lastN.y+lastN.h/2+30)) : 0;
-            ftScrollY = Math.max(minScroll, Math.min(0, ftDragStart.y + dy));
+            if (e.touches.length === 2 && ftPinchDist0 !== null) {
+                var dx = e.touches[0].clientX - e.touches[1].clientX;
+                var dy = e.touches[0].clientY - e.touches[1].clientY;
+                var dist = Math.sqrt(dx*dx + dy*dy);
+                var rect = canvas.getBoundingClientRect();
+                var cx   = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+                var cy   = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
+                applyZoom(ftPinchScale0 * (dist / ftPinchDist0), cx, cy);
+            } else if (e.touches.length === 1 && ftDragStart) {
+                var dx = e.touches[0].clientX - ftDragStart.startX;
+                var dy = e.touches[0].clientY - ftDragStart.startY;
+                ftPanX    = ftDragStart.panX0    + dx;
+                ftScrollY = ftDragStart.scrollY0 + dy;
+            }
         }, { passive: true });
+
         canvas.addEventListener('touchend', function(e) {
-            if (ftDragStart && Math.abs(ftDragStart.startY - e.changedTouches[0].clientY) > 8) { ftDragStart=null; return; }
-            var touch = e.changedTouches[0], rect = canvas.getBoundingClientRect();
-            var node = getNodeAtPoint(touch.clientX-rect.left, touch.clientY-rect.top);
-            if (node) openDetailDrawer(node);
-            ftDragStart = null;
+            if (e.touches.length < 2) { ftPinchDist0 = null; }
+            if (e.touches.length === 0 && ftDragStart) {
+                var movedX = Math.abs(e.changedTouches[0].clientX - ftDragStart.startX);
+                var movedY = Math.abs(e.changedTouches[0].clientY - ftDragStart.startY);
+                if (movedX < 8 && movedY < 8) {
+                    var rect  = canvas.getBoundingClientRect();
+                    var touch = e.changedTouches[0];
+                    var node  = getNodeAtPoint(touch.clientX-rect.left, touch.clientY-rect.top);
+                    if (node) openDetailDrawer(node);
+                }
+                ftDragStart = null;
+            }
         }, { passive: true });
     }
 
@@ -8500,4 +8618,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+        }
