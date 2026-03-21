@@ -6808,61 +6808,33 @@ async function runFlowTrace() {
     try {
         var projectSummary = buildProjectSummaryForTrace();
 
-        var systemPrompt =
-'You are an expert JavaScript debugger and code flow analyst.
+        var systemPrompt = [
+            'You are an expert JavaScript debugger and code flow analyst.',
+            'Perform a STATIC ANALYSIS trace of a web project execution flow for a specific user interaction.',
+            'OUTPUT FORMAT: Return ONLY a valid JSON object with no markdown fences and no prose outside the JSON.',
+            '{',
+            '  "summary": "One sentence describing what this interaction does overall.",',
+            '  "steps": [',
+            '    {',
+            '      "type": "trigger|handler|dom|network|state|output|error",',
+            '      "title": "Short label (max 6 words)",',
+            '      "detail": "What happens at this step (1-2 sentences)",',
+            '      "codeSnippet": "Relevant 1-3 line code excerpt or null",',
+            '      "nodeId": "vibeTree node ID containing this code or null"',
+            '    }',
+            '  ]',
+            '}',
+            'Rules:',
+            '- Produce 4-12 steps. Start with type trigger, end with output or error.',
+            '- Be specific: name actual functions, variables, DOM selectors from the code.',
+            '- If no project code is loaded, produce a generic illustrative trace anyway.',
+            '- Return RAW JSON only. No fences, no text outside the JSON object.'
+        ].join('\n');
 
-' +
-'Perform a STATIC ANALYSIS trace of a web project execution flow for a specific user interaction.
-
-' +
-'**OUTPUT FORMAT:** Return ONLY a valid JSON object — no markdown, no prose:
-' +
-'{
-' +
-'  "summary": "One sentence describing what this interaction does.",
-' +
-'  "steps": [
-' +
-'    {
-' +
-'      "type": "trigger|handler|dom|network|state|output|error",
-' +
-'      "title": "Short label (max 6 words)",
-' +
-'      "detail": "What happens at this step (1-2 sentences)",
-' +
-'      "codeSnippet": "Relevant 1-3 line code excerpt or null",
-' +
-'      "nodeId": "vibeTree node ID containing this code or null"
-' +
-'    }
-' +
-'  ]
-' +
-'}
-
-' +
-'Rules:
-' +
-'- Produce 4–12 steps. Start with type "trigger", end with "output" or "error".
-' +
-'- Be specific: name actual functions, variables, DOM selectors from the code.
-' +
-'- If no project code is loaded, produce a generic illustrative trace anyway.
-' +
-'- Return RAW JSON only. No ```json fences, no explanations outside the JSON.';
-
-        var userPrompt =
-'Project:
-' + projectSummary + '
-
-' +
-'Trace: ' + triggerType + ' on "' + (targetSelector || 'most interactive element') + '"' +
-(inputValue ? ' with value "' + inputValue + '"' : '') +
-' (depth: ' + depth + ')
-
-' +
-'Return the JSON trace.';
+        var userPrompt = 'Project:\n' + projectSummary + '\n\n' +
+            'Trace: ' + triggerType + ' on "' + (targetSelector || 'most interactive element') + '"' +
+            (inputValue ? ' with value "' + inputValue + '"' : '') +
+            ' (depth: ' + depth + ')\n\nReturn the JSON trace.';
 
         var rawResponse = await callAI(systemPrompt, userPrompt, true);
 
