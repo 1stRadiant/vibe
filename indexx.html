@@ -711,6 +711,42 @@
             cursor: pointer;
             text-decoration: underline;
         }
+        .ft-drawer-section-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #5c6370;
+            margin: 8px 0 3px;
+        }
+        .ft-drawer-row {
+            font-size: 0.78rem;
+            color: #abb2bf;
+            line-height: 1.5;
+            padding: 2px 0;
+        }
+        .ft-var-name   { color: #c678dd; font-family:'Roboto Mono',monospace; font-weight:700; font-size:0.76rem; }
+        .ft-var-before { color: #e06c75; font-family:'Roboto Mono',monospace; font-size:0.76rem; }
+        .ft-var-arrow  { color: #5c6370; margin: 0 4px; }
+        .ft-var-after  { color: #98c379; font-family:'Roboto Mono',monospace; font-size:0.76rem; font-weight:700; }
+        /* Detail drawer taller for rich content */
+        .ft-detail-drawer.ft-drawer-open { height: 220px; }
+        .ft-detail-body p { margin: 0 0 6px; }
+        .ft-detail-body code {
+            font-family: 'Roboto Mono',monospace;
+            font-size: 0.71rem;
+            background: #21252b;
+            border: 1px solid #2d333b;
+            border-radius: 4px;
+            padding: 5px 8px;
+            display: block;
+            margin: 4px 0 6px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #98c379;
+            cursor: pointer;
+        }
+        .ft-detail-body code:hover { border-color: #61afef; }
         /* Loading overlay on canvas */
         @keyframes ft-spin { to { transform: rotate(360deg); } }
         .ft-loading-overlay {
@@ -1635,4 +1671,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-    </html>
+</html>
