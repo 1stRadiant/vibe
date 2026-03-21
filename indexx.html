@@ -703,6 +703,36 @@
             cursor: pointer;
         }
         .ft-detail-body code:hover { border-color: #61afef; }
+        /* Zoom controls */
+        .ft-zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            background: #21252b;
+            border: 1px solid #3e4451;
+            border-radius: 5px;
+            padding: 2px 4px;
+        }
+        .ft-zoom-label {
+            font-size: 0.72rem;
+            color: #7f848e;
+            font-family: 'Roboto Mono', monospace;
+            min-width: 36px;
+            text-align: center;
+        }
+        .ft-icon-btn {
+            background: transparent;
+            border: none;
+            color: #7f848e;
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            line-height: 1;
+            transition: color 0.12s, background 0.12s;
+        }
+        .ft-icon-btn:hover { color: #abb2bf; background: rgba(255,255,255,0.06); }
+        .ft-icon-btn:active { color: #c678dd; }
         .ft-detail-node-link {
             display: inline-block;
             margin-top: 6px;
@@ -1212,6 +1242,12 @@
                                             <div class="ft-flow-header-right">
                                                 <span id="ft-step-count" class="ft-step-count"></span>
                                                 <button id="ft-replay-button" class="ft-icon-btn" title="Replay animation" style="display:none;">⟳ Replay</button>
+                                                <div class="ft-zoom-controls">
+                                                    <button id="ft-zoom-out" class="ft-icon-btn" title="Zoom out (Ctrl + scroll)">－</button>
+                                                    <span id="ft-zoom-label" class="ft-zoom-label">100%</span>
+                                                    <button id="ft-zoom-in"  class="ft-icon-btn" title="Zoom in (Ctrl + scroll)">＋</button>
+                                                    <button id="ft-zoom-fit" class="ft-icon-btn" title="Fit to screen">⤢</button>
+                                                </div>
                                                 <label class="ft-speed-label">
                                                     Speed
                                                     <select id="ft-speed-select" class="ft-speed-select">
@@ -1226,7 +1262,10 @@
                                         <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
                                             <canvas id="ft-canvas" class="ft-canvas"></canvas>
                                             <div id="ft-tooltip" class="ft-node-tooltip" style="display:none;"></div>
-                                            <div id="ft-placeholder" class="ft-flow-placeholder">Configure a trigger and click ▶ Run Trace</div>
+                                            <div id="ft-placeholder" class="ft-flow-placeholder">
+                                                Configure a trigger and click ▶ Run Trace<br>
+                                                <span style="font-size:0.72rem;color:#3e4451;margin-top:6px;display:block">Ctrl+Scroll to zoom · Drag to pan · Pinch on mobile</span>
+                                            </div>
                                         </div>
                                         <!-- Detail drawer that slides up when a node is clicked -->
                                         <div id="ft-detail-drawer" class="ft-detail-drawer">
@@ -1671,4 +1710,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-</html>
+    </html>
