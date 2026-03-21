@@ -799,11 +799,147 @@
             border-radius: 50%;
             animation: ft-spin 0.8s linear infinite;
         }
-        /* Mobile: stack canvas below config */
-        @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
-            .ft-canvas-wrapper { min-height: 300px; flex: unset; height: 300px; }
-            .ft-right-panel { min-height: 340px; flex: unset; }
-            .ft-detail-drawer.ft-drawer-open { height: 130px; }
+        /* ── Flow Tracer Streamer Styles ── */
+        .ft-body {
+            flex: 1; display: flex; overflow: hidden; min-height: 0;
+        }
+        .ft-left-panel {
+            width: 220px; flex-shrink: 0; border-right: 1px solid #2d333b;
+            padding: 12px 12px; overflow-y: auto; display: flex;
+            flex-direction: column; gap: 5px; background: #1a1d23;
+        }
+        /* Centre code panel */
+        .ft-code-panel {
+            flex: 1; min-width: 0; display: flex; flex-direction: column;
+            overflow: hidden; border-right: 1px solid #2d333b;
+        }
+        .ft-code-header {
+            display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+            border-bottom: 1px solid #2d333b; flex-shrink: 0; background: #1a1d23;
+            min-height: 34px; flex-wrap: wrap;
+        }
+        .ft-node-label {
+            font-family: 'Roboto Mono', monospace; font-size: 0.78rem;
+            color: #61afef; font-weight: 700;
+        }
+        .ft-exec-status {
+            font-size: 0.72rem; padding: 2px 7px; border-radius: 10px;
+            font-weight: 600;
+        }
+        .ft-exec-status.running { background: rgba(198,120,221,0.15); color: #c678dd; }
+        .ft-exec-status.paused  { background: rgba(229,192,123,0.15); color: #e5c07b; }
+        .ft-exec-status.done    { background: rgba(152,195,121,0.15); color: #98c379; }
+        .ft-exec-status.error   { background: rgba(224,108,117,0.15); color: #e06c75; }
+        .ft-line-counter { font-size: 0.7rem; color: #5c6370; margin-left: auto; }
+        .ft-code-scroll {
+            flex: 1; overflow: auto; min-height: 0; background: #161a1f;
+        }
+        .ft-code-pre {
+            margin: 0; padding: 8px 0; font-family: 'Roboto Mono',monospace;
+            font-size: 0.78rem; line-height: 1.65; color: #abb2bf;
+            white-space: pre; min-width: max-content;
+        }
+        .ft-code-placeholder { color: #3e4451; font-style: italic; padding: 20px; display: block; }
+        /* Individual code lines */
+        .ft-line {
+            display: flex; align-items: flex-start; padding: 0 8px;
+            border-left: 3px solid transparent; transition: background 0.12s;
+        }
+        .ft-line-num {
+            color: #3e4451; min-width: 32px; user-select: none;
+            text-align: right; margin-right: 14px; flex-shrink: 0; font-size: 0.72rem;
+            padding-top: 1px;
+        }
+        .ft-line-code { flex: 1; }
+        .ft-line.ft-line-active {
+            background: rgba(198,120,221,0.12);
+            border-left-color: #c678dd;
+        }
+        .ft-line.ft-line-active .ft-line-num { color: #c678dd; }
+        .ft-line.ft-line-done {
+            background: rgba(152,195,121,0.05);
+            border-left-color: rgba(152,195,121,0.3);
+        }
+        .ft-line.ft-line-error {
+            background: rgba(224,108,117,0.15) !important;
+            border-left-color: #e06c75 !important;
+        }
+        .ft-line.ft-line-error .ft-line-num { color: #e06c75; }
+        .ft-line-inline-val {
+            margin-left: 12px; font-size: 0.7rem; color: #5c6370;
+            font-style: italic; flex-shrink: 0;
+        }
+        .ft-line-inline-val.changed { color: #e5c07b; }
+        /* Execution log */
+        .ft-log-header {
+            padding: 4px 12px; font-size: 0.68rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.06em; color: #5c6370;
+            background: #1a1d23; border-top: 1px solid #2d333b;
+            border-bottom: 1px solid #2d333b; flex-shrink: 0;
+        }
+        .ft-log-scroll { height: 120px; overflow-y: auto; background: #161a1f; flex-shrink: 0; }
+        .ft-log { padding: 4px 8px; font-family: 'Roboto Mono',monospace; font-size: 0.72rem; }
+        .ft-log-entry {
+            padding: 2px 4px; border-radius: 3px; margin-bottom: 1px;
+            display: flex; gap: 8px; align-items: baseline;
+        }
+        .ft-log-entry .ft-log-time { color: #3e4451; font-size: 0.65rem; flex-shrink: 0; }
+        .ft-log-entry.log-info  .ft-log-msg { color: #abb2bf; }
+        .ft-log-entry.log-var   .ft-log-msg { color: #e5c07b; }
+        .ft-log-entry.log-return .ft-log-msg { color: #98c379; }
+        .ft-log-entry.log-error .ft-log-msg { color: #e06c75; font-weight: 700; }
+        .ft-log-entry.log-call  .ft-log-msg { color: #61afef; }
+        .ft-log-entry.log-branch .ft-log-msg { color: #d19a66; }
+        /* Right: variable inspector */
+        .ft-vars-panel {
+            width: 220px; flex-shrink: 0; display: flex; flex-direction: column;
+            overflow: hidden; background: #1a1d23;
+        }
+        .ft-vars-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 10px; border-bottom: 1px solid #2d333b;
+            flex-shrink: 0; min-height: 34px;
+        }
+        .ft-vars-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+        .ft-vars-list { padding: 6px; }
+        .ft-vars-placeholder { font-size: 0.75rem; color: #3e4451; padding: 8px; font-style: italic; }
+        .ft-var-row {
+            display: flex; flex-direction: column; padding: 4px 6px;
+            border-radius: 4px; margin-bottom: 3px; background: #21252b;
+            border: 1px solid #2d333b; transition: border-color 0.2s;
+        }
+        .ft-var-row.ft-var-changed { border-color: #e5c07b; animation: ft-var-flash 0.4s ease; }
+        @keyframes ft-var-flash {
+            0%   { background: rgba(229,192,123,0.25); }
+            100% { background: #21252b; }
+        }
+        .ft-var-name-row { display: flex; justify-content: space-between; align-items: center; }
+        .ft-var-name-row .name { font-family:'Roboto Mono',monospace; font-size:0.72rem; color:#c678dd; font-weight:700; }
+        .ft-var-name-row .type { font-size:0.62rem; color:#5c6370; background:#161a1f; padding:1px 4px; border-radius:3px; }
+        .ft-var-value { font-family:'Roboto Mono',monospace; font-size:0.72rem; color:#e5c07b; margin-top:2px; word-break:break-all; }
+        .ft-callstack-header {
+            padding: 4px 10px; font-size: 0.68rem; font-weight:700;
+            text-transform: uppercase; letter-spacing: 0.06em; color: #5c6370;
+            background: #1a1d23; border-top: 1px solid #2d333b;
+            border-bottom: 1px solid #2d333b; flex-shrink: 0;
+        }
+        .ft-callstack { padding: 6px; overflow-y: auto; max-height: 120px; }
+        .ft-stack-frame {
+            font-family:'Roboto Mono',monospace; font-size:0.7rem; color:#7f848e;
+            padding: 2px 4px; border-left: 2px solid #3e4451; margin-bottom: 2px;
+        }
+        .ft-stack-frame.active { color:#61afef; border-left-color:#61afef; }
+        /* Responsive: stack panels vertically on mobile */
+        @media (max-width: 700px) {
+            .ft-body { flex-direction: column; overflow-y: auto; }
+            .ft-left-panel { width: 100%; max-height: 0; overflow: hidden; padding: 0 12px;
+                border-right: none; border-bottom: 1px solid #2d333b;
+                transition: max-height 0.3s, padding 0.3s; }
+            .ft-left-panel.ft-config-open { max-height: 400px; padding: 12px; }
+            .ft-code-panel { min-height: 300px; flex: unset; }
+            .ft-vars-panel { width: 100%; border-top: 1px solid #2d333b; flex-direction: row; }
+            .ft-vars-scroll { flex: 1; }
+            .ft-callstack-header, .ft-callstack { display: none; }
         }
     </style>
     <!-- Libraries -->
@@ -1194,89 +1330,96 @@
                         </div>
                         <div id="flow-trace" class="tab-content">
                             <div class="ft-container">
+
+                                <!-- ── Top toolbar ── -->
                                 <div class="ft-header">
                                     <div class="ft-title-group">
                                         <h2>Flow Tracer</h2>
-                                        <p>Simulate user interactions and trace the full execution path — from trigger to output.</p>
+                                        <p>Instruments &amp; executes your code line-by-line. Watch variables change in real time.</p>
                                     </div>
                                     <div class="ft-header-actions">
-                                        <button id="ft-run-button" class="action-button ft-run-btn">▶ Run Trace</button>
+                                        <button id="ft-run-button"   class="action-button ft-run-btn">▶ Run</button>
+                                        <button id="ft-pause-button" class="action-button ft-pause-btn" disabled>⏸ Pause</button>
+                                        <button id="ft-step-button"  class="action-button ft-step-btn"  disabled>⏭ Step</button>
                                         <button id="ft-clear-button" class="action-button ft-clear-btn">✕ Clear</button>
                                     </div>
                                 </div>
+
+                                <!-- ── Body: config + code stream + vars ── -->
                                 <div class="ft-body">
-                                    <!-- Mobile: tap to expand/collapse config panel -->
+
+                                    <!-- Mobile toggle -->
                                     <div class="ft-mobile-config-toggle" id="ft-config-toggle">
                                         <span class="ft-mobile-config-label">⚙ Configure Trigger</span>
                                         <span class="ft-mobile-config-arrow">▼</span>
                                     </div>
+
+                                    <!-- Left: config panel -->
                                     <div class="ft-left-panel" id="ft-left-panel">
-                                        <div class="ft-section-label">Interaction Trigger</div>
+                                        <div class="ft-section-label">Trigger Event</div>
                                         <select id="ft-trigger-type" class="ft-select">
-                                            <option value="click">🖱️ Click element</option>
+                                            <option value="click">🖱 Click element</option>
                                             <option value="submit">📨 Form submit</option>
-                                            <option value="input">⌨️ Input change</option>
-                                            <option value="load">📄 Page load</option>
+                                            <option value="input">⌨ Input change</option>
+                                            <option value="load">📄 Page load (all JS)</option>
                                             <option value="custom">⚡ Custom event</option>
                                         </select>
                                         <input type="text" id="ft-target-selector" placeholder="CSS selector e.g. #submit-btn" class="ft-input" />
-                                        <div class="ft-section-label" style="margin-top:14px;">Input Value (optional)</div>
-                                        <input type="text" id="ft-input-value" placeholder='e.g. "hello world" or {"key":"val"}' class="ft-input" />
-                                        <div class="ft-section-label" style="margin-top:14px;">Trace Depth</div>
-                                        <select id="ft-depth" class="ft-select">
-                                            <option value="shallow">Shallow — direct handlers only</option>
-                                            <option value="deep" selected>Deep — follow all function calls</option>
-                                            <option value="full">Full — include DOM mutations &amp; network</option>
-                                        </select>
-                                        <div class="ft-known-triggers" id="ft-known-triggers">
-                                            <div class="ft-section-label" style="margin-top:16px;">Detected Interactions</div>
-                                            <div id="ft-trigger-list" class="ft-trigger-list">
-                                                <div class="ft-trigger-placeholder">Click "Scan" to detect interactive elements.</div>
-                                            </div>
-                                            <button id="ft-scan-button" class="action-button ft-scan-btn" style="margin-top:8px;">🔍 Scan Project</button>
+
+                                        <div class="ft-section-label" style="margin-top:12px;">Input Value</div>
+                                        <input type="text" id="ft-input-value" placeholder="Value to inject into input" class="ft-input" />
+
+                                        <div class="ft-section-label" style="margin-top:12px;">Step Delay (ms)</div>
+                                        <div style="display:flex;align-items:center;gap:8px">
+                                            <input type="range" id="ft-speed-range" min="0" max="2000" value="400" style="flex:1" />
+                                            <span id="ft-speed-val" style="font-size:0.78rem;color:#7f848e;min-width:36px">400ms</span>
+                                        </div>
+
+                                        <div class="ft-section-label" style="margin-top:14px;">Detected Triggers</div>
+                                        <div id="ft-trigger-list" class="ft-trigger-list">
+                                            <div class="ft-trigger-placeholder">Click Scan to detect.</div>
+                                        </div>
+                                        <button id="ft-scan-button" class="action-button ft-scan-btn" style="margin-top:8px">🔍 Scan Project</button>
+                                    </div>
+
+                                    <!-- Centre: streaming code view -->
+                                    <div class="ft-code-panel" id="ft-code-panel">
+                                        <div class="ft-code-header">
+                                            <span id="ft-node-label" class="ft-node-label">—</span>
+                                            <span id="ft-exec-status" class="ft-exec-status"></span>
+                                            <span id="ft-line-counter" class="ft-line-counter"></span>
+                                        </div>
+                                        <div class="ft-code-scroll" id="ft-code-scroll">
+                                            <pre id="ft-code-pre" class="ft-code-pre"><span class="ft-code-placeholder">Run a trace to see code execute line by line.</span></pre>
+                                        </div>
+                                        <!-- Execution log below the code -->
+                                        <div class="ft-log-header">Execution Log</div>
+                                        <div class="ft-log-scroll" id="ft-log-scroll">
+                                            <div id="ft-log" class="ft-log"></div>
                                         </div>
                                     </div>
-                                    <div class="ft-right-panel">
-                                        <div class="ft-flow-header">
-                                            <span class="ft-section-label">Execution Flow</span>
-                                            <div class="ft-flow-header-right">
-                                                <span id="ft-step-count" class="ft-step-count"></span>
-                                                <button id="ft-replay-button" class="ft-icon-btn" title="Replay animation" style="display:none;">⟳ Replay</button>
-                                                <div class="ft-zoom-controls">
-                                                    <button id="ft-zoom-out" class="ft-icon-btn" title="Zoom out (Ctrl + scroll)">－</button>
-                                                    <span id="ft-zoom-label" class="ft-zoom-label">100%</span>
-                                                    <button id="ft-zoom-in"  class="ft-icon-btn" title="Zoom in (Ctrl + scroll)">＋</button>
-                                                    <button id="ft-zoom-fit" class="ft-icon-btn" title="Fit to screen">⤢</button>
-                                                </div>
-                                                <label class="ft-speed-label">
-                                                    Speed
-                                                    <select id="ft-speed-select" class="ft-speed-select">
-                                                        <option value="2">Slow</option>
-                                                        <option value="1" selected>Normal</option>
-                                                        <option value="0.4">Fast</option>
-                                                    </select>
-                                                </label>
+
+                                    <!-- Right: live variable inspector -->
+                                    <div class="ft-vars-panel" id="ft-vars-panel">
+                                        <div class="ft-vars-header">
+                                            <span class="ft-section-label" style="margin:0">Variables</span>
+                                            <span id="ft-var-count" style="font-size:0.7rem;color:#5c6370"></span>
+                                        </div>
+                                        <div class="ft-vars-scroll" id="ft-vars-scroll">
+                                            <div id="ft-vars-list" class="ft-vars-list">
+                                                <div class="ft-vars-placeholder">Variables will appear here as the code runs.</div>
                                             </div>
                                         </div>
-                                        <!-- Canvas for the animated flow graph -->
-                                        <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
-                                            <canvas id="ft-canvas" class="ft-canvas"></canvas>
-                                            <div id="ft-tooltip" class="ft-node-tooltip" style="display:none;"></div>
-                                            <div id="ft-placeholder" class="ft-flow-placeholder">
-                                                Configure a trigger and click ▶ Run Trace<br>
-                                                <span style="font-size:0.72rem;color:#3e4451;margin-top:6px;display:block">Ctrl+Scroll to zoom · Drag to pan · Pinch on mobile</span>
-                                            </div>
-                                        </div>
-                                        <!-- Detail drawer that slides up when a node is clicked -->
-                                        <div id="ft-detail-drawer" class="ft-detail-drawer">
-                                            <div class="ft-detail-header">
-                                                <span id="ft-detail-title" class="ft-detail-title"></span>
-                                                <button id="ft-detail-close" class="ft-icon-btn">✕</button>
-                                            </div>
-                                            <div id="ft-detail-body" class="ft-detail-body"></div>
+                                        <div class="ft-callstack-header">Call Stack</div>
+                                        <div class="ft-callstack" id="ft-callstack">
+                                            <div class="ft-vars-placeholder">—</div>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Hidden sandbox iframe for actual execution -->
+                                <iframe id="ft-sandbox" style="display:none" sandbox="allow-scripts"></iframe>
+
                             </div>
                         </div>
                         <div id="nervous-system" class="tab-content">
@@ -1710,4 +1853,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-    </html>
+</html>
