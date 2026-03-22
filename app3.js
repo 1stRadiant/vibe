@@ -6811,10 +6811,10 @@ function instrumentCode(src, nodeId) {
 }
 
 function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlCode) {
-    // Sandbox using ES generator for pauseable line-by-line execution.
-    // The instrumented code has "yield;" injected at each top-level statement.
-    // __ftStep() calls generator.next() to advance one yield at a time.
-    // The parent controls pacing via setTimeout.
+    // The sandbox runs the instrumented code as a generator.
+    // CRITICAL: user code is base64-encoded before being put in the HTML so
+    // that any </script> inside template literals or strings cannot
+    // prematurely close the <script> block and cause parse errors.
 
     var sandboxLines = [
         '"use strict";',
@@ -6823,82 +6823,156 @@ function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlC
         'var __ftDelay  = 0;',
         'var __ftGen    = null;',
         '',
-        'function __ftSetVar(n,v){',
-        '  try{',
-        '    var t=Array.isArray(v)?"array":typeof v;',
-        '    var s=JSON.parse(JSON.stringify(v==null?"null":v===undefined?"undefined":v));',
-        '    __ftVars[n]={value:s,type:t};',
-        '  }catch(e){__ftVars[n]={value:String(v),type:typeof v};}',
-        '}',
-        '',
-        'function __ftHookSync(li,ni){',
-        '  window.parent.postMessage({type:"ft-line",lineIdx:li,nodeId:ni,vars:JSON.parse(JSON.stringify(__ftVars))},"*");',
-        '}',
-        '',
-        'function __ftStep(){',
-        '  if(!__ftGen)return;',
-        '  try{',
-        '    var r=__ftGen.next();',
-        '    if(r.done){',
-        '      window.parent.postMessage({type:"ft-done"},"*");',
-        '      __ftGen=null;',
-        '    }else if(!__ftPaused){',
-        '      setTimeout(__ftStep,__ftDelay);',
-        '    }',
-        '  }catch(e){',
-        '    window.parent.postMessage({type:"ft-error",message:e.message,stack:e.stack||""},"*");',
-        '    window.parent.postMessage({type:"ft-done"},"*");',
-        '    __ftGen=null;',
+        'function __ftSetVar(name, value) {',
+        '  try {',
+        '    var t = Array.isArray(value) ? "array" : typeof value;',
+        '    var s = JSON.parse(JSON.stringify(',
+        '      value == null ? "null" : value === undefined ? "undefined" : value));',
+        '    __ftVars[name] = { value: s, type: t };',
+        '  } catch(e) {',
+        '    __ftVars[name] = { value: String(value), type: typeof value };',
         '  }',
         '}',
         '',
-        'window.addEventListener("message",function(e){',
-        '  var d=e.data;if(!d)return;',
-        '  if(d.type==="ft-set-delay"){__ftDelay=d.delay||0;}',
-        '  if(d.type==="ft-pause"){__ftPaused=true;}',
-        '  if(d.type==="ft-resume"){__ftPaused=false;setTimeout(__ftStep,__ftDelay);}',
-        '  if(d.type==="ft-step"){__ftPaused=true;__ftStep();}',
-        '  if(d.type==="ft-start-run"){__ftDelay=d.delay||0;__ftPaused=false;setTimeout(__ftStep,0);}',
+        'function __ftHookSync(li, ni) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-line", lineIdx: li, nodeId: ni,',
+        '    vars: JSON.parse(JSON.stringify(__ftVars))',
+        '  }, "*");',
+        '}',
+        '',
+        'function __ftStep() {',
+        '  if (!__ftGen) return;',
+        '  try {',
+        '    var r = __ftGen.next();',
+        '    if (r.done) {',
+        '      window.parent.postMessage({ type: "ft-done" }, "*");',
+        '      __ftGen = null;',
+        '    } else if (!__ftPaused) {',
+        '      setTimeout(__ftStep, __ftDelay);',
+        '    }',
+        '  } catch(e) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: e.message, stack: e.stack || ""',
+        '    }, "*");',
+        '    window.parent.postMessage({ type: "ft-done" }, "*");',
+        '    __ftGen = null;',
+        '  }',
+        '}',
+        '',
+        'window.addEventListener("message", function(e) {',
+        '  var d = e.data; if (!d) return;',
+        '  if (d.type === "ft-set-delay")  { __ftDelay = d.delay || 0; }',
+        '  if (d.type === "ft-pause")      { __ftPaused = true; }',
+        '  if (d.type === "ft-resume")     { __ftPaused = false; setTimeout(__ftStep, __ftDelay); }',
+        '  if (d.type === "ft-step")       { __ftPaused = true; __ftStep(); }',
+        '  if (d.type === "ft-start-run")  {',
+        '    __ftDelay = d.delay || 0; __ftPaused = false;',
+        '    setTimeout(__ftStep, 0);',
+        '  }',
         '});',
         '',
-        '["log","warn","error","info"].forEach(function(m){',
-        '  var orig=console[m].bind(console);',
-        '  console[m]=function(){',
-        '    var args=Array.from(arguments).map(function(a){try{return typeof a==="object"?JSON.stringify(a):String(a);}catch(e){return String(a);}});',
-        '    window.parent.postMessage({type:"ft-console",level:m,args:args},"*");',
-        '    orig.apply(console,arguments);',
+        '["log","warn","error","info"].forEach(function(m) {',
+        '  var orig = console[m].bind(console);',
+        '  console[m] = function() {',
+        '    var args = Array.from(arguments).map(function(a) {',
+        '      try { return typeof a === "object" ? JSON.stringify(a) : String(a); }',
+        '      catch(e) { return String(a); }',
+        '    });',
+        '    window.parent.postMessage({ type: "ft-console", level: m, args: args }, "*");',
+        '    orig.apply(console, arguments);',
         '  };',
         '});',
         '',
-        'window.onerror=function(msg,src,line,col,err){',
-        '  window.parent.postMessage({type:"ft-error",message:msg,stack:err?err.stack:""},"*");',
+        'window.onerror = function(msg, src, line, col, err) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-error", message: msg.replace(/^Uncaught\\s+/,""),',
+        '    stack: err ? err.stack : "", line: line, col: col',
+        '  }, "*");',
         '  return true;',
         '};',
-        'window.onunhandledrejection=function(e){',
-        '  window.parent.postMessage({type:"ft-error",message:String(e.reason||e)},"*");',
+        'window.onunhandledrejection = function(e) {',
+        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason || e) }, "*");',
         '};',
-    ];
-
-    var userLines = [
-        'function* __ftMain(){',
-        '  try{',
-        jsCode,
-        '  }catch(__e){',
-        '    window.parent.postMessage({type:"ft-error",message:__e.message,stack:__e.stack||""},"*");',
+        '',
+        '// Decode and run the user code from the data attribute',
+        '// (base64-encoded so </script> inside strings cannot break the HTML)',
+        'function __ftBoot() {',
+        '  try {',
+        '    var encoded = document.getElementById("__ft_code").getAttribute("data-src");',
+        '    var decoded = decodeURIComponent(atob(encoded).split("").map(function(c) {',
+        '      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);',
+        '    }).join(""));',
+        '    var fn = new Function(decoded);',
+        '    fn();',
+        '    if (!__ftGen) {',
+        '      window.parent.postMessage({ type: "ft-done" }, "*");',
+        '    }',
+        '  } catch(e) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: e.message, stack: e.stack || ""',
+        '    }, "*");',
+        '    window.parent.postMessage({ type: "ft-done" }, "*");',
         '  }',
         '}',
-        'window.parent.postMessage({type:"ft-start"},"*");',
-        '__ftGen=__ftMain();',
-    ];
+    ].join('\n');
+
+    // The user code runs as a generator
+    var userCode = [
+        'function* __ftMain() {',
+        '  try {',
+        jsCode,
+        '  } catch(__err) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: __err.message, stack: __err.stack || ""',
+        '    }, "*");',
+        '  }',
+        '}',
+        'window.parent.postMessage({ type: "ft-start" }, "*");',
+        '__ftGen = __ftMain();',
+    ].join('\n');
+
+    // Pre-flight: check the generated generator parses before encoding
+    try {
+        new Function(userCode);
+    } catch(syntaxErr) {
+        var errMsg = syntaxErr.message;
+        // Return an error page immediately
+        var errPage = [
+            '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>',
+            '<script>',
+            'window.parent.postMessage({type:"ft-start"},"*");',
+            'window.parent.postMessage({type:"ft-error",message:' + JSON.stringify('Code instrumentation error: ' + errMsg) + '},"*");',
+            'window.parent.postMessage({type:"ft-done"},"*");',
+            '<\/script></body></html>',
+        ].join('\n');
+        return errPage;
+    }
+
+    // Base64-encode the user code so </script> inside strings is safe
+    var encoded;
+    try {
+        encoded = btoa(encodeURIComponent(userCode).replace(/%([0-9A-F]{2})/g, function(_, p1) {
+            return String.fromCharCode(parseInt(p1, 16));
+        }));
+    } catch(encErr) {
+        encoded = btoa(unescape(encodeURIComponent(userCode)));
+    }
 
     return [
-        '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>',
+        '<!DOCTYPE html>',
+        '<html><head><meta charset="UTF-8"></head>',
+        '<body>',
         htmlCode || '',
+        // Invisible element carrying the base64 user code
+        '<div id="__ft_code" data-src="' + encoded + '" style="display:none"></div>',
+        // Sandbox runtime script — contains NO user code so </script> is safe
         '<script>',
-        sandboxLines.join('\n'),
+        sandboxLines,
         '<\/script>',
+        // Boot: reads and evals the encoded user code
         '<script>',
-        userLines.join('\n'),
+        '__ftBoot();',
         '<\/script>',
         '</body></html>',
     ].join('\n');
@@ -8734,4 +8808,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+}
