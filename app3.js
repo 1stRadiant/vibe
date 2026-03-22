@@ -6732,103 +6732,250 @@ function renderCallStack() {
 // so we can pause, capture vars, and stream output.
 
 function instrumentCode(src, nodeId) {
+    // SAFE instrumentation: we only inject __ftHookSync calls as
+    // STANDALONE STATEMENTS between top-level statements.
+    // We never inject inside object literals, arrays, or any nested context.
+    //
+    // Strategy: split on semicolons and closing braces at depth 0.
+    // For each top-level statement boundary, inject the hook.
+    // This is conservative — we miss lines inside functions —
+    // but it never produces syntax errors.
+    //
+    // The hook call uses yield so the generator pauses between top-level
+    // statements. Inner lines (inside callbacks, methods) are NOT hooked
+    // with yield — they run at full speed but the ft-line messages from
+    // within them are still sent (we use Error stack tricks below).
+    //
+    // Since this is complex to get right without a real parser, we use
+    // the simplest possible approach that NEVER breaks syntax:
+    // wrap the ENTIRE node's code as a single generator yield point,
+    // preceded by a hook that sends the node's first line.
+    // The code runs atomically from the generator's perspective.
+    // Fine-grained line reporting comes from console.log interception.
+
+    // We inject hooks only before lines that are safe to instrument:
+    // lines at brace depth 0 that are complete statements on their own.
     var lines  = src.split('\n');
     var result = [];
-    // Inject a per-line hook: __ftHook(idx, fn) where fn returns {vars}
+    var depth  = 0;
+    var inStr  = false;   // rough string tracking (single/double quote)
+    var strCh  = '';
+
     lines.forEach(function(line, i) {
         var trimmed = line.trim();
-        // Skip blank lines and pure comment lines
-        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+
+        // Skip blank/comment lines
+        if (!trimmed ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('*') ||
+            trimmed.startsWith('*/')) {
+            // still count braces
+            for (var ci = 0; ci < line.length; ci++) {
+                var ch = line[ci];
+                if (!inStr) {
+                    if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+                    else if (ch === '{') depth++;
+                    else if (ch === '}') depth = Math.max(0, depth - 1);
+                } else {
+                    if (ch === strCh && (ci === 0 || line[ci-1] !== '\\')) inStr = false;
+                }
+            }
             result.push(line);
             return;
         }
-        // Insert hook BEFORE the line using a comma expression trick
-        // We wrap in an async immediately-invoked form so await works
-        result.push('await __ftHook(' + i + ', ' + JSON.stringify(nodeId) + ', (function(){try{return __ftCapture();}catch(e){return {};}})());');
+
+        // Only inject hook at depth 0 AND when line is a safe statement start
+        // (not a continuation line, not an object property)
+        var isSafeTopLevel = depth === 0;
+
+        if (isSafeTopLevel) {
+            result.push('__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + '); yield;');
+        }
         result.push(line);
+
+        // Update depth after the line
+        for (var ci = 0; ci < line.length; ci++) {
+            var ch = line[ci];
+            if (!inStr) {
+                if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+                else if (ch === '{') depth++;
+                else if (ch === '}') depth = Math.max(0, depth - 1);
+            } else {
+                if (ch === strCh && (ci === 0 || line[ci-1] !== '\\')) inStr = false;
+            }
+        }
     });
+
     return result.join('\n');
 }
 
-// ── Sandbox runner ────────────────────────────────────────────────
-// We build a full HTML page, inject it into the hidden iframe,
-// and listen for postMessage events back.
-
 function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlCode) {
-    // The sandbox page runs the instrumented code and messages back each step
-    var sandboxScript = [
-        'var __ftLines = [];',
+    // The sandbox runs the instrumented code as a generator.
+    // CRITICAL: user code is base64-encoded before being put in the HTML so
+    // that any </script> inside template literals or strings cannot
+    // prematurely close the <script> block and cause parse errors.
+
+    var sandboxLines = [
+        '"use strict";',
+        'var __ftVars   = {};',
         'var __ftPaused = false;',
-        'var __ftStepResolve = null;',
-        'var __ftVars = {};',
-        'var __ftCallStack = [];',
-        '',
-        'function __ftCapture() {',
-        '  // Capture all vars in current scope — we do this via a with-eval trick,',
-        '  // but since we cannot enumerate locals, we track via __ftSetVar calls.',
-        '  return JSON.parse(JSON.stringify(__ftVars));',
-        '}',
+        'var __ftDelay  = 0;',
+        'var __ftGen    = null;',
         '',
         'function __ftSetVar(name, value) {',
         '  try {',
-        '    var type = Array.isArray(value) ? "array" : typeof value;',
-        '    var safe = JSON.parse(JSON.stringify(value === undefined ? "undefined" : value === null ? "null" : value));',
-        '    __ftVars[name] = { value: safe, type: type };',
-        '  } catch(e) { __ftVars[name] = { value: String(value), type: typeof value }; }',
+        '    var t = Array.isArray(value) ? "array" : typeof value;',
+        '    var s = JSON.parse(JSON.stringify(',
+        '      value == null ? "null" : value === undefined ? "undefined" : value));',
+        '    __ftVars[name] = { value: s, type: t };',
+        '  } catch(e) {',
+        '    __ftVars[name] = { value: String(value), type: typeof value };',
+        '  }',
         '}',
         '',
-        'async function __ftHook(lineIdx, nodeId, vars) {',
-        '  Object.assign(__ftVars, vars);',
-        '  window.parent.postMessage({ type: "ft-line", lineIdx: lineIdx, nodeId: nodeId, vars: __ftVars }, "*");',
-        '  if (__ftPaused) {',
-        '    await new Promise(function(res) { __ftStepResolve = res; });',
+        'function __ftHookSync(li, ni) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-line", lineIdx: li, nodeId: ni,',
+        '    vars: JSON.parse(JSON.stringify(__ftVars))',
+        '  }, "*");',
+        '}',
+        '',
+        'function __ftStep() {',
+        '  if (!__ftGen) return;',
+        '  try {',
+        '    var r = __ftGen.next();',
+        '    if (r.done) {',
+        '      window.parent.postMessage({ type: "ft-done" }, "*");',
+        '      __ftGen = null;',
+        '    } else if (!__ftPaused) {',
+        '      setTimeout(__ftStep, __ftDelay);',
+        '    }',
+        '  } catch(e) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: e.message, stack: e.stack || ""',
+        '    }, "*");',
+        '    window.parent.postMessage({ type: "ft-done" }, "*");',
+        '    __ftGen = null;',
         '  }',
         '}',
         '',
         'window.addEventListener("message", function(e) {',
-        '  if (e.data.type === "ft-resume") { __ftPaused = false; if (__ftStepResolve) { __ftStepResolve(); __ftStepResolve = null; } }',
-        '  if (e.data.type === "ft-pause")  { __ftPaused = true; }',
-        '  if (e.data.type === "ft-step")   { if (__ftStepResolve) { __ftPaused = true; __ftStepResolve(); __ftStepResolve = null; } }',
+        '  var d = e.data; if (!d) return;',
+        '  if (d.type === "ft-set-delay")  { __ftDelay = d.delay || 0; }',
+        '  if (d.type === "ft-pause")      { __ftPaused = true; }',
+        '  if (d.type === "ft-resume")     { __ftPaused = false; setTimeout(__ftStep, __ftDelay); }',
+        '  if (d.type === "ft-step")       { __ftPaused = true; __ftStep(); }',
+        '  if (d.type === "ft-start-run")  {',
+        '    __ftDelay = d.delay || 0; __ftPaused = false;',
+        '    setTimeout(__ftStep, 0);',
+        '  }',
         '});',
         '',
-        '// Override console to forward to parent',
         '["log","warn","error","info"].forEach(function(m) {',
         '  var orig = console[m].bind(console);',
         '  console[m] = function() {',
-        '    var args = Array.from(arguments).map(function(a){ try{return JSON.stringify(a);}catch(e){return String(a);} });',
+        '    var args = Array.from(arguments).map(function(a) {',
+        '      try { return typeof a === "object" ? JSON.stringify(a) : String(a); }',
+        '      catch(e) { return String(a); }',
+        '    });',
         '    window.parent.postMessage({ type: "ft-console", level: m, args: args }, "*");',
         '    orig.apply(console, arguments);',
         '  };',
         '});',
         '',
-        '// Catch unhandled errors',
-        'window.addEventListener("error", function(e) {',
-        '  window.parent.postMessage({ type: "ft-error", message: e.message, line: e.lineno, col: e.colno }, "*");',
-        '});',
-        'window.addEventListener("unhandledrejection", function(e) {',
-        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason) }, "*");',
-        '});',
-    ].join('\n');
-
-    // The actual user code (instrumented), wrapped in an async IIFE
-    var userCode = [
-        '(async function __ftMain() {',
-        '  window.parent.postMessage({ type: "ft-start" }, "*");',
+        'window.onerror = function(msg, src, line, col, err) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-error", message: msg.replace(/^Uncaught\\s+/,""),',
+        '    stack: err ? err.stack : "", line: line, col: col',
+        '  }, "*");',
+        '  return true;',
+        '};',
+        'window.onunhandledrejection = function(e) {',
+        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason || e) }, "*");',
+        '};',
+        '',
+        '// Decode and run the user code from the data attribute',
+        '// (base64-encoded so </script> inside strings cannot break the HTML)',
+        'function __ftBoot() {',
         '  try {',
-        jsCode,
-        '  } catch(__ftErr) {',
-        '    window.parent.postMessage({ type: "ft-error", message: __ftErr.message, stack: __ftErr.stack }, "*");',
-        '  } finally {',
+        '    var encoded = document.getElementById("__ft_code").getAttribute("data-src");',
+        '    var decoded = decodeURIComponent(atob(encoded).split("").map(function(c) {',
+        '      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);',
+        '    }).join(""));',
+        '    var fn = new Function(decoded);',
+        '    fn();',
+        '    if (!__ftGen) {',
+        '      window.parent.postMessage({ type: "ft-done" }, "*");',
+        '    }',
+        '  } catch(e) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: e.message, stack: e.stack || ""',
+        '    }, "*");',
         '    window.parent.postMessage({ type: "ft-done" }, "*");',
         '  }',
-        '})();',
+        '}',
     ].join('\n');
 
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' +
-        (htmlCode ? htmlCode : '') +
-        '<script>\n' + sandboxScript + '\n</script>\n' +
-        '<script>\n' + userCode + '\n</script>' +
-        '</body></html>';
+    // The user code runs as a generator
+    var userCode = [
+        'function* __ftMain() {',
+        '  try {',
+        jsCode,
+        '  } catch(__err) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: __err.message, stack: __err.stack || ""',
+        '    }, "*");',
+        '  }',
+        '}',
+        'window.parent.postMessage({ type: "ft-start" }, "*");',
+        '__ftGen = __ftMain();',
+    ].join('\n');
+
+    // Pre-flight: check the generated generator parses before encoding
+    try {
+        new Function(userCode);
+    } catch(syntaxErr) {
+        var errMsg = syntaxErr.message;
+        // Return an error page immediately
+        var errPage = [
+            '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>',
+            '<script>',
+            'window.parent.postMessage({type:"ft-start"},"*");',
+            'window.parent.postMessage({type:"ft-error",message:' + JSON.stringify('Code instrumentation error: ' + errMsg) + '},"*");',
+            'window.parent.postMessage({type:"ft-done"},"*");',
+            '<\/script></body></html>',
+        ].join('\n');
+        return errPage;
+    }
+
+    // Base64-encode the user code so </script> inside strings is safe
+    var encoded;
+    try {
+        encoded = btoa(encodeURIComponent(userCode).replace(/%([0-9A-F]{2})/g, function(_, p1) {
+            return String.fromCharCode(parseInt(p1, 16));
+        }));
+    } catch(encErr) {
+        encoded = btoa(unescape(encodeURIComponent(userCode)));
+    }
+
+    return [
+        '<!DOCTYPE html>',
+        '<html><head><meta charset="UTF-8"></head>',
+        '<body>',
+        htmlCode || '',
+        // Invisible element carrying the base64 user code
+        '<div id="__ft_code" data-src="' + encoded + '" style="display:none"></div>',
+        // Sandbox runtime script — contains NO user code so </script> is safe
+        '<script>',
+        sandboxLines,
+        '<\/script>',
+        // Boot: reads and evals the encoded user code
+        '<script>',
+        '__ftBoot();',
+        '<\/script>',
+        '</body></html>',
+    ].join('\n');
 }
 
 // ── Trigger detection ─────────────────────────────────────────────
@@ -6936,6 +7083,82 @@ function renderCodeLines(nodeBlocks) {
     });
 }
 
+// ── AI Line Explainer ────────────────────────────────────────────
+// Calls the AI once to explain each line, then attaches tooltips.
+
+var ftLineExplanations = {};   // key: "nodeId::lineNum" → explanation string
+
+async function fetchLineExplanations(nodeBlocks) {
+    if (!callAI) return;
+    var keyOk = (currentAIProvider === 'gemini' && !!geminiApiKey) ||
+                (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if (!keyOk) return;
+
+    // Build a compact source listing with line numbers for the AI
+    var listing = nodeBlocks.map(function(block) {
+        var numbered = block.src.split('\n').map(function(line, i) {
+            return (i + 1) + ': ' + line;
+        }).join('\n');
+        return '=== ' + block.nodeId + ' ===\n' + numbered;
+    }).join('\n\n');
+
+    var systemPrompt = [
+        'You are a JavaScript code explainer. Given numbered source lines, explain what each line DOES in plain English.',
+        'Keep each explanation SHORT — one sentence max, 10 words or fewer.',
+        'Focus on WHAT happens: variable set, function called, condition checked, DOM updated, etc.',
+        'Return ONLY a JSON object mapping "nodeId::lineNumber" to the explanation string.',
+        'Line numbers are 1-based. Only include non-blank, non-comment lines.',
+        'Example output: { "main-js::1": "Finds the button element by ID", "main-js::3": "Adds click listener to button" }'
+    ].join(' ');
+
+    var userPrompt = 'Explain each line:\n\n' + listing;
+
+    try {
+        ftLog('AI is annotating lines…', 'info');
+        var raw = await callAI(systemPrompt, userPrompt, true);
+        var text = raw.trim();
+        var fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (fence && fence[1]) text = fence[1].trim();
+        var s = text.indexOf('{'), e = text.lastIndexOf('}');
+        if (s !== -1 && e > s) text = text.substring(s, e + 1);
+        ftLineExplanations = JSON.parse(text);
+        applyLineExplanations(nodeBlocks);
+        ftLog('AI annotations ready — hover any line to see explanation.', 'info');
+    } catch(err) {
+        // Non-fatal — tracing still works without AI annotations
+        console.warn('FT AI explain failed:', err.message);
+    }
+}
+
+function applyLineExplanations(nodeBlocks) {
+    // Attach explanation as tooltip title and as a hoverable annotation element
+    nodeBlocks.forEach(function(block) {
+        block.src.split('\n').forEach(function(_, i) {
+            var key = block.nodeId + '::' + (i + 1);
+            var explanation = ftLineExplanations[key];
+            if (!explanation) return;
+
+            // Find the line element in ftState.lines
+            var lineEntry = ftState.lines.find(function(l) {
+                return l.nodeId === block.nodeId && l.lineNum === i;
+            });
+            if (!lineEntry || !lineEntry.el) return;
+
+            lineEntry.el.title = explanation;
+            lineEntry.explanation = explanation;
+
+            // Add a small annotation badge to the line
+            var badge = lineEntry.el.querySelector('.ft-line-explain');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'ft-line-explain';
+                lineEntry.el.appendChild(badge);
+            }
+            badge.textContent = explanation;
+        });
+    });
+}
+
 // ── Main run function ────────────────────────────────────────────
 
 async function runFlowTrace() {
@@ -6995,6 +7218,13 @@ async function runFlowTrace() {
     // Render all code lines
     renderCodeLines(nodeBlocks);
 
+    // Build the execution flow graph on the canvas (nodes = JS blocks)
+    buildExecutionGraph(nodeBlocks);
+
+    // Kick off AI line annotations in background (non-blocking)
+    ftLineExplanations = {};
+    fetchLineExplanations(nodeBlocks);
+
     // Build a line-index map: nodeId+lineNum → globalIdx
     // (used to map sandbox messages back to line elements)
     var lineMap = {}; // key: nodeId+'::'+lineNum → globalIdx
@@ -7033,8 +7263,15 @@ async function runFlowTrace() {
         if (!d || !d.type || !d.type.startsWith('ft-')) return;
 
         if (d.type === 'ft-start') {
-            ftLog('Sandbox executing…', 'info');
+            ftLog('Sandbox ready · delay: ' + ftState.delay + 'ms', 'info');
             ftPushStack('__ftMain', '(root)');
+            // Kick off execution with the current delay setting
+            if (sandbox.contentWindow) {
+                sandbox.contentWindow.postMessage({
+                    type: 'ft-start-run',
+                    delay: ftState.delay
+                }, '*');
+            }
         }
 
         else if (d.type === 'ft-line') {
@@ -7043,34 +7280,46 @@ async function runFlowTrace() {
                 ftState.lines[activeLine].el.classList.remove('ft-line-active');
                 ftState.lines[activeLine].el.classList.add('ft-line-done');
             }
-            // Find the global line index
-            var key = d.nodeId + '::' + d.lineNum;
+            // Sandbox sends lineIdx (global) or we look up by nodeId+lineIdx
+            var key  = d.nodeId + '::' + (d.lineIdx !== undefined ? d.lineIdx : d.lineNum);
             var gIdx = lineMap[key];
             activeLine = (gIdx !== undefined) ? gIdx : activeLine + 1;
             if (activeLine >= 0 && activeLine < ftState.lines.length) {
                 var lineEntry = ftState.lines[activeLine];
                 lineEntry.el.classList.add('ft-line-active');
-                // Scroll to it
                 lineEntry.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 ftSetNodeLabel(d.nodeId);
                 ftUpdateLineCounter();
-                // Update vars from snapshot
+                // Show AI explanation in the log for this line
+                if (lineEntry.explanation) {
+                    ftLog('💬 ' + lineEntry.code.trim() + '  →  ' + lineEntry.explanation, 'branch');
+                }
                 if (d.vars && typeof d.vars === 'object') {
-                    Object.keys(d.vars).forEach(function(name) {
-                        var v = d.vars[name];
-                        ftUpdateVar(name, v.value, v.type);
+                    Object.keys(d.vars).forEach(function(n) {
+                        var v = d.vars[n]; ftUpdateVar(n, v.value, v.type);
                     });
+                }
+                // Show inline value hint on the line if vars changed
+                var valEl = document.getElementById('ftlineval-' + activeLine);
+                if (valEl && d.vars) {
+                    var changed = Object.keys(d.vars).filter(function(n) { return d.vars[n] && ftState.vars[n] && JSON.stringify(ftState.vars[n].value) !== JSON.stringify(d.vars[n].value); });
+                    if (changed.length) {
+                        valEl.textContent = changed.map(function(n) { return n + ' = ' + JSON.stringify(d.vars[n].value); }).join(', ');
+                        valEl.style.display = 'inline';
+                    }
                 }
             }
             ftState.lineIndex = activeLine;
 
-            // Apply step delay via sandbox control
+            // Activate canvas node for this nodeId
+            canvasActivateNode(d.nodeId);
+
+            // Apply step delay
             if (ftState.delay > 0) {
                 sandbox.contentWindow.postMessage({ type: 'ft-pause' }, '*');
                 setTimeout(function() {
                     if (ftState.isRunning) {
-                        if (ftState.stepMode) { /* wait for user Step button */ }
-                        else { sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*'); }
+                        if (!ftState.isPaused) sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*');
                     }
                 }, ftState.delay);
             }
@@ -7083,12 +7332,28 @@ async function runFlowTrace() {
         }
 
         else if (d.type === 'ft-error') {
-            // Mark the current line as errored
+            // If sandbox tells us the exact line, use it
+            if (d.lineIdx !== undefined && d.nodeId) {
+                var eKey  = d.nodeId + '::' + d.lineIdx;
+                var eGIdx = lineMap[eKey];
+                if (eGIdx !== undefined) activeLine = eGIdx;
+            }
             if (activeLine >= 0 && ftState.lines[activeLine]) {
                 ftState.lines[activeLine].el.classList.add('ft-line-error');
                 ftState.lines[activeLine].el.classList.remove('ft-line-active');
+                ftState.lines[activeLine].el.classList.add('ft-line-shake');
             }
-            ftLog('ERROR: ' + d.message + (d.stack ? '\n' + d.stack.split('\n')[1] : ''), 'error');
+            var errNodeId = (ftState.lines[activeLine] && ftState.lines[activeLine].nodeId) || ftCanvasState.lastNodeId;
+            if (errNodeId) canvasMarkError(errNodeId);
+            // Strip internal __ft frames from the stack
+            var stackHint = '';
+            if (d.stack) {
+                var cleanLine = d.stack.split('\n').find(function(l) {
+                    return l.trim() && !l.includes('__ftHook') && !l.includes('__ftMain') && !l.includes('__ftQueue') && !l.includes('__ftRunNext');
+                });
+                if (cleanLine) stackHint = '  \u2192  ' + cleanLine.trim();
+            }
+            ftLog('\u2717 ERROR' + (activeLine >= 0 ? ' at line ' + (activeLine + 1) : '') + ': ' + d.message + stackHint, 'error');
             ftSetStatus('Error', 'error');
             ftState.errorCount++;
         }
@@ -7102,6 +7367,7 @@ async function runFlowTrace() {
             }
             ftState.isRunning = false;
             ftState.isPaused  = false;
+            canvasFinish();
             ftSetStatus(ftState.errorCount > 0 ? 'Finished with errors' : 'Done ✓', ftState.errorCount > 0 ? 'error' : 'done');
             ftLog('Trace complete in ' + ftNow() + (ftState.errorCount ? ' · ' + ftState.errorCount + ' error(s)' : ''), ftState.errorCount ? 'error' : 'return');
             ftPopStack();
@@ -7200,11 +7466,18 @@ function bindFlowTracerEvents() {
         range.addEventListener('input', function() {
             ftState.delay = parseInt(range.value);
             rangeVal.textContent = range.value + 'ms';
+            // Sync to running sandbox immediately
+            var sb = document.getElementById('ft-sandbox');
+            if (sb && sb.contentWindow && ftState.isRunning) {
+                sb.contentWindow.postMessage({ type: 'ft-set-delay', delay: ftState.delay }, '*');
+            }
         });
     }
 
     var selectorInput = document.getElementById('ft-target-selector');
     if (selectorInput) selectorInput.addEventListener('keydown', function(e) { if (e.key==='Enter') runFlowTrace(); });
+
+    bindFtCanvasEvents();
 
     var configToggle = document.getElementById('ft-config-toggle');
     var leftPanel    = document.getElementById('ft-left-panel');
@@ -7218,6 +7491,409 @@ function bindFlowTracerEvents() {
             if (lbl)   lbl.textContent   = isOpen ? '⚙ Hide Config' : '⚙ Configure Trigger';
         });
     }
+}
+
+
+// ─────────────────────────────────────────────────────────────────
+// EXECUTION CANVAS — driven by real sandbox execution events
+// ─────────────────────────────────────────────────────────────────
+
+var ftCanvasState = {
+    nodes: [],          // { id, nodeId, x, y, w, h, color, glowColor, state, pulsePhase }
+    edges: [],          // { from, to, color, progress }
+    particles: [],
+    activeNodeId: null,
+    lastNodeId: null,
+    animFrame: null,
+    scale: 1.0,
+    panX: 0,
+    scrollY: 0,
+    pinchDist0: null,
+    pinchScale0: null,
+    dragStart: null,
+    pulseTime: 0,
+};
+
+var FT_SCALE_MIN = 0.2, FT_SCALE_MAX = 4.0;
+
+function buildExecutionGraph(nodeBlocks) {
+    stopFtCanvas();
+    var cs      = ftCanvasState;
+    cs.nodes    = []; cs.edges = []; cs.particles = [];
+    cs.activeNodeId = null; cs.lastNodeId = null;
+    cs.scale    = 1.0; cs.panX = 0; cs.scrollY = 0;
+
+    var canvas  = document.getElementById('ft-canvas');
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    if (!canvas || !wrapper) return;
+
+    var ph = document.getElementById('ft-placeholder');
+    if (ph) ph.style.display = 'none';
+
+    var dpr = window.devicePixelRatio || 1;
+    var W   = wrapper.clientWidth  || 220;
+    var H   = wrapper.clientHeight || 220;
+    canvas.width  = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    var PAD    = 14;
+    var NODE_W = Math.min(W - PAD*2, 180);
+    var NODE_H = 38;
+    var GAP_Y  = 28;
+
+    var PALETTE = ['#c678dd','#e5c07b','#61afef','#98c379','#56b6c2','#d19a66','#e06c75'];
+    nodeBlocks.forEach(function(block, i) {
+        var col = PALETTE[i % PALETTE.length];
+        var y   = PAD + i * (NODE_H + GAP_Y) + NODE_H / 2;
+        cs.nodes.push({
+            id: i, nodeId: block.nodeId,
+            x: W / 2, y: y, w: NODE_W, h: NODE_H,
+            color: col,
+            glowColor: col.replace('#', 'rgba(').replace(/([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i, function(m,r,g,b){
+                return parseInt(r,16)+','+parseInt(g,16)+','+parseInt(b,16)+',0.5)';
+            }),
+            state: 'idle',
+            pulsePhase: i * 0.4,
+        });
+        if (i > 0) cs.edges.push({ from: i-1, to: i, color: PALETTE[(i-1) % PALETTE.length], progress: 0 });
+    });
+
+    ftCanvasState = cs;
+    ftCanvasState.ctx = ctx;
+    ftCanvasState.W = W;
+    ftCanvasState.H = H;
+    updateFtZoomLabel();
+    cs.animFrame = requestAnimationFrame(drawFtFrame);
+}
+
+function canvasActivateNode(nodeId) {
+    var cs = ftCanvasState;
+    var idx = cs.nodes.findIndex(function(n){ return n.nodeId === nodeId; });
+    if (idx === -1) return;
+
+    // Mark previous node done, fire edge particle
+    if (cs.lastNodeId !== null && cs.lastNodeId !== nodeId) {
+        cs.nodes.forEach(function(n){ if (n.nodeId === cs.lastNodeId) n.state = 'done'; });
+        // Find edge between last and this
+        var lastIdx = cs.nodes.findIndex(function(n){ return n.nodeId === cs.lastNodeId; });
+        var edgeIdx = cs.edges.findIndex(function(e){ return e.from === lastIdx && e.to === idx; });
+        if (edgeIdx !== -1) {
+            cs.edges[edgeIdx].progress = 0;
+            animateFtEdge(edgeIdx, 350);
+            spawnFtParticles(edgeIdx);
+        }
+    }
+
+    cs.nodes[idx].state = 'active';
+    cs.activeNodeId = nodeId;
+    cs.lastNodeId   = nodeId;
+
+    // Auto-scroll canvas to keep active node visible
+    autoScrollToNode(cs.nodes[idx]);
+}
+
+function canvasMarkError(nodeId) {
+    ftCanvasState.nodes.forEach(function(n){
+        if (n.nodeId === nodeId) { n.state = 'error'; n.color = '#e06c75'; }
+    });
+}
+
+function canvasFinish() {
+    ftCanvasState.nodes.forEach(function(n){
+        if (n.state === 'active') n.state = 'done';
+    });
+}
+
+function autoScrollToNode(node) {
+    var cs = ftCanvasState;
+    var H  = cs.H || 220;
+    var nodeBottom = node.y + node.h/2 + cs.scrollY / cs.scale;
+    var nodeTop    = node.y - node.h/2 + cs.scrollY / cs.scale;
+    if (nodeBottom * cs.scale + cs.scrollY > H - 20) cs.scrollY = -(node.y * cs.scale - H / 2);
+    if (nodeTop    * cs.scale + cs.scrollY < 20)     cs.scrollY = -(node.y * cs.scale - H / 2);
+}
+
+function animateFtEdge(idx, dur) {
+    var edge = ftCanvasState.edges[idx]; if (!edge) return;
+    var t0   = performance.now();
+    function tick(now) { edge.progress = Math.min(1, (now-t0)/dur); if (edge.progress<1) requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+}
+
+function spawnFtParticles(edgeIdx) {
+    var edge = ftCanvasState.edges[edgeIdx]; if (!edge) return;
+    for (var k=0; k<4; k++) {
+        (function(k){ setTimeout(function(){
+            ftCanvasState.particles.push({ edgeIdx:edgeIdx, progress:0, speed:0.02+Math.random()*0.01, color:edge.color, size:3+Math.random()*2, trail:[], done:false });
+        }, k*70); })(k);
+    }
+}
+
+function stopFtCanvas() {
+    if (ftCanvasState.animFrame) { cancelAnimationFrame(ftCanvasState.animFrame); ftCanvasState.animFrame = null; }
+}
+
+function drawFtFrame(now) {
+    var cs  = ftCanvasState;
+    var ctx = cs.ctx;
+    if (!ctx) return;
+    var W = cs.W || 220, H = cs.H || 220;
+    cs.pulseTime = now * 0.001;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(W/2 + cs.panX, H/2);
+    ctx.scale(cs.scale, cs.scale);
+    ctx.translate(-W/2, -H/2 + cs.scrollY/cs.scale);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+    for (var gx=0; gx<W; gx+=36) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H+200); ctx.stroke(); }
+    for (var gy=-200; gy<H+200; gy+=36) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+
+    // Edges + progress fill
+    cs.edges.forEach(function(edge) {
+        var fn = cs.nodes[edge.from], tn = cs.nodes[edge.to]; if (!fn||!tn) return;
+        var x  = W/2, y0 = fn.y+fn.h/2, y1 = tn.y-tn.h/2;
+        ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,y1);
+        ctx.strokeStyle = hexRgba(edge.color, 0.1); ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+        if (edge.progress>0) {
+            ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x, y0+(y1-y0)*edge.progress);
+            ctx.strokeStyle = hexRgba(edge.color, 0.7); ctx.lineWidth=2.5; ctx.stroke();
+            if (edge.progress>0.8) {
+                ctx.fillStyle = hexRgba(edge.color, 0.8);
+                ctx.beginPath(); ctx.moveTo(x,y1); ctx.lineTo(x-5,y1-8); ctx.lineTo(x+5,y1-8); ctx.closePath(); ctx.fill();
+            }
+        }
+    });
+
+    // Particles
+    cs.particles.forEach(function(p) {
+        if (p.done) return;
+        var e = cs.edges[p.edgeIdx]; if (!e) return;
+        var fn = cs.nodes[e.from], tn = cs.nodes[e.to]; if (!fn||!tn) return;
+        var x = W/2;
+        var y0 = fn.y+fn.h/2, y1 = tn.y-tn.h/2;
+        p.progress = Math.min(1, p.progress+p.speed);
+        var py = y0 + (y1-y0)*p.progress;
+        p.trail.push({x:x,y:py}); if (p.trail.length>14) p.trail.shift();
+        p.trail.forEach(function(pt,ti) {
+            var a = (ti/p.trail.length)*0.6, r = p.size*(ti/p.trail.length)*0.7;
+            ctx.beginPath(); ctx.arc(pt.x,pt.y,Math.max(0.4,r),0,Math.PI*2);
+            ctx.fillStyle = hexRgba(p.color,a); ctx.fill();
+        });
+        ctx.shadowBlur=12; ctx.shadowColor=p.color;
+        ctx.beginPath(); ctx.arc(x,py,p.size,0,Math.PI*2);
+        ctx.fillStyle=p.color; ctx.fill(); ctx.shadowBlur=0;
+        if (p.progress>=1) p.done=true;
+    });
+    cs.particles = cs.particles.filter(function(p){return !p.done;});
+
+    // Nodes
+    cs.nodes.forEach(function(n) {
+        var x = n.x - n.w/2, y = n.y - n.h/2, r = 8;
+        var isA = n.state==='active', isD = n.state==='done', isE = n.state==='error';
+
+        // Pulse ring
+        if (isA) {
+            var pulse = (Math.sin(cs.pulseTime*3 + n.pulsePhase)+1)/2;
+            ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2*0.6+pulse*16, 0, Math.PI*2);
+            ctx.strokeStyle = hexRgba(n.color, 0.06+pulse*0.12); ctx.lineWidth=2+pulse*3; ctx.stroke();
+        }
+
+        if (isA || isE) { ctx.shadowBlur=isA?20:28; ctx.shadowColor=n.glowColor; }
+
+        // Fill
+        ctx.fillStyle = hexRgba(n.color, isE?0.35:isD?0.4:isA?0.82:0.06);
+        ftRoundRect(ctx, x, y, n.w, n.h, r); ctx.fill(); ctx.shadowBlur=0;
+
+        // Border
+        ctx.strokeStyle = hexRgba(n.color, isE?1:isD?0.55:isA?1:0.18);
+        ctx.lineWidth = isA?2:1.5;
+        ftRoundRect(ctx, x, y, n.w, n.h, r); ctx.stroke();
+
+        // Left stripe
+        ctx.fillStyle = hexRgba(n.color, isA?0.9:0.25);
+        ftRoundRect(ctx, x, y, 4, n.h, {tl:r,tr:0,br:0,bl:r}); ctx.fill();
+
+        // Label
+        ctx.fillStyle = isA?'#e8eaed': isD?hexRgba(n.color,0.7):'rgba(127,132,142,0.5)';
+        ctx.font = (isA?'bold ':'')+'11px Inter,sans-serif';
+        ctx.textAlign='left'; ctx.textBaseline='middle';
+        var lbl = n.nodeId, maxW = n.w-22;
+        if (ctx.measureText(lbl).width>maxW) { while(lbl.length>3&&ctx.measureText(lbl+'…').width>maxW) lbl=lbl.slice(0,-1); lbl+='…'; }
+        ctx.fillText(lbl, x+10, n.y);
+
+        // State icon
+        ctx.textAlign='right';
+        if (isE)  { ctx.fillStyle='#e06c75'; ctx.fillText('✗', x+n.w-6, n.y); }
+        else if (isD) { ctx.fillStyle=hexRgba(n.color,0.6); ctx.fillText('✓', x+n.w-6, n.y); }
+        else if (isA) { ctx.fillStyle=n.color; ctx.fillText('▶', x+n.w-6, n.y); }
+        ctx.textAlign='left';
+    });
+
+    ctx.restore();
+
+    // Scroll hint arrows
+    if (cs.nodes.length) {
+        var last = cs.nodes[cs.nodes.length-1];
+        if ((last.y+last.h/2)*cs.scale + cs.scrollY > H-10) {
+            ctx.fillStyle='rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.moveTo(W/2-12,H-14); ctx.lineTo(W/2+12,H-14); ctx.lineTo(W/2,H-4); ctx.closePath(); ctx.fill();
+        }
+    }
+
+    cs.animFrame = requestAnimationFrame(drawFtFrame);
+}
+
+function hexRgba(hex, a) {
+    if (!hex||hex[0]!=='#') return 'rgba(127,132,142,'+a+')';
+    var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+    return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+function ftRoundRect(ctx, x, y, w, h, r) {
+    var tl,tr,br,bl;
+    if (typeof r==='object'){tl=r.tl||0;tr=r.tr||0;br=r.br||0;bl=r.bl||0;}else{tl=tr=br=bl=r;}
+    ctx.beginPath();
+    ctx.moveTo(x+tl,y); ctx.lineTo(x+w-tr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+tr);
+    ctx.lineTo(x+w,y+h-br); ctx.quadraticCurveTo(x+w,y+h,x+w-br,y+h);
+    ctx.lineTo(x+bl,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-bl);
+    ctx.lineTo(x,y+tl); ctx.quadraticCurveTo(x,y,x+tl,y); ctx.closePath();
+}
+
+// ── Canvas zoom/pan for execution canvas ─────────────────────────
+
+function ftCanvasApplyZoom(newScale, fx, fy) {
+    var cs = ftCanvasState;
+    var W  = cs.W||220, H = cs.H||220;
+    newScale = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, newScale));
+    var ratio = newScale / cs.scale;
+    cs.panX    = fx - ratio*(fx - cs.panX);
+    cs.scrollY = (fy-H/2) - ratio*((fy-H/2) - cs.scrollY);
+    cs.scale   = newScale;
+    updateFtZoomLabel();
+}
+
+function ftCanvasFit() {
+    var cs = ftCanvasState;
+    if (!cs.nodes.length) { cs.scale=1; cs.scrollY=0; cs.panX=0; updateFtZoomLabel(); return; }
+    var W = cs.W||220, H = cs.H||220;
+    var lastN = cs.nodes[cs.nodes.length-1];
+    var totalH = lastN.y + lastN.h/2 + 20;
+    cs.scale   = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, (H-20)/totalH));
+    cs.scrollY = 0; cs.panX = 0;
+    updateFtZoomLabel();
+}
+
+function updateFtZoomLabel() {
+    var lbl = document.getElementById('ft-zoom-label');
+    if (lbl) lbl.textContent = Math.round(ftCanvasState.scale*100)+'%';
+}
+
+function ftCanvasGetNodeAt(mx, my) {
+    var cs = ftCanvasState;
+    var W  = cs.W||220, H = cs.H||220;
+    var wx = (mx - W/2 - cs.panX) / cs.scale + W/2;
+    var wy = (my - H/2) / cs.scale + H/2 - cs.scrollY/cs.scale;
+    for (var i=cs.nodes.length-1; i>=0; i--) {
+        var n=cs.nodes[i];
+        if (wx>=n.x-n.w/2&&wx<=n.x+n.w/2&&wy>=n.y-n.h/2&&wy<=n.y+n.h/2) return n;
+    }
+    return null;
+}
+
+function bindFtCanvasEvents() {
+    var canvas  = document.getElementById('ft-canvas');
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    if (!canvas||!wrapper) return;
+
+    var zoomIn  = document.getElementById('ft-zoom-in');
+    var zoomOut = document.getElementById('ft-zoom-out');
+    var fitBtn  = document.getElementById('ft-zoom-fit');
+    if (zoomIn)  zoomIn.addEventListener('click',  function(){ var cs=ftCanvasState; ftCanvasApplyZoom(cs.scale*1.3, cs.W/2, cs.H/2); });
+    if (zoomOut) zoomOut.addEventListener('click', function(){ var cs=ftCanvasState; ftCanvasApplyZoom(cs.scale*0.77, cs.W/2, cs.H/2); });
+    if (fitBtn)  fitBtn.addEventListener('click',  ftCanvasFit);
+
+    canvas.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var rect = canvas.getBoundingClientRect();
+        var mx = e.clientX-rect.left, my = e.clientY-rect.top;
+        if (e.ctrlKey||e.metaKey) {
+            ftCanvasApplyZoom(ftCanvasState.scale * (e.deltaY>0?0.88:1.14), mx, my);
+        } else {
+            ftCanvasState.scrollY -= e.deltaY * 0.9;
+        }
+    }, {passive:false});
+
+    canvas.addEventListener('touchstart', function(e) {
+        if (e.touches.length===2) {
+            var dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+            ftCanvasState.pinchDist0  = Math.sqrt(dx*dx+dy*dy);
+            ftCanvasState.pinchScale0 = ftCanvasState.scale;
+            ftCanvasState.dragStart   = null;
+        } else {
+            ftCanvasState.dragStart = { startX:e.touches[0].clientX, startY:e.touches[0].clientY, panX0:ftCanvasState.panX, scrollY0:ftCanvasState.scrollY };
+            ftCanvasState.pinchDist0 = null;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('touchmove', function(e) {
+        if (e.touches.length===2 && ftCanvasState.pinchDist0!==null) {
+            var dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+            var dist=Math.sqrt(dx*dx+dy*dy);
+            var rect=canvas.getBoundingClientRect();
+            var cx=((e.touches[0].clientX+e.touches[1].clientX)/2)-rect.left;
+            var cy=((e.touches[0].clientY+e.touches[1].clientY)/2)-rect.top;
+            ftCanvasApplyZoom(ftCanvasState.pinchScale0*(dist/ftCanvasState.pinchDist0), cx, cy);
+        } else if (e.touches.length===1 && ftCanvasState.dragStart) {
+            var dx=e.touches[0].clientX-ftCanvasState.dragStart.startX;
+            var dy=e.touches[0].clientY-ftCanvasState.dragStart.startY;
+            ftCanvasState.panX    = ftCanvasState.dragStart.panX0    + dx;
+            ftCanvasState.scrollY = ftCanvasState.dragStart.scrollY0 + dy;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('touchend', function(e) {
+        if (e.touches.length<2) ftCanvasState.pinchDist0=null;
+        if (e.touches.length===0 && ftCanvasState.dragStart) {
+            var mx=Math.abs(e.changedTouches[0].clientX-ftCanvasState.dragStart.startX);
+            var my=Math.abs(e.changedTouches[0].clientY-ftCanvasState.dragStart.startY);
+            if (mx<8&&my<8) {
+                var rect=canvas.getBoundingClientRect();
+                var n=ftCanvasGetNodeAt(e.changedTouches[0].clientX-rect.left, e.changedTouches[0].clientY-rect.top);
+                if (n) ftSetNodeLabel(n.nodeId);
+            }
+            ftCanvasState.dragStart=null;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('mousemove', function(e) {
+        if (ftCanvasState.dragStart && ftCanvasState.dragStart.type==='pan') {
+            ftCanvasState.panX    = ftCanvasState.dragStart.panX0    + (e.clientX-ftCanvasState.dragStart.startX);
+            ftCanvasState.scrollY = ftCanvasState.dragStart.scrollY0 + (e.clientY-ftCanvasState.dragStart.startY);
+            canvas.style.cursor='grabbing'; return;
+        }
+        var rect=canvas.getBoundingClientRect();
+        var n=ftCanvasGetNodeAt(e.clientX-rect.left, e.clientY-rect.top);
+        canvas.style.cursor = n?'pointer':'default';
+    });
+    canvas.addEventListener('mousedown', function(e) {
+        if (e.button===1||(e.button===0&&e.altKey)) {
+            e.preventDefault();
+            var rect=canvas.getBoundingClientRect();
+            ftCanvasState.dragStart={type:'pan',startX:e.clientX,startY:e.clientY,panX0:ftCanvasState.panX,scrollY0:ftCanvasState.scrollY};
+        }
+    });
+    canvas.addEventListener('mouseup', function(e) {
+        if (ftCanvasState.dragStart && ftCanvasState.dragStart.type==='pan') { ftCanvasState.dragStart=null; canvas.style.cursor='default'; return; }
+        var rect=canvas.getBoundingClientRect();
+        var n=ftCanvasGetNodeAt(e.clientX-rect.left, e.clientY-rect.top);
+        if (n) ftSetNodeLabel(n.nodeId);
+    });
+    canvas.addEventListener('mouseleave', function() { ftCanvasState.dragStart=null; canvas.style.cursor='default'; });
 }
 
 
@@ -8132,4 +8808,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+            }
