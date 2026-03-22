@@ -6732,12 +6732,23 @@ function renderCallStack() {
 // so we can pause, capture vars, and stream output.
 
 function instrumentCode(src, nodeId) {
-    // Instruments user JS code for step-by-step execution.
-    // Every executable line is wrapped in a queue entry closure.
-    // Function/class declarations are left in place (hoisting) but get
-    // a plain synchronous hook call prepended.
+    // Depth-aware instrumentation for generator-based stepping.
+    //
+    // At brace depth 0 (top-level of the generator body):
+    //   → inject:  __ftHookSync(i, nodeId); yield;
+    //   The generator pauses at yield; the parent drives it with .next()
+    //
+    // Inside nested functions/callbacks (depth > 0):
+    //   → inject:  __ftHookSync(i, nodeId);
+    //   yield is INVALID inside nested regular functions, so we skip it.
+    //   The hook still reports the line; the generator continues without pausing.
+    //
+    // This covers all real-world patterns: addEventListener callbacks,
+    // array.forEach, setTimeout handlers, class methods, etc.
+
     var lines  = src.split('\n');
     var result = [];
+    var depth  = 0;  // brace nesting depth
 
     lines.forEach(function(line, i) {
         var trimmed = line.trim();
@@ -6748,113 +6759,172 @@ function instrumentCode(src, nodeId) {
             trimmed.startsWith('/*') ||
             trimmed.startsWith('*') ||
             trimmed.startsWith('*/')) {
+            // Still count braces in skipped lines
+            for (var ci = 0; ci < line.length; ci++) {
+                if (line[ci] === '{') depth++;
+                else if (line[ci] === '}') depth = Math.max(0, depth - 1);
+            }
             result.push(line);
             return;
         }
 
-        // Function / class declarations must stay at the top level for
-        // hoisting — don't wrap them in a closure, just hook before them.
-        var isFnDecl = /^(async\s+)?function[\s*]/.test(trimmed) ||
-                       /^class\s+\w/.test(trimmed);
-        if (isFnDecl) {
+        // Inject hook BEFORE the line
+        if (depth === 0) {
+            // Top-level of the generator — yield here to pause
+            result.push('__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + '); yield;');
+        } else {
+            // Inside a nested function — hook only, no yield
             result.push('__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + ');');
-            result.push(line);
-            return;
         }
+        result.push(line);
 
-        // All other statements: push as a queue entry so the runner can
-        // pause between them, one at a time.
-        result.push(
-            '__ftQueue.push({li:' + i + ',ni:' + JSON.stringify(nodeId) + ',fn:function(){' +
-            '__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + ');' +
-            line.trim() +
-            '}});'
-        );
+        // Count brace depth from this line (AFTER injecting hook)
+        for (var ci = 0; ci < line.length; ci++) {
+            if (line[ci] === '{') depth++;
+            else if (line[ci] === '}') depth = Math.max(0, depth - 1);
+        }
     });
+
     return result.join('\n');
 }
 
 function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlCode) {
-    // Event-driven sandbox: each queue entry posts ft-line then yields
-    // via setTimeout so the parent can pause/step/resume between lines.
+    // The sandbox runs the instrumented code directly (no queue wrapping).
+    // __ftHookSync posts ft-line to the parent each time it is called,
+    // then WAITS for the parent to post ft-next before returning.
+    //
+    // Wait mechanism: we use a synchronous XMLHttpRequest to a data: URL
+    // which gives us ~0ms sleep, combined with a shared flag polled in a
+    // tight loop.  The parent sets __ftPaused=false by posting a message,
+    // which the sandbox receives *between* script executions (i.e. whenever
+    // the call stack is empty).
+    //
+    // ACTUALLY: because JS is single-threaded, a busy-wait in __ftHookSync
+    // blocks message receipt too.  The only truly synchronous inter-thread
+    // communication in a browser is Atomics.wait on a SharedArrayBuffer.
+    // We use that where available, and fall back to a plain per-line
+    // setTimeout-based approach on the PARENT side (rate-limiting ft-next).
+    //
+    // Simplest reliable design:
+    //   1. __ftHookSync posts ft-line and returns immediately (no blocking).
+    //   2. The user code runs as fast as it can (no pausing inside).
+    //   3. The PARENT receives ft-line events and updates the UI.
+    //   4. For visual step-delay the parent just processes the stream and
+    //      animates the highlight with its own setTimeout.
+    //   5. For true pause/step, we use a Proxy-wrapped eval with
+    //      Generator functions to yield between lines.
+    //
+    // GENERATOR approach: we transform the code so each instrumented line
+    // becomes a yield point in a generator.  The parent drives the generator
+    // one step at a time by posting ft-next.  Generators work in regular
+    // functions too — we wrap the whole code in a generator function.
 
     var sandboxLines = [
         '"use strict";',
-        'var __ftVars={};',
-        'var __ftQueue=[];',
-        'var __ftPaused=false;',
-        'var __ftDelay=0;',
-        'var __ftDone=false;',
+        'var __ftVars   = {};',
+        'var __ftPaused = false;',
+        'var __ftDelay  = 0;',
+        'var __ftGen    = null;   // the running generator',
         '',
-        'function __ftSetVar(name,value){',
-        '  try{',
-        '    var t=Array.isArray(value)?"array":typeof value;',
-        '    var s=JSON.parse(JSON.stringify(value==null?"null":value===undefined?"undefined":value));',
-        '    __ftVars[name]={value:s,type:t};',
-        '  }catch(e){__ftVars[name]={value:String(value),type:typeof value};}',
-        '}',
-        '',
-        'function __ftHookSync(li,ni){',
-        '  window.parent.postMessage({type:"ft-line",lineIdx:li,nodeId:ni,vars:JSON.parse(JSON.stringify(__ftVars))},"*");',
-        '}',
-        '',
-        'function __ftRunNext(){',
-        '  if(__ftPaused||__ftQueue.length===0)return;',
-        '  var item=__ftQueue.shift();',
-        '  try{item.fn();}catch(e){',
-        '    window.parent.postMessage({type:"ft-error",message:e.message,stack:e.stack||"",lineIdx:item.li,nodeId:item.ni},"*");',
-        '  }',
-        '  if(__ftQueue.length===0&&!__ftDone){',
-        '    __ftDone=true;',
-        '    window.parent.postMessage({type:"ft-done"},"*");',
-        '  }else if(!__ftPaused&&__ftQueue.length>0){',
-        '    setTimeout(__ftRunNext,__ftDelay);',
+        '// Variable tracker',
+        'function __ftSetVar(name, value) {',
+        '  try {',
+        '    var t = Array.isArray(value) ? "array" : typeof value;',
+        '    var s = JSON.parse(JSON.stringify(',
+        '      value == null ? "null" : value === undefined ? "undefined" : value));',
+        '    __ftVars[name] = { value: s, type: t };',
+        '  } catch(e) {',
+        '    __ftVars[name] = { value: String(value), type: typeof value };',
         '  }',
         '}',
         '',
-        'window.addEventListener("message",function(e){',
-        '  var d=e.data;if(!d)return;',
-        '  if(d.type==="ft-set-delay"){__ftDelay=d.delay||0;}',
-        '  if(d.type==="ft-pause"){__ftPaused=true;}',
-        '  if(d.type==="ft-resume"){__ftPaused=false;setTimeout(__ftRunNext,__ftDelay);}',
-        '  if(d.type==="ft-step"){',
-        '    var old=__ftPaused;__ftPaused=true;',
-        '    if(__ftQueue.length>0){',
-        '      var item=__ftQueue.shift();',
-        '      try{item.fn();}catch(e){window.parent.postMessage({type:"ft-error",message:e.message,stack:e.stack||"",lineIdx:item.li,nodeId:item.ni},"*");}',
-        '      if(__ftQueue.length===0&&!__ftDone){__ftDone=true;window.parent.postMessage({type:"ft-done"},"*");}',
+        '// Called before each line — posts ft-line then YIELDS (via the generator)',
+        'function __ftHookSync(li, ni) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-line", lineIdx: li, nodeId: ni,',
+        '    vars: JSON.parse(JSON.stringify(__ftVars))',
+        '  }, "*");',
+        '  // Actual yield happens in the generator wrapper — this function',
+        '  // is called inside the generator body so "return" here just returns.',
+        '}',
+        '',
+        '// Advance the generator one step (called by ft-next or setTimeout)',
+        'function __ftStep() {',
+        '  if (!__ftGen) return;',
+        '  try {',
+        '    var r = __ftGen.next();',
+        '    if (r.done) {',
+        '      window.parent.postMessage({ type: "ft-done" }, "*");',
+        '      __ftGen = null;',
+        '    } else if (!__ftPaused) {',
+        '      setTimeout(__ftStep, __ftDelay);',
         '    }',
+        '  } catch(e) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: e.message, stack: e.stack || ""',
+        '    }, "*");',
+        '    window.parent.postMessage({ type: "ft-done" }, "*");',
+        '    __ftGen = null;',
         '  }',
-        '  if(d.type==="ft-start-run"){',
-        '    __ftDelay=d.delay||0;__ftPaused=false;',
-        '    setTimeout(__ftRunNext,0);',
+        '}',
+        '',
+        '// Messages from parent',
+        'window.addEventListener("message", function(e) {',
+        '  var d = e.data; if (!d) return;',
+        '  if (d.type === "ft-set-delay")  { __ftDelay = d.delay || 0; }',
+        '  if (d.type === "ft-pause")      { __ftPaused = true; }',
+        '  if (d.type === "ft-resume")     { __ftPaused = false; setTimeout(__ftStep, __ftDelay); }',
+        '  if (d.type === "ft-step")       { __ftPaused = true; __ftStep(); }',
+        '  if (d.type === "ft-start-run")  {',
+        '    __ftDelay = d.delay || 0;',
+        '    __ftPaused = false;',
+        '    setTimeout(__ftStep, 0);',
         '  }',
         '});',
         '',
-        '["log","warn","error","info"].forEach(function(m){',
-        '  var orig=console[m].bind(console);',
-        '  console[m]=function(){',
-        '    var args=Array.from(arguments).map(function(a){try{return typeof a==="object"?JSON.stringify(a):String(a);}catch(e){return String(a);}});',
-        '    window.parent.postMessage({type:"ft-console",level:m,args:args},"*");',
-        '    orig.apply(console,arguments);',
+        '// Console forwarding',
+        '["log","warn","error","info"].forEach(function(m) {',
+        '  var orig = console[m].bind(console);',
+        '  console[m] = function() {',
+        '    var args = Array.from(arguments).map(function(a) {',
+        '      try { return typeof a === "object" ? JSON.stringify(a) : String(a); }',
+        '      catch(e) { return String(a); }',
+        '    });',
+        '    window.parent.postMessage({ type: "ft-console", level: m, args: args }, "*");',
+        '    orig.apply(console, arguments);',
         '  };',
         '});',
         '',
-        'window.onerror=function(msg,src,line,col,err){',
-        '  window.parent.postMessage({type:"ft-error",message:msg,stack:err?err.stack:"",line:line,col:col},"*");',
+        '// Error catching',
+        'window.onerror = function(msg, src, line, col, err) {',
+        '  window.parent.postMessage({',
+        '    type: "ft-error", message: msg, stack: err ? err.stack : "",',
+        '    line: line, col: col',
+        '  }, "*");',
         '  return true;',
         '};',
-        'window.onunhandledrejection=function(e){',
-        '  window.parent.postMessage({type:"ft-error",message:String(e.reason||e)},"*");',
+        'window.onunhandledrejection = function(e) {',
+        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason || e) }, "*");',
         '};',
     ];
 
     var userLines = [
-        'window.parent.postMessage({type:"ft-start"},"*");',
-        '(function(){',
+        '// Wrap user code in a generator so yield pauses at each line',
+        '// yield is already in place at depth-0 from instrumentCode()',
+        'function* __ftMain() {',
+        '  try {',
         jsCode,
-        '})();',
-        'if(__ftQueue.length===0){window.parent.postMessage({type:"ft-done"},"*");}',
+        '  } catch(__err) {',
+        '    window.parent.postMessage({',
+        '      type: "ft-error", message: __err.message, stack: __err.stack || ""',
+        '    }, "*");',
+        '  }',
+        '}',
+        '',
+        '// Signal ready, then wait for ft-start-run',
+        'window.parent.postMessage({ type: "ft-start" }, "*");',
+        '__ftGen = __ftMain();',
+        '// ft-start-run from parent will call __ftStep() to begin',
     ];
 
     return [
