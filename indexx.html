@@ -844,7 +844,37 @@
             0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)}
         }
         .ft-line-shake { animation: ft-shake 0.4s ease; }
-        .ft-line-inline-val {
+                /* AI explanation badge on each line */
+        .ft-line-explain {
+            display: none;
+            margin-left: 12px;
+            font-size: 0.68rem;
+            color: #5c6370;
+            font-style: italic;
+            font-family: Inter, sans-serif;
+            vertical-align: middle;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 260px;
+        }
+        .ft-line-active .ft-line-explain {
+            display: inline;
+            color: #c678dd;
+            font-style: normal;
+            animation: ft-explain-fade 0.3s ease;
+        }
+        .ft-line-done .ft-line-explain {
+            display: inline;
+            color: #3e4451;
+        }
+        @keyframes ft-explain-fade {
+            from { opacity: 0; transform: translateX(-4px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .ft-line-shake {
+            animation: ft-line-shake 0.35s ease-in-out;
+        }
             display: none; margin-left: 10px; color: #5c6370;
             font-size: 0.68rem; font-style: italic; opacity: 0.85; white-space: nowrap;
         }
@@ -1883,4 +1913,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-    </html>
+</html>
