@@ -6995,6 +6995,9 @@ async function runFlowTrace() {
     // Render all code lines
     renderCodeLines(nodeBlocks);
 
+    // Build the execution flow graph on the canvas (nodes = JS blocks)
+    buildExecutionGraph(nodeBlocks);
+
     // Build a line-index map: nodeId+lineNum → globalIdx
     // (used to map sandbox messages back to line elements)
     var lineMap = {}; // key: nodeId+'::'+lineNum → globalIdx
@@ -7050,27 +7053,35 @@ async function runFlowTrace() {
             if (activeLine >= 0 && activeLine < ftState.lines.length) {
                 var lineEntry = ftState.lines[activeLine];
                 lineEntry.el.classList.add('ft-line-active');
-                // Scroll to it
                 lineEntry.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 ftSetNodeLabel(d.nodeId);
                 ftUpdateLineCounter();
-                // Update vars from snapshot
                 if (d.vars && typeof d.vars === 'object') {
-                    Object.keys(d.vars).forEach(function(name) {
-                        var v = d.vars[name];
-                        ftUpdateVar(name, v.value, v.type);
+                    Object.keys(d.vars).forEach(function(n) {
+                        var v = d.vars[n]; ftUpdateVar(n, v.value, v.type);
                     });
+                }
+                // Show inline value hint on the line if vars changed
+                var valEl = document.getElementById('ftlineval-' + activeLine);
+                if (valEl && d.vars) {
+                    var changed = Object.keys(d.vars).filter(function(n) { return d.vars[n] && ftState.vars[n] && JSON.stringify(ftState.vars[n].value) !== JSON.stringify(d.vars[n].value); });
+                    if (changed.length) {
+                        valEl.textContent = changed.map(function(n) { return n + ' = ' + JSON.stringify(d.vars[n].value); }).join(', ');
+                        valEl.style.display = 'inline';
+                    }
                 }
             }
             ftState.lineIndex = activeLine;
 
-            // Apply step delay via sandbox control
+            // Activate canvas node for this nodeId
+            canvasActivateNode(d.nodeId);
+
+            // Apply step delay
             if (ftState.delay > 0) {
                 sandbox.contentWindow.postMessage({ type: 'ft-pause' }, '*');
                 setTimeout(function() {
                     if (ftState.isRunning) {
-                        if (ftState.stepMode) { /* wait for user Step button */ }
-                        else { sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*'); }
+                        if (!ftState.isPaused) sandbox.contentWindow.postMessage({ type: 'ft-resume' }, '*');
                     }
                 }, ftState.delay);
             }
@@ -7083,12 +7094,16 @@ async function runFlowTrace() {
         }
 
         else if (d.type === 'ft-error') {
-            // Mark the current line as errored
             if (activeLine >= 0 && ftState.lines[activeLine]) {
                 ftState.lines[activeLine].el.classList.add('ft-line-error');
                 ftState.lines[activeLine].el.classList.remove('ft-line-active');
+                // Shake the line element to draw attention
+                ftState.lines[activeLine].el.classList.add('ft-line-shake');
             }
-            ftLog('ERROR: ' + d.message + (d.stack ? '\n' + d.stack.split('\n')[1] : ''), 'error');
+            // Mark current canvas node as error
+            var errNodeId = ftState.lines[activeLine] ? ftState.lines[activeLine].nodeId : ftCanvasState.lastNodeId;
+            if (errNodeId) canvasMarkError(errNodeId);
+            ftLog('\u2717 ERROR at line ' + (activeLine+1) + ': ' + d.message + (d.stack ? '  →  ' + d.stack.split('\n')[0] : ''), 'error');
             ftSetStatus('Error', 'error');
             ftState.errorCount++;
         }
@@ -7102,6 +7117,7 @@ async function runFlowTrace() {
             }
             ftState.isRunning = false;
             ftState.isPaused  = false;
+            canvasFinish();
             ftSetStatus(ftState.errorCount > 0 ? 'Finished with errors' : 'Done ✓', ftState.errorCount > 0 ? 'error' : 'done');
             ftLog('Trace complete in ' + ftNow() + (ftState.errorCount ? ' · ' + ftState.errorCount + ' error(s)' : ''), ftState.errorCount ? 'error' : 'return');
             ftPopStack();
@@ -7206,6 +7222,8 @@ function bindFlowTracerEvents() {
     var selectorInput = document.getElementById('ft-target-selector');
     if (selectorInput) selectorInput.addEventListener('keydown', function(e) { if (e.key==='Enter') runFlowTrace(); });
 
+    bindFtCanvasEvents();
+
     var configToggle = document.getElementById('ft-config-toggle');
     var leftPanel    = document.getElementById('ft-left-panel');
     if (configToggle && leftPanel) {
@@ -7218,6 +7236,409 @@ function bindFlowTracerEvents() {
             if (lbl)   lbl.textContent   = isOpen ? '⚙ Hide Config' : '⚙ Configure Trigger';
         });
     }
+}
+
+
+// ─────────────────────────────────────────────────────────────────
+// EXECUTION CANVAS — driven by real sandbox execution events
+// ─────────────────────────────────────────────────────────────────
+
+var ftCanvasState = {
+    nodes: [],          // { id, nodeId, x, y, w, h, color, glowColor, state, pulsePhase }
+    edges: [],          // { from, to, color, progress }
+    particles: [],
+    activeNodeId: null,
+    lastNodeId: null,
+    animFrame: null,
+    scale: 1.0,
+    panX: 0,
+    scrollY: 0,
+    pinchDist0: null,
+    pinchScale0: null,
+    dragStart: null,
+    pulseTime: 0,
+};
+
+var FT_SCALE_MIN = 0.2, FT_SCALE_MAX = 4.0;
+
+function buildExecutionGraph(nodeBlocks) {
+    stopFtCanvas();
+    var cs      = ftCanvasState;
+    cs.nodes    = []; cs.edges = []; cs.particles = [];
+    cs.activeNodeId = null; cs.lastNodeId = null;
+    cs.scale    = 1.0; cs.panX = 0; cs.scrollY = 0;
+
+    var canvas  = document.getElementById('ft-canvas');
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    if (!canvas || !wrapper) return;
+
+    var ph = document.getElementById('ft-placeholder');
+    if (ph) ph.style.display = 'none';
+
+    var dpr = window.devicePixelRatio || 1;
+    var W   = wrapper.clientWidth  || 220;
+    var H   = wrapper.clientHeight || 220;
+    canvas.width  = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    var PAD    = 14;
+    var NODE_W = Math.min(W - PAD*2, 180);
+    var NODE_H = 38;
+    var GAP_Y  = 28;
+
+    var PALETTE = ['#c678dd','#e5c07b','#61afef','#98c379','#56b6c2','#d19a66','#e06c75'];
+    nodeBlocks.forEach(function(block, i) {
+        var col = PALETTE[i % PALETTE.length];
+        var y   = PAD + i * (NODE_H + GAP_Y) + NODE_H / 2;
+        cs.nodes.push({
+            id: i, nodeId: block.nodeId,
+            x: W / 2, y: y, w: NODE_W, h: NODE_H,
+            color: col,
+            glowColor: col.replace('#', 'rgba(').replace(/([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i, function(m,r,g,b){
+                return parseInt(r,16)+','+parseInt(g,16)+','+parseInt(b,16)+',0.5)';
+            }),
+            state: 'idle',
+            pulsePhase: i * 0.4,
+        });
+        if (i > 0) cs.edges.push({ from: i-1, to: i, color: PALETTE[(i-1) % PALETTE.length], progress: 0 });
+    });
+
+    ftCanvasState = cs;
+    ftCanvasState.ctx = ctx;
+    ftCanvasState.W = W;
+    ftCanvasState.H = H;
+    updateFtZoomLabel();
+    cs.animFrame = requestAnimationFrame(drawFtFrame);
+}
+
+function canvasActivateNode(nodeId) {
+    var cs = ftCanvasState;
+    var idx = cs.nodes.findIndex(function(n){ return n.nodeId === nodeId; });
+    if (idx === -1) return;
+
+    // Mark previous node done, fire edge particle
+    if (cs.lastNodeId !== null && cs.lastNodeId !== nodeId) {
+        cs.nodes.forEach(function(n){ if (n.nodeId === cs.lastNodeId) n.state = 'done'; });
+        // Find edge between last and this
+        var lastIdx = cs.nodes.findIndex(function(n){ return n.nodeId === cs.lastNodeId; });
+        var edgeIdx = cs.edges.findIndex(function(e){ return e.from === lastIdx && e.to === idx; });
+        if (edgeIdx !== -1) {
+            cs.edges[edgeIdx].progress = 0;
+            animateFtEdge(edgeIdx, 350);
+            spawnFtParticles(edgeIdx);
+        }
+    }
+
+    cs.nodes[idx].state = 'active';
+    cs.activeNodeId = nodeId;
+    cs.lastNodeId   = nodeId;
+
+    // Auto-scroll canvas to keep active node visible
+    autoScrollToNode(cs.nodes[idx]);
+}
+
+function canvasMarkError(nodeId) {
+    ftCanvasState.nodes.forEach(function(n){
+        if (n.nodeId === nodeId) { n.state = 'error'; n.color = '#e06c75'; }
+    });
+}
+
+function canvasFinish() {
+    ftCanvasState.nodes.forEach(function(n){
+        if (n.state === 'active') n.state = 'done';
+    });
+}
+
+function autoScrollToNode(node) {
+    var cs = ftCanvasState;
+    var H  = cs.H || 220;
+    var nodeBottom = node.y + node.h/2 + cs.scrollY / cs.scale;
+    var nodeTop    = node.y - node.h/2 + cs.scrollY / cs.scale;
+    if (nodeBottom * cs.scale + cs.scrollY > H - 20) cs.scrollY = -(node.y * cs.scale - H / 2);
+    if (nodeTop    * cs.scale + cs.scrollY < 20)     cs.scrollY = -(node.y * cs.scale - H / 2);
+}
+
+function animateFtEdge(idx, dur) {
+    var edge = ftCanvasState.edges[idx]; if (!edge) return;
+    var t0   = performance.now();
+    function tick(now) { edge.progress = Math.min(1, (now-t0)/dur); if (edge.progress<1) requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+}
+
+function spawnFtParticles(edgeIdx) {
+    var edge = ftCanvasState.edges[edgeIdx]; if (!edge) return;
+    for (var k=0; k<4; k++) {
+        (function(k){ setTimeout(function(){
+            ftCanvasState.particles.push({ edgeIdx:edgeIdx, progress:0, speed:0.02+Math.random()*0.01, color:edge.color, size:3+Math.random()*2, trail:[], done:false });
+        }, k*70); })(k);
+    }
+}
+
+function stopFtCanvas() {
+    if (ftCanvasState.animFrame) { cancelAnimationFrame(ftCanvasState.animFrame); ftCanvasState.animFrame = null; }
+}
+
+function drawFtFrame(now) {
+    var cs  = ftCanvasState;
+    var ctx = cs.ctx;
+    if (!ctx) return;
+    var W = cs.W || 220, H = cs.H || 220;
+    cs.pulseTime = now * 0.001;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(W/2 + cs.panX, H/2);
+    ctx.scale(cs.scale, cs.scale);
+    ctx.translate(-W/2, -H/2 + cs.scrollY/cs.scale);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+    for (var gx=0; gx<W; gx+=36) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H+200); ctx.stroke(); }
+    for (var gy=-200; gy<H+200; gy+=36) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+
+    // Edges + progress fill
+    cs.edges.forEach(function(edge) {
+        var fn = cs.nodes[edge.from], tn = cs.nodes[edge.to]; if (!fn||!tn) return;
+        var x  = W/2, y0 = fn.y+fn.h/2, y1 = tn.y-tn.h/2;
+        ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x,y1);
+        ctx.strokeStyle = hexRgba(edge.color, 0.1); ctx.lineWidth=3; ctx.setLineDash([5,5]); ctx.stroke(); ctx.setLineDash([]);
+        if (edge.progress>0) {
+            ctx.beginPath(); ctx.moveTo(x,y0); ctx.lineTo(x, y0+(y1-y0)*edge.progress);
+            ctx.strokeStyle = hexRgba(edge.color, 0.7); ctx.lineWidth=2.5; ctx.stroke();
+            if (edge.progress>0.8) {
+                ctx.fillStyle = hexRgba(edge.color, 0.8);
+                ctx.beginPath(); ctx.moveTo(x,y1); ctx.lineTo(x-5,y1-8); ctx.lineTo(x+5,y1-8); ctx.closePath(); ctx.fill();
+            }
+        }
+    });
+
+    // Particles
+    cs.particles.forEach(function(p) {
+        if (p.done) return;
+        var e = cs.edges[p.edgeIdx]; if (!e) return;
+        var fn = cs.nodes[e.from], tn = cs.nodes[e.to]; if (!fn||!tn) return;
+        var x = W/2;
+        var y0 = fn.y+fn.h/2, y1 = tn.y-tn.h/2;
+        p.progress = Math.min(1, p.progress+p.speed);
+        var py = y0 + (y1-y0)*p.progress;
+        p.trail.push({x:x,y:py}); if (p.trail.length>14) p.trail.shift();
+        p.trail.forEach(function(pt,ti) {
+            var a = (ti/p.trail.length)*0.6, r = p.size*(ti/p.trail.length)*0.7;
+            ctx.beginPath(); ctx.arc(pt.x,pt.y,Math.max(0.4,r),0,Math.PI*2);
+            ctx.fillStyle = hexRgba(p.color,a); ctx.fill();
+        });
+        ctx.shadowBlur=12; ctx.shadowColor=p.color;
+        ctx.beginPath(); ctx.arc(x,py,p.size,0,Math.PI*2);
+        ctx.fillStyle=p.color; ctx.fill(); ctx.shadowBlur=0;
+        if (p.progress>=1) p.done=true;
+    });
+    cs.particles = cs.particles.filter(function(p){return !p.done;});
+
+    // Nodes
+    cs.nodes.forEach(function(n) {
+        var x = n.x - n.w/2, y = n.y - n.h/2, r = 8;
+        var isA = n.state==='active', isD = n.state==='done', isE = n.state==='error';
+
+        // Pulse ring
+        if (isA) {
+            var pulse = (Math.sin(cs.pulseTime*3 + n.pulsePhase)+1)/2;
+            ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2*0.6+pulse*16, 0, Math.PI*2);
+            ctx.strokeStyle = hexRgba(n.color, 0.06+pulse*0.12); ctx.lineWidth=2+pulse*3; ctx.stroke();
+        }
+
+        if (isA || isE) { ctx.shadowBlur=isA?20:28; ctx.shadowColor=n.glowColor; }
+
+        // Fill
+        ctx.fillStyle = hexRgba(n.color, isE?0.35:isD?0.4:isA?0.82:0.06);
+        ftRoundRect(ctx, x, y, n.w, n.h, r); ctx.fill(); ctx.shadowBlur=0;
+
+        // Border
+        ctx.strokeStyle = hexRgba(n.color, isE?1:isD?0.55:isA?1:0.18);
+        ctx.lineWidth = isA?2:1.5;
+        ftRoundRect(ctx, x, y, n.w, n.h, r); ctx.stroke();
+
+        // Left stripe
+        ctx.fillStyle = hexRgba(n.color, isA?0.9:0.25);
+        ftRoundRect(ctx, x, y, 4, n.h, {tl:r,tr:0,br:0,bl:r}); ctx.fill();
+
+        // Label
+        ctx.fillStyle = isA?'#e8eaed': isD?hexRgba(n.color,0.7):'rgba(127,132,142,0.5)';
+        ctx.font = (isA?'bold ':'')+'11px Inter,sans-serif';
+        ctx.textAlign='left'; ctx.textBaseline='middle';
+        var lbl = n.nodeId, maxW = n.w-22;
+        if (ctx.measureText(lbl).width>maxW) { while(lbl.length>3&&ctx.measureText(lbl+'…').width>maxW) lbl=lbl.slice(0,-1); lbl+='…'; }
+        ctx.fillText(lbl, x+10, n.y);
+
+        // State icon
+        ctx.textAlign='right';
+        if (isE)  { ctx.fillStyle='#e06c75'; ctx.fillText('✗', x+n.w-6, n.y); }
+        else if (isD) { ctx.fillStyle=hexRgba(n.color,0.6); ctx.fillText('✓', x+n.w-6, n.y); }
+        else if (isA) { ctx.fillStyle=n.color; ctx.fillText('▶', x+n.w-6, n.y); }
+        ctx.textAlign='left';
+    });
+
+    ctx.restore();
+
+    // Scroll hint arrows
+    if (cs.nodes.length) {
+        var last = cs.nodes[cs.nodes.length-1];
+        if ((last.y+last.h/2)*cs.scale + cs.scrollY > H-10) {
+            ctx.fillStyle='rgba(255,255,255,0.15)';
+            ctx.beginPath(); ctx.moveTo(W/2-12,H-14); ctx.lineTo(W/2+12,H-14); ctx.lineTo(W/2,H-4); ctx.closePath(); ctx.fill();
+        }
+    }
+
+    cs.animFrame = requestAnimationFrame(drawFtFrame);
+}
+
+function hexRgba(hex, a) {
+    if (!hex||hex[0]!=='#') return 'rgba(127,132,142,'+a+')';
+    var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+    return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+function ftRoundRect(ctx, x, y, w, h, r) {
+    var tl,tr,br,bl;
+    if (typeof r==='object'){tl=r.tl||0;tr=r.tr||0;br=r.br||0;bl=r.bl||0;}else{tl=tr=br=bl=r;}
+    ctx.beginPath();
+    ctx.moveTo(x+tl,y); ctx.lineTo(x+w-tr,y); ctx.quadraticCurveTo(x+w,y,x+w,y+tr);
+    ctx.lineTo(x+w,y+h-br); ctx.quadraticCurveTo(x+w,y+h,x+w-br,y+h);
+    ctx.lineTo(x+bl,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-bl);
+    ctx.lineTo(x,y+tl); ctx.quadraticCurveTo(x,y,x+tl,y); ctx.closePath();
+}
+
+// ── Canvas zoom/pan for execution canvas ─────────────────────────
+
+function ftCanvasApplyZoom(newScale, fx, fy) {
+    var cs = ftCanvasState;
+    var W  = cs.W||220, H = cs.H||220;
+    newScale = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, newScale));
+    var ratio = newScale / cs.scale;
+    cs.panX    = fx - ratio*(fx - cs.panX);
+    cs.scrollY = (fy-H/2) - ratio*((fy-H/2) - cs.scrollY);
+    cs.scale   = newScale;
+    updateFtZoomLabel();
+}
+
+function ftCanvasFit() {
+    var cs = ftCanvasState;
+    if (!cs.nodes.length) { cs.scale=1; cs.scrollY=0; cs.panX=0; updateFtZoomLabel(); return; }
+    var W = cs.W||220, H = cs.H||220;
+    var lastN = cs.nodes[cs.nodes.length-1];
+    var totalH = lastN.y + lastN.h/2 + 20;
+    cs.scale   = Math.max(FT_SCALE_MIN, Math.min(FT_SCALE_MAX, (H-20)/totalH));
+    cs.scrollY = 0; cs.panX = 0;
+    updateFtZoomLabel();
+}
+
+function updateFtZoomLabel() {
+    var lbl = document.getElementById('ft-zoom-label');
+    if (lbl) lbl.textContent = Math.round(ftCanvasState.scale*100)+'%';
+}
+
+function ftCanvasGetNodeAt(mx, my) {
+    var cs = ftCanvasState;
+    var W  = cs.W||220, H = cs.H||220;
+    var wx = (mx - W/2 - cs.panX) / cs.scale + W/2;
+    var wy = (my - H/2) / cs.scale + H/2 - cs.scrollY/cs.scale;
+    for (var i=cs.nodes.length-1; i>=0; i--) {
+        var n=cs.nodes[i];
+        if (wx>=n.x-n.w/2&&wx<=n.x+n.w/2&&wy>=n.y-n.h/2&&wy<=n.y+n.h/2) return n;
+    }
+    return null;
+}
+
+function bindFtCanvasEvents() {
+    var canvas  = document.getElementById('ft-canvas');
+    var wrapper = document.getElementById('ft-canvas-wrapper');
+    if (!canvas||!wrapper) return;
+
+    var zoomIn  = document.getElementById('ft-zoom-in');
+    var zoomOut = document.getElementById('ft-zoom-out');
+    var fitBtn  = document.getElementById('ft-zoom-fit');
+    if (zoomIn)  zoomIn.addEventListener('click',  function(){ var cs=ftCanvasState; ftCanvasApplyZoom(cs.scale*1.3, cs.W/2, cs.H/2); });
+    if (zoomOut) zoomOut.addEventListener('click', function(){ var cs=ftCanvasState; ftCanvasApplyZoom(cs.scale*0.77, cs.W/2, cs.H/2); });
+    if (fitBtn)  fitBtn.addEventListener('click',  ftCanvasFit);
+
+    canvas.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var rect = canvas.getBoundingClientRect();
+        var mx = e.clientX-rect.left, my = e.clientY-rect.top;
+        if (e.ctrlKey||e.metaKey) {
+            ftCanvasApplyZoom(ftCanvasState.scale * (e.deltaY>0?0.88:1.14), mx, my);
+        } else {
+            ftCanvasState.scrollY -= e.deltaY * 0.9;
+        }
+    }, {passive:false});
+
+    canvas.addEventListener('touchstart', function(e) {
+        if (e.touches.length===2) {
+            var dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+            ftCanvasState.pinchDist0  = Math.sqrt(dx*dx+dy*dy);
+            ftCanvasState.pinchScale0 = ftCanvasState.scale;
+            ftCanvasState.dragStart   = null;
+        } else {
+            ftCanvasState.dragStart = { startX:e.touches[0].clientX, startY:e.touches[0].clientY, panX0:ftCanvasState.panX, scrollY0:ftCanvasState.scrollY };
+            ftCanvasState.pinchDist0 = null;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('touchmove', function(e) {
+        if (e.touches.length===2 && ftCanvasState.pinchDist0!==null) {
+            var dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+            var dist=Math.sqrt(dx*dx+dy*dy);
+            var rect=canvas.getBoundingClientRect();
+            var cx=((e.touches[0].clientX+e.touches[1].clientX)/2)-rect.left;
+            var cy=((e.touches[0].clientY+e.touches[1].clientY)/2)-rect.top;
+            ftCanvasApplyZoom(ftCanvasState.pinchScale0*(dist/ftCanvasState.pinchDist0), cx, cy);
+        } else if (e.touches.length===1 && ftCanvasState.dragStart) {
+            var dx=e.touches[0].clientX-ftCanvasState.dragStart.startX;
+            var dy=e.touches[0].clientY-ftCanvasState.dragStart.startY;
+            ftCanvasState.panX    = ftCanvasState.dragStart.panX0    + dx;
+            ftCanvasState.scrollY = ftCanvasState.dragStart.scrollY0 + dy;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('touchend', function(e) {
+        if (e.touches.length<2) ftCanvasState.pinchDist0=null;
+        if (e.touches.length===0 && ftCanvasState.dragStart) {
+            var mx=Math.abs(e.changedTouches[0].clientX-ftCanvasState.dragStart.startX);
+            var my=Math.abs(e.changedTouches[0].clientY-ftCanvasState.dragStart.startY);
+            if (mx<8&&my<8) {
+                var rect=canvas.getBoundingClientRect();
+                var n=ftCanvasGetNodeAt(e.changedTouches[0].clientX-rect.left, e.changedTouches[0].clientY-rect.top);
+                if (n) ftSetNodeLabel(n.nodeId);
+            }
+            ftCanvasState.dragStart=null;
+        }
+    },{passive:true});
+
+    canvas.addEventListener('mousemove', function(e) {
+        if (ftCanvasState.dragStart && ftCanvasState.dragStart.type==='pan') {
+            ftCanvasState.panX    = ftCanvasState.dragStart.panX0    + (e.clientX-ftCanvasState.dragStart.startX);
+            ftCanvasState.scrollY = ftCanvasState.dragStart.scrollY0 + (e.clientY-ftCanvasState.dragStart.startY);
+            canvas.style.cursor='grabbing'; return;
+        }
+        var rect=canvas.getBoundingClientRect();
+        var n=ftCanvasGetNodeAt(e.clientX-rect.left, e.clientY-rect.top);
+        canvas.style.cursor = n?'pointer':'default';
+    });
+    canvas.addEventListener('mousedown', function(e) {
+        if (e.button===1||(e.button===0&&e.altKey)) {
+            e.preventDefault();
+            var rect=canvas.getBoundingClientRect();
+            ftCanvasState.dragStart={type:'pan',startX:e.clientX,startY:e.clientY,panX0:ftCanvasState.panX,scrollY0:ftCanvasState.scrollY};
+        }
+    });
+    canvas.addEventListener('mouseup', function(e) {
+        if (ftCanvasState.dragStart && ftCanvasState.dragStart.type==='pan') { ftCanvasState.dragStart=null; canvas.style.cursor='default'; return; }
+        var rect=canvas.getBoundingClientRect();
+        var n=ftCanvasGetNodeAt(e.clientX-rect.left, e.clientY-rect.top);
+        if (n) ftSetNodeLabel(n.nodeId);
+    });
+    canvas.addEventListener('mouseleave', function() { ftCanvasState.dragStart=null; canvas.style.cursor='default'; });
 }
 
 
@@ -8132,4 +8553,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+            }
