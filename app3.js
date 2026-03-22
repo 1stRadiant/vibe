@@ -7009,6 +7009,82 @@ function renderCodeLines(nodeBlocks) {
     });
 }
 
+// ── AI Line Explainer ────────────────────────────────────────────
+// Calls the AI once to explain each line, then attaches tooltips.
+
+var ftLineExplanations = {};   // key: "nodeId::lineNum" → explanation string
+
+async function fetchLineExplanations(nodeBlocks) {
+    if (!callAI) return;
+    var keyOk = (currentAIProvider === 'gemini' && !!geminiApiKey) ||
+                (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if (!keyOk) return;
+
+    // Build a compact source listing with line numbers for the AI
+    var listing = nodeBlocks.map(function(block) {
+        var numbered = block.src.split('\n').map(function(line, i) {
+            return (i + 1) + ': ' + line;
+        }).join('\n');
+        return '=== ' + block.nodeId + ' ===\n' + numbered;
+    }).join('\n\n');
+
+    var systemPrompt = [
+        'You are a JavaScript code explainer. Given numbered source lines, explain what each line DOES in plain English.',
+        'Keep each explanation SHORT — one sentence max, 10 words or fewer.',
+        'Focus on WHAT happens: variable set, function called, condition checked, DOM updated, etc.',
+        'Return ONLY a JSON object mapping "nodeId::lineNumber" to the explanation string.',
+        'Line numbers are 1-based. Only include non-blank, non-comment lines.',
+        'Example output: { "main-js::1": "Finds the button element by ID", "main-js::3": "Adds click listener to button" }'
+    ].join(' ');
+
+    var userPrompt = 'Explain each line:\n\n' + listing;
+
+    try {
+        ftLog('AI is annotating lines…', 'info');
+        var raw = await callAI(systemPrompt, userPrompt, true);
+        var text = raw.trim();
+        var fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (fence && fence[1]) text = fence[1].trim();
+        var s = text.indexOf('{'), e = text.lastIndexOf('}');
+        if (s !== -1 && e > s) text = text.substring(s, e + 1);
+        ftLineExplanations = JSON.parse(text);
+        applyLineExplanations(nodeBlocks);
+        ftLog('AI annotations ready — hover any line to see explanation.', 'info');
+    } catch(err) {
+        // Non-fatal — tracing still works without AI annotations
+        console.warn('FT AI explain failed:', err.message);
+    }
+}
+
+function applyLineExplanations(nodeBlocks) {
+    // Attach explanation as tooltip title and as a hoverable annotation element
+    nodeBlocks.forEach(function(block) {
+        block.src.split('\n').forEach(function(_, i) {
+            var key = block.nodeId + '::' + (i + 1);
+            var explanation = ftLineExplanations[key];
+            if (!explanation) return;
+
+            // Find the line element in ftState.lines
+            var lineEntry = ftState.lines.find(function(l) {
+                return l.nodeId === block.nodeId && l.lineNum === i;
+            });
+            if (!lineEntry || !lineEntry.el) return;
+
+            lineEntry.el.title = explanation;
+            lineEntry.explanation = explanation;
+
+            // Add a small annotation badge to the line
+            var badge = lineEntry.el.querySelector('.ft-line-explain');
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'ft-line-explain';
+                lineEntry.el.appendChild(badge);
+            }
+            badge.textContent = explanation;
+        });
+    });
+}
+
 // ── Main run function ────────────────────────────────────────────
 
 async function runFlowTrace() {
@@ -7070,6 +7146,10 @@ async function runFlowTrace() {
 
     // Build the execution flow graph on the canvas (nodes = JS blocks)
     buildExecutionGraph(nodeBlocks);
+
+    // Kick off AI line annotations in background (non-blocking)
+    ftLineExplanations = {};
+    fetchLineExplanations(nodeBlocks);
 
     // Build a line-index map: nodeId+lineNum → globalIdx
     // (used to map sandbox messages back to line elements)
@@ -7136,6 +7216,10 @@ async function runFlowTrace() {
                 lineEntry.el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 ftSetNodeLabel(d.nodeId);
                 ftUpdateLineCounter();
+                // Show AI explanation in the log for this line
+                if (lineEntry.explanation) {
+                    ftLog('💬 ' + lineEntry.code.trim() + '  →  ' + lineEntry.explanation, 'branch');
+                }
                 if (d.vars && typeof d.vars === 'object') {
                     Object.keys(d.vars).forEach(function(n) {
                         var v = d.vars[n]; ftUpdateVar(n, v.value, v.type);
@@ -8650,4 +8734,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+  }
