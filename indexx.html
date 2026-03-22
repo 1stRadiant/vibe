@@ -592,10 +592,10 @@
             font-size: 0.72rem;
         }
         .ft-canvas-wrapper {
-            flex: 1;
             position: relative;
             overflow: hidden;
-            min-height: 260px;
+            height: 220px;
+            flex-shrink: 0;
             background: #161a1f;
         }
         .ft-canvas {
@@ -840,6 +840,15 @@
             white-space: pre; min-width: max-content;
         }
         .ft-code-placeholder { color: #3e4451; font-style: italic; padding: 20px; display: block; }
+        @keyframes ft-shake {
+            0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)}
+        }
+        .ft-line-shake { animation: ft-shake 0.4s ease; }
+        .ft-line-inline-val {
+            display: none; margin-left: 10px; color: #5c6370;
+            font-size: 0.68rem; font-style: italic; opacity: 0.85; white-space: nowrap;
+        }
+        .ft-line.ft-line-active .ft-line-inline-val { display: inline; color: #e5c07b; }
         /* Individual code lines */
         .ft-line {
             display: flex; align-items: flex-start; padding: 0 8px;
@@ -902,6 +911,11 @@
         }
         .ft-vars-scroll { flex: 1; overflow-y: auto; min-height: 0; }
         .ft-vars-list { padding: 6px; }
+        .ft-canvas-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 5px 10px; border-bottom: 1px solid #2d333b;
+            flex-shrink: 0; background: #1a1d23;
+        }
         .ft-vars-placeholder { font-size: 0.75rem; color: #3e4451; padding: 8px; font-style: italic; }
         .ft-var-row {
             display: flex; flex-direction: column; padding: 4px 6px;
@@ -1399,8 +1413,24 @@
                                         </div>
                                     </div>
 
-                                    <!-- Right: live variable inspector -->
+                                    <!-- Right: live variable inspector + canvas flow -->
                                     <div class="ft-vars-panel" id="ft-vars-panel">
+                                        <!-- Canvas flow (top of right panel) -->
+                                        <div class="ft-canvas-header">
+                                            <span class="ft-section-label" style="margin:0">Execution Flow</span>
+                                            <div class="ft-zoom-controls">
+                                                <button id="ft-zoom-out" class="ft-icon-btn" title="Zoom out">－</button>
+                                                <span id="ft-zoom-label" class="ft-zoom-label">100%</span>
+                                                <button id="ft-zoom-in"  class="ft-icon-btn" title="Zoom in">＋</button>
+                                                <button id="ft-zoom-fit" class="ft-icon-btn" title="Fit">⤢</button>
+                                            </div>
+                                        </div>
+                                        <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
+                                            <canvas id="ft-canvas" class="ft-canvas"></canvas>
+                                            <div id="ft-tooltip" class="ft-node-tooltip" style="display:none"></div>
+                                            <div id="ft-placeholder" class="ft-flow-placeholder">Run a trace to see the flow.</div>
+                                        </div>
+                                        <!-- Variables below canvas -->
                                         <div class="ft-vars-header">
                                             <span class="ft-section-label" style="margin:0">Variables</span>
                                             <span id="ft-var-count" style="font-size:0.7rem;color:#5c6370"></span>
@@ -1853,4 +1883,4 @@
     <script type="module" src="app3.js"></script>
 
 </body>
-</html>
+    </html>
