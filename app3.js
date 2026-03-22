@@ -6732,103 +6732,142 @@ function renderCallStack() {
 // so we can pause, capture vars, and stream output.
 
 function instrumentCode(src, nodeId) {
+    // Instruments user JS code for step-by-step execution.
+    // Every executable line is wrapped in a queue entry closure.
+    // Function/class declarations are left in place (hoisting) but get
+    // a plain synchronous hook call prepended.
     var lines  = src.split('\n');
     var result = [];
-    // Inject a per-line hook: __ftHook(idx, fn) where fn returns {vars}
+
     lines.forEach(function(line, i) {
         var trimmed = line.trim();
-        // Skip blank lines and pure comment lines
-        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+
+        // Skip blank and comment-only lines
+        if (!trimmed ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('*') ||
+            trimmed.startsWith('*/')) {
             result.push(line);
             return;
         }
-        // Insert hook BEFORE the line using a comma expression trick
-        // We wrap in an async immediately-invoked form so await works
-        result.push('await __ftHook(' + i + ', ' + JSON.stringify(nodeId) + ', (function(){try{return __ftCapture();}catch(e){return {};}})());');
-        result.push(line);
+
+        // Function / class declarations must stay at the top level for
+        // hoisting — don't wrap them in a closure, just hook before them.
+        var isFnDecl = /^(async\s+)?function[\s*]/.test(trimmed) ||
+                       /^class\s+\w/.test(trimmed);
+        if (isFnDecl) {
+            result.push('__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + ');');
+            result.push(line);
+            return;
+        }
+
+        // All other statements: push as a queue entry so the runner can
+        // pause between them, one at a time.
+        result.push(
+            '__ftQueue.push({li:' + i + ',ni:' + JSON.stringify(nodeId) + ',fn:function(){' +
+            '__ftHookSync(' + i + ',' + JSON.stringify(nodeId) + ');' +
+            line.trim() +
+            '}});'
+        );
     });
     return result.join('\n');
 }
 
-// ── Sandbox runner ────────────────────────────────────────────────
-// We build a full HTML page, inject it into the hidden iframe,
-// and listen for postMessage events back.
-
 function buildSandboxHtml(jsCode, triggerType, targetSelector, inputValue, htmlCode) {
-    // The sandbox page runs the instrumented code and messages back each step
-    var sandboxScript = [
-        'var __ftLines = [];',
-        'var __ftPaused = false;',
-        'var __ftStepResolve = null;',
-        'var __ftVars = {};',
-        'var __ftCallStack = [];',
+    // Event-driven sandbox: each queue entry posts ft-line then yields
+    // via setTimeout so the parent can pause/step/resume between lines.
+
+    var sandboxLines = [
+        '"use strict";',
+        'var __ftVars={};',
+        'var __ftQueue=[];',
+        'var __ftPaused=false;',
+        'var __ftDelay=0;',
+        'var __ftDone=false;',
         '',
-        'function __ftCapture() {',
-        '  // Capture all vars in current scope — we do this via a with-eval trick,',
-        '  // but since we cannot enumerate locals, we track via __ftSetVar calls.',
-        '  return JSON.parse(JSON.stringify(__ftVars));',
+        'function __ftSetVar(name,value){',
+        '  try{',
+        '    var t=Array.isArray(value)?"array":typeof value;',
+        '    var s=JSON.parse(JSON.stringify(value==null?"null":value===undefined?"undefined":value));',
+        '    __ftVars[name]={value:s,type:t};',
+        '  }catch(e){__ftVars[name]={value:String(value),type:typeof value};}',
         '}',
         '',
-        'function __ftSetVar(name, value) {',
-        '  try {',
-        '    var type = Array.isArray(value) ? "array" : typeof value;',
-        '    var safe = JSON.parse(JSON.stringify(value === undefined ? "undefined" : value === null ? "null" : value));',
-        '    __ftVars[name] = { value: safe, type: type };',
-        '  } catch(e) { __ftVars[name] = { value: String(value), type: typeof value }; }',
+        'function __ftHookSync(li,ni){',
+        '  window.parent.postMessage({type:"ft-line",lineIdx:li,nodeId:ni,vars:JSON.parse(JSON.stringify(__ftVars))},"*");',
         '}',
         '',
-        'async function __ftHook(lineIdx, nodeId, vars) {',
-        '  Object.assign(__ftVars, vars);',
-        '  window.parent.postMessage({ type: "ft-line", lineIdx: lineIdx, nodeId: nodeId, vars: __ftVars }, "*");',
-        '  if (__ftPaused) {',
-        '    await new Promise(function(res) { __ftStepResolve = res; });',
+        'function __ftRunNext(){',
+        '  if(__ftPaused||__ftQueue.length===0)return;',
+        '  var item=__ftQueue.shift();',
+        '  try{item.fn();}catch(e){',
+        '    window.parent.postMessage({type:"ft-error",message:e.message,stack:e.stack||"",lineIdx:item.li,nodeId:item.ni},"*");',
+        '  }',
+        '  if(__ftQueue.length===0&&!__ftDone){',
+        '    __ftDone=true;',
+        '    window.parent.postMessage({type:"ft-done"},"*");',
+        '  }else if(!__ftPaused&&__ftQueue.length>0){',
+        '    setTimeout(__ftRunNext,__ftDelay);',
         '  }',
         '}',
         '',
-        'window.addEventListener("message", function(e) {',
-        '  if (e.data.type === "ft-resume") { __ftPaused = false; if (__ftStepResolve) { __ftStepResolve(); __ftStepResolve = null; } }',
-        '  if (e.data.type === "ft-pause")  { __ftPaused = true; }',
-        '  if (e.data.type === "ft-step")   { if (__ftStepResolve) { __ftPaused = true; __ftStepResolve(); __ftStepResolve = null; } }',
+        'window.addEventListener("message",function(e){',
+        '  var d=e.data;if(!d)return;',
+        '  if(d.type==="ft-set-delay"){__ftDelay=d.delay||0;}',
+        '  if(d.type==="ft-pause"){__ftPaused=true;}',
+        '  if(d.type==="ft-resume"){__ftPaused=false;setTimeout(__ftRunNext,__ftDelay);}',
+        '  if(d.type==="ft-step"){',
+        '    var old=__ftPaused;__ftPaused=true;',
+        '    if(__ftQueue.length>0){',
+        '      var item=__ftQueue.shift();',
+        '      try{item.fn();}catch(e){window.parent.postMessage({type:"ft-error",message:e.message,stack:e.stack||"",lineIdx:item.li,nodeId:item.ni},"*");}',
+        '      if(__ftQueue.length===0&&!__ftDone){__ftDone=true;window.parent.postMessage({type:"ft-done"},"*");}',
+        '    }',
+        '  }',
+        '  if(d.type==="ft-start-run"){',
+        '    __ftDelay=d.delay||0;__ftPaused=false;',
+        '    setTimeout(__ftRunNext,0);',
+        '  }',
         '});',
         '',
-        '// Override console to forward to parent',
-        '["log","warn","error","info"].forEach(function(m) {',
-        '  var orig = console[m].bind(console);',
-        '  console[m] = function() {',
-        '    var args = Array.from(arguments).map(function(a){ try{return JSON.stringify(a);}catch(e){return String(a);} });',
-        '    window.parent.postMessage({ type: "ft-console", level: m, args: args }, "*");',
-        '    orig.apply(console, arguments);',
+        '["log","warn","error","info"].forEach(function(m){',
+        '  var orig=console[m].bind(console);',
+        '  console[m]=function(){',
+        '    var args=Array.from(arguments).map(function(a){try{return typeof a==="object"?JSON.stringify(a):String(a);}catch(e){return String(a);}});',
+        '    window.parent.postMessage({type:"ft-console",level:m,args:args},"*");',
+        '    orig.apply(console,arguments);',
         '  };',
         '});',
         '',
-        '// Catch unhandled errors',
-        'window.addEventListener("error", function(e) {',
-        '  window.parent.postMessage({ type: "ft-error", message: e.message, line: e.lineno, col: e.colno }, "*");',
-        '});',
-        'window.addEventListener("unhandledrejection", function(e) {',
-        '  window.parent.postMessage({ type: "ft-error", message: String(e.reason) }, "*");',
-        '});',
-    ].join('\n');
+        'window.onerror=function(msg,src,line,col,err){',
+        '  window.parent.postMessage({type:"ft-error",message:msg,stack:err?err.stack:"",line:line,col:col},"*");',
+        '  return true;',
+        '};',
+        'window.onunhandledrejection=function(e){',
+        '  window.parent.postMessage({type:"ft-error",message:String(e.reason||e)},"*");',
+        '};',
+    ];
 
-    // The actual user code (instrumented), wrapped in an async IIFE
-    var userCode = [
-        '(async function __ftMain() {',
-        '  window.parent.postMessage({ type: "ft-start" }, "*");',
-        '  try {',
+    var userLines = [
+        'window.parent.postMessage({type:"ft-start"},"*");',
+        '(function(){',
         jsCode,
-        '  } catch(__ftErr) {',
-        '    window.parent.postMessage({ type: "ft-error", message: __ftErr.message, stack: __ftErr.stack }, "*");',
-        '  } finally {',
-        '    window.parent.postMessage({ type: "ft-done" }, "*");',
-        '  }',
         '})();',
-    ].join('\n');
+        'if(__ftQueue.length===0){window.parent.postMessage({type:"ft-done"},"*");}',
+    ];
 
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>' +
-        (htmlCode ? htmlCode : '') +
-        '<script>\n' + sandboxScript + '\n</script>\n' +
-        '<script>\n' + userCode + '\n</script>' +
-        '</body></html>';
+    return [
+        '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>',
+        htmlCode || '',
+        '<script>',
+        sandboxLines.join('\n'),
+        '<\/script>',
+        '<script>',
+        userLines.join('\n'),
+        '<\/script>',
+        '</body></html>',
+    ].join('\n');
 }
 
 // ── Trigger detection ─────────────────────────────────────────────
@@ -7036,8 +7075,15 @@ async function runFlowTrace() {
         if (!d || !d.type || !d.type.startsWith('ft-')) return;
 
         if (d.type === 'ft-start') {
-            ftLog('Sandbox executing…', 'info');
+            ftLog('Sandbox ready · delay: ' + ftState.delay + 'ms', 'info');
             ftPushStack('__ftMain', '(root)');
+            // Kick off execution with the current delay setting
+            if (sandbox.contentWindow) {
+                sandbox.contentWindow.postMessage({
+                    type: 'ft-start-run',
+                    delay: ftState.delay
+                }, '*');
+            }
         }
 
         else if (d.type === 'ft-line') {
@@ -7046,8 +7092,8 @@ async function runFlowTrace() {
                 ftState.lines[activeLine].el.classList.remove('ft-line-active');
                 ftState.lines[activeLine].el.classList.add('ft-line-done');
             }
-            // Find the global line index
-            var key = d.nodeId + '::' + d.lineNum;
+            // Sandbox sends lineIdx (global) or we look up by nodeId+lineIdx
+            var key  = d.nodeId + '::' + (d.lineIdx !== undefined ? d.lineIdx : d.lineNum);
             var gIdx = lineMap[key];
             activeLine = (gIdx !== undefined) ? gIdx : activeLine + 1;
             if (activeLine >= 0 && activeLine < ftState.lines.length) {
@@ -7094,16 +7140,28 @@ async function runFlowTrace() {
         }
 
         else if (d.type === 'ft-error') {
+            // If sandbox tells us the exact line, use it
+            if (d.lineIdx !== undefined && d.nodeId) {
+                var eKey  = d.nodeId + '::' + d.lineIdx;
+                var eGIdx = lineMap[eKey];
+                if (eGIdx !== undefined) activeLine = eGIdx;
+            }
             if (activeLine >= 0 && ftState.lines[activeLine]) {
                 ftState.lines[activeLine].el.classList.add('ft-line-error');
                 ftState.lines[activeLine].el.classList.remove('ft-line-active');
-                // Shake the line element to draw attention
                 ftState.lines[activeLine].el.classList.add('ft-line-shake');
             }
-            // Mark current canvas node as error
-            var errNodeId = ftState.lines[activeLine] ? ftState.lines[activeLine].nodeId : ftCanvasState.lastNodeId;
+            var errNodeId = (ftState.lines[activeLine] && ftState.lines[activeLine].nodeId) || ftCanvasState.lastNodeId;
             if (errNodeId) canvasMarkError(errNodeId);
-            ftLog('\u2717 ERROR at line ' + (activeLine+1) + ': ' + d.message + (d.stack ? '  →  ' + d.stack.split('\n')[0] : ''), 'error');
+            // Strip internal __ft frames from the stack
+            var stackHint = '';
+            if (d.stack) {
+                var cleanLine = d.stack.split('\n').find(function(l) {
+                    return l.trim() && !l.includes('__ftHook') && !l.includes('__ftMain') && !l.includes('__ftQueue') && !l.includes('__ftRunNext');
+                });
+                if (cleanLine) stackHint = '  \u2192  ' + cleanLine.trim();
+            }
+            ftLog('\u2717 ERROR' + (activeLine >= 0 ? ' at line ' + (activeLine + 1) : '') + ': ' + d.message + stackHint, 'error');
             ftSetStatus('Error', 'error');
             ftState.errorCount++;
         }
@@ -7216,6 +7274,11 @@ function bindFlowTracerEvents() {
         range.addEventListener('input', function() {
             ftState.delay = parseInt(range.value);
             rangeVal.textContent = range.value + 'ms';
+            // Sync to running sandbox immediately
+            var sb = document.getElementById('ft-sandbox');
+            if (sb && sb.contentWindow && ftState.isRunning) {
+                sb.contentWindow.postMessage({ type: 'ft-set-delay', delay: ftState.delay }, '*');
+            }
         });
     }
 
@@ -8553,4 +8616,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-            }
+}
