@@ -7004,7 +7004,9 @@ var ftSpeedMultiplier = 1;
 var ftHoveredNode = null;
 var ftClickedNode = null;
 var ftPulseTime   = 0;
-var ftScrollY     = 0;          // vertical pan for tall graphs
+var ftScrollY       = 0;          // vertical pan for tall graphs (current, interpolated)
+var ftScrollYTarget = 0;          // where the camera wants to be
+var ftScrollYVel    = 0;          // spring velocity for smooth scroll
 var ftPanX        = 0;          // horizontal pan (zoom-dependent)
 var ftScale       = 1.0;        // zoom level
 var ftDragStart   = null;
@@ -7056,12 +7058,12 @@ function clearCanvas() {
     if (!c) return;
     c.getContext('2d').clearRect(0, 0, c.width, c.height);
     ftGraphNodes = []; ftGraphEdges = []; ftParticles = [];
-    ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
+    ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftScrollYTarget = 0; ftScrollYVel = 0; ftPanX = 0; ftScale = 1.0;
 }
 
 function buildAndAnimateGraph(steps) {
     stopCanvasAnimation();
-    ftParticles = []; ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftPanX = 0; ftScale = 1.0;
+    ftParticles = []; ftHoveredNode = null; ftClickedNode = null; ftScrollY = 0; ftScrollYTarget = 0; ftScrollYVel = 0; ftPanX = 0; ftScale = 1.0;
 
     var canvas  = document.getElementById('ft-canvas');
     var wrapper = document.getElementById('ft-canvas-wrapper');
@@ -7123,8 +7125,8 @@ function buildAndAnimateGraph(steps) {
         ftGraphNodes[0].activatedAt = performance.now();
     }
 
-    // Animate each node activating in sequence — 2 s read time per node
-    var READ_TIME = 2000; // ms the user has to read each active node
+    // Animate each node activating in sequence — 3 s read time per node
+    var READ_TIME = 3000; // ms the user has to read each active node
     steps.forEach(function(_, i) {
         setTimeout(function() {
             if (i > 0 && ftGraphNodes[i])     ftGraphNodes[i].state     = 'active';
@@ -7133,13 +7135,13 @@ function buildAndAnimateGraph(steps) {
             if (ftGraphNodes[i]) ftGraphNodes[i].activatedAt = performance.now();
             if (i < ftGraphEdges.length) { animateEdgeFill(i, 450 * ftSpeedMultiplier); spawnParticles(i); }
             if (i === steps.length - 1) setTimeout(function() { if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done'; }, READ_TIME * ftSpeedMultiplier);
-            // Auto-scroll to keep active node visible
+            // Smoothly scroll camera to keep active node centred
             var n = ftGraphNodes[i];
             if (n) {
-                var nodeBottom = n.y + n.h / 2 + ftScrollY;
-                var nodeTop    = n.y - n.h / 2 + ftScrollY;
-                if (nodeBottom > H - 30) ftScrollY = Math.min(0, H - n.y - n.h / 2 - 30);
-                if (nodeTop    < 30)     ftScrollY = Math.min(0, 30 - n.y + n.h / 2);
+                var canvas  = ftCanvas;
+                var dpr     = window.devicePixelRatio || 1;
+                var H       = canvas ? canvas.height / dpr : 500;
+                ftScrollYTarget = Math.min(0, H / 2 - n.y);
             }
         }, i * READ_TIME * ftSpeedMultiplier);
     });
@@ -7170,6 +7172,11 @@ function drawFrame(now) {
     var W = ftCanvas.width / dpr, H = ftCanvas.height / dpr;
     var ctx = ftCtx;
     ftPulseTime = now * 0.001;
+
+    // Spring-physics smooth scroll toward target
+    var stiffness = 0.10, damping = 0.72;
+    ftScrollYVel  = ftScrollYVel * damping + (ftScrollYTarget - ftScrollY) * stiffness;
+    ftScrollY    += ftScrollYVel;
 
     ctx.clearRect(0, 0, W, H);
     ctx.save();
@@ -7264,80 +7271,43 @@ function drawNodes(ctx, W, H) {
             ctx.strokeStyle = hexToRgba(n.color, 0.06 + pulse*0.1); ctx.lineWidth = 2+pulse*4; ctx.stroke();
         }
 
-        // ── Countdown loader ring (sweeps around the card border over 2 s) ──
+        // ── Countdown loader ring around the active card ──────────────
         if (isA && n.activatedAt) {
-            var READ_MS   = 2000 / ftSpeedMultiplier;
-            var elapsed   = performance.now() - n.activatedAt;
-            var progress  = Math.min(1, elapsed / READ_MS); // 0 → 1
-            var pad       = 4;           // px gap between card edge and ring
-            var rx        = n.x - n.w / 2 - pad;
-            var ry        = n.y - n.h / 2 - pad;
-            var rw        = n.w + pad * 2;
-            var rh        = n.h + pad * 2;
-            var rr        = 14;          // corner radius for the ring path
+            var READ_MS  = 3000 / ftSpeedMultiplier;
+            var progress = Math.min(1, (performance.now() - n.activatedAt) / READ_MS);
+            var pad = 5, rr = 14;
+            var rx  = n.x - n.w / 2 - pad, ry2 = n.y - n.h / 2 - pad;
+            var rw  = n.w + pad * 2,        rh2 = n.h + pad * 2;
 
-            // Track (full dim outline)
+            // Dim track
             ctx.save();
             ctx.strokeStyle = hexToRgba(n.color, 0.15);
-            ctx.lineWidth   = 3;
-            ctx.setLineDash([]);
-            roundRect(ctx, rx, ry, rw, rh, rr);
-            ctx.stroke();
+            ctx.lineWidth   = 3.5;
+            roundRect(ctx, rx, ry2, rw, rh2, rr); ctx.stroke();
 
-            // Filled arc — we trace the rectangle perimeter up to `progress`
-            // Perimeter segments: top → right → bottom → left
-            var perimeter = 2 * (rw + rh);
+            // Animated filled portion — walk the rect perimeter clockwise
+            var perimeter = 2 * (rw + rh2);
             var filled    = perimeter * progress;
+            var rem       = filled;
 
             ctx.strokeStyle = n.color;
-            ctx.lineWidth   = 3;
-            ctx.shadowBlur  = 8;
-            ctx.shadowColor = n.glowColor;
+            ctx.lineWidth   = 3.5;
             ctx.lineCap     = 'round';
+            ctx.shadowBlur  = 10; ctx.shadowColor = n.glowColor;
             ctx.beginPath();
-
-            // Start at top-left corner (after the top-left radius) and go clockwise
-            var cx = rx + rr, cy_top = ry;
-            ctx.moveTo(cx, cy_top);
-
-            var drawn = 0;
-            function seg(dx, dy, len) {
-                if (drawn >= filled) return;
-                var take = Math.min(len, filled - drawn);
-                var frac = take / len;
-                ctx.lineTo(cx + dx * frac, cy_top + dy * frac);
-                cx += dx * frac; cy_top += dy * frac;
-                drawn += take;
-            }
-            // We manually walk: top edge, right edge, bottom edge, left edge
-            // top edge (left→right), minus two corners
-            var top_len    = rw - 2 * rr;
-            var right_len  = rh - 2 * rr;
-            var bottom_len = rw - 2 * rr;
-            var left_len   = rh - 2 * rr;
-
-            // Simplified — just draw a stroked arc along the bounding rectangle perimeter
-            // using lineTo segments for each side, starting from top-left after corner
-            var sx = rx + rr, sy = ry;
-            ctx.beginPath(); ctx.moveTo(sx, sy);
-            var rem = filled;
-
-            function drawSide(x1, y1, x2, y2) {
+            // Start: top-left, after corner radius
+            ctx.moveTo(rx + rr, ry2);
+            function _side(x1, y1, x2, y2) {
                 if (rem <= 0) return;
-                var len = Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+                var len = Math.abs(x2 - x1) + Math.abs(y2 - y1);
                 var t   = Math.min(1, rem / len);
-                ctx.lineTo(x1 + (x2-x1)*t, y1 + (y2-y1)*t);
+                ctx.lineTo(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t);
                 rem -= len * t;
             }
-            // Top: left→right
-            drawSide(rx+rr, ry,      rx+rw-rr, ry);
-            // Right: top→bottom
-            drawSide(rx+rw, ry+rr,   rx+rw,    ry+rh-rr);
-            // Bottom: right→left
-            drawSide(rx+rw-rr, ry+rh, rx+rr,   ry+rh);
-            // Left: bottom→top
-            drawSide(rx,   ry+rh-rr, rx,        ry+rr);
-
+            _side(rx + rr,       ry2,        rx + rw - rr, ry2);         // top →
+            _side(rx + rw,       ry2 + rr,   rx + rw,      ry2 + rh2 - rr); // right ↓
+            _side(rx + rw - rr,  ry2 + rh2,  rx + rr,      ry2 + rh2); // bottom ←
+            _side(rx,            ry2 + rh2 - rr, rx,        ry2 + rr);  // left ↑
             ctx.stroke();
             ctx.restore();
         }
@@ -7680,8 +7650,9 @@ function bindFlowTracerEvents() {
             var mx = e.clientX - rect.left, my = e.clientY - rect.top;
             if (ftDragStart && ftDragStart.type === 'pan') {
                 var dx = mx - ftDragStart.startX, dy = my - ftDragStart.startY;
-                ftPanX    = ftDragStart.panX0  + dx;
-                ftScrollY = ftDragStart.scrollY0 + dy;
+                ftPanX         = ftDragStart.panX0  + dx;
+                ftScrollY      = ftDragStart.scrollY0 + dy;
+                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
                 canvas.style.cursor = 'grabbing';
                 return;
             }
@@ -7717,8 +7688,9 @@ function bindFlowTracerEvents() {
                 applyZoom(ftScale * delta, mx, my);
             } else {
                 // Scroll / pan
-                ftScrollY -= e.deltaY * 0.85 / ftScale;
-                ftPanX    -= e.deltaX * 0.85 / ftScale;
+                ftScrollY      -= e.deltaY * 0.85 / ftScale;
+                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
+                ftPanX         -= e.deltaX * 0.85 / ftScale;
             }
         }, { passive: false });
 
@@ -7748,8 +7720,9 @@ function bindFlowTracerEvents() {
             } else if (e.touches.length === 1 && ftDragStart) {
                 var dx = e.touches[0].clientX - ftDragStart.startX;
                 var dy = e.touches[0].clientY - ftDragStart.startY;
-                ftPanX    = ftDragStart.panX0    + dx;
-                ftScrollY = ftDragStart.scrollY0 + dy;
+                ftPanX         = ftDragStart.panX0    + dx;
+                ftScrollY      = ftDragStart.scrollY0 + dy;
+                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
             }
         }, { passive: true });
 
@@ -8702,4 +8675,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+        }
