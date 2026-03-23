@@ -576,6 +576,7 @@
             transition: border-color 0.15s, color 0.15s;
         }
         .ft-icon-btn:hover { border-color: #c678dd; color: #c678dd; }
+        .ft-icon-btn.ft-tts-active { border-color: #98c379; color: #98c379; background: rgba(152,195,121,0.08); }
         .ft-speed-label {
             font-size: 0.72rem;
             color: #5c6370;
@@ -1176,6 +1177,7 @@
                                             <div class="ft-flow-header-right">
                                                 <span id="ft-step-count" class="ft-step-count"></span>
                                                 <button id="ft-replay-button" class="ft-icon-btn" title="Replay animation" style="display:none;">⟳ Replay</button>
+                                                <button id="ft-tts-button" class="ft-icon-btn" title="Toggle read-out (Text-to-Speech)">🔇 Read Out</button>
                                                 <label class="ft-speed-label">
                                                     Speed
                                                     <select id="ft-speed-select" class="ft-speed-select">
