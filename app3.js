@@ -7118,15 +7118,21 @@ function buildAndAnimateGraph(steps) {
     var speedEl = document.getElementById('ft-speed-select');
     ftSpeedMultiplier = speedEl ? parseFloat(speedEl.value) : 1;
 
-    if (ftGraphNodes.length > 0) ftGraphNodes[0].state = 'active';
+    if (ftGraphNodes.length > 0) {
+        ftGraphNodes[0].state       = 'active';
+        ftGraphNodes[0].activatedAt = performance.now();
+    }
 
-    // Animate each node activating in sequence
+    // Animate each node activating in sequence — 2 s read time per node
+    var READ_TIME = 2000; // ms the user has to read each active node
     steps.forEach(function(_, i) {
         setTimeout(function() {
             if (i > 0 && ftGraphNodes[i])     ftGraphNodes[i].state     = 'active';
             if (i > 0 && ftGraphNodes[i - 1]) ftGraphNodes[i - 1].state = 'done';
+            // Record when this node became active so the loader ring knows its progress
+            if (ftGraphNodes[i]) ftGraphNodes[i].activatedAt = performance.now();
             if (i < ftGraphEdges.length) { animateEdgeFill(i, 450 * ftSpeedMultiplier); spawnParticles(i); }
-            if (i === steps.length - 1) setTimeout(function() { if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done'; }, 550 * ftSpeedMultiplier);
+            if (i === steps.length - 1) setTimeout(function() { if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done'; }, READ_TIME * ftSpeedMultiplier);
             // Auto-scroll to keep active node visible
             var n = ftGraphNodes[i];
             if (n) {
@@ -7135,7 +7141,7 @@ function buildAndAnimateGraph(steps) {
                 if (nodeBottom > H - 30) ftScrollY = Math.min(0, H - n.y - n.h / 2 - 30);
                 if (nodeTop    < 30)     ftScrollY = Math.min(0, 30 - n.y + n.h / 2);
             }
-        }, i * 800 * ftSpeedMultiplier);
+        }, i * READ_TIME * ftSpeedMultiplier);
     });
 
     ftPulseTime = 0;
@@ -7256,6 +7262,84 @@ function drawNodes(ctx, W, H) {
             var pulse = (Math.sin(ftPulseTime * 2.8 + n.pulsePhase) + 1) / 2;
             ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2 * 0.54 + pulse*20, 0, Math.PI*2);
             ctx.strokeStyle = hexToRgba(n.color, 0.06 + pulse*0.1); ctx.lineWidth = 2+pulse*4; ctx.stroke();
+        }
+
+        // ── Countdown loader ring (sweeps around the card border over 2 s) ──
+        if (isA && n.activatedAt) {
+            var READ_MS   = 2000 / ftSpeedMultiplier;
+            var elapsed   = performance.now() - n.activatedAt;
+            var progress  = Math.min(1, elapsed / READ_MS); // 0 → 1
+            var pad       = 4;           // px gap between card edge and ring
+            var rx        = n.x - n.w / 2 - pad;
+            var ry        = n.y - n.h / 2 - pad;
+            var rw        = n.w + pad * 2;
+            var rh        = n.h + pad * 2;
+            var rr        = 14;          // corner radius for the ring path
+
+            // Track (full dim outline)
+            ctx.save();
+            ctx.strokeStyle = hexToRgba(n.color, 0.15);
+            ctx.lineWidth   = 3;
+            ctx.setLineDash([]);
+            roundRect(ctx, rx, ry, rw, rh, rr);
+            ctx.stroke();
+
+            // Filled arc — we trace the rectangle perimeter up to `progress`
+            // Perimeter segments: top → right → bottom → left
+            var perimeter = 2 * (rw + rh);
+            var filled    = perimeter * progress;
+
+            ctx.strokeStyle = n.color;
+            ctx.lineWidth   = 3;
+            ctx.shadowBlur  = 8;
+            ctx.shadowColor = n.glowColor;
+            ctx.lineCap     = 'round';
+            ctx.beginPath();
+
+            // Start at top-left corner (after the top-left radius) and go clockwise
+            var cx = rx + rr, cy_top = ry;
+            ctx.moveTo(cx, cy_top);
+
+            var drawn = 0;
+            function seg(dx, dy, len) {
+                if (drawn >= filled) return;
+                var take = Math.min(len, filled - drawn);
+                var frac = take / len;
+                ctx.lineTo(cx + dx * frac, cy_top + dy * frac);
+                cx += dx * frac; cy_top += dy * frac;
+                drawn += take;
+            }
+            // We manually walk: top edge, right edge, bottom edge, left edge
+            // top edge (left→right), minus two corners
+            var top_len    = rw - 2 * rr;
+            var right_len  = rh - 2 * rr;
+            var bottom_len = rw - 2 * rr;
+            var left_len   = rh - 2 * rr;
+
+            // Simplified — just draw a stroked arc along the bounding rectangle perimeter
+            // using lineTo segments for each side, starting from top-left after corner
+            var sx = rx + rr, sy = ry;
+            ctx.beginPath(); ctx.moveTo(sx, sy);
+            var rem = filled;
+
+            function drawSide(x1, y1, x2, y2) {
+                if (rem <= 0) return;
+                var len = Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+                var t   = Math.min(1, rem / len);
+                ctx.lineTo(x1 + (x2-x1)*t, y1 + (y2-y1)*t);
+                rem -= len * t;
+            }
+            // Top: left→right
+            drawSide(rx+rr, ry,      rx+rw-rr, ry);
+            // Right: top→bottom
+            drawSide(rx+rw, ry+rr,   rx+rw,    ry+rh-rr);
+            // Bottom: right→left
+            drawSide(rx+rw-rr, ry+rh, rx+rr,   ry+rh);
+            // Left: bottom→top
+            drawSide(rx,   ry+rh-rr, rx,        ry+rr);
+
+            ctx.stroke();
+            ctx.restore();
         }
 
         // Shadow/glow
@@ -8618,4 +8702,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-        }
+  }
