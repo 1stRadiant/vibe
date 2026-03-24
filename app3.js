@@ -1765,7 +1765,18 @@ function initializeApiSettings() {
     nscaleApiKey = localStorage.getItem('nscaleApiKey');
     
     aiProviderSelect.value = currentAIProvider;
-    geminiModelSelect.value = localStorage.getItem('geminiModel') || 'gemini-1.5-flash-latest';
+    var _savedModel = localStorage.getItem('geminiModel') || 'gemini-2.5-flash';
+    var _savedCustomModel = localStorage.getItem('geminiCustomModel') || '';
+    if (_savedCustomModel) {
+        // Restore custom model selection
+        geminiModelSelect.value = '__custom__';
+        var _customContainer = document.getElementById('gemini-custom-model-container');
+        var _customInput = document.getElementById('gemini-custom-model-input');
+        if (_customContainer) _customContainer.style.display = 'block';
+        if (_customInput) _customInput.value = _savedCustomModel;
+    } else {
+        geminiModelSelect.value = _savedModel;
+    }
 
     updateApiStatusDisplays();
     updateApiKeyVisibility();
@@ -2170,6 +2181,15 @@ Construct a URL using this format: \`https://pollinations.ai/p/{PROMPT}\`
 `;
 }
 
+function getGeminiModel() {
+    if (geminiModelSelect && geminiModelSelect.value === '__custom__') {
+        var customInput = document.getElementById('gemini-custom-model-input');
+        var customVal = customInput ? customInput.value.trim() : '';
+        if (customVal) return customVal;
+    }
+    return geminiModelSelect ? geminiModelSelect.value : 'gemini-2.5-flash';
+}
+
 async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
     if (!geminiApiKey) throw new Error("Gemini API key is not set.");
     
@@ -2181,7 +2201,7 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     });
 
     const augmentedSystemPrompt = systemPrompt + libraryContext;
-    const model = geminiModelSelect.value;
+    const model = getGeminiModel();
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
     const requestBody = {
@@ -2207,7 +2227,7 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         throw new Error("Gemini API key is not set.");
     }
 
-    const model = geminiModelSelect.value;
+    const model = getGeminiModel();
     const useStreaming = typeof streamCallback === 'function';
     const endpoint = useStreaming 
         ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}`
@@ -6191,7 +6211,24 @@ function bindEventListeners() {
     if (aiImproveDescriptionButton) aiImproveDescriptionButton.addEventListener('click', handleAiImproveDescription);
     if (saveAsComponentButton) saveAsComponentButton.addEventListener('click', handleSaveNodeAsComponent);
     if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-    if (geminiModelSelect) geminiModelSelect.addEventListener('change', () => localStorage.setItem('geminiModel', geminiModelSelect.value));
+    if (geminiModelSelect) geminiModelSelect.addEventListener('change', function() {
+        var customContainer = document.getElementById('gemini-custom-model-container');
+        if (geminiModelSelect.value === '__custom__') {
+            if (customContainer) customContainer.style.display = 'block';
+            // Focus the input so the user can type right away
+            var customInput = document.getElementById('gemini-custom-model-input');
+            if (customInput) setTimeout(function() { customInput.focus(); }, 50);
+        } else {
+            if (customContainer) customContainer.style.display = 'none';
+            localStorage.setItem('geminiModel', geminiModelSelect.value);
+            localStorage.removeItem('geminiCustomModel');
+        }
+    });
+    // Save custom model name as user types
+    var geminiCustomModelInput = document.getElementById('gemini-custom-model-input');
+    if (geminiCustomModelInput) geminiCustomModelInput.addEventListener('input', function() {
+        localStorage.setItem('geminiCustomModel', geminiCustomModelInput.value.trim());
+    });
     if (saveApiKeyButton) saveApiKeyButton.addEventListener('click', saveGeminiApiKey);
     if (saveNscaleApiKeyButton) saveNscaleApiKeyButton.addEventListener('click', saveNscaleApiKey);
     
@@ -7285,74 +7322,73 @@ function drawNodes(ctx, W, H) {
             ctx.strokeStyle = hexToRgba(n.color, 0.06 + pulse*0.1); ctx.lineWidth = 2+pulse*4; ctx.stroke();
         }
 
-        // ── Countdown loader ring — hugs the exact card border ────────
+        // ── Countdown loader ring — traces the exact card border ──────
         if (isA && n.activatedAt) {
             var READ_MS  = 3000 / ftSpeedMultiplier;
             var progress = Math.min(1, (performance.now() - n.activatedAt) / READ_MS);
-            var r2 = 10; // must match card corner radius
-            // Perimeter of the rounded rectangle
-            var straightW  = n.w - 2 * r2;
-            var straightH  = n.h - 2 * r2;
-            var perimeter  = 2 * (straightW + straightH) + 2 * Math.PI * r2;
-            var filled     = perimeter * progress;
+            var r2 = 10; // matches card corner radius
+            // Perimeter = 4 straight segments + full circle (4 quarter-arcs)
+            var straightW = n.w - 2 * r2;
+            var straightH = n.h - 2 * r2;
+            var perimeter = 2 * (straightW + straightH) + 2 * Math.PI * r2;
+            var filled    = perimeter * progress;
+            var pi = Math.PI;
 
             ctx.save();
-            ctx.lineWidth   = 3;
-            ctx.lineCap     = 'round';
-            ctx.lineJoin    = 'round';
+            ctx.lineWidth  = 3;
+            ctx.lineCap    = 'round';
+            ctx.lineJoin   = 'round';
 
-            // Track (full dim outline exactly on card border)
+            // Dim track — exact card border
             ctx.strokeStyle = hexToRgba(n.color, 0.18);
             roundRect(ctx, x, y, n.w, n.h, r2); ctx.stroke();
 
-            // Filled arc — draw path segments clockwise starting from top-left arc end
-            // Order: top-left corner arc → top edge → top-right arc → right edge →
-            //        bottom-right arc → bottom edge → bottom-left arc → left edge
+            // Animated filled stroke
             ctx.strokeStyle = n.color;
             ctx.shadowBlur  = 8; ctx.shadowColor = n.glowColor;
             ctx.beginPath();
 
-            var rem = filled;
-            var drawn = false;
+            var rem   = filled;
+            var moved = false;
 
-            function arcSeg(cx2, cy2, startAngle, endAngle, ccw) {
+            function _mvto(px2, py2) {
+                if (!moved) { ctx.moveTo(px2, py2); moved = true; }
+            }
+            function _arcSeg(cx2, cy2, sa, ea) {
                 if (rem <= 0) return;
-                var arcLen = r2 * Math.abs(endAngle - startAngle);
+                var arcLen = r2 * (ea - sa);
                 var take   = Math.min(arcLen, rem);
-                var endA   = ccw
-                    ? startAngle - (take / r2)
-                    : startAngle + (take / r2);
-                if (!drawn) { ctx.moveTo(cx2 + r2 * Math.cos(startAngle), cy2 + r2 * Math.sin(startAngle)); drawn = true; }
-                ctx.arc(cx2, cy2, r2, startAngle, endA, ccw);
+                var endA   = sa + take / r2;
+                _mvto(cx2 + r2 * Math.cos(sa), cy2 + r2 * Math.sin(sa));
+                ctx.arc(cx2, cy2, r2, sa, endA, false);
                 rem -= take;
             }
-            function lineSeg(x1, y1, x2, y2) {
+            function _lineSeg(x1, y1, x2, y2) {
                 if (rem <= 0) return;
-                var len  = Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
-                var take = Math.min(len, rem);
-                var t    = take / len;
-                if (!drawn) { ctx.moveTo(x1, y1); drawn = true; }
-                ctx.lineTo(x1 + (x2-x1)*t, y1 + (y2-y1)*t);
-                rem -= take;
+                var len = Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+                var t   = Math.min(1, rem / len);
+                _mvto(x1, y1);
+                ctx.lineTo(x1+(x2-x1)*t, y1+(y2-y1)*t);
+                rem -= len * t;
             }
 
-            var pi = Math.PI;
-            // Top-left corner arc: start at angle=-π, sweep to -π/2 (clockwise)
-            arcSeg(x + r2,       y + r2,       -pi,      -pi/2, false);
-            // Top edge: left→right
-            lineSeg(x + r2,      y,             x + n.w - r2, y);
-            // Top-right corner arc: -π/2 → 0
-            arcSeg(x + n.w - r2, y + r2,        -pi/2,   0,    false);
-            // Right edge: top→bottom
-            lineSeg(x + n.w,     y + r2,         x + n.w, y + n.h - r2);
-            // Bottom-right corner arc: 0 → π/2
-            arcSeg(x + n.w - r2, y + n.h - r2,  0,       pi/2, false);
-            // Bottom edge: right→left
-            lineSeg(x + n.w - r2, y + n.h,       x + r2,  y + n.h);
-            // Bottom-left corner arc: π/2 → π
-            arcSeg(x + r2,       y + n.h - r2,   pi/2,    pi,   false);
-            // Left edge: bottom→top
-            lineSeg(x,           y + n.h - r2,   x,       y + r2);
+            // Clockwise from top-left arc end, matching roundRect path exactly:
+            // top-left arc  (-π → -π/2)
+            _arcSeg(x + r2,       y + r2,       -pi,    -pi/2);
+            // top edge  (left → right)
+            _lineSeg(x + r2,      y,              x + n.w - r2, y);
+            // top-right arc  (-π/2 → 0)
+            _arcSeg(x + n.w - r2, y + r2,        -pi/2,  0);
+            // right edge  (top → bottom)
+            _lineSeg(x + n.w,     y + r2,         x + n.w, y + n.h - r2);
+            // bottom-right arc  (0 → π/2)
+            _arcSeg(x + n.w - r2, y + n.h - r2,   0,      pi/2);
+            // bottom edge  (right → left)
+            _lineSeg(x + n.w - r2, y + n.h,        x + r2,  y + n.h);
+            // bottom-left arc  (π/2 → π)
+            _arcSeg(x + r2,       y + n.h - r2,   pi/2,   pi);
+            // left edge  (bottom → top)
+            _lineSeg(x,           y + n.h - r2,   x,       y + r2);
 
             ctx.stroke();
             ctx.shadowBlur = 0;
@@ -7628,7 +7664,6 @@ function bindFlowTracerEvents() {
     var clearBtn    = document.getElementById('ft-clear-button');
     var scanBtn     = document.getElementById('ft-scan-button');
     var replayBtn   = document.getElementById('ft-replay-button');
-    var ttsBtn      = document.getElementById('ft-tts-button');
     var detailClose = document.getElementById('ft-detail-close');
 
     if (runBtn)      runBtn.addEventListener('click', runFlowTrace);
@@ -7637,6 +7672,7 @@ function bindFlowTracerEvents() {
     if (replayBtn)   replayBtn.addEventListener('click', function() {
         if (flowTracerState.lastTrace) buildAndAnimateGraph(flowTracerState.lastTrace.steps || []);
     });
+    var ttsBtn = document.getElementById('ft-tts-button');
     if (ttsBtn) ttsBtn.addEventListener('click', function() {
         ftTtsEnabled = !ftTtsEnabled;
         ttsBtn.textContent = ftTtsEnabled ? '🔊 Read Out' : '🔇 Read Out';
