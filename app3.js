@@ -7799,6 +7799,7 @@ async function runNlFlowGenerate() {
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = '✦ Generate Flow'; }
     }
+}
 
 
 function buildBasicMermaidFromTree(tree) {
@@ -8712,4 +8713,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+                     }
