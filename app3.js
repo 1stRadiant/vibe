@@ -7108,33 +7108,42 @@ function buildAndAnimateGraph(steps) {
     if (!canvas || !wrapper) return;
 
     var dpr = window.devicePixelRatio || 1;
-    var W   = wrapper.clientWidth  || 420;
-    var H   = wrapper.clientHeight || 500;
-    canvas.width  = W * dpr; canvas.height = H * dpr;
-    canvas.style.width = W+'px'; canvas.style.height = H+'px';
-    ftCtx = canvas.getContext('2d');
-    ftCtx.scale(dpr, dpr);
-    ftCanvas = canvas;
+    // Use a large virtual canvas for the graph — much wider/taller than the visible area
+    var VIS_W = wrapper.clientWidth  || 800;
+    var VIS_H = wrapper.clientHeight || 600;
 
-    var PAD    = 20;
-    var NODE_W = Math.min(W - PAD * 2, 460);
-    var GAP_Y  = 36;
+    // Node layout constants
+    var PAD    = 40;
+    var NODE_W = Math.min(VIS_W - PAD * 2, 520);
+    var GAP_Y  = 44;
 
-    // Calculate each node's height based on its rich data
+    // Calculate each node's height
     var nodeHeights = steps.map(function(s) { return measureNodeHeight(s, NODE_W); });
 
     // Stack nodes vertically
     var yPositions = [];
     var cur = PAD;
     nodeHeights.forEach(function(h) { yPositions.push(cur + h / 2); cur += h + GAP_Y; });
-    var totalH = cur;
+    var totalGraphH = cur + PAD;
+
+    // Virtual canvas size: at least the visible area, or the full graph height
+    var CANVAS_W = Math.max(VIS_W, NODE_W + PAD * 2 + 40);
+    var CANVAS_H = Math.max(VIS_H, totalGraphH + PAD);
+
+    canvas.width  = CANVAS_W * dpr;
+    canvas.height = CANVAS_H * dpr;
+    canvas.style.width  = CANVAS_W + 'px';
+    canvas.style.height = CANVAS_H + 'px';
+    ftCtx = canvas.getContext('2d');
+    ftCtx.scale(dpr, dpr);
+    ftCanvas = canvas;
 
     var col_c_arr = steps.map(function(s) { return getStepColor(s.type || 'handler'); });
 
     ftGraphNodes = steps.map(function(step, i) {
         return {
             id:         i,
-            x:          W / 2,
+            x:          CANVAS_W / 2,
             y:          yPositions[i],
             w:          NODE_W,
             h:          nodeHeights[i],
@@ -7145,47 +7154,17 @@ function buildAndAnimateGraph(steps) {
             glowColor:  col_c_arr[i].glow,
             dimColor:   col_c_arr[i].dim,
             textColor:  col_c_arr[i].text,
-            state:      'idle',
+            state:      'done',   // All nodes shown immediately — no animation
             pulsePhase: i * 0.35
         };
     });
 
     ftGraphEdges = [];
     for (var i = 0; i < ftGraphNodes.length - 1; i++) {
-        ftGraphEdges.push({ from: i, to: i + 1, color: ftGraphNodes[i].color, progress: 0 });
+        ftGraphEdges.push({ from: i, to: i + 1, color: ftGraphNodes[i].color, progress: 1 });
     }
 
-    var speedEl = document.getElementById('ft-speed-select');
-    ftSpeedMultiplier = speedEl ? parseFloat(speedEl.value) : 1;
-
-    if (ftGraphNodes.length > 0) {
-        ftGraphNodes[0].state       = 'active';
-        ftGraphNodes[0].activatedAt = performance.now();
-        if (ftTtsEnabled) ftSpeakNode(ftGraphNodes[0]);
-    }
-
-    // Animate each node activating in sequence — 3 s read time per node
-    var READ_TIME = 3000;
-    steps.forEach(function(_, i) {
-        setTimeout(function() {
-            if (i > 0 && ftGraphNodes[i])     ftGraphNodes[i].state     = 'active';
-            if (i > 0 && ftGraphNodes[i - 1]) ftGraphNodes[i - 1].state = 'done';
-            if (ftGraphNodes[i]) {
-                ftGraphNodes[i].activatedAt = performance.now();
-                if (ftTtsEnabled) ftSpeakNode(ftGraphNodes[i]);
-            }
-            if (i < ftGraphEdges.length) { animateEdgeFill(i, 450 * ftSpeedMultiplier); spawnParticles(i); }
-            if (i === steps.length - 1) setTimeout(function() { if (ftGraphNodes[i]) ftGraphNodes[i].state = 'done'; }, READ_TIME * ftSpeedMultiplier);
-            // Smoothly pan camera to keep active node centred
-            var n = ftGraphNodes[i];
-            if (n) {
-                var dpr = window.devicePixelRatio || 1;
-                var H   = ftCanvas ? ftCanvas.height / dpr : 500;
-                ftScrollYTarget = Math.min(0, H / 2 - n.y);
-            }
-        }, i * READ_TIME * ftSpeedMultiplier);
-    });
-
+    // Draw once (static — no rAF loop needed, but keep loop for hover/tooltip updates)
     ftPulseTime = 0;
     ftAnimFrame = requestAnimationFrame(drawFrame);
 }
@@ -7224,49 +7203,11 @@ function drawFrame(now) {
     var ctx = ftCtx;
     ftPulseTime = now * 0.001;
 
-    // Spring-physics smooth scroll toward target
-    var stiffness = 0.10, damping = 0.72;
-    ftScrollYVel = ftScrollYVel * damping + (ftScrollYTarget - ftScrollY) * stiffness;
-    ftScrollY   += ftScrollYVel;
-
     ctx.clearRect(0, 0, W, H);
-    ctx.save();
-    // Apply zoom centred on canvas centre, then pan
-    ctx.translate(W / 2 + ftPanX, H / 2);
-    ctx.scale(ftScale, ftScale);
-    ctx.translate(-W / 2, -H / 2 + ftScrollY / ftScale);
-
+    // No transform — nodes are placed at absolute canvas positions (large virtual canvas)
     drawGrid(ctx, W, H);
     drawEdges(ctx);
-
-    // Particles
-    ftParticles.forEach(function(p) {
-        if (p.done) return;
-        var e  = ftGraphEdges[p.edgeIdx]; if (!e) return;
-        var fn = ftGraphNodes[e.from], tn = ftGraphNodes[e.to]; if (!fn || !tn) return;
-        var cy = (fn.y + tn.y) / 2;
-        p.progress = Math.min(1, p.progress + p.speed);
-        var t = p.progress, mt = 1 - t;
-        var px = mt*mt*fn.x + 2*mt*t*fn.x + t*t*tn.x;
-        var py = mt*mt*(fn.y+fn.h/2+4) + 2*mt*t*cy + t*t*(tn.y-tn.h/2-4);
-        p.trail.push({x:px,y:py}); if (p.trail.length > 18) p.trail.shift();
-        for (var ti = 0; ti < p.trail.length; ti++) {
-            var a = (ti/p.trail.length)*0.65, r = p.size*(ti/p.trail.length)*0.75;
-            ctx.beginPath(); ctx.arc(p.trail[ti].x, p.trail[ti].y, Math.max(0.5,r), 0, Math.PI*2);
-            ctx.fillStyle = hexToRgba(p.color, a); ctx.fill();
-        }
-        ctx.shadowBlur = 16; ctx.shadowColor = p.color;
-        ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI*2);
-        ctx.fillStyle = p.color; ctx.fill(); ctx.shadowBlur = 0;
-        if (p.progress >= 1) p.done = true;
-    });
-    ftParticles = ftParticles.filter(function(p){return !p.done;});
-
     drawNodes(ctx, W, H);
-    ctx.restore();
-
-    // Scroll indicator
-    drawScrollHint(ctx, W, H);
 
     ftAnimFrame = requestAnimationFrame(drawFrame);
 }
@@ -7315,84 +7256,11 @@ function drawNodes(ctx, W, H) {
         var isC  = ftClickedNode && ftClickedNode.id === n.id;
         var step = n.step;
 
-        // Pulse ring (ambient glow)
-        if (isA) {
+        // Pulse ring (ambient glow for hovered/clicked nodes)
+        if (isH || isC) {
             var pulse = (Math.sin(ftPulseTime * 2.8 + n.pulsePhase) + 1) / 2;
-            ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2 * 0.54 + pulse*20, 0, Math.PI*2);
-            ctx.strokeStyle = hexToRgba(n.color, 0.06 + pulse*0.1); ctx.lineWidth = 2+pulse*4; ctx.stroke();
-        }
-
-        // ── Countdown loader ring — traces the exact card border ──────
-        if (isA && n.activatedAt) {
-            var READ_MS  = 3000 / ftSpeedMultiplier;
-            var progress = Math.min(1, (performance.now() - n.activatedAt) / READ_MS);
-            var r2 = 10; // matches card corner radius
-            // Perimeter = 4 straight segments + full circle (4 quarter-arcs)
-            var straightW = n.w - 2 * r2;
-            var straightH = n.h - 2 * r2;
-            var perimeter = 2 * (straightW + straightH) + 2 * Math.PI * r2;
-            var filled    = perimeter * progress;
-            var pi = Math.PI;
-
-            ctx.save();
-            ctx.lineWidth  = 3;
-            ctx.lineCap    = 'round';
-            ctx.lineJoin   = 'round';
-
-            // Dim track — exact card border
-            ctx.strokeStyle = hexToRgba(n.color, 0.18);
-            roundRect(ctx, x, y, n.w, n.h, r2); ctx.stroke();
-
-            // Animated filled stroke
-            ctx.strokeStyle = n.color;
-            ctx.shadowBlur  = 8; ctx.shadowColor = n.glowColor;
-            ctx.beginPath();
-
-            var rem   = filled;
-            var moved = false;
-
-            function _mvto(px2, py2) {
-                if (!moved) { ctx.moveTo(px2, py2); moved = true; }
-            }
-            function _arcSeg(cx2, cy2, sa, ea) {
-                if (rem <= 0) return;
-                var arcLen = r2 * (ea - sa);
-                var take   = Math.min(arcLen, rem);
-                var endA   = sa + take / r2;
-                _mvto(cx2 + r2 * Math.cos(sa), cy2 + r2 * Math.sin(sa));
-                ctx.arc(cx2, cy2, r2, sa, endA, false);
-                rem -= take;
-            }
-            function _lineSeg(x1, y1, x2, y2) {
-                if (rem <= 0) return;
-                var len = Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
-                var t   = Math.min(1, rem / len);
-                _mvto(x1, y1);
-                ctx.lineTo(x1+(x2-x1)*t, y1+(y2-y1)*t);
-                rem -= len * t;
-            }
-
-            // Clockwise from top-left arc end, matching roundRect path exactly:
-            // top-left arc  (-π → -π/2)
-            _arcSeg(x + r2,       y + r2,       -pi,    -pi/2);
-            // top edge  (left → right)
-            _lineSeg(x + r2,      y,              x + n.w - r2, y);
-            // top-right arc  (-π/2 → 0)
-            _arcSeg(x + n.w - r2, y + r2,        -pi/2,  0);
-            // right edge  (top → bottom)
-            _lineSeg(x + n.w,     y + r2,         x + n.w, y + n.h - r2);
-            // bottom-right arc  (0 → π/2)
-            _arcSeg(x + n.w - r2, y + n.h - r2,   0,      pi/2);
-            // bottom edge  (right → left)
-            _lineSeg(x + n.w - r2, y + n.h,        x + r2,  y + n.h);
-            // bottom-left arc  (π/2 → π)
-            _arcSeg(x + r2,       y + n.h - r2,   pi/2,   pi);
-            // left edge  (bottom → top)
-            _lineSeg(x,           y + n.h - r2,   x,       y + r2);
-
-            ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.restore();
+            ctx.beginPath(); ctx.arc(n.x, n.y, n.w/2 * 0.54 + pulse*12, 0, Math.PI*2);
+            ctx.strokeStyle = hexToRgba(n.color, 0.05 + pulse*0.08); ctx.lineWidth = 2+pulse*3; ctx.stroke();
         }
 
         // Shadow/glow
@@ -7555,14 +7423,10 @@ function hexToRgba(hex, a) {
 }
 
 function screenToWorld(sx, sy) {
-    // Inverse of the transform in drawFrame
-    var dpr = window.devicePixelRatio || 1;
-    var W = ftCanvas ? ftCanvas.width / dpr : 400;
-    var H = ftCanvas ? ftCanvas.height / dpr : 400;
-    // Undo: translate(W/2+ftPanX, H/2) scale(ftScale) translate(-W/2, -H/2+scrollAdj)
-    var wx = (sx - W / 2 - ftPanX) / ftScale + W / 2;
-    var wy = (sy - H / 2) / ftScale + H / 2 - ftScrollY / ftScale;
-    return { x: wx, y: wy };
+    // Canvas is absolute-positioned inside a scrollable wrapper.
+    // sx/sy are already relative to canvas top-left (from getBoundingClientRect),
+    // so world coords == canvas coords (no transform applied in drawFrame).
+    return { x: sx, y: sy };
 }
 
 function getNodeAtPoint(mx, my) {
@@ -7726,63 +7590,71 @@ function bindFlowTracerEvents() {
         updateZoomLabel();
     }
 
-    // Wire zoom buttons
+    // Wire zoom buttons (kept for compatibility — zoom via wrapper scroll)
     var zoomInBtn  = document.getElementById('ft-zoom-in');
     var zoomOutBtn = document.getElementById('ft-zoom-out');
     var fitBtn     = document.getElementById('ft-zoom-fit');
-    if (zoomInBtn)  zoomInBtn.addEventListener('click',  function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*1.25, cx, cy); });
-    if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { var dpr=window.devicePixelRatio||1; var cx=canvas.width/dpr/2, cy=canvas.height/dpr/2; applyZoom(ftScale*0.8,  cx, cy); });
-    if (fitBtn)     fitBtn.addEventListener('click',     fitToScreen);
+    if (zoomInBtn)  zoomInBtn.addEventListener('click',  function() { /* no-op: canvas is scroll-navigated */ });
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', function() { /* no-op */ });
+    if (fitBtn)     fitBtn.addEventListener('click',     function() {
+        var wr = document.getElementById('ft-canvas-wrapper');
+        if (wr) { wr.scrollLeft = 0; wr.scrollTop = 0; }
+    });
 
     if (canvas) {
+        // Pointer events relative to the canvas element itself
         canvas.addEventListener('mousemove', function(e) {
             var rect = canvas.getBoundingClientRect();
             var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
             if (ftDragStart && ftDragStart.type === 'pan') {
-                var dx = mx - ftDragStart.startX, dy = my - ftDragStart.startY;
-                ftPanX          = ftDragStart.panX0  + dx;
-                ftScrollY       = ftDragStart.scrollY0 + dy;
-                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
+                var wrapper2 = document.getElementById('ft-canvas-wrapper');
+                if (wrapper2) {
+                    wrapper2.scrollLeft = ftDragStart.scrollLeft0 - (e.clientX - ftDragStart.startX);
+                    wrapper2.scrollTop  = ftDragStart.scrollTop0  - (e.clientY - ftDragStart.startY);
+                }
                 canvas.style.cursor = 'grabbing';
                 return;
             }
+
             var node = getNodeAtPoint(mx, my);
             ftHoveredNode = node;
-            if (node) { canvas.style.cursor='pointer'; showNodeTooltip(node, mx, my); }
-            else       { canvas.style.cursor='default'; hideTooltip(); }
-        });
-        canvas.addEventListener('mouseleave', function() { ftHoveredNode=null; hideTooltip(); ftDragStart=null; });
-        canvas.addEventListener('mousedown', function(e) {
-            if (e.button === 1 || (e.button === 0 && e.altKey)) {
-                // Middle-click or Alt+drag = pan
-                e.preventDefault();
-                var rect = canvas.getBoundingClientRect();
-                ftDragStart = { type:'pan', startX: e.clientX-rect.left, startY: e.clientY-rect.top, panX0: ftPanX, scrollY0: ftScrollY };
-            }
-        });
-        canvas.addEventListener('mouseup', function(e) {
-            if (ftDragStart && ftDragStart.type === 'pan') { ftDragStart=null; canvas.style.cursor='default'; return; }
-            var rect = canvas.getBoundingClientRect();
-            var node = getNodeAtPoint(e.clientX-rect.left, e.clientY-rect.top);
-            if (node) openDetailDrawer(node);
+            if (node) { canvas.style.cursor = 'pointer'; showNodeTooltip(node, mx, my); }
+            else       { canvas.style.cursor = 'grab';   hideTooltip(); }
         });
 
-        // Ctrl+Wheel = zoom, plain Wheel = scroll
-        canvas.addEventListener('wheel', function(e) {
-            e.preventDefault();
-            var rect = canvas.getBoundingClientRect();
-            var mx = e.clientX - rect.left, my = e.clientY - rect.top;
-            if (e.ctrlKey || e.metaKey) {
-                // Zoom towards cursor
-                var delta = e.deltaY > 0 ? 0.9 : 1.11;
-                applyZoom(ftScale * delta, mx, my);
-            } else {
-                // Scroll / pan
-                ftScrollY      -= e.deltaY * 0.85 / ftScale;
-                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
-                ftPanX         -= e.deltaX * 0.85 / ftScale;
+        canvas.addEventListener('mouseleave', function() {
+            ftHoveredNode = null; hideTooltip(); ftDragStart = null;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('mousedown', function(e) {
+            if (e.button === 0) {
+                e.preventDefault();
+                var wrapper2 = document.getElementById('ft-canvas-wrapper');
+                ftDragStart = {
+                    type: 'pan',
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    scrollLeft0: wrapper2 ? wrapper2.scrollLeft : 0,
+                    scrollTop0:  wrapper2 ? wrapper2.scrollTop  : 0
+                };
+                canvas.style.cursor = 'grabbing';
             }
-        }, { passive: false });
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            if (ftDragStart && ftDragStart.type === 'pan') {
+                var movedX = Math.abs(e.clientX - ftDragStart.startX);
+                var movedY = Math.abs(e.clientY - ftDragStart.startY);
+                ftDragStart = null;
+                canvas.style.cursor = 'grab';
+                if (movedX > 6 || movedY > 6) return; // was a drag, not a click
+            }
+            var rect = canvas.getBoundingClientRect();
+            var node = getNodeAtPoint(e.clientX - rect.left, e.clientY - rect.top);
+            if (node) openDetailDrawer(node);
+        });
 
         // Touch: single finger pan, two finger pinch-to-zoom
         canvas.addEventListener('touchstart', function(e) {
@@ -7793,38 +7665,36 @@ function bindFlowTracerEvents() {
                 ftPinchScale0 = ftScale;
                 ftDragStart   = null;
             } else if (e.touches.length === 1) {
-                ftDragStart = { type:'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX0: ftPanX, scrollY0: ftScrollY };
+                var wrapper2 = document.getElementById('ft-canvas-wrapper');
+                ftDragStart = {
+                    type: 'pan',
+                    startX: e.touches[0].clientX,
+                    startY: e.touches[0].clientY,
+                    scrollLeft0: wrapper2 ? wrapper2.scrollLeft : 0,
+                    scrollTop0:  wrapper2 ? wrapper2.scrollTop  : 0
+                };
                 ftPinchDist0 = null;
             }
         }, { passive: true });
 
         canvas.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2 && ftPinchDist0 !== null) {
-                var dx = e.touches[0].clientX - e.touches[1].clientX;
-                var dy = e.touches[0].clientY - e.touches[1].clientY;
-                var dist = Math.sqrt(dx*dx + dy*dy);
-                var rect = canvas.getBoundingClientRect();
-                var cx   = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
-                var cy   = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
-                applyZoom(ftPinchScale0 * (dist / ftPinchDist0), cx, cy);
-            } else if (e.touches.length === 1 && ftDragStart) {
-                var dx = e.touches[0].clientX - ftDragStart.startX;
-                var dy = e.touches[0].clientY - ftDragStart.startY;
-                ftPanX          = ftDragStart.panX0    + dx;
-                ftScrollY       = ftDragStart.scrollY0 + dy;
-                ftScrollYTarget = ftScrollY; ftScrollYVel = 0;
+            if (e.touches.length === 1 && ftDragStart) {
+                var wrapper2 = document.getElementById('ft-canvas-wrapper');
+                if (wrapper2) {
+                    wrapper2.scrollLeft = ftDragStart.scrollLeft0 - (e.touches[0].clientX - ftDragStart.startX);
+                    wrapper2.scrollTop  = ftDragStart.scrollTop0  - (e.touches[0].clientY - ftDragStart.startY);
+                }
             }
         }, { passive: true });
 
         canvas.addEventListener('touchend', function(e) {
-            if (e.touches.length < 2) { ftPinchDist0 = null; }
             if (e.touches.length === 0 && ftDragStart) {
                 var movedX = Math.abs(e.changedTouches[0].clientX - ftDragStart.startX);
                 var movedY = Math.abs(e.changedTouches[0].clientY - ftDragStart.startY);
                 if (movedX < 8 && movedY < 8) {
                     var rect  = canvas.getBoundingClientRect();
                     var touch = e.changedTouches[0];
-                    var node  = getNodeAtPoint(touch.clientX-rect.left, touch.clientY-rect.top);
+                    var node  = getNodeAtPoint(touch.clientX - rect.left, touch.clientY - rect.top);
                     if (node) openDetailDrawer(node);
                 }
                 ftDragStart = null;
@@ -7835,9 +7705,21 @@ function bindFlowTracerEvents() {
     window.addEventListener('resize', function() {
         if (flowTracerState.lastTrace && flowTracerState.lastTrace.steps) {
             stopCanvasAnimation();
-            setTimeout(function() { buildAndAnimateGraph(flowTracerState.lastTrace.steps); }, 120);
+            setTimeout(function() {
+                buildAndAnimateGraph(flowTracerState.lastTrace.steps);
+            }, 120);
         }
     });
+
+    // Natural language prompt flow generation
+    var nlPromptBtn = document.getElementById('ft-nl-generate-button');
+    var nlPromptInput = document.getElementById('ft-nl-prompt-input');
+    if (nlPromptBtn && nlPromptInput) {
+        nlPromptBtn.addEventListener('click', runNlFlowGenerate);
+        nlPromptInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runNlFlowGenerate();
+        });
+    }
 
     var configToggle = document.getElementById('ft-config-toggle');
     var leftPanel    = document.getElementById('ft-left-panel');
@@ -7852,6 +7734,71 @@ function bindFlowTracerEvents() {
         });
     }
 }
+
+async function runNlFlowGenerate() {
+    var inputEl = document.getElementById('ft-nl-prompt-input');
+    var btn     = document.getElementById('ft-nl-generate-button');
+    var statusEl = document.getElementById('ft-nl-status');
+    if (!inputEl) return;
+    var prompt = inputEl.value.trim();
+    if (!prompt) { if (statusEl) { statusEl.textContent = 'Please describe your flow first.'; statusEl.style.color = '#e06c75'; } return; }
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating…'; }
+    if (statusEl) { statusEl.textContent = 'Calling AI…'; statusEl.style.color = '#c678dd'; }
+
+    // Collect node names from vibeTree for context
+    var nodeNames = [];
+    if (typeof vibeTree !== 'undefined') {
+        (function walk(n) {
+            if (n && n.id) nodeNames.push(n.id);
+            if (n && n.children) n.children.forEach(walk);
+        })(vibeTree);
+    }
+
+    var systemPrompt = [
+        'You are a flow trace generator for a web app called Vibe.',
+        'Given a natural language description of a flow (including node names and logic), produce a JSON object with:',
+        '  "summary": string — one sentence overview',
+        '  "steps": array of step objects, each with:',
+        '    "title": string (short, e.g. function or node name)',
+        '    "type": one of trigger|handler|condition|mutation|dom|network|state|output|error',
+        '    "detail": string (1-2 sentence explanation)',
+        '    "codeSnippet": string|null (optional short code snippet)',
+        '    "nodeId": string|null (matching node ID if known)',
+        '    "condition": string|null,',
+        '    "conditionResult": boolean|null,',
+        '    "variables": array of {name,before,after}|null,',
+        '    "returns": string|null,',
+        '    "sideEffects": array of strings|null',
+        'Available node IDs in this project: ' + (nodeNames.slice(0,40).join(', ') || '(none loaded)'),
+        'Return ONLY valid JSON — no markdown fences, no preamble.'
+    ].join('\n');
+
+    try {
+        var raw = await callAI(systemPrompt, prompt, true);
+        var clean = raw.trim().replace(/^```json\s*/i,'').replace(/```$/,'').trim();
+        var traceData = JSON.parse(clean);
+        if (!traceData.steps || !Array.isArray(traceData.steps)) throw new Error('No steps array in response');
+
+        if (statusEl) { statusEl.textContent = traceData.steps.length + ' steps generated'; statusEl.style.color = '#98c379'; }
+
+        var placeholder = document.getElementById('ft-placeholder');
+        var stepCountEl = document.getElementById('ft-step-count');
+        var replayBtn   = document.getElementById('ft-replay-button');
+        if (placeholder) placeholder.style.display = 'none';
+        if (replayBtn)   replayBtn.style.display = '';
+        if (stepCountEl) stepCountEl.textContent = traceData.steps.length + ' node' + (traceData.steps.length !== 1 ? 's' : '');
+
+        flowTracerState.lastTrace = traceData;
+        flowTracerState.summary   = traceData.summary || '';
+        buildAndAnimateGraph(traceData.steps);
+
+    } catch(e) {
+        if (statusEl) { statusEl.textContent = 'Error: ' + e.message; statusEl.style.color = '#e06c75'; }
+        console.error('NL Flow Generate error:', e);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✦ Generate Flow'; }
+    }
 
 
 function buildBasicMermaidFromTree(tree) {
