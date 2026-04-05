@@ -595,18 +595,24 @@
         .ft-canvas-wrapper {
             flex: 1;
             position: relative;
-            overflow: hidden;
-            min-height: 260px;
+            overflow: auto;
+            min-height: 400px;
             background: #161a1f;
+            cursor: grab;
+            scrollbar-width: thin;
+            scrollbar-color: #3e4451 #161a1f;
         }
+        .ft-canvas-wrapper:active { cursor: grabbing; }
+        .ft-canvas-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
+        .ft-canvas-wrapper::-webkit-scrollbar-track { background: #161a1f; }
+        .ft-canvas-wrapper::-webkit-scrollbar-thumb { background: #3e4451; border-radius: 4px; }
+        .ft-canvas-wrapper::-webkit-scrollbar-thumb:hover { background: #5c6370; }
         .ft-canvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
+            position: static;
             display: block;
-            cursor: default;
+            cursor: grab;
         }
+        .ft-canvas:active { cursor: grabbing; }
         .ft-flow-placeholder {
             position: absolute;
             top: 50%; left: 50%;
@@ -734,12 +740,80 @@
             border-radius: 50%;
             animation: ft-spin 0.8s linear infinite;
         }
-        /* Mobile: stack canvas below config */
-        @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
-            .ft-canvas-wrapper { min-height: 300px; flex: unset; height: 300px; }
-            .ft-right-panel { min-height: 340px; flex: unset; }
-            .ft-detail-drawer.ft-drawer-open { height: 130px; }
+        /* ── Flow Tracer: Natural Language Prompt section ── */
+        .ft-nl-section {
+            margin-top: 18px;
+            border-top: 1px solid #2d333b;
+            padding-top: 14px;
         }
+        .ft-nl-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #c678dd;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .ft-nl-badge {
+            font-size: 0.62rem;
+            background: rgba(198,120,221,0.15);
+            color: #c678dd;
+            border: 1px solid rgba(198,120,221,0.35);
+            border-radius: 3px;
+            padding: 1px 5px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .ft-nl-textarea {
+            width: 100%;
+            background: #21252b;
+            border: 1px solid #3e4451;
+            color: #abb2bf;
+            border-radius: 4px;
+            padding: 7px 9px;
+            font-size: 0.80rem;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 80px;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
+        }
+        .ft-nl-textarea:focus { outline: none; border-color: #c678dd; }
+        .ft-nl-textarea::placeholder { color: #5c6370; font-style: italic; }
+        .ft-nl-hint {
+            font-size: 0.70rem;
+            color: #5c6370;
+            margin-bottom: 7px;
+            line-height: 1.45;
+        }
+        .ft-nl-generate-btn {
+            width: 100%;
+            background: rgba(198,120,221,0.12) !important;
+            color: #c678dd !important;
+            border: 1px solid rgba(198,120,221,0.45) !important;
+            font-weight: 700;
+            font-size: 0.80rem !important;
+            padding: 7px 0 !important;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .ft-nl-generate-btn:hover:not(:disabled) {
+            background: rgba(198,120,221,0.22) !important;
+            border-color: #c678dd !important;
+        }
+        .ft-nl-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ft-nl-status {
+            font-size: 0.71rem;
+            margin-top: 5px;
+            min-height: 1.1em;
+            color: #5c6370;
+        }
+        /* Speed + replay controls hidden when not needed */
+        .ft-speed-row { display: flex; align-items: center; gap: 8px; }
     </style>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -1170,29 +1244,28 @@
                                             </div>
                                             <button id="ft-scan-button" class="action-button ft-scan-btn" style="margin-top:8px;">🔍 Scan Project</button>
                                         </div>
+                                        <div class="ft-nl-section">
+                                            <div class="ft-nl-label">✦ AI Flow Builder <span class="ft-nl-badge">Natural Language</span></div>
+                                            <p class="ft-nl-hint">Describe your flow using node names and logic. E.g. "When the login button is clicked, validateForm checks the inputs, then submitHandler sends a POST to /api/login…"<br><small style="color:#3e4451">(Ctrl+Enter to generate)</small></p>
+                                            <textarea id="ft-nl-prompt-input" class="ft-nl-textarea" rows="4" placeholder="Describe nodes and logic in natural language…"></textarea>
+                                            <button id="ft-nl-generate-button" class="action-button ft-nl-generate-btn">✦ Generate Flow</button>
+                                            <div id="ft-nl-status" class="ft-nl-status"></div>
+                                        </div>
                                     </div>
                                     <div class="ft-right-panel">
                                         <div class="ft-flow-header">
                                             <span class="ft-section-label">Execution Flow</span>
                                             <div class="ft-flow-header-right">
                                                 <span id="ft-step-count" class="ft-step-count"></span>
-                                                <button id="ft-replay-button" class="ft-icon-btn" title="Replay animation" style="display:none;">⟳ Replay</button>
+                                                <button id="ft-replay-button" class="ft-icon-btn" title="Rebuild graph" style="display:none;">⟳ Rebuild</button>
                                                 <button id="ft-tts-button" class="ft-icon-btn" title="Toggle read-out (Text-to-Speech)">🔇 Read Out</button>
-                                                <label class="ft-speed-label">
-                                                    Speed
-                                                    <select id="ft-speed-select" class="ft-speed-select">
-                                                        <option value="2">Slow</option>
-                                                        <option value="1" selected>Normal</option>
-                                                        <option value="0.4">Fast</option>
-                                                    </select>
-                                                </label>
                                             </div>
                                         </div>
                                         <!-- Canvas for the animated flow graph -->
                                         <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
                                             <canvas id="ft-canvas" class="ft-canvas"></canvas>
                                             <div id="ft-tooltip" class="ft-node-tooltip" style="display:none;"></div>
-                                            <div id="ft-placeholder" class="ft-flow-placeholder">Configure a trigger and click ▶ Run Trace</div>
+                                            <div id="ft-placeholder" class="ft-flow-placeholder">Configure a trigger and click ▶ Run Trace — or use ✦ AI Flow Builder to describe a flow in natural language.</div>
                                         </div>
                                         <!-- Detail drawer that slides up when a node is clicked -->
                                         <div id="ft-detail-drawer" class="ft-detail-drawer">
