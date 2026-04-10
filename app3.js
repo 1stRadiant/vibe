@@ -3797,7 +3797,11 @@ async function executeSingleTask(promptContext) {
         const fullTreeString = JSON.stringify(vibeTree, null, 2);
         const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
         
-        const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
+        // ANC: prepend session intent to the prompt context if set
+        const ancIntentPrefix = (typeof ancSessionIntent !== 'undefined' && ancSessionIntent)
+            ? `Session intent: ${ancSessionIntent}\n\n`
+            : '';
+        const userPrompt = `User Request History:\n"${ancIntentPrefix}${promptContext}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
         const agentDecision = JSON.parse(rawResponse);
@@ -4944,13 +4948,13 @@ function switchToTab(tabId) {
         }
         updateTaskQueueUI();
         refreshShorthandDropdowns();
-        // ANC: refresh node context panel and show intent bar
+        // ANC: refresh node context panel and keep intent text current
         try {
-            const ancIntentBar = document.getElementById('anc-intent-bar');
-            if (ancIntentBar) {
-                ancIntentBar.style.display = '';
-                const ancIntentText = document.getElementById('anc-intent-text');
-                if (ancIntentText) ancIntentText.textContent = (typeof ancSessionIntent !== 'undefined' && ancSessionIntent) ? ancSessionIntent : '(no intent set — click edit to add a goal)';
+            const ancIntentText = document.getElementById('anc-intent-text');
+            if (ancIntentText) {
+                ancIntentText.innerHTML = (typeof ancSessionIntent !== 'undefined' && ancSessionIntent)
+                    ? ancEsc(ancSessionIntent)
+                    : '(no intent set — click <b>edit</b> to describe what you\'re working on)';
             }
             if (typeof ancCurrentNodeId !== 'undefined' && ancCurrentNodeId && typeof ancRenderPanel === 'function') {
                 setTimeout(function(){ ancRenderPanel(ancCurrentNodeId); }, 0);
@@ -8673,20 +8677,23 @@ function ancRenderPanel(nodeId) {
     if (!nodeId) return;
     ancCurrentNodeId = nodeId;
 
-    const panelEl   = document.getElementById('anc-panel');
-    const quickEl   = document.getElementById('anc-quick');
-    const histEl    = document.getElementById('anc-history');
-    const intentBar = document.getElementById('anc-intent-bar');
+    const panelEl = document.getElementById('anc-panel');
+    const quickEl = document.getElementById('anc-quick');
+    const histEl  = document.getElementById('anc-history');
     if (!panelEl) return;
 
-    // Show all ANC sections
-    panelEl.style.display   = '';
-    quickEl.style.display   = '';
-    histEl.style.display    = '';
-    intentBar.style.display = '';
+    // Show node-dependent sections
+    panelEl.style.display = '';
+    quickEl.style.display = '';
+    histEl.style.display  = '';
 
-    // Intent bar
-    document.getElementById('anc-intent-text').textContent = ancSessionIntent || '(no intent set — click edit to add a goal)';
+    // Intent bar text — always present in DOM, just keep updated
+    const intentTextEl = document.getElementById('anc-intent-text');
+    if (intentTextEl) {
+        intentTextEl.innerHTML = ancSessionIntent
+            ? ancEsc(ancSessionIntent)
+            : '(no intent set — click <b>edit</b> to describe what you\'re working on)';
+    }
 
     const node = findNodeById(nodeId);
 
@@ -8725,7 +8732,7 @@ function ancRenderPanel(nodeId) {
             return `<div class="anc-diff-line ${cls}">${ancEsc(l)}</div>`;
         }).join('');
     } else {
-        diffEl.innerHTML = '<span style="color:#5c6370;font-size:12px">No accepted changes yet for this node.</span>';
+        diffEl.innerHTML = '<span style="color:#5c6370;font-size:13px">No accepted changes yet for this node.</span>';
     }
 
     ancRenderQuickPills(nodeId);
@@ -8780,51 +8787,60 @@ function ancRenderQuickPills(nodeId) {
 
 /* ── Attempt history list ── */
 function ancRenderHistory(nodeId) {
-    const el   = document.getElementById('anc-att-list');
+    const el = document.getElementById('anc-att-list');
     if (!el) return;
     const atts = ancNodeHist(nodeId);
     if (!atts.length) {
-        el.innerHTML = '<div style="padding:10px 12px;color:#5c6370;font-size:12px;text-align:center">No attempts yet for this node.</div>';
+        el.innerHTML = '<div style="padding:16px;color:#5c6370;font-size:13px;text-align:center">No attempts yet for this node.</div>';
         return;
     }
     el.innerHTML = atts.slice().reverse().map(a => {
-        const open = ancOpenAtts[a.id];
+        // Default new attempts to open; user can toggle closed
+        const isClosed = ancOpenAtts[a.id] === false;
+
         const diffHtml = (a.diff || []).map(l => {
             const cls = l.startsWith('+') ? 'anc-diff-add' : l.startsWith('-') ? 'anc-diff-del' : 'anc-diff-ctx';
             return `<div class="anc-diff-line ${cls}">${ancEsc(l)}</div>`;
         }).join('');
-        const pseudo = a.pseudo
-            ? `<div style="margin-bottom:8px"><div class="anc-sec-lbl">what was tried</div><div style="background:#161920;padding:7px 9px;border-radius:4px;font-family:'Roboto Mono',monospace;font-size:11px;white-space:pre-wrap;max-height:70px;overflow-y:auto;color:#abb2bf">${ancEsc(a.pseudo)}</div></div>`
+
+        const pseudoBlock = a.pseudo
+            ? `<div style="margin-bottom:12px">
+                 <div class="anc-sec-lbl">what was tried</div>
+                 <div class="anc-att-pseudo-block">${ancEsc(a.pseudo)}</div>
+               </div>`
             : '';
+
         const isRunning = a.status === 'pending';
         const outcomeHtml = !isRunning
             ? `<div class="anc-outcome-row">
-                <span style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.06em">did it work?</span>
+                <span style="font-size:11px;color:#5c6370;text-transform:uppercase;letter-spacing:.06em">did it work?</span>
                 <button class="action-button small" style="border-color:#98c379;color:#98c379;background:rgba(152,195,121,.1)" onclick="ancMarkOutcome('${a.id}','ok',event)">✓ worked</button>
                 <button class="action-button small" style="border-color:#e06c75;color:#e06c75;background:rgba(224,108,117,.1)" onclick="ancMarkOutcome('${a.id}','fail',event)">✗ didn't</button>
                </div>`
-            : `<div style="margin-top:7px;display:flex;align-items:center;gap:5px"><span style="font-size:11px;color:#5c6370">running…</span></div>`;
+            : `<div style="margin-top:10px;color:#5c6370;font-size:12px">Running…</div>`;
+
         return `<div class="anc-att-item">
           <div class="anc-att-hd" onclick="ancToggleAtt('${a.id}')">
             <span class="anc-badge anc-badge-${a.status}">${a.status}</span>
             <span class="anc-att-prompt">${ancEsc(a.prompt)}</span>
             <span class="anc-att-time">${a.time}</span>
-            <span style="font-size:10px;color:#5c6370;flex-shrink:0">${open ? '▲' : '▼'}</span>
+            <span style="font-size:11px;color:#5c6370;flex-shrink:0;padding-top:2px">${isClosed ? '▶' : '▼'}</span>
           </div>
-          <div class="anc-att-body ${open ? 'open' : ''}">
-            ${pseudo}
-            ${diffHtml ? `<div style="margin-bottom:8px"><div class="anc-sec-lbl">diff</div>${diffHtml}</div>` : ''}
+          <div class="anc-att-body${isClosed ? ' closed' : ''}">
+            ${pseudoBlock}
+            ${diffHtml ? `<div style="margin-bottom:12px"><div class="anc-sec-lbl">diff</div>${diffHtml}</div>` : ''}
             <div class="anc-sec-lbl">result</div>
             <div class="anc-att-result">${ancEsc(a.result)}</div>
             ${outcomeHtml}
-            <button class="action-button small" style="margin-top:8px" onclick="ancReusePrompt('${a.id}')">↑ reuse prompt</button>
+            <button class="action-button small" style="margin-top:12px" onclick="ancReusePrompt('${a.id}')">↑ reuse prompt</button>
           </div>
         </div>`;
     }).join('');
 }
 
 function ancToggleAtt(id) {
-    ancOpenAtts[id] = !ancOpenAtts[id];
+    // undefined/true = open, false = closed; toggle between them
+    ancOpenAtts[id] = ancOpenAtts[id] === false ? undefined : false;
     if (ancCurrentNodeId) ancRenderHistory(ancCurrentNodeId);
 }
 
@@ -8918,12 +8934,18 @@ function ancEditIntent() {
     document.getElementById('anc-intent-input').value = ancSessionIntent;
     bar.style.display    = 'none';
     editor.style.display = '';
+    document.getElementById('anc-intent-input').focus();
 }
 function ancSaveIntent() {
     ancSessionIntent = (document.getElementById('anc-intent-input').value || '').trim();
+    const intentTextEl = document.getElementById('anc-intent-text');
+    if (intentTextEl) {
+        intentTextEl.innerHTML = ancSessionIntent
+            ? ancEsc(ancSessionIntent)
+            : '(no intent set — click <b>edit</b> to describe what you\'re working on)';
+    }
     document.getElementById('anc-intent-bar').style.display    = '';
     document.getElementById('anc-intent-editor').style.display = 'none';
-    document.getElementById('anc-intent-text').textContent = ancSessionIntent || '(no intent set)';
 }
 function ancCancelIntent() {
     document.getElementById('anc-intent-bar').style.display    = '';
@@ -9157,4 +9179,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-        }
+}
