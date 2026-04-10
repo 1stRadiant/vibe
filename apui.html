@@ -107,7 +107,7 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 .stab{flex:1;min-width:56px;padding:9px 4px;font-size:10px;font-weight:700;cursor:pointer;text-align:center;color:var(--text3);border:none;background:transparent;font-family:inherit;text-transform:uppercase;letter-spacing:.07em;transition:all .1s;border-bottom:2px solid transparent;white-space:nowrap}
 .stab:active{color:var(--text2)}
 .stab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.spane{display:none;padding:11px 13px;font-size:13px;line-height:1.7;min-height:90px;max-height:220px;overflow-y:auto}
+.spane{display:none;padding:11px 13px;font-size:13px;line-height:1.7;min-height:120px;max-height:420px;overflow-y:auto}
 .spane.active{display:block}
 .spane.code{background:#161920;color:#abb2bf;white-space:pre-wrap;font-family:inherit;font-size:12px;line-height:1.6}
 .pk{color:#c678dd}.pf{color:#61afef}.ps{color:#98c379}.pc{color:#3c4552;font-style:italic}
@@ -214,7 +214,7 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
   #drawer-scrim{display:none}
   #drawer-panel{position:static;transform:none !important;transition:none;width:100%;border-right:1px solid var(--border)}
   .tb-menu{display:none}
-  .spane{max-height:220px}
+  .spane{max-height:520px;min-height:140px}
   .stab{padding:7px 4px}
   .work-scroll{padding:14px 16px}
   .prompt-bar{padding:10px 14px;padding-bottom:10px}
@@ -1011,11 +1011,12 @@ function markOutcome(id, outcome, e) {
     const a=arr.find(x=>x.id===id);
     if(a) { a.status=outcome; foundAtt=a; break; }
   }
-  // If user marks as 'ok', ensure the node code is in Vibe
+  // If user marks as 'ok', push the node code to Vibe so it persists
   if (outcome==='ok' && foundAtt) {
     const node = getNodeFromTree(foundAtt.node);
-    if (node) {
-      pushNodeToVibe(foundAtt.node, node.code);
+    const codeToPush = foundAtt.appliedCode || (node && node.code);
+    if (codeToPush !== undefined) {
+      pushNodeToVibe(foundAtt.node, codeToPush);
     }
   }
   renderWork(); renderSidebar();
@@ -1081,8 +1082,9 @@ async function submitPrompt() {
       att.result = result.summary;
       att.aiResultFormatted = result.htmlSummary;
       att.diff   = result.diff || [];
-      // Push updated code back to vibe
+      // Push updated code back to vibe and store on attempt
       if (result.newCode !== undefined && result.newCode !== null) {
+        att.appliedCode = result.newCode;
         node.code = result.newCode;
         pushNodeToVibe(nid, result.newCode);
       }
@@ -1217,4 +1219,4 @@ function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&l
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
 </script>
 </body>
-          </html>
+  </html>
