@@ -814,6 +814,95 @@
         }
         /* Speed + replay controls hidden when not needed */
         .ft-speed-row { display: flex; align-items: center; gap: 8px; }
+
+        /* ── ANC: Agent Node Context (APUI features in Agent tab) ── */
+        .anc-stab {
+            flex: 1; min-width: 52px; padding: 7px 4px;
+            font-size: 10px; font-weight: 700; cursor: pointer;
+            text-align: center; color: #5c6370; border: none;
+            background: transparent; font-family: 'Roboto Mono', monospace;
+            text-transform: uppercase; letter-spacing: .07em;
+            border-bottom: 2px solid transparent; white-space: nowrap;
+            transition: color .1s;
+        }
+        .anc-stab:hover { color: #7f848e; }
+        .anc-stab-active { color: #61afef !important; border-bottom-color: #61afef !important; }
+        .anc-pane {
+            display: none; padding: 10px 13px;
+            font-size: 12px; line-height: 1.7;
+            min-height: 70px; max-height: 180px; overflow-y: auto;
+        }
+        .anc-pane-active { display: block; }
+        .anc-pane-code {
+            background: #161920; color: #abb2bf;
+            white-space: pre-wrap; font-family: 'Roboto Mono', monospace;
+            font-size: 11px; line-height: 1.6;
+        }
+        .anc-quick-label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: #5c6370; margin-bottom: 5px;
+        }
+        .anc-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .anc-pill {
+            font-family: 'Roboto Mono', monospace; font-size: 11px;
+            padding: 4px 10px; border: 1px solid #3e4451;
+            border-radius: 20px; background: #21252b; color: #7f848e;
+            cursor: pointer; white-space: nowrap; max-width: 220px;
+            overflow: hidden; text-overflow: ellipsis;
+            display: inline-flex; align-items: center; gap: 5px;
+            transition: all .1s;
+        }
+        .anc-pill:hover { border-color: #61afef; color: #61afef; }
+        .anc-pill-ok { border-color: #98c379; color: #98c379; }
+        .anc-pill-ok:hover { background: rgba(152,195,121,.1); }
+        .anc-pill-last { border-color: #c678dd; color: #c678dd; background: rgba(198,120,221,.07); }
+        .anc-badge {
+            font-size: 9px; padding: 1px 6px; border-radius: 10px;
+            font-weight: 700; white-space: nowrap; flex-shrink: 0;
+        }
+        .anc-badge-ok     { background: rgba(152,195,121,.15); color: #98c379; }
+        .anc-badge-fail   { background: rgba(224,108,117,.15); color: #e06c75; }
+        .anc-badge-pending{ background: rgba(229,192,123,.15); color: #e5c07b; }
+        .anc-att-item { border-bottom: 1px solid #2d333b; }
+        .anc-att-item:last-child { border-bottom: none; }
+        .anc-att-hd {
+            display: flex; align-items: center; gap: 7px;
+            padding: 9px 12px; cursor: pointer; background: #21252b;
+            transition: background .1s; min-height: 38px;
+        }
+        .anc-att-hd:hover { background: #282c34; }
+        .anc-att-prompt {
+            font-size: 12px; color: #abb2bf; flex: 1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+        }
+        .anc-att-time { font-size: 10px; color: #5c6370; white-space: nowrap; flex-shrink: 0; }
+        .anc-att-body {
+            display: none; padding: 10px 12px;
+            border-top: 1px solid #2d333b; background: #1a1d22;
+        }
+        .anc-att-body.open { display: block; }
+        .anc-att-result {
+            margin-top: 5px; padding: 7px 9px; background: #21252b;
+            border-radius: 4px; font-size: 11px; color: #7f848e;
+            line-height: 1.55; max-height: 90px; overflow-y: auto;
+        }
+        .anc-diff-line {
+            font-size: 11px; line-height: 1.55; padding: 1px 5px;
+            border-radius: 3px; font-family: 'Roboto Mono', monospace;
+            white-space: pre-wrap; word-break: break-all;
+        }
+        .anc-diff-add  { background: rgba(152,195,121,.07); color: #98c379; }
+        .anc-diff-del  { background: rgba(224,108,117,.07); color: #e06c75; text-decoration: line-through; opacity: .65; }
+        .anc-diff-ctx  { color: #5c6370; }
+        .anc-outcome-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+        .anc-sec-lbl {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: #5c6370; margin-bottom: 3px;
+        }
+        .anc-pseudo-k { color: #c678dd; }
+        .anc-pseudo-f { color: #61afef; }
+        .anc-pseudo-s { color: #98c379; }
+        .anc-pseudo-c { color: #3c4552; font-style: italic; }
     </style>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -1136,7 +1225,76 @@
                             <div class="agent-container">
                                 <h2>Vibe</h2>
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
-                                
+
+                                <!-- ══ APUI: Session Intent ══ -->
+                                <div id="anc-intent-bar" style="display:none;margin-bottom:10px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">session intent</span>
+                                        <button class="action-button small" onclick="ancEditIntent()" style="padding:2px 8px;font-size:11px">edit</button>
+                                    </div>
+                                    <div id="anc-intent-text" style="padding:8px 12px;font-size:12px;color:#abb2bf;line-height:1.6"></div>
+                                </div>
+                                <div id="anc-intent-editor" style="display:none;margin-bottom:10px;background:#1e2227;border:1px solid #61afef;border-radius:6px;padding:10px 12px">
+                                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:6px">session goal / intent</div>
+                                    <textarea id="anc-intent-input" rows="2" placeholder="e.g. Fix the nav scroll behaviour and tighten card spacing…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 9px;font-size:13px;resize:vertical"></textarea>
+                                    <div style="display:flex;gap:7px;margin-top:7px">
+                                        <button class="action-button small" onclick="ancSaveIntent()">save intent</button>
+                                        <button class="action-button small secondary" onclick="ancCancelIntent()">cancel</button>
+                                    </div>
+                                </div>
+
+                                <!-- ══ APUI: Node Context Panel ══ -->
+                                <div id="anc-panel" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b;gap:8px">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="anc-panel-label">current state</span>
+                                        <span id="anc-type-badge" style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap"></span>
+                                        <button class="action-button small" id="anc-analyze-btn" onclick="ancAnalyzeState()" style="padding:2px 9px;font-size:11px;border-color:#c678dd;color:#c678dd">✦ analyze</button>
+                                    </div>
+                                    <!-- State tabs -->
+                                    <div id="anc-stabs" style="display:flex;border-bottom:1px solid #2d333b;overflow-x:auto">
+                                        <button class="anc-stab anc-stab-active" onclick="ancSwitchTab('desc',this)">description</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('pseudo',this)">pseudocode</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('code',this)">code</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('diff',this)">diff</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('ai',this)">✦ AI state</button>
+                                    </div>
+                                    <div id="anc-pane-desc"   class="anc-pane anc-pane-active" style="color:#abb2bf"></div>
+                                    <div id="anc-pane-pseudo" class="anc-pane anc-pane-code"></div>
+                                    <div id="anc-pane-code"   class="anc-pane anc-pane-code"></div>
+                                    <div id="anc-pane-diff"   class="anc-pane"></div>
+                                    <div id="anc-pane-ai"     class="anc-pane" style="color:#abb2bf"><span style="color:#5c6370;font-size:12px">Click <b>✦ analyze</b> to get an AI summary of the current node state.</span></div>
+                                </div>
+
+                                <!-- ══ APUI: Quick re-invoke ══ -->
+                                <div id="anc-quick" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">quick re-invoke</span>
+                                    </div>
+                                    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+                                        <div id="anc-last-row" style="display:none">
+                                            <div class="anc-quick-label">last attempt</div>
+                                            <div id="anc-last-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-ok-row" style="display:none">
+                                            <div class="anc-quick-label">✓ worked before</div>
+                                            <div id="anc-ok-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-all-row" style="display:none">
+                                            <div class="anc-quick-label">all tried on this node</div>
+                                            <div id="anc-all-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-quick-empty" style="color:#5c6370;font-size:12px;text-align:center;padding:4px 0">No attempts yet on this node</div>
+                                    </div>
+                                </div>
+
+                                <!-- ══ APUI: Attempt history ══ -->
+                                <div id="anc-history" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370" id="anc-history-label">attempts</span>
+                                    </div>
+                                    <div id="anc-att-list" style="display:flex;flex-direction:column;gap:0"></div>
+                                </div>
+
                                 <div id="agent-controls">
                                     <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
                                     <div class="agent-buttons-container">
