@@ -360,21 +360,37 @@ let vibeTree        = null;   // full tree from Vibe
 let vibeProjectId   = null;
 let aiProvider      = null;   // 'gemini' | 'nscale'
 let geminiApiKey    = null;
-let geminiModel     = 'gemini-2.5-flash';
+let geminiModel     = null;   // null = always re-read from storage
 let nscaleApiKey    = null;
 const NSCALE_MODEL  = 'meta-llama/Llama-3.3-70B-Instruct';
 const NSCALE_ENDPOINT = 'https://api.nscale.com/v1/chat/completions';
 
+/* Read all AI settings fresh from localStorage every time — this way
+   changes made in Vibe (including custom model updates) are always
+   picked up without needing a reload. */
+function readSettingsFromStorage() {
+  try {
+    const p  = localStorage.getItem('aiProvider');
+    const gk = localStorage.getItem('geminiApiKey');
+    const gm = localStorage.getItem('geminiModel');        // may be '__custom__'
+    const gc = localStorage.getItem('geminiCustomModel'); // the actual custom string
+    const nk = localStorage.getItem('nscaleApiKey');
+
+    if (p)  aiProvider   = p;
+    if (gk) geminiApiKey = gk;
+    // Resolve __custom__ → the real custom model string
+    if (gm === '__custom__' && gc) geminiModel = gc;
+    else if (gm && gm !== '__custom__') geminiModel = gm;
+    if (nk) nscaleApiKey = nk;
+
+    if (!aiProvider) aiProvider = 'gemini';
+    if (!geminiModel) geminiModel = 'gemini-2.5-flash';
+  } catch(e) {}
+}
+
 // On load, request the tree from parent (if embedded)
 window.addEventListener('load', () => {
-  // Read from localStorage (same-origin sibling) as fallback
-  try {
-    const p = localStorage.getItem('aiProvider');   if(p) aiProvider   = p;
-    const gk= localStorage.getItem('geminiApiKey'); if(gk) geminiApiKey= gk;
-    const gm= localStorage.getItem('geminiModel');  if(gm) geminiModel  = gm;
-    const nk= localStorage.getItem('nscaleApiKey'); if(nk) nscaleApiKey = nk;
-    if (!aiProvider) aiProvider = 'gemini';
-  } catch(e){}
+  readSettingsFromStorage();
 
   // Request tree from parent Vibe app
   try { window.parent.postMessage({source:'apui-vibe',type:'apui-request-tree'},'*'); } catch(e){}
@@ -421,6 +437,7 @@ function onVibeTreeReceived() {
 }
 
 function updateAiStatusBadge() {
+  readSettingsFromStorage();
   const badge = document.getElementById('ai-status-badge');
   const keyOk = (aiProvider==='gemini' && !!geminiApiKey) ||
                 (aiProvider==='nscale' && !!nscaleApiKey);
@@ -1017,6 +1034,7 @@ Respond with JSON: {"newCode":"...","summary":"...","diff":["...","..."]}`;
 
 /* ══ Unified AI call (gemini or nscale) ══ */
 async function callAI(systemPrompt, userPrompt, forJson=false) {
+  readSettingsFromStorage(); // always pick up latest model/key/provider
   if (aiProvider==='nscale') {
     return callNscaleAI(systemPrompt, userPrompt, forJson);
   }
@@ -1062,4 +1080,4 @@ function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&l
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
 </script>
 </body>
-            </html>
+  </html>
