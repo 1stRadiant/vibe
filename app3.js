@@ -3789,6 +3789,8 @@ function handleQuickReply(replyText) {
 }
 
 async function executeSingleTask(promptContext) {
+    // ANC: store prompt so executeAgentPlan can stamp it onto the attempt record
+    window._ancLastPromptContext = promptContext;
     showAgentSpinner();
     try {
         const systemPrompt = getAgentSystemPrompt();
@@ -3799,6 +3801,8 @@ async function executeSingleTask(promptContext) {
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
         const agentDecision = JSON.parse(rawResponse);
+        // ANC: attach the user prompt so attempt records show the original request
+        agentDecision._ancPrompt = promptContext;
         
         if (agentDecision.question) {
             renderAgentQuestionUI(agentDecision.question);
@@ -3948,7 +3952,34 @@ function executeAgentPlan(agentDecision, agentLogger) {
             agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType}\`. Skipping.`, 'warn');
         }
     }
-    
+
+    // ANC: record each touched node as an attempt and refresh the panel
+    try {
+        if (Array.isArray(agentDecision.actions)) {
+            let ancLastId = null;
+            agentDecision.actions.forEach(function(action) {
+                const nid = action.actionType === 'update'
+                    ? action.nodeId
+                    : (action.newNode && action.newNode.id) || null;
+                if (!nid) return;
+                ancLastId = nid;
+                const newCode  = action.newCode || (action.newNode && action.newNode.code) || '';
+                const diffLines = newCode ? newCode.split('\n').slice(0, 6).map(function(l){ return '+ ' + l; }) : [];
+                const promptText = (agentDecision._ancPrompt || agentDecision.plan || 'Agent action');
+                if (typeof ancRecordAttempt === 'function') {
+                    const att = ancRecordAttempt(nid, promptText, 'Agent: ' + agentDecision.plan, diffLines);
+                    att.status = 'ok';
+                }
+            });
+            if (ancLastId) {
+                ancCurrentNodeId = ancLastId;
+                if (typeof ancRenderPanel === 'function') ancRenderPanel(ancLastId);
+            } else if (ancCurrentNodeId && typeof ancRenderPanel === 'function') {
+                ancRenderPanel(ancCurrentNodeId);
+            }
+        }
+    } catch(ancErr) { /* non-fatal */ }
+
     refreshAllUI();
 }
 
@@ -4913,6 +4944,18 @@ function switchToTab(tabId) {
         }
         updateTaskQueueUI();
         refreshShorthandDropdowns();
+        // ANC: refresh node context panel and show intent bar
+        try {
+            const ancIntentBar = document.getElementById('anc-intent-bar');
+            if (ancIntentBar) {
+                ancIntentBar.style.display = '';
+                const ancIntentText = document.getElementById('anc-intent-text');
+                if (ancIntentText) ancIntentText.textContent = (typeof ancSessionIntent !== 'undefined' && ancSessionIntent) ? ancSessionIntent : '(no intent set — click edit to add a goal)';
+            }
+            if (typeof ancCurrentNodeId !== 'undefined' && ancCurrentNodeId && typeof ancRenderPanel === 'function') {
+                setTimeout(function(){ ancRenderPanel(ancCurrentNodeId); }, 0);
+            }
+        } catch(ancErr) { /* non-fatal */ }
     }
 
     if (tabId === 'nervous-system') {
@@ -8910,94 +8953,9 @@ function ancSummarizePrompt(text) {
     return t.split(/[,;]/).map(p => '→ ' + p.trim().slice(0, 60)).filter(Boolean).join('\n');
 }
 
-/* ── Hook into executeAgentPlan — record each updated/created node ── */
-const _ancOrigExecuteAgentPlan = executeAgentPlan;
-function executeAgentPlan(agentDecision, agentLogger) {
-    // Call original first — it mutates vibeTree
-    _ancOrigExecuteAgentPlan(agentDecision, agentLogger);
-
-    // Record attempt for each action's node, detect the last touched node
-    if (Array.isArray(agentDecision.actions)) {
-        let lastNodeId = null;
-        agentDecision.actions.forEach(action => {
-            const nid = action.actionType === 'update'
-                ? action.nodeId
-                : (action.newNode && action.newNode.id) || null;
-            if (!nid) return;
-            lastNodeId = nid;
-
-            // Build diff lines from old vs new code where possible
-            const node = findNodeById(nid);
-            const newCode  = action.newCode || (action.newNode && action.newNode.code) || '';
-            const diffLines = newCode
-                ? newCode.split('\n').slice(0, 6).map(l => '+ ' + l)
-                : [];
-
-            // Use the agent plan as the prompt context
-            const promptText = agentDecision._ancPrompt
-                ? agentDecision._ancPrompt
-                : agentDecision.plan || 'Agent action';
-
-            const att = ancRecordAttempt(nid, promptText, `Agent: ${agentDecision.plan}`, diffLines);
-            // Mark ok immediately since agent applied it — user can flip to fail
-            att.status = 'ok';
-        });
-
-        // Refresh panel for the last touched node
-        if (lastNodeId) {
-            ancCurrentNodeId = lastNodeId;
-            ancRenderPanel(lastNodeId);
-        } else if (ancCurrentNodeId) {
-            ancRenderPanel(ancCurrentNodeId);
-        }
-    }
-}
-
-/* ── Attach user prompt text to the decision before execution ── */
-// Wrap executeSingleTask to capture the prompt and stamp it onto the decision
-const _ancOrigExecuteSingleTask = executeSingleTask;
-async function executeSingleTask(promptContext) {
-    // Store current prompt context so executeAgentPlan can read it
-    window._ancLastPromptContext = promptContext;
-    return _ancOrigExecuteSingleTask(promptContext);
-}
-
-// Patch callAI response parsing in executeSingleTask to stamp prompt onto decision
-// We do this by wrapping executeAgentPlan's call site in executeSingleTask:
-// executeAgentPlan is already wrapped above — it gets agentDecision which we annotate here.
-// The annotation happens via the _ancPrompt on the decision object passed through.
-// Since we can't easily intercept between callAI and executeAgentPlan in executeSingleTask,
-// we patch JSON.parse temporarily during each task run.
-const _ancOrigJSONParse = JSON.parse;
-// Lightweight hook: after executeSingleTask calls JSON.parse on the AI response,
-// stamp the prompt onto the resulting object.
-const _ancParsePatch = function(text, reviver) {
-    const result = _ancOrigJSONParse(text, reviver);
-    if (result && typeof result === 'object' && Array.isArray(result.actions)) {
-        result._ancPrompt = window._ancLastPromptContext || '';
-    }
-    return result;
-};
-JSON.parse = _ancParsePatch;
-
-/* ── Wire up: when agent tab is switched to, show panel for last node ── */
-const _ancOrigSwitchToTab = switchToTab;
-function switchToTab(tabId) {
-    _ancOrigSwitchToTab(tabId);
-    if (tabId === 'agent') {
-        // If there's a current node, refresh its panel
-        if (ancCurrentNodeId) {
-            setTimeout(() => ancRenderPanel(ancCurrentNodeId), 0);
-        }
-        // Show intent bar even with no node yet
-        const intentBar = document.getElementById('anc-intent-bar');
-        if (intentBar) {
-            intentBar.style.display = '';
-            const intentText = document.getElementById('anc-intent-text');
-            if (intentText) intentText.textContent = ancSessionIntent || '(no intent set — click edit to add a goal)';
-        }
-    }
-}
+/* ── Hook into executeAgentPlan — ANC logic injected directly into the original function above ── */
+/* ── Hook into executeSingleTask — ANC logic injected directly into the original function above ── */
+/* ── Hook into switchToTab — ANC logic injected directly into the original function above ── */
 
 /* ── Wire up: when a node is clicked in the inspector/tree, update the panel ── */
 // Listen for the vibe-node-click postMessage that the preview iframe sends
@@ -9199,4 +9157,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+        }
