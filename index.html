@@ -576,6 +576,7 @@
             transition: border-color 0.15s, color 0.15s;
         }
         .ft-icon-btn:hover { border-color: #c678dd; color: #c678dd; }
+        .ft-icon-btn.ft-tts-active { border-color: #98c379; color: #98c379; background: rgba(152,195,121,0.08); }
         .ft-speed-label {
             font-size: 0.72rem;
             color: #5c6370;
@@ -592,20 +593,26 @@
             font-size: 0.72rem;
         }
         .ft-canvas-wrapper {
+            flex: 1;
             position: relative;
-            overflow: hidden;
-            height: 220px;
-            flex-shrink: 0;
+            overflow: auto;
+            min-height: 400px;
             background: #161a1f;
+            cursor: grab;
+            scrollbar-width: thin;
+            scrollbar-color: #3e4451 #161a1f;
         }
+        .ft-canvas-wrapper:active { cursor: grabbing; }
+        .ft-canvas-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
+        .ft-canvas-wrapper::-webkit-scrollbar-track { background: #161a1f; }
+        .ft-canvas-wrapper::-webkit-scrollbar-thumb { background: #3e4451; border-radius: 4px; }
+        .ft-canvas-wrapper::-webkit-scrollbar-thumb:hover { background: #5c6370; }
         .ft-canvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%;
-            height: 100%;
+            position: static;
             display: block;
-            cursor: default;
+            cursor: grab;
         }
+        .ft-canvas:active { cursor: grabbing; }
         .ft-flow-placeholder {
             position: absolute;
             top: 50%; left: 50%;
@@ -703,36 +710,6 @@
             cursor: pointer;
         }
         .ft-detail-body code:hover { border-color: #61afef; }
-        /* Zoom controls */
-        .ft-zoom-controls {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-            background: #21252b;
-            border: 1px solid #3e4451;
-            border-radius: 5px;
-            padding: 2px 4px;
-        }
-        .ft-zoom-label {
-            font-size: 0.72rem;
-            color: #7f848e;
-            font-family: 'Roboto Mono', monospace;
-            min-width: 36px;
-            text-align: center;
-        }
-        .ft-icon-btn {
-            background: transparent;
-            border: none;
-            color: #7f848e;
-            cursor: pointer;
-            font-size: 0.85rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            line-height: 1;
-            transition: color 0.12s, background 0.12s;
-        }
-        .ft-icon-btn:hover { color: #abb2bf; background: rgba(255,255,255,0.06); }
-        .ft-icon-btn:active { color: #c678dd; }
         .ft-detail-node-link {
             display: inline-block;
             margin-top: 6px;
@@ -741,42 +718,6 @@
             cursor: pointer;
             text-decoration: underline;
         }
-        .ft-drawer-section-label {
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            color: #5c6370;
-            margin: 8px 0 3px;
-        }
-        .ft-drawer-row {
-            font-size: 0.78rem;
-            color: #abb2bf;
-            line-height: 1.5;
-            padding: 2px 0;
-        }
-        .ft-var-name   { color: #c678dd; font-family:'Roboto Mono',monospace; font-weight:700; font-size:0.76rem; }
-        .ft-var-before { color: #e06c75; font-family:'Roboto Mono',monospace; font-size:0.76rem; }
-        .ft-var-arrow  { color: #5c6370; margin: 0 4px; }
-        .ft-var-after  { color: #98c379; font-family:'Roboto Mono',monospace; font-size:0.76rem; font-weight:700; }
-        /* Detail drawer taller for rich content */
-        .ft-detail-drawer.ft-drawer-open { height: 220px; }
-        .ft-detail-body p { margin: 0 0 6px; }
-        .ft-detail-body code {
-            font-family: 'Roboto Mono',monospace;
-            font-size: 0.71rem;
-            background: #21252b;
-            border: 1px solid #2d333b;
-            border-radius: 4px;
-            padding: 5px 8px;
-            display: block;
-            margin: 4px 0 6px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            color: #98c379;
-            cursor: pointer;
-        }
-        .ft-detail-body code:hover { border-color: #61afef; }
         /* Loading overlay on canvas */
         @keyframes ft-spin { to { transform: rotate(360deg); } }
         .ft-loading-overlay {
@@ -799,192 +740,169 @@
             border-radius: 50%;
             animation: ft-spin 0.8s linear infinite;
         }
-        /* ── Flow Tracer Streamer Styles ── */
-        .ft-body {
-            flex: 1; display: flex; overflow: hidden; min-height: 0;
+        /* ── Flow Tracer: Natural Language Prompt section ── */
+        .ft-nl-section {
+            margin-top: 18px;
+            border-top: 1px solid #2d333b;
+            padding-top: 14px;
         }
-        .ft-left-panel {
-            width: 220px; flex-shrink: 0; border-right: 1px solid #2d333b;
-            padding: 12px 12px; overflow-y: auto; display: flex;
-            flex-direction: column; gap: 5px; background: #1a1d23;
-        }
-        /* Centre code panel */
-        .ft-code-panel {
-            flex: 1; min-width: 0; display: flex; flex-direction: column;
-            overflow: hidden; border-right: 1px solid #2d333b;
-        }
-        .ft-code-header {
-            display: flex; align-items: center; gap: 10px; padding: 6px 12px;
-            border-bottom: 1px solid #2d333b; flex-shrink: 0; background: #1a1d23;
-            min-height: 34px; flex-wrap: wrap;
-        }
-        .ft-node-label {
-            font-family: 'Roboto Mono', monospace; font-size: 0.78rem;
-            color: #61afef; font-weight: 700;
-        }
-        .ft-exec-status {
-            font-size: 0.72rem; padding: 2px 7px; border-radius: 10px;
-            font-weight: 600;
-        }
-        .ft-exec-status.running { background: rgba(198,120,221,0.15); color: #c678dd; }
-        .ft-exec-status.paused  { background: rgba(229,192,123,0.15); color: #e5c07b; }
-        .ft-exec-status.done    { background: rgba(152,195,121,0.15); color: #98c379; }
-        .ft-exec-status.error   { background: rgba(224,108,117,0.15); color: #e06c75; }
-        .ft-line-counter { font-size: 0.7rem; color: #5c6370; margin-left: auto; }
-        .ft-code-scroll {
-            flex: 1; overflow: auto; min-height: 0; background: #161a1f;
-        }
-        .ft-code-pre {
-            margin: 0; padding: 8px 0; font-family: 'Roboto Mono',monospace;
-            font-size: 0.78rem; line-height: 1.65; color: #abb2bf;
-            white-space: pre; min-width: max-content;
-        }
-        .ft-code-placeholder { color: #3e4451; font-style: italic; padding: 20px; display: block; }
-        @keyframes ft-shake {
-            0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)}
-        }
-        .ft-line-shake { animation: ft-shake 0.4s ease; }
-                /* AI explanation badge on each line */
-        .ft-line-explain {
-            display: none;
-            margin-left: 12px;
-            font-size: 0.68rem;
-            color: #5c6370;
-            font-style: italic;
-            font-family: Inter, sans-serif;
-            vertical-align: middle;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 260px;
-        }
-        .ft-line-active .ft-line-explain {
-            display: inline;
+        .ft-nl-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
             color: #c678dd;
-            font-style: normal;
-            animation: ft-explain-fade 0.3s ease;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
-        .ft-line-done .ft-line-explain {
-            display: inline;
-            color: #3e4451;
+        .ft-nl-badge {
+            font-size: 0.62rem;
+            background: rgba(198,120,221,0.15);
+            color: #c678dd;
+            border: 1px solid rgba(198,120,221,0.35);
+            border-radius: 3px;
+            padding: 1px 5px;
+            text-transform: none;
+            letter-spacing: 0;
         }
-        @keyframes ft-explain-fade {
-            from { opacity: 0; transform: translateX(-4px); }
-            to   { opacity: 1; transform: translateX(0); }
+        .ft-nl-textarea {
+            width: 100%;
+            background: #21252b;
+            border: 1px solid #3e4451;
+            color: #abb2bf;
+            border-radius: 4px;
+            padding: 7px 9px;
+            font-size: 0.80rem;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 80px;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
         }
-        .ft-line-shake {
-            animation: ft-line-shake 0.35s ease-in-out;
+        .ft-nl-textarea:focus { outline: none; border-color: #c678dd; }
+        .ft-nl-textarea::placeholder { color: #5c6370; font-style: italic; }
+        .ft-nl-hint {
+            font-size: 0.70rem;
+            color: #5c6370;
+            margin-bottom: 7px;
+            line-height: 1.45;
         }
-            display: none; margin-left: 10px; color: #5c6370;
-            font-size: 0.68rem; font-style: italic; opacity: 0.85; white-space: nowrap;
+        .ft-nl-generate-btn {
+            width: 100%;
+            background: rgba(198,120,221,0.12) !important;
+            color: #c678dd !important;
+            border: 1px solid rgba(198,120,221,0.45) !important;
+            font-weight: 700;
+            font-size: 0.80rem !important;
+            padding: 7px 0 !important;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
         }
-        .ft-line.ft-line-active .ft-line-inline-val { display: inline; color: #e5c07b; }
-        /* Individual code lines */
-        .ft-line {
-            display: flex; align-items: flex-start; padding: 0 8px;
-            border-left: 3px solid transparent; transition: background 0.12s;
+        .ft-nl-generate-btn:hover:not(:disabled) {
+            background: rgba(198,120,221,0.22) !important;
+            border-color: #c678dd !important;
         }
-        .ft-line-num {
-            color: #3e4451; min-width: 32px; user-select: none;
-            text-align: right; margin-right: 14px; flex-shrink: 0; font-size: 0.72rem;
-            padding-top: 1px;
+        .ft-nl-generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ft-nl-status {
+            font-size: 0.71rem;
+            margin-top: 5px;
+            min-height: 1.1em;
+            color: #5c6370;
         }
-        .ft-line-code { flex: 1; }
-        .ft-line.ft-line-active {
-            background: rgba(198,120,221,0.12);
-            border-left-color: #c678dd;
+        /* Speed + replay controls hidden when not needed */
+        .ft-speed-row { display: flex; align-items: center; gap: 8px; }
+
+        /* ── ANC: Agent Node Context (APUI features in Agent tab) ── */
+        .anc-stab {
+            flex: 1; min-width: 52px; padding: 7px 4px;
+            font-size: 10px; font-weight: 700; cursor: pointer;
+            text-align: center; color: #5c6370; border: none;
+            background: transparent; font-family: 'Roboto Mono', monospace;
+            text-transform: uppercase; letter-spacing: .07em;
+            border-bottom: 2px solid transparent; white-space: nowrap;
+            transition: color .1s;
         }
-        .ft-line.ft-line-active .ft-line-num { color: #c678dd; }
-        .ft-line.ft-line-done {
-            background: rgba(152,195,121,0.05);
-            border-left-color: rgba(152,195,121,0.3);
+        .anc-stab:hover { color: #7f848e; }
+        .anc-stab-active { color: #61afef !important; border-bottom-color: #61afef !important; }
+        .anc-pane {
+            display: none; padding: 10px 13px;
+            font-size: 12px; line-height: 1.7;
+            min-height: 70px; max-height: 180px; overflow-y: auto;
         }
-        .ft-line.ft-line-error {
-            background: rgba(224,108,117,0.15) !important;
-            border-left-color: #e06c75 !important;
+        .anc-pane-active { display: block; }
+        .anc-pane-code {
+            background: #161920; color: #abb2bf;
+            white-space: pre-wrap; font-family: 'Roboto Mono', monospace;
+            font-size: 11px; line-height: 1.6;
         }
-        .ft-line.ft-line-error .ft-line-num { color: #e06c75; }
-        .ft-line-inline-val {
-            margin-left: 12px; font-size: 0.7rem; color: #5c6370;
-            font-style: italic; flex-shrink: 0;
+        .anc-quick-label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: #5c6370; margin-bottom: 5px;
         }
-        .ft-line-inline-val.changed { color: #e5c07b; }
-        /* Execution log */
-        .ft-log-header {
-            padding: 4px 12px; font-size: 0.68rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.06em; color: #5c6370;
-            background: #1a1d23; border-top: 1px solid #2d333b;
-            border-bottom: 1px solid #2d333b; flex-shrink: 0;
+        .anc-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .anc-pill {
+            font-family: 'Roboto Mono', monospace; font-size: 11px;
+            padding: 4px 10px; border: 1px solid #3e4451;
+            border-radius: 20px; background: #21252b; color: #7f848e;
+            cursor: pointer; white-space: nowrap; max-width: 220px;
+            overflow: hidden; text-overflow: ellipsis;
+            display: inline-flex; align-items: center; gap: 5px;
+            transition: all .1s;
         }
-        .ft-log-scroll { height: 120px; overflow-y: auto; background: #161a1f; flex-shrink: 0; }
-        .ft-log { padding: 4px 8px; font-family: 'Roboto Mono',monospace; font-size: 0.72rem; }
-        .ft-log-entry {
-            padding: 2px 4px; border-radius: 3px; margin-bottom: 1px;
-            display: flex; gap: 8px; align-items: baseline;
+        .anc-pill:hover { border-color: #61afef; color: #61afef; }
+        .anc-pill-ok { border-color: #98c379; color: #98c379; }
+        .anc-pill-ok:hover { background: rgba(152,195,121,.1); }
+        .anc-pill-last { border-color: #c678dd; color: #c678dd; background: rgba(198,120,221,.07); }
+        .anc-badge {
+            font-size: 9px; padding: 1px 6px; border-radius: 10px;
+            font-weight: 700; white-space: nowrap; flex-shrink: 0;
         }
-        .ft-log-entry .ft-log-time { color: #3e4451; font-size: 0.65rem; flex-shrink: 0; }
-        .ft-log-entry.log-info  .ft-log-msg { color: #abb2bf; }
-        .ft-log-entry.log-var   .ft-log-msg { color: #e5c07b; }
-        .ft-log-entry.log-return .ft-log-msg { color: #98c379; }
-        .ft-log-entry.log-error .ft-log-msg { color: #e06c75; font-weight: 700; }
-        .ft-log-entry.log-call  .ft-log-msg { color: #61afef; }
-        .ft-log-entry.log-branch .ft-log-msg { color: #d19a66; }
-        /* Right: variable inspector */
-        .ft-vars-panel {
-            width: 220px; flex-shrink: 0; display: flex; flex-direction: column;
-            overflow: hidden; background: #1a1d23;
+        .anc-badge-ok     { background: rgba(152,195,121,.15); color: #98c379; }
+        .anc-badge-fail   { background: rgba(224,108,117,.15); color: #e06c75; }
+        .anc-badge-pending{ background: rgba(229,192,123,.15); color: #e5c07b; }
+        .anc-att-item { border-bottom: 1px solid #2d333b; }
+        .anc-att-item:last-child { border-bottom: none; }
+        .anc-att-hd {
+            display: flex; align-items: center; gap: 7px;
+            padding: 9px 12px; cursor: pointer; background: #21252b;
+            transition: background .1s; min-height: 38px;
         }
-        .ft-vars-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 6px 10px; border-bottom: 1px solid #2d333b;
-            flex-shrink: 0; min-height: 34px;
+        .anc-att-hd:hover { background: #282c34; }
+        .anc-att-prompt {
+            font-size: 12px; color: #abb2bf; flex: 1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
         }
-        .ft-vars-scroll { flex: 1; overflow-y: auto; min-height: 0; }
-        .ft-vars-list { padding: 6px; }
-        .ft-canvas-header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 5px 10px; border-bottom: 1px solid #2d333b;
-            flex-shrink: 0; background: #1a1d23;
+        .anc-att-time { font-size: 10px; color: #5c6370; white-space: nowrap; flex-shrink: 0; }
+        .anc-att-body {
+            display: none; padding: 10px 12px;
+            border-top: 1px solid #2d333b; background: #1a1d22;
         }
-        .ft-vars-placeholder { font-size: 0.75rem; color: #3e4451; padding: 8px; font-style: italic; }
-        .ft-var-row {
-            display: flex; flex-direction: column; padding: 4px 6px;
-            border-radius: 4px; margin-bottom: 3px; background: #21252b;
-            border: 1px solid #2d333b; transition: border-color 0.2s;
+        .anc-att-body.open { display: block; }
+        .anc-att-result {
+            margin-top: 5px; padding: 7px 9px; background: #21252b;
+            border-radius: 4px; font-size: 11px; color: #7f848e;
+            line-height: 1.55; max-height: 90px; overflow-y: auto;
         }
-        .ft-var-row.ft-var-changed { border-color: #e5c07b; animation: ft-var-flash 0.4s ease; }
-        @keyframes ft-var-flash {
-            0%   { background: rgba(229,192,123,0.25); }
-            100% { background: #21252b; }
+        .anc-diff-line {
+            font-size: 11px; line-height: 1.55; padding: 1px 5px;
+            border-radius: 3px; font-family: 'Roboto Mono', monospace;
+            white-space: pre-wrap; word-break: break-all;
         }
-        .ft-var-name-row { display: flex; justify-content: space-between; align-items: center; }
-        .ft-var-name-row .name { font-family:'Roboto Mono',monospace; font-size:0.72rem; color:#c678dd; font-weight:700; }
-        .ft-var-name-row .type { font-size:0.62rem; color:#5c6370; background:#161a1f; padding:1px 4px; border-radius:3px; }
-        .ft-var-value { font-family:'Roboto Mono',monospace; font-size:0.72rem; color:#e5c07b; margin-top:2px; word-break:break-all; }
-        .ft-callstack-header {
-            padding: 4px 10px; font-size: 0.68rem; font-weight:700;
-            text-transform: uppercase; letter-spacing: 0.06em; color: #5c6370;
-            background: #1a1d23; border-top: 1px solid #2d333b;
-            border-bottom: 1px solid #2d333b; flex-shrink: 0;
+        .anc-diff-add  { background: rgba(152,195,121,.07); color: #98c379; }
+        .anc-diff-del  { background: rgba(224,108,117,.07); color: #e06c75; text-decoration: line-through; opacity: .65; }
+        .anc-diff-ctx  { color: #5c6370; }
+        .anc-outcome-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+        .anc-sec-lbl {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: #5c6370; margin-bottom: 3px;
         }
-        .ft-callstack { padding: 6px; overflow-y: auto; max-height: 120px; }
-        .ft-stack-frame {
-            font-family:'Roboto Mono',monospace; font-size:0.7rem; color:#7f848e;
-            padding: 2px 4px; border-left: 2px solid #3e4451; margin-bottom: 2px;
-        }
-        .ft-stack-frame.active { color:#61afef; border-left-color:#61afef; }
-        /* Responsive: stack panels vertically on mobile */
-        @media (max-width: 700px) {
-            .ft-body { flex-direction: column; overflow-y: auto; }
-            .ft-left-panel { width: 100%; max-height: 0; overflow: hidden; padding: 0 12px;
-                border-right: none; border-bottom: 1px solid #2d333b;
-                transition: max-height 0.3s, padding 0.3s; }
-            .ft-left-panel.ft-config-open { max-height: 400px; padding: 12px; }
-            .ft-code-panel { min-height: 300px; flex: unset; }
-            .ft-vars-panel { width: 100%; border-top: 1px solid #2d333b; flex-direction: row; }
-            .ft-vars-scroll { flex: 1; }
-            .ft-callstack-header, .ft-callstack { display: none; }
-        }
+        .anc-pseudo-k { color: #c678dd; }
+        .anc-pseudo-f { color: #61afef; }
+        .anc-pseudo-s { color: #98c379; }
+        .anc-pseudo-c { color: #3c4552; font-style: italic; }
     </style>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
@@ -1307,7 +1225,76 @@
                             <div class="agent-container">
                                 <h2>Vibe</h2>
                                 <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
-                                
+
+                                <!-- ══ APUI: Session Intent ══ -->
+                                <div id="anc-intent-bar" style="display:none;margin-bottom:10px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">session intent</span>
+                                        <button class="action-button small" onclick="ancEditIntent()" style="padding:2px 8px;font-size:11px">edit</button>
+                                    </div>
+                                    <div id="anc-intent-text" style="padding:8px 12px;font-size:12px;color:#abb2bf;line-height:1.6"></div>
+                                </div>
+                                <div id="anc-intent-editor" style="display:none;margin-bottom:10px;background:#1e2227;border:1px solid #61afef;border-radius:6px;padding:10px 12px">
+                                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:6px">session goal / intent</div>
+                                    <textarea id="anc-intent-input" rows="2" placeholder="e.g. Fix the nav scroll behaviour and tighten card spacing…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 9px;font-size:13px;resize:vertical"></textarea>
+                                    <div style="display:flex;gap:7px;margin-top:7px">
+                                        <button class="action-button small" onclick="ancSaveIntent()">save intent</button>
+                                        <button class="action-button small secondary" onclick="ancCancelIntent()">cancel</button>
+                                    </div>
+                                </div>
+
+                                <!-- ══ APUI: Node Context Panel ══ -->
+                                <div id="anc-panel" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b;gap:8px">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="anc-panel-label">current state</span>
+                                        <span id="anc-type-badge" style="font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap"></span>
+                                        <button class="action-button small" id="anc-analyze-btn" onclick="ancAnalyzeState()" style="padding:2px 9px;font-size:11px;border-color:#c678dd;color:#c678dd">✦ analyze</button>
+                                    </div>
+                                    <!-- State tabs -->
+                                    <div id="anc-stabs" style="display:flex;border-bottom:1px solid #2d333b;overflow-x:auto">
+                                        <button class="anc-stab anc-stab-active" onclick="ancSwitchTab('desc',this)">description</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('pseudo',this)">pseudocode</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('code',this)">code</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('diff',this)">diff</button>
+                                        <button class="anc-stab" onclick="ancSwitchTab('ai',this)">✦ AI state</button>
+                                    </div>
+                                    <div id="anc-pane-desc"   class="anc-pane anc-pane-active" style="color:#abb2bf"></div>
+                                    <div id="anc-pane-pseudo" class="anc-pane anc-pane-code"></div>
+                                    <div id="anc-pane-code"   class="anc-pane anc-pane-code"></div>
+                                    <div id="anc-pane-diff"   class="anc-pane"></div>
+                                    <div id="anc-pane-ai"     class="anc-pane" style="color:#abb2bf"><span style="color:#5c6370;font-size:12px">Click <b>✦ analyze</b> to get an AI summary of the current node state.</span></div>
+                                </div>
+
+                                <!-- ══ APUI: Quick re-invoke ══ -->
+                                <div id="anc-quick" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">quick re-invoke</span>
+                                    </div>
+                                    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+                                        <div id="anc-last-row" style="display:none">
+                                            <div class="anc-quick-label">last attempt</div>
+                                            <div id="anc-last-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-ok-row" style="display:none">
+                                            <div class="anc-quick-label">✓ worked before</div>
+                                            <div id="anc-ok-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-all-row" style="display:none">
+                                            <div class="anc-quick-label">all tried on this node</div>
+                                            <div id="anc-all-pills" class="anc-pill-row"></div>
+                                        </div>
+                                        <div id="anc-quick-empty" style="color:#5c6370;font-size:12px;text-align:center;padding:4px 0">No attempts yet on this node</div>
+                                    </div>
+                                </div>
+
+                                <!-- ══ APUI: Attempt history ══ -->
+                                <div id="anc-history" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
+                                    <div style="padding:7px 12px;background:#21252b;border-bottom:1px solid #2d333b">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370" id="anc-history-label">attempts</span>
+                                    </div>
+                                    <div id="anc-att-list" style="display:flex;flex-direction:column;gap:0"></div>
+                                </div>
+
                                 <div id="agent-controls">
                                     <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
                                     <div class="agent-buttons-container">
@@ -1374,112 +1361,80 @@
                         </div>
                         <div id="flow-trace" class="tab-content">
                             <div class="ft-container">
-
-                                <!-- ── Top toolbar ── -->
                                 <div class="ft-header">
                                     <div class="ft-title-group">
                                         <h2>Flow Tracer</h2>
-                                        <p>Instruments &amp; executes your code line-by-line. Watch variables change in real time.</p>
+                                        <p>Simulate user interactions and trace the full execution path — from trigger to output.</p>
                                     </div>
                                     <div class="ft-header-actions">
-                                        <button id="ft-run-button"   class="action-button ft-run-btn">▶ Run</button>
-                                        <button id="ft-pause-button" class="action-button ft-pause-btn" disabled>⏸ Pause</button>
-                                        <button id="ft-step-button"  class="action-button ft-step-btn"  disabled>⏭ Step</button>
+                                        <button id="ft-run-button" class="action-button ft-run-btn">▶ Run Trace</button>
                                         <button id="ft-clear-button" class="action-button ft-clear-btn">✕ Clear</button>
                                     </div>
                                 </div>
-
-                                <!-- ── Body: config + code stream + vars ── -->
                                 <div class="ft-body">
-
-                                    <!-- Mobile toggle -->
+                                    <!-- Mobile: tap to expand/collapse config panel -->
                                     <div class="ft-mobile-config-toggle" id="ft-config-toggle">
                                         <span class="ft-mobile-config-label">⚙ Configure Trigger</span>
                                         <span class="ft-mobile-config-arrow">▼</span>
                                     </div>
-
-                                    <!-- Left: config panel -->
                                     <div class="ft-left-panel" id="ft-left-panel">
-                                        <div class="ft-section-label">Trigger Event</div>
+                                        <div class="ft-section-label">Interaction Trigger</div>
                                         <select id="ft-trigger-type" class="ft-select">
-                                            <option value="click">🖱 Click element</option>
+                                            <option value="click">🖱️ Click element</option>
                                             <option value="submit">📨 Form submit</option>
-                                            <option value="input">⌨ Input change</option>
-                                            <option value="load">📄 Page load (all JS)</option>
+                                            <option value="input">⌨️ Input change</option>
+                                            <option value="load">📄 Page load</option>
                                             <option value="custom">⚡ Custom event</option>
                                         </select>
                                         <input type="text" id="ft-target-selector" placeholder="CSS selector e.g. #submit-btn" class="ft-input" />
-
-                                        <div class="ft-section-label" style="margin-top:12px;">Input Value</div>
-                                        <input type="text" id="ft-input-value" placeholder="Value to inject into input" class="ft-input" />
-
-                                        <div class="ft-section-label" style="margin-top:12px;">Step Delay (ms)</div>
-                                        <div style="display:flex;align-items:center;gap:8px">
-                                            <input type="range" id="ft-speed-range" min="0" max="2000" value="400" style="flex:1" />
-                                            <span id="ft-speed-val" style="font-size:0.78rem;color:#7f848e;min-width:36px">400ms</span>
+                                        <div class="ft-section-label" style="margin-top:14px;">Input Value (optional)</div>
+                                        <input type="text" id="ft-input-value" placeholder='e.g. "hello world" or {"key":"val"}' class="ft-input" />
+                                        <div class="ft-section-label" style="margin-top:14px;">Trace Depth</div>
+                                        <select id="ft-depth" class="ft-select">
+                                            <option value="shallow">Shallow — direct handlers only</option>
+                                            <option value="deep" selected>Deep — follow all function calls</option>
+                                            <option value="full">Full — include DOM mutations &amp; network</option>
+                                        </select>
+                                        <div class="ft-known-triggers" id="ft-known-triggers">
+                                            <div class="ft-section-label" style="margin-top:16px;">Detected Interactions</div>
+                                            <div id="ft-trigger-list" class="ft-trigger-list">
+                                                <div class="ft-trigger-placeholder">Click "Scan" to detect interactive elements.</div>
+                                            </div>
+                                            <button id="ft-scan-button" class="action-button ft-scan-btn" style="margin-top:8px;">🔍 Scan Project</button>
                                         </div>
-
-                                        <div class="ft-section-label" style="margin-top:14px;">Detected Triggers</div>
-                                        <div id="ft-trigger-list" class="ft-trigger-list">
-                                            <div class="ft-trigger-placeholder">Click Scan to detect.</div>
-                                        </div>
-                                        <button id="ft-scan-button" class="action-button ft-scan-btn" style="margin-top:8px">🔍 Scan Project</button>
-                                    </div>
-
-                                    <!-- Centre: streaming code view -->
-                                    <div class="ft-code-panel" id="ft-code-panel">
-                                        <div class="ft-code-header">
-                                            <span id="ft-node-label" class="ft-node-label">—</span>
-                                            <span id="ft-exec-status" class="ft-exec-status"></span>
-                                            <span id="ft-line-counter" class="ft-line-counter"></span>
-                                        </div>
-                                        <div class="ft-code-scroll" id="ft-code-scroll">
-                                            <pre id="ft-code-pre" class="ft-code-pre"><span class="ft-code-placeholder">Run a trace to see code execute line by line.</span></pre>
-                                        </div>
-                                        <!-- Execution log below the code -->
-                                        <div class="ft-log-header">Execution Log</div>
-                                        <div class="ft-log-scroll" id="ft-log-scroll">
-                                            <div id="ft-log" class="ft-log"></div>
+                                        <div class="ft-nl-section">
+                                            <div class="ft-nl-label">✦ AI Flow Builder <span class="ft-nl-badge">Natural Language</span></div>
+                                            <p class="ft-nl-hint">Describe your flow using node names and logic. E.g. "When the login button is clicked, validateForm checks the inputs, then submitHandler sends a POST to /api/login…"<br><small style="color:#3e4451">(Ctrl+Enter to generate)</small></p>
+                                            <textarea id="ft-nl-prompt-input" class="ft-nl-textarea" rows="4" placeholder="Describe nodes and logic in natural language…"></textarea>
+                                            <button id="ft-nl-generate-button" class="action-button ft-nl-generate-btn">✦ Generate Flow</button>
+                                            <div id="ft-nl-status" class="ft-nl-status"></div>
                                         </div>
                                     </div>
-
-                                    <!-- Right: live variable inspector + canvas flow -->
-                                    <div class="ft-vars-panel" id="ft-vars-panel">
-                                        <!-- Canvas flow (top of right panel) -->
-                                        <div class="ft-canvas-header">
-                                            <span class="ft-section-label" style="margin:0">Execution Flow</span>
-                                            <div class="ft-zoom-controls">
-                                                <button id="ft-zoom-out" class="ft-icon-btn" title="Zoom out">－</button>
-                                                <span id="ft-zoom-label" class="ft-zoom-label">100%</span>
-                                                <button id="ft-zoom-in"  class="ft-icon-btn" title="Zoom in">＋</button>
-                                                <button id="ft-zoom-fit" class="ft-icon-btn" title="Fit">⤢</button>
+                                    <div class="ft-right-panel">
+                                        <div class="ft-flow-header">
+                                            <span class="ft-section-label">Execution Flow</span>
+                                            <div class="ft-flow-header-right">
+                                                <span id="ft-step-count" class="ft-step-count"></span>
+                                                <button id="ft-replay-button" class="ft-icon-btn" title="Rebuild graph" style="display:none;">⟳ Rebuild</button>
+                                                <button id="ft-tts-button" class="ft-icon-btn" title="Toggle read-out (Text-to-Speech)">🔇 Read Out</button>
                                             </div>
                                         </div>
+                                        <!-- Canvas for the animated flow graph -->
                                         <div id="ft-canvas-wrapper" class="ft-canvas-wrapper">
                                             <canvas id="ft-canvas" class="ft-canvas"></canvas>
-                                            <div id="ft-tooltip" class="ft-node-tooltip" style="display:none"></div>
-                                            <div id="ft-placeholder" class="ft-flow-placeholder">Run a trace to see the flow.</div>
+                                            <div id="ft-tooltip" class="ft-node-tooltip" style="display:none;"></div>
+                                            <div id="ft-placeholder" class="ft-flow-placeholder">Configure a trigger and click ▶ Run Trace — or use ✦ AI Flow Builder to describe a flow in natural language.</div>
                                         </div>
-                                        <!-- Variables below canvas -->
-                                        <div class="ft-vars-header">
-                                            <span class="ft-section-label" style="margin:0">Variables</span>
-                                            <span id="ft-var-count" style="font-size:0.7rem;color:#5c6370"></span>
-                                        </div>
-                                        <div class="ft-vars-scroll" id="ft-vars-scroll">
-                                            <div id="ft-vars-list" class="ft-vars-list">
-                                                <div class="ft-vars-placeholder">Variables will appear here as the code runs.</div>
+                                        <!-- Detail drawer that slides up when a node is clicked -->
+                                        <div id="ft-detail-drawer" class="ft-detail-drawer">
+                                            <div class="ft-detail-header">
+                                                <span id="ft-detail-title" class="ft-detail-title"></span>
+                                                <button id="ft-detail-close" class="ft-icon-btn">✕</button>
                                             </div>
-                                        </div>
-                                        <div class="ft-callstack-header">Call Stack</div>
-                                        <div class="ft-callstack" id="ft-callstack">
-                                            <div class="ft-vars-placeholder">—</div>
+                                            <div id="ft-detail-body" class="ft-detail-body"></div>
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Hidden sandbox iframe for actual execution -->
-                                <iframe id="ft-sandbox" style="display:none" sandbox="allow-scripts"></iframe>
-
                             </div>
                         </div>
                         <div id="nervous-system" class="tab-content">
@@ -1701,8 +1656,14 @@
                  <select id="gemini-model-select">
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                          <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                    <option value="gemini-3-pro-preview">Gemini 3 Pro</option>
+                    <option value="__custom__">Custom model name…</option>
                  </select>
+                 <div id="gemini-custom-model-container" style="display:none;margin-top:8px;">
+                    <label for="gemini-custom-model-input" style="font-size:0.8rem;color:#7f848e;display:block;margin-bottom:4px;">Enter model ID:</label>
+                    <input type="text" id="gemini-custom-model-input" placeholder="e.g. gemini-2.0-flash-exp" autocomplete="off" spellcheck="false">
+                    <div style="font-size:0.72rem;color:#5c6370;margin-top:4px;">Type the exact model ID used in API calls.</div>
+                 </div>
                 <div id="gemini-api-key-container" class="api-key-container">
                     <h3>Gemini API Key</h3>
                     <input type="password" id="api-key-input" placeholder="Enter your Gemini API Key here...">
