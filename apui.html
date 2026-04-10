@@ -92,7 +92,8 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 .intent-row{display:flex;gap:8px;justify-content:flex-end}
 
 /* ── Work view ── */
-.work-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;display:flex;flex-direction:column;gap:10px;padding-bottom:4px}
+#view-work{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+.work-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px;display:flex;flex-direction:column;gap:10px;padding-bottom:8px}
 
 /* Cards */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
@@ -189,6 +190,24 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 /* No-project notice */
 #no-project-notice{display:none;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--rs);padding:9px 13px;font-size:12px;color:var(--amber);margin:10px 12px 0;flex-shrink:0}
 
+/* ══ MODEL SETTINGS POPOVER ══ */
+#model-popover{
+  position:absolute;top:52px;right:0;z-index:200;
+  width:min(320px,96vw);
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.5);
+  padding:14px;display:none;flex-direction:column;gap:10px;
+}
+#model-popover.open{display:flex}
+.mp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:3px}
+.mp-input{width:100%;padding:8px 10px;font-family:inherit;font-size:13px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg3);color:var(--text)}
+.mp-input:focus{outline:none;border-color:var(--accent)}
+.mp-row{display:flex;gap:7px;align-items:center}
+.mp-hint{font-size:11px;color:var(--text3);line-height:1.5}
+.mp-provider{display:flex;gap:6px}
+.mp-prov-btn{font-family:inherit;font-size:11px;padding:5px 10px;border:1px solid var(--border2);border-radius:20px;background:transparent;color:var(--text3);cursor:pointer;transition:all .1s}
+.mp-prov-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+
 /* Desktop */
 @media (min-width:680px){
   #drawer{position:static;pointer-events:all;width:220px;min-width:220px;display:flex}
@@ -221,15 +240,42 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
   </div>
 
   <!-- ══ MAIN ══ -->
-  <div id="main">
+  <div id="main" style="position:relative">
 
     <!-- Topbar -->
     <div id="topbar">
       <button class="tb-menu" onclick="openDrawer()" aria-label="Sessions">☰</button>
       <span class="tb-name" id="tb-name">—</span>
-      <span id="ai-status-badge">⚡ AI ready</span>
+      <span id="ai-status-badge" onclick="toggleModelPopover()" style="cursor:pointer" title="Click to configure model">⚡ AI ready</span>
       <span id="tb-node" class="tb-node" style="display:none"></span>
       <button class="btn sm" id="btn-intent" style="display:none" onclick="goToIntent()">← intent</button>
+    </div>
+
+    <!-- Model settings popover -->
+    <div id="model-popover">
+      <div>
+        <div class="mp-label">AI Provider</div>
+        <div class="mp-provider">
+          <button class="mp-prov-btn active" id="prov-gemini" onclick="setProvider('gemini')">Gemini</button>
+          <button class="mp-prov-btn" id="prov-nscale" onclick="setProvider('nscale')">nscale</button>
+        </div>
+      </div>
+      <div id="mp-model-row">
+        <div class="mp-label">Model name</div>
+        <input id="mp-model-input" class="mp-input" type="text" placeholder="e.g. gemini-2.5-flash-preview-04-17"
+          oninput="onModelInput()" onblur="saveModelOverride()">
+        <div class="mp-hint" style="margin-top:4px">Overrides the model set in Vibe for this editor only. Leave blank to use Vibe's setting.</div>
+      </div>
+      <div id="mp-key-row">
+        <div class="mp-label">API Key <span style="color:var(--text3)">(optional override)</span></div>
+        <input id="mp-key-input" class="mp-input" type="password" placeholder="Leave blank to use Vibe's key"
+          onblur="saveKeyOverride()">
+      </div>
+      <div style="display:flex;gap:7px">
+        <button class="btn xs prim" onclick="applyModelSettings()">apply</button>
+        <button class="btn xs" onclick="clearModelOverride()">reset to Vibe</button>
+        <button class="btn xs" style="margin-left:auto" onclick="closeModelPopover()">close</button>
+      </div>
     </div>
 
     <!-- No project notice -->
@@ -356,43 +402,111 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
    VIBE BRIDGE — receive project + AI settings from parent
 ══════════════════════════════════════════════════════ */
 
-let vibeTree        = null;   // full tree from Vibe
+let vibeTree        = null;
 let vibeProjectId   = null;
-let aiProvider      = null;   // 'gemini' | 'nscale'
+let aiProvider      = null;
 let geminiApiKey    = null;
-let geminiModel     = null;   // null = always re-read from storage
+let geminiModel     = null;
 let nscaleApiKey    = null;
+// Manual overrides set inside APUI (take priority over Vibe/localStorage)
+let _modelOverride  = null;
+let _keyOverride    = null;
+let _providerOverride = null;
 const NSCALE_MODEL  = 'meta-llama/Llama-3.3-70B-Instruct';
 const NSCALE_ENDPOINT = 'https://api.nscale.com/v1/chat/completions';
 
-/* Read all AI settings fresh from localStorage every time — this way
-   changes made in Vibe (including custom model updates) are always
-   picked up without needing a reload. */
+/* Read from localStorage, respecting __custom__ */
 function readSettingsFromStorage() {
   try {
     const p  = localStorage.getItem('aiProvider');
     const gk = localStorage.getItem('geminiApiKey');
-    const gm = localStorage.getItem('geminiModel');        // may be '__custom__'
-    const gc = localStorage.getItem('geminiCustomModel'); // the actual custom string
+    const gm = localStorage.getItem('geminiModel');
+    const gc = localStorage.getItem('geminiCustomModel');
     const nk = localStorage.getItem('nscaleApiKey');
-
     if (p)  aiProvider   = p;
     if (gk) geminiApiKey = gk;
-    // Resolve __custom__ → the real custom model string
     if (gm === '__custom__' && gc) geminiModel = gc;
     else if (gm && gm !== '__custom__') geminiModel = gm;
     if (nk) nscaleApiKey = nk;
-
-    if (!aiProvider) aiProvider = 'gemini';
+    if (!aiProvider)  aiProvider  = 'gemini';
     if (!geminiModel) geminiModel = 'gemini-2.5-flash';
   } catch(e) {}
 }
 
+/* Effective values — overrides win over storage */
+function effectiveProvider() { return _providerOverride || aiProvider || 'gemini'; }
+function effectiveModel()    { return _modelOverride    || geminiModel || 'gemini-2.5-flash'; }
+function effectiveKey()      {
+  if (effectiveProvider() === 'nscale') return _keyOverride || nscaleApiKey;
+  return _keyOverride || geminiApiKey;
+}
+
+/* ══ MODEL POPOVER ══ */
+function toggleModelPopover() {
+  const p = document.getElementById('model-popover');
+  p.classList.contains('open') ? closeModelPopover() : openModelPopover();
+}
+function openModelPopover() {
+  readSettingsFromStorage();
+  const p = document.getElementById('model-popover');
+  document.getElementById('mp-model-input').value = _modelOverride || effectiveModel();
+  document.getElementById('mp-key-input').value   = _keyOverride || '';
+  // Sync provider buttons
+  document.getElementById('prov-gemini').classList.toggle('active', effectiveProvider()==='gemini');
+  document.getElementById('prov-nscale').classList.toggle('active', effectiveProvider()==='nscale');
+  p.classList.add('open');
+}
+function closeModelPopover() {
+  document.getElementById('model-popover').classList.remove('open');
+}
+function setProvider(prov) {
+  _providerOverride = prov;
+  document.getElementById('prov-gemini').classList.toggle('active', prov==='gemini');
+  document.getElementById('prov-nscale').classList.toggle('active', prov==='nscale');
+}
+function onModelInput() {
+  // live preview in badge while typing
+  const val = document.getElementById('mp-model-input').value.trim();
+  const badge = document.getElementById('ai-status-badge');
+  if (val) badge.textContent = '⚡ ' + val.replace('gemini-','');
+}
+function saveModelOverride() {
+  const val = document.getElementById('mp-model-input').value.trim();
+  _modelOverride = val || null;
+}
+function saveKeyOverride() {
+  const val = document.getElementById('mp-key-input').value.trim();
+  _keyOverride = val || null;
+}
+function applyModelSettings() {
+  saveModelOverride();
+  saveKeyOverride();
+  updateAiStatusBadge();
+  closeModelPopover();
+}
+function clearModelOverride() {
+  _modelOverride = null;
+  _keyOverride   = null;
+  _providerOverride = null;
+  document.getElementById('mp-model-input').value = '';
+  document.getElementById('mp-key-input').value   = '';
+  readSettingsFromStorage();
+  updateAiStatusBadge();
+  closeModelPopover();
+}
+
+// Close popover on outside click
+document.addEventListener('click', e => {
+  const pop = document.getElementById('model-popover');
+  const badge = document.getElementById('ai-status-badge');
+  if (pop.classList.contains('open') && !pop.contains(e.target) && !badge.contains(e.target)) {
+    closeModelPopover();
+  }
+});
+
 // On load, request the tree from parent (if embedded)
 window.addEventListener('load', () => {
   readSettingsFromStorage();
-
-  // Request tree from parent Vibe app
   try { window.parent.postMessage({source:'apui-vibe',type:'apui-request-tree'},'*'); } catch(e){}
   updateAiStatusBadge();
 });
@@ -438,15 +552,16 @@ function onVibeTreeReceived() {
 
 function updateAiStatusBadge() {
   readSettingsFromStorage();
-  const badge = document.getElementById('ai-status-badge');
-  const keyOk = (aiProvider==='gemini' && !!geminiApiKey) ||
-                (aiProvider==='nscale' && !!nscaleApiKey);
+  const badge  = document.getElementById('ai-status-badge');
+  const prov   = effectiveProvider();
+  const keyOk  = !!effectiveKey();
+  const model  = effectiveModel();
   if (!vibeTree) {
     badge.textContent = '⚠ no project';
     badge.className = 'no-key';
   } else if (keyOk) {
-    const shortName = aiProvider==='gemini'
-      ? (geminiModel||'gemini').replace('gemini-','')
+    const shortName = prov==='gemini'
+      ? model.replace('gemini-','')
       : 'nscale';
     badge.textContent = '⚡ ' + shortName;
     badge.className = 'ready';
@@ -740,7 +855,7 @@ async function analyzeCurrentState() {
   document.querySelectorAll('.stab').forEach(b=>{ if(b.textContent.includes('AI state')) b.classList.add('active'); });
 
   const aiStateEl = document.getElementById('sp-ai-state');
-  const keyOk = (aiProvider==='gemini' && !!geminiApiKey) || (aiProvider==='nscale' && !!nscaleApiKey);
+  const keyOk = !!effectiveKey();
   if (!keyOk) {
     aiStateEl.innerHTML = '<span style="color:var(--red)">⚠ No AI key configured. Set your API key in Vibe settings.</span>';
     return;
@@ -891,9 +1006,17 @@ function toggleAtt(id)  { openAtts[id]=!openAtts[id]; const s=sess(); if(s) rend
 function markOutcome(id, outcome, e) {
   e.stopPropagation();
   const s=sess(); if(!s) return;
+  let foundAtt = null;
   for (const arr of Object.values(s.history)) {
     const a=arr.find(x=>x.id===id);
-    if(a) { a.status=outcome; break; }
+    if(a) { a.status=outcome; foundAtt=a; break; }
+  }
+  // If user marks as 'ok', ensure the node code is in Vibe
+  if (outcome==='ok' && foundAtt) {
+    const node = getNodeFromTree(foundAtt.node);
+    if (node) {
+      pushNodeToVibe(foundAtt.node, node.code);
+    }
   }
   renderWork(); renderSidebar();
 }
@@ -951,7 +1074,7 @@ async function submitPrompt() {
   openAtts[att.id]=true;
   renderWork(); renderSidebar();
 
-  const keyOk = (aiProvider==='gemini'&&!!geminiApiKey)||(aiProvider==='nscale'&&!!nscaleApiKey);
+  const keyOk = !!effectiveKey();
   if (keyOk && node) {
     try {
       const result = await callNodeEdit(node, s, att);
@@ -961,7 +1084,7 @@ async function submitPrompt() {
       // Push updated code back to vibe
       if (result.newCode !== undefined && result.newCode !== null) {
         node.code = result.newCode;
-        window.parent.postMessage({source:'apui-vibe',type:'apui-node-update',nodeId:nid,newCode:result.newCode},'*');
+        pushNodeToVibe(nid, result.newCode);
       }
     } catch(e) {
       att.result = '⚠ AI error: ' + e.message;
@@ -977,6 +1100,18 @@ async function submitPrompt() {
   }
 
   renderWork(); renderSidebar();
+}
+
+/* ══ Push a node update to the parent Vibe app ══ */
+function pushNodeToVibe(nodeId, newCode) {
+  try {
+    window.parent.postMessage({
+      source: 'apui-vibe',
+      type: 'apui-node-update',
+      nodeId,
+      newCode
+    }, '*');
+  } catch(e) { console.warn('Could not postMessage to Vibe:', e); }
 }
 
 /* Summarize a prompt into a pseudo-code style description */
@@ -1035,16 +1170,17 @@ Respond with JSON: {"newCode":"...","summary":"...","diff":["...","..."]}`;
 /* ══ Unified AI call (gemini or nscale) ══ */
 async function callAI(systemPrompt, userPrompt, forJson=false) {
   readSettingsFromStorage(); // always pick up latest model/key/provider
-  if (aiProvider==='nscale') {
+  if (effectiveProvider()==='nscale') {
     return callNscaleAI(systemPrompt, userPrompt, forJson);
   }
   return callGeminiAI(systemPrompt, userPrompt, forJson);
 }
 
 async function callGeminiAI(systemPrompt, userPrompt, forJson=false) {
-  if (!geminiApiKey) throw new Error('Gemini API key not set');
-  const model = geminiModel || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+  const key = effectiveKey();
+  if (!key) throw new Error('Gemini API key not set. Tap the badge to configure.');
+  const model = effectiveModel();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const body = {
     contents:[{role:'user',parts:[{text:userPrompt}]}],
     systemInstruction:{parts:[{text:systemPrompt}]},
@@ -1058,10 +1194,11 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson=false) {
 }
 
 async function callNscaleAI(systemPrompt, userPrompt, forJson=false) {
-  if (!nscaleApiKey) throw new Error('nscale API key not set');
+  const key = effectiveKey();
+  if (!key) throw new Error('nscale API key not set. Tap the badge to configure.');
   const res = await fetch(NSCALE_ENDPOINT,{
     method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+nscaleApiKey},
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
     body:JSON.stringify({model:NSCALE_MODEL,messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}]})
   });
   if (!res.ok) throw new Error('nscale error: ' + await res.text());
@@ -1080,4 +1217,4 @@ function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&l
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
 </script>
 </body>
-  </html>
+          </html>
