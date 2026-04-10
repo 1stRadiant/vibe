@@ -2115,6 +2115,14 @@ function refreshAllUI() {
             }, '*');
         }
     } catch(e) {}
+
+    // Refresh ANC node context panel if agent tab is visible and a node is tracked
+    try {
+        if (typeof ancCurrentNodeId !== 'undefined' && ancCurrentNodeId &&
+            document.getElementById('agent')?.classList.contains('active')) {
+            ancRenderPanel(ancCurrentNodeId);
+        }
+    } catch(e) {}
 }
 
 function getComponentContextForAI() {
@@ -8530,6 +8538,484 @@ async function handleZipUpload() {
 
                                                                     
 
+
+
+// ══════════════════════════════════════════════════════════════════
+// ANC — Agent Node Context (APUI features embedded in the Agent tab)
+// All variables and functions are prefixed `anc` to avoid collisions.
+// Hooks into existing agent flow: executeAgentPlan, executeSingleTask.
+// ══════════════════════════════════════════════════════════════════
+
+/* ── State ── */
+let ancSessionIntent  = '';           // persistent goal for this agent session
+let ancNodeHistory    = {};           // { nodeId: [ {id,prompt,status,time,diff,result,pseudo}, … ] }
+let ancCurrentNodeId  = null;         // last node the agent touched / user picked
+let ancOpenAtts       = {};           // { attId: bool } expanded state
+let ancActiveTab      = 'desc';       // current state-panel tab
+
+/* ── Helpers ── */
+function ancEsc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function ancTrunc(s, n) { const t = String(s || ''); return t.length > n ? t.slice(0, n) + '…' : t; }
+function ancNodeHist(nid) { return ancNodeHistory[nid] || []; }
+
+function ancFlattenTree(node, list = []) {
+    if (!node) return list;
+    if (node.id && node.type && node.type !== 'project') list.push(node);
+    if (node.children) node.children.forEach(c => ancFlattenTree(c, list));
+    return list;
+}
+
+/* ── Pseudo-code generator (mirrors APUI logic) ── */
+function ancGenPseudo(code, type) {
+    if (!code) return '<span class="anc-pseudo-c">// empty</span>';
+    const lines = code.split('\n').slice(0, 40);
+    const out = [];
+    if (type === 'css') {
+        lines.forEach(l => {
+            const t = l.trim(); if (!t) return;
+            if (t.startsWith('/*')) { out.push(`<span class="anc-pseudo-c">${ancEsc(t)}</span>`); return; }
+            if (t.startsWith('@'))  { out.push(`<span class="anc-pseudo-k">${ancEsc(t)}</span>`); return; }
+            if (t.endsWith('{'))    { out.push(`<span class="anc-pseudo-s">${ancEsc(t)}</span>`); return; }
+            if (t.includes(':') && !t.endsWith('{')) {
+                const [prop, ...rest] = t.split(':');
+                out.push(`  <span class="anc-pseudo-f">${ancEsc(prop.trim())}</span><span class="anc-pseudo-k">: ${ancEsc(rest.join(':').trim())}</span>`);
+                return;
+            }
+            out.push(ancEsc(t));
+        });
+    } else if (['javascript','js-function','declaration'].includes(type)) {
+        lines.forEach(l => {
+            const t = l.trim(); if (!t) return;
+            if (t.startsWith('//')) { out.push(`<span class="anc-pseudo-c">${ancEsc(t)}</span>`); return; }
+            if (/^(function|const|let|var|class|async|export|import)/.test(t)) {
+                out.push(`<span class="anc-pseudo-k">${ancEsc(t.split(/[\s(=]/)[0])}</span> <span class="anc-pseudo-s">${ancEsc(t.slice(t.indexOf(' ') + 1))}</span>`);
+                return;
+            }
+            const m = t.match(/(\w+)\s*\(/);
+            if (m) { out.push(`  <span class="anc-pseudo-f">${ancEsc(m[1])}</span><span class="anc-pseudo-k">(…)</span>`); return; }
+            out.push(ancEsc(t));
+        });
+    } else {
+        lines.forEach(l => {
+            const t = l.trim(); if (!t) return;
+            if (t.startsWith('<!--')) { out.push(`<span class="anc-pseudo-c">${ancEsc(t)}</span>`); return; }
+            const tagM = t.match(/^<([a-zA-Z][a-zA-Z0-9-]*)/);
+            if (tagM) {
+                const cls = t.match(/class="([^"]+)"/);
+                const id  = t.match(/id="([^"]+)"/);
+                let desc = `<span class="anc-pseudo-k">&lt;${ancEsc(tagM[1])}&gt;</span>`;
+                if (id)  desc += ` <span class="anc-pseudo-s">#${ancEsc(id[1])}</span>`;
+                if (cls) desc += ` <span class="anc-pseudo-f">.${ancEsc(cls[1].split(' ').join('.'))}</span>`;
+                out.push(desc); return;
+            }
+            out.push(ancEsc(t.slice(0, 70)));
+        });
+    }
+    const totalLines = code.split('\n').length;
+    if (totalLines > 40) out.push(`<span class="anc-pseudo-c">// … ${totalLines - 40} more lines</span>`);
+    return out.join('\n');
+}
+
+/* ── Type badge ── */
+function ancTypeBadgeStyle(type) {
+    if (type === 'css')        return 'background:rgba(152,195,121,.15);color:#98c379';
+    if (type === 'html')       return 'background:rgba(97,175,239,.15);color:#61afef';
+    return                            'background:rgba(229,192,123,.15);color:#e5c07b';
+}
+
+/* ── Main panel render ── */
+function ancRenderPanel(nodeId) {
+    if (!nodeId) return;
+    ancCurrentNodeId = nodeId;
+
+    const panelEl   = document.getElementById('anc-panel');
+    const quickEl   = document.getElementById('anc-quick');
+    const histEl    = document.getElementById('anc-history');
+    const intentBar = document.getElementById('anc-intent-bar');
+    if (!panelEl) return;
+
+    // Show all ANC sections
+    panelEl.style.display   = '';
+    quickEl.style.display   = '';
+    histEl.style.display    = '';
+    intentBar.style.display = '';
+
+    // Intent bar
+    document.getElementById('anc-intent-text').textContent = ancSessionIntent || '(no intent set — click edit to add a goal)';
+
+    const node = findNodeById(nodeId);
+
+    // Header
+    document.getElementById('anc-panel-label').textContent = 'current state · ' + nodeId;
+    document.getElementById('anc-history-label').textContent = 'attempts · ' + nodeId;
+    const badge = document.getElementById('anc-type-badge');
+    const t = node ? node.type : 'unknown';
+    badge.textContent = t;
+    badge.style.cssText = ancTypeBadgeStyle(t);
+
+    // Description tab
+    const descEl = document.getElementById('anc-pane-desc');
+    if (node) {
+        descEl.innerHTML = node.description
+            ? `<b>${ancEsc(node.id)}</b> — ${ancEsc(node.description)}`
+            : `<b>${ancEsc(node.id)}</b> <span style="color:#5c6370">(${ancEsc(t)} — no description yet)</span>`;
+    } else {
+        descEl.innerHTML = `<span style="color:#5c6370">Node "${ancEsc(nodeId)}" not found in current tree.</span>`;
+    }
+
+    // Pseudocode tab
+    document.getElementById('anc-pane-pseudo').innerHTML = node && node.code
+        ? ancGenPseudo(node.code, t)
+        : '<span class="anc-pseudo-c">// no code yet</span>';
+
+    // Code tab
+    document.getElementById('anc-pane-code').textContent = node ? (node.code || '// empty') : '// not in tree';
+
+    // Diff tab — cumulative from all accepted attempts
+    const okDiffs = ancNodeHist(nodeId).filter(a => a.status === 'ok').flatMap(a => a.diff || []);
+    const diffEl  = document.getElementById('anc-pane-diff');
+    if (okDiffs.length) {
+        diffEl.innerHTML = okDiffs.map(l => {
+            const cls = l.startsWith('+') ? 'anc-diff-add' : l.startsWith('-') ? 'anc-diff-del' : 'anc-diff-ctx';
+            return `<div class="anc-diff-line ${cls}">${ancEsc(l)}</div>`;
+        }).join('');
+    } else {
+        diffEl.innerHTML = '<span style="color:#5c6370;font-size:12px">No accepted changes yet for this node.</span>';
+    }
+
+    ancRenderQuickPills(nodeId);
+    ancRenderHistory(nodeId);
+}
+
+/* ── Quick re-invoke pills ── */
+function ancRenderQuickPills(nodeId) {
+    const history  = ancNodeHist(nodeId);
+    const okAtts   = history.filter(a => a.status === 'ok');
+    const otherAtts= history.filter(a => a.status !== 'ok');
+
+    const lastRow  = document.getElementById('anc-last-row');
+    const okRow    = document.getElementById('anc-ok-row');
+    const allRow   = document.getElementById('anc-all-row');
+    const emptyEl  = document.getElementById('anc-quick-empty');
+    if (!lastRow) return;
+
+    const hasAny = history.length > 0;
+    emptyEl.style.display = hasAny ? 'none' : 'block';
+
+    // Last attempt
+    if (history.length > 0) {
+        const last = history[history.length - 1];
+        lastRow.style.display = '';
+        document.getElementById('anc-last-pills').innerHTML =
+            `<button class="anc-pill anc-pill-last" title="${ancEsc(last.prompt)}" onclick="ancReusePrompt('${last.id}')"><span class="anc-badge anc-badge-${last.status}">${last.status}</span>${ancEsc(ancTrunc(last.prompt, 36))}</button>`;
+    } else {
+        lastRow.style.display = 'none';
+    }
+
+    // Successful
+    if (okAtts.length > 0) {
+        okRow.style.display = '';
+        document.getElementById('anc-ok-pills').innerHTML = okAtts
+            .map(a => `<button class="anc-pill anc-pill-ok" title="${ancEsc(a.prompt)}" onclick="ancReusePrompt('${a.id}')">${ancEsc(ancTrunc(a.prompt, 30))}</button>`)
+            .join('');
+    } else {
+        okRow.style.display = 'none';
+    }
+
+    // Others (fail/pending)
+    if (otherAtts.length > 0) {
+        allRow.style.display = '';
+        document.getElementById('anc-all-pills').innerHTML = otherAtts
+            .map(a => `<button class="anc-pill" title="${ancEsc(a.prompt)}" onclick="ancReusePrompt('${a.id}')"><span class="anc-badge anc-badge-${a.status}">${a.status}</span>${ancEsc(ancTrunc(a.prompt, 28))}</button>`)
+            .join('');
+    } else {
+        allRow.style.display = 'none';
+    }
+}
+
+/* ── Attempt history list ── */
+function ancRenderHistory(nodeId) {
+    const el   = document.getElementById('anc-att-list');
+    if (!el) return;
+    const atts = ancNodeHist(nodeId);
+    if (!atts.length) {
+        el.innerHTML = '<div style="padding:10px 12px;color:#5c6370;font-size:12px;text-align:center">No attempts yet for this node.</div>';
+        return;
+    }
+    el.innerHTML = atts.slice().reverse().map(a => {
+        const open = ancOpenAtts[a.id];
+        const diffHtml = (a.diff || []).map(l => {
+            const cls = l.startsWith('+') ? 'anc-diff-add' : l.startsWith('-') ? 'anc-diff-del' : 'anc-diff-ctx';
+            return `<div class="anc-diff-line ${cls}">${ancEsc(l)}</div>`;
+        }).join('');
+        const pseudo = a.pseudo
+            ? `<div style="margin-bottom:8px"><div class="anc-sec-lbl">what was tried</div><div style="background:#161920;padding:7px 9px;border-radius:4px;font-family:'Roboto Mono',monospace;font-size:11px;white-space:pre-wrap;max-height:70px;overflow-y:auto;color:#abb2bf">${ancEsc(a.pseudo)}</div></div>`
+            : '';
+        const isRunning = a.status === 'pending';
+        const outcomeHtml = !isRunning
+            ? `<div class="anc-outcome-row">
+                <span style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.06em">did it work?</span>
+                <button class="action-button small" style="border-color:#98c379;color:#98c379;background:rgba(152,195,121,.1)" onclick="ancMarkOutcome('${a.id}','ok',event)">✓ worked</button>
+                <button class="action-button small" style="border-color:#e06c75;color:#e06c75;background:rgba(224,108,117,.1)" onclick="ancMarkOutcome('${a.id}','fail',event)">✗ didn't</button>
+               </div>`
+            : `<div style="margin-top:7px;display:flex;align-items:center;gap:5px"><span style="font-size:11px;color:#5c6370">running…</span></div>`;
+        return `<div class="anc-att-item">
+          <div class="anc-att-hd" onclick="ancToggleAtt('${a.id}')">
+            <span class="anc-badge anc-badge-${a.status}">${a.status}</span>
+            <span class="anc-att-prompt">${ancEsc(a.prompt)}</span>
+            <span class="anc-att-time">${a.time}</span>
+            <span style="font-size:10px;color:#5c6370;flex-shrink:0">${open ? '▲' : '▼'}</span>
+          </div>
+          <div class="anc-att-body ${open ? 'open' : ''}">
+            ${pseudo}
+            ${diffHtml ? `<div style="margin-bottom:8px"><div class="anc-sec-lbl">diff</div>${diffHtml}</div>` : ''}
+            <div class="anc-sec-lbl">result</div>
+            <div class="anc-att-result">${ancEsc(a.result)}</div>
+            ${outcomeHtml}
+            <button class="action-button small" style="margin-top:8px" onclick="ancReusePrompt('${a.id}')">↑ reuse prompt</button>
+          </div>
+        </div>`;
+    }).join('');
+}
+
+function ancToggleAtt(id) {
+    ancOpenAtts[id] = !ancOpenAtts[id];
+    if (ancCurrentNodeId) ancRenderHistory(ancCurrentNodeId);
+}
+
+function ancMarkOutcome(id, outcome, e) {
+    e.stopPropagation();
+    const arr = ancNodeHistory[ancCurrentNodeId];
+    if (!arr) return;
+    const a = arr.find(x => x.id === id);
+    if (a) a.status = outcome;
+    ancRenderPanel(ancCurrentNodeId);
+}
+
+function ancReusePrompt(id) {
+    let found = null;
+    for (const arr of Object.values(ancNodeHistory)) {
+        found = arr.find(a => a.id === id);
+        if (found) break;
+    }
+    if (!found) return;
+    const ta = document.getElementById('agent-prompt-input');
+    if (ta) { ta.value = found.prompt; ta.focus(); }
+}
+
+/* ── Tab switching ── */
+function ancSwitchTab(name, btn) {
+    ancActiveTab = name;
+    document.querySelectorAll('.anc-pane').forEach(p => p.classList.remove('anc-pane-active'));
+    document.querySelectorAll('.anc-stab').forEach(b => b.classList.remove('anc-stab-active'));
+    const pane = document.getElementById('anc-pane-' + name);
+    if (pane) pane.classList.add('anc-pane-active');
+    if (btn)  btn.classList.add('anc-stab-active');
+}
+
+/* ── AI: analyze current state ── */
+async function ancAnalyzeState() {
+    const nid  = ancCurrentNodeId;
+    const node = nid ? findNodeById(nid) : null;
+    const aiEl = document.getElementById('anc-pane-ai');
+    if (!aiEl) return;
+
+    // Switch to AI tab
+    document.querySelectorAll('.anc-pane').forEach(p => p.classList.remove('anc-pane-active'));
+    document.querySelectorAll('.anc-stab').forEach(b => b.classList.remove('anc-stab-active'));
+    aiEl.classList.add('anc-pane-active');
+    document.querySelectorAll('.anc-stab').forEach(b => { if (b.textContent.includes('AI')) b.classList.add('anc-stab-active'); });
+
+    const keyOk = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
+    if (!keyOk) { aiEl.innerHTML = '<span style="color:#e06c75">⚠ No AI key configured. Add one in Settings.</span>'; return; }
+    if (!node)  { aiEl.innerHTML = `<span style="color:#e5c07b">Node "${ancEsc(nid)}" not found in current project tree.</span>`; return; }
+
+    const btn = document.getElementById('anc-analyze-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    aiEl.innerHTML = '<span style="color:#5c6370">Analyzing current state…</span>';
+
+    const systemPrompt = `You are a concise frontend code analyst. Given a node's code, produce a brief structured analysis:
+1. CURRENT STATE (2-3 sentences: what this code does, its visual effect, patterns)
+2. PSEUDO CODE (a short annotated overview as plain text with indented structure)
+3. WHAT TO WATCH (1-2 gotchas, dependencies, or performance concerns before editing)
+Keep it brief, developer-friendly, no fluff. Use plain text, minimal markdown.`;
+
+    const userPrompt = `Node ID: ${node.id}
+Node Type: ${node.type}
+Description: ${node.description || 'none'}
+Session intent: ${ancSessionIntent || 'none'}
+
+Code:
+\`\`\`${node.type}
+${node.code || '// empty'}
+\`\`\`
+
+Analyze the current state of this node.`;
+
+    try {
+        const result = await callAI(systemPrompt, userPrompt);
+        const formatted = result
+            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+            .replace(/\n/g, '<br>');
+        aiEl.innerHTML = `<div style="font-size:12px;line-height:1.75;color:#abb2bf">${formatted}</div>`;
+    } catch (err) {
+        aiEl.innerHTML = `<span style="color:#e06c75">⚠ AI error: ${ancEsc(err.message)}</span>`;
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '✦ analyze'; }
+}
+
+/* ── Intent management ── */
+function ancEditIntent() {
+    const editor = document.getElementById('anc-intent-editor');
+    const bar    = document.getElementById('anc-intent-bar');
+    if (!editor || !bar) return;
+    document.getElementById('anc-intent-input').value = ancSessionIntent;
+    bar.style.display    = 'none';
+    editor.style.display = '';
+}
+function ancSaveIntent() {
+    ancSessionIntent = (document.getElementById('anc-intent-input').value || '').trim();
+    document.getElementById('anc-intent-bar').style.display    = '';
+    document.getElementById('anc-intent-editor').style.display = 'none';
+    document.getElementById('anc-intent-text').textContent = ancSessionIntent || '(no intent set)';
+}
+function ancCancelIntent() {
+    document.getElementById('anc-intent-bar').style.display    = '';
+    document.getElementById('anc-intent-editor').style.display = 'none';
+}
+
+/* ── Record an attempt from the agent ── */
+function ancRecordAttempt(nodeId, prompt, result, diff) {
+    if (!ancNodeHistory[nodeId]) ancNodeHistory[nodeId] = [];
+    const att = {
+        id:     'a' + Date.now() + Math.random().toString(36).slice(2, 5),
+        node:   nodeId,
+        prompt: prompt,
+        status: 'pending',
+        time:   'just now',
+        diff:   diff || [],
+        result: result || 'Applied. Mark outcome below.',
+        pseudo: ancSummarizePrompt(prompt)
+    };
+    ancNodeHistory[nodeId].push(att);
+    return att;
+}
+
+function ancSummarizePrompt(text) {
+    const t = (text || '').trim();
+    if (t.length < 60) return '→ ' + t;
+    return t.split(/[,;]/).map(p => '→ ' + p.trim().slice(0, 60)).filter(Boolean).join('\n');
+}
+
+/* ── Hook into executeAgentPlan — record each updated/created node ── */
+const _ancOrigExecuteAgentPlan = executeAgentPlan;
+function executeAgentPlan(agentDecision, agentLogger) {
+    // Call original first — it mutates vibeTree
+    _ancOrigExecuteAgentPlan(agentDecision, agentLogger);
+
+    // Record attempt for each action's node, detect the last touched node
+    if (Array.isArray(agentDecision.actions)) {
+        let lastNodeId = null;
+        agentDecision.actions.forEach(action => {
+            const nid = action.actionType === 'update'
+                ? action.nodeId
+                : (action.newNode && action.newNode.id) || null;
+            if (!nid) return;
+            lastNodeId = nid;
+
+            // Build diff lines from old vs new code where possible
+            const node = findNodeById(nid);
+            const newCode  = action.newCode || (action.newNode && action.newNode.code) || '';
+            const diffLines = newCode
+                ? newCode.split('\n').slice(0, 6).map(l => '+ ' + l)
+                : [];
+
+            // Use the agent plan as the prompt context
+            const promptText = agentDecision._ancPrompt
+                ? agentDecision._ancPrompt
+                : agentDecision.plan || 'Agent action';
+
+            const att = ancRecordAttempt(nid, promptText, `Agent: ${agentDecision.plan}`, diffLines);
+            // Mark ok immediately since agent applied it — user can flip to fail
+            att.status = 'ok';
+        });
+
+        // Refresh panel for the last touched node
+        if (lastNodeId) {
+            ancCurrentNodeId = lastNodeId;
+            ancRenderPanel(lastNodeId);
+        } else if (ancCurrentNodeId) {
+            ancRenderPanel(ancCurrentNodeId);
+        }
+    }
+}
+
+/* ── Attach user prompt text to the decision before execution ── */
+// Wrap executeSingleTask to capture the prompt and stamp it onto the decision
+const _ancOrigExecuteSingleTask = executeSingleTask;
+async function executeSingleTask(promptContext) {
+    // Store current prompt context so executeAgentPlan can read it
+    window._ancLastPromptContext = promptContext;
+    return _ancOrigExecuteSingleTask(promptContext);
+}
+
+// Patch callAI response parsing in executeSingleTask to stamp prompt onto decision
+// We do this by wrapping executeAgentPlan's call site in executeSingleTask:
+// executeAgentPlan is already wrapped above — it gets agentDecision which we annotate here.
+// The annotation happens via the _ancPrompt on the decision object passed through.
+// Since we can't easily intercept between callAI and executeAgentPlan in executeSingleTask,
+// we patch JSON.parse temporarily during each task run.
+const _ancOrigJSONParse = JSON.parse;
+// Lightweight hook: after executeSingleTask calls JSON.parse on the AI response,
+// stamp the prompt onto the resulting object.
+const _ancParsePatch = function(text, reviver) {
+    const result = _ancOrigJSONParse(text, reviver);
+    if (result && typeof result === 'object' && Array.isArray(result.actions)) {
+        result._ancPrompt = window._ancLastPromptContext || '';
+    }
+    return result;
+};
+JSON.parse = _ancParsePatch;
+
+/* ── Wire up: when agent tab is switched to, show panel for last node ── */
+const _ancOrigSwitchToTab = switchToTab;
+function switchToTab(tabId) {
+    _ancOrigSwitchToTab(tabId);
+    if (tabId === 'agent') {
+        // If there's a current node, refresh its panel
+        if (ancCurrentNodeId) {
+            setTimeout(() => ancRenderPanel(ancCurrentNodeId), 0);
+        }
+        // Show intent bar even with no node yet
+        const intentBar = document.getElementById('anc-intent-bar');
+        if (intentBar) {
+            intentBar.style.display = '';
+            const intentText = document.getElementById('anc-intent-text');
+            if (intentText) intentText.textContent = ancSessionIntent || '(no intent set — click edit to add a goal)';
+        }
+    }
+}
+
+/* ── Wire up: when a node is clicked in the inspector/tree, update the panel ── */
+// Listen for the vibe-node-click postMessage that the preview iframe sends
+window.addEventListener('message', e => {
+    const d = e.data;
+    if (!d) return;
+    if (d.type === 'vibe-node-click' && d.nodeId) {
+        // Only update ANC panel if agent tab is active
+        const agentTab = document.getElementById('agent');
+        if (agentTab && agentTab.classList.contains('active')) {
+            ancRenderPanel(d.nodeId);
+        }
+    }
+});
+
+// ── END ANC ──
+
+
 // ══════════════════════════════════════════════════════════════════
 // APUI VIBE BRIDGE — exposes vibe tree to the APUI editor panel
 // ══════════════════════════════════════════════════════════════════
@@ -8713,4 +9199,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                     }
+  }
