@@ -8687,6 +8687,21 @@ function handleApuiMessage(e) {
             refreshAllUI();
             break;
         }
+
+        // APUI requests that Vibe saves to its storage source and sends back updated tree
+        case 'apui-request-save': {
+            autoSaveProject();
+            // Send the freshly-saved tree back so APUI always has the canonical version
+            const frame = document.getElementById('apui-frame');
+            if (frame?.contentWindow) {
+                frame.contentWindow.postMessage({
+                    type: 'apui-init',
+                    vibeTree: JSON.parse(JSON.stringify(vibeTree)),
+                    projectId: currentProjectId
+                }, '*');
+            }
+            break;
+        }
     }
 }
 
@@ -8716,4 +8731,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+                     }
