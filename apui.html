@@ -190,24 +190,6 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 /* No-project notice */
 #no-project-notice{display:none;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--rs);padding:9px 13px;font-size:12px;color:var(--amber);margin:10px 12px 0;flex-shrink:0}
 
-/* ══ MODEL SETTINGS POPOVER ══ */
-#model-popover{
-  position:absolute;top:52px;right:0;z-index:200;
-  width:min(320px,96vw);
-  background:var(--bg2);border:1px solid var(--border2);
-  border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.5);
-  padding:14px;display:none;flex-direction:column;gap:10px;
-}
-#model-popover.open{display:flex}
-.mp-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:3px}
-.mp-input{width:100%;padding:8px 10px;font-family:inherit;font-size:13px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg3);color:var(--text)}
-.mp-input:focus{outline:none;border-color:var(--accent)}
-.mp-row{display:flex;gap:7px;align-items:center}
-.mp-hint{font-size:11px;color:var(--text3);line-height:1.5}
-.mp-provider{display:flex;gap:6px}
-.mp-prov-btn{font-family:inherit;font-size:11px;padding:5px 10px;border:1px solid var(--border2);border-radius:20px;background:transparent;color:var(--text3);cursor:pointer;transition:all .1s}
-.mp-prov-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
-
 /* Desktop */
 @media (min-width:680px){
   #drawer{position:static;pointer-events:all;width:220px;min-width:220px;display:flex}
@@ -246,36 +228,9 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
     <div id="topbar">
       <button class="tb-menu" onclick="openDrawer()" aria-label="Sessions">☰</button>
       <span class="tb-name" id="tb-name">—</span>
-      <span id="ai-status-badge" onclick="toggleModelPopover()" style="cursor:pointer" title="Click to configure model">⚡ AI ready</span>
+      <span id="ai-status-badge" title="Changes are processed by Vibe's AI agent">⚡ via Vibe agent</span>
       <span id="tb-node" class="tb-node" style="display:none"></span>
       <button class="btn sm" id="btn-intent" style="display:none" onclick="goToIntent()">← intent</button>
-    </div>
-
-    <!-- Model settings popover -->
-    <div id="model-popover">
-      <div>
-        <div class="mp-label">AI Provider</div>
-        <div class="mp-provider">
-          <button class="mp-prov-btn active" id="prov-gemini" onclick="setProvider('gemini')">Gemini</button>
-          <button class="mp-prov-btn" id="prov-nscale" onclick="setProvider('nscale')">nscale</button>
-        </div>
-      </div>
-      <div id="mp-model-row">
-        <div class="mp-label">Model name</div>
-        <input id="mp-model-input" class="mp-input" type="text" placeholder="e.g. gemini-2.5-flash-preview-04-17"
-          oninput="onModelInput()" onblur="saveModelOverride()">
-        <div class="mp-hint" style="margin-top:4px">Overrides the model set in Vibe for this editor only. Leave blank to use Vibe's setting.</div>
-      </div>
-      <div id="mp-key-row">
-        <div class="mp-label">API Key <span style="color:var(--text3)">(optional override)</span></div>
-        <input id="mp-key-input" class="mp-input" type="password" placeholder="Leave blank to use Vibe's key"
-          onblur="saveKeyOverride()">
-      </div>
-      <div style="display:flex;gap:7px">
-        <button class="btn xs prim" onclick="applyModelSettings()">apply</button>
-        <button class="btn xs" onclick="clearModelOverride()">reset to Vibe</button>
-        <button class="btn xs" style="margin-left:auto" onclick="closeModelPopover()">close</button>
-      </div>
     </div>
 
     <!-- No project notice -->
@@ -408,14 +363,11 @@ let aiProvider      = null;
 let geminiApiKey    = null;
 let geminiModel     = null;
 let nscaleApiKey    = null;
-// Manual overrides set inside APUI (take priority over Vibe/localStorage)
 let _modelOverride  = null;
 let _keyOverride    = null;
 let _providerOverride = null;
-const NSCALE_MODEL  = 'meta-llama/Llama-3.3-70B-Instruct';
-const NSCALE_ENDPOINT = 'https://api.nscale.com/v1/chat/completions';
 
-/* Read from localStorage, respecting __custom__ */
+/* Read from localStorage — used only for the ✦ analyze feature */
 function readSettingsFromStorage() {
   try {
     const p  = localStorage.getItem('aiProvider');
@@ -432,8 +384,6 @@ function readSettingsFromStorage() {
     if (!geminiModel) geminiModel = 'gemini-2.5-flash';
   } catch(e) {}
 }
-
-/* Effective values — overrides win over storage */
 function effectiveProvider() { return _providerOverride || aiProvider || 'gemini'; }
 function effectiveModel()    { return _modelOverride    || geminiModel || 'gemini-2.5-flash'; }
 function effectiveKey()      {
@@ -441,68 +391,8 @@ function effectiveKey()      {
   return _keyOverride || geminiApiKey;
 }
 
-/* ══ MODEL POPOVER ══ */
-function toggleModelPopover() {
-  const p = document.getElementById('model-popover');
-  p.classList.contains('open') ? closeModelPopover() : openModelPopover();
-}
-function openModelPopover() {
-  readSettingsFromStorage();
-  const p = document.getElementById('model-popover');
-  document.getElementById('mp-model-input').value = _modelOverride || effectiveModel();
-  document.getElementById('mp-key-input').value   = _keyOverride || '';
-  // Sync provider buttons
-  document.getElementById('prov-gemini').classList.toggle('active', effectiveProvider()==='gemini');
-  document.getElementById('prov-nscale').classList.toggle('active', effectiveProvider()==='nscale');
-  p.classList.add('open');
-}
-function closeModelPopover() {
-  document.getElementById('model-popover').classList.remove('open');
-}
-function setProvider(prov) {
-  _providerOverride = prov;
-  document.getElementById('prov-gemini').classList.toggle('active', prov==='gemini');
-  document.getElementById('prov-nscale').classList.toggle('active', prov==='nscale');
-}
-function onModelInput() {
-  // live preview in badge while typing
-  const val = document.getElementById('mp-model-input').value.trim();
-  const badge = document.getElementById('ai-status-badge');
-  if (val) badge.textContent = '⚡ ' + val.replace('gemini-','');
-}
-function saveModelOverride() {
-  const val = document.getElementById('mp-model-input').value.trim();
-  _modelOverride = val || null;
-}
-function saveKeyOverride() {
-  const val = document.getElementById('mp-key-input').value.trim();
-  _keyOverride = val || null;
-}
-function applyModelSettings() {
-  saveModelOverride();
-  saveKeyOverride();
-  updateAiStatusBadge();
-  closeModelPopover();
-}
-function clearModelOverride() {
-  _modelOverride = null;
-  _keyOverride   = null;
-  _providerOverride = null;
-  document.getElementById('mp-model-input').value = '';
-  document.getElementById('mp-key-input').value   = '';
-  readSettingsFromStorage();
-  updateAiStatusBadge();
-  closeModelPopover();
-}
-
-// Close popover on outside click
-document.addEventListener('click', e => {
-  const pop = document.getElementById('model-popover');
-  const badge = document.getElementById('ai-status-badge');
-  if (pop.classList.contains('open') && !pop.contains(e.target) && !badge.contains(e.target)) {
-    closeModelPopover();
-  }
-});
+// Close popover on outside click — kept for safety
+document.addEventListener('click', e => {});
 
 // On load, request the tree from parent (if embedded)
 window.addEventListener('load', () => {
@@ -535,6 +425,11 @@ window.addEventListener('message', e => {
     if (d.nscaleApiKey) nscaleApiKey = d.nscaleApiKey;
     updateAiStatusBadge();
   }
+
+  // Agent result coming back from Vibe
+  if (d.type === 'apui-agent-status') {
+    handleAgentStatus(d);
+  }
 });
 
 function onVibeTreeReceived() {
@@ -558,21 +453,12 @@ function onVibeTreeReceived() {
 function updateAiStatusBadge() {
   readSettingsFromStorage();
   const badge  = document.getElementById('ai-status-badge');
-  const prov   = effectiveProvider();
-  const keyOk  = !!effectiveKey();
-  const model  = effectiveModel();
   if (!vibeTree) {
     badge.textContent = '⚠ no project';
     badge.className = 'no-key';
-  } else if (keyOk) {
-    const shortName = prov==='gemini'
-      ? model.replace('gemini-','')
-      : 'nscale';
-    badge.textContent = '⚡ ' + shortName;
-    badge.className = 'ready';
   } else {
-    badge.textContent = '⚠ no AI key';
-    badge.className = 'no-key';
+    badge.textContent = '⚡ via Vibe agent';
+    badge.className = 'ready';
   }
 }
 
@@ -932,7 +818,7 @@ ${node.code || '// empty'}
 Analyze the current state of this node.`;
 
   try {
-    const result = await callAI(systemPrompt, userPrompt);
+    const result = await callAnalysisAI(systemPrompt, userPrompt);
     // Format nicely
     const formatted = result
       .replace(/^(#+\s*)/gm, '')
@@ -1052,14 +938,7 @@ function markOutcome(id, outcome, e) {
     const a=arr.find(x=>x.id===id);
     if(a) { a.status=outcome; foundAtt=a; break; }
   }
-  // If user marks as 'ok', push the node code to Vibe so it persists
-  if (outcome==='ok' && foundAtt) {
-    const node = getNodeFromTree(foundAtt.node);
-    const codeToPush = foundAtt.appliedCode || (node && node.code);
-    if (codeToPush !== undefined) {
-      pushNodeToVibe(foundAtt.node, codeToPush);
-    }
-  }
+  saveSessions();
   renderWork(); renderSidebar();
 }
 
@@ -1088,7 +967,7 @@ function onNodeChange() {
   renderWork();
 }
 
-/* ══ Prompt submission + real AI call ══ */
+/* ══ Prompt submission — routes through Vibe's native agent ══ */
 function onPbKey(e) { if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();submitPrompt();} }
 
 async function submitPrompt() {
@@ -1097,7 +976,6 @@ async function submitPrompt() {
   if(!text){document.getElementById('pb-ta').focus();return;}
 
   const nid = s.currentNode;
-  const node = getNodeFromTree(nid);
   if (!s.history[nid]) s.history[nid]=[];
 
   const att = {
@@ -1105,9 +983,9 @@ async function submitPrompt() {
     node:nid,
     prompt:text,
     status:'pending',
-    time:'just now',
+    time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
     diff:[],
-    result:'Running…',
+    result:'Sending to Vibe agent…',
     promptPseudo: summarizePrompt(text),
     aiResultFormatted: null
   };
@@ -1116,36 +994,118 @@ async function submitPrompt() {
   openAtts[att.id]=true;
   renderWork(); renderSidebar();
 
-  const keyOk = !!effectiveKey();
-  if (keyOk && node) {
-    try {
-      const result = await callNodeEdit(node, s, att);
-      att.result = result.summary;
-      att.aiResultFormatted = result.htmlSummary;
-      att.diff   = result.diff || [];
-      // Push updated code back to vibe and store on attempt
-      if (result.newCode !== undefined && result.newCode !== null) {
-        att.appliedCode = result.newCode;
-        node.code = result.newCode;
-        pushNodeToVibe(nid, result.newCode);
-      }
-    } catch(e) {
-      att.result = '⚠ AI error: ' + e.message;
-      att.aiResultFormatted = `<span style="color:var(--red)">${esc(att.result)}</span>`;
-    }
-  } else {
-    // No AI — simulate
-    await new Promise(r=>setTimeout(r,900));
-    att.result = node
-      ? `Ready to apply to ${nid}. Mark whether it worked after testing in preview.`
-      : `Node "${nid}" not found in project. Check if the project is loaded.`;
-    att.diff = [`+  /* ${trunc(text,50)} */`];
+  // Route to Vibe's native agent — no local AI call
+  try {
+    window.parent.postMessage({
+      source: 'apui-vibe',
+      type: 'apui-run-agent',
+      prompt: text,
+      attemptId: att.id,
+      nodeId: nid,
+      sessionIntent: s.intent
+    }, '*');
+  } catch(err) {
+    att.status = 'fail';
+    att.result = '⚠ Could not reach Vibe agent: ' + err.message;
+    att.aiResultFormatted = `<span style="color:var(--red)">${esc(att.result)}</span>`;
+    renderWork(); renderSidebar();
   }
-
-  renderWork(); renderSidebar();
 }
 
-/* ══ Push a node update to the parent Vibe app ══ */
+/* ══ Handle agent status messages from Vibe ══ */
+function handleAgentStatus(d) {
+  const s = sess(); if (!s) return;
+  // Find the attempt across all node histories
+  let att = null;
+  for (const arr of Object.values(s.history)) {
+    att = arr.find(a => a.id === d.attemptId);
+    if (att) break;
+  }
+  if (!att) return;
+
+  if (d.status === 'running') {
+    att.result = d.message || 'Agent is running…';
+    att.aiResultFormatted = `<div style="display:flex;align-items:center;gap:8px;color:var(--text2)"><div class="spin"><span></span><span></span><span></span></div> ${esc(d.message||'Agent is running…')}</div>`;
+    renderWork(); renderSidebar();
+    return;
+  }
+
+  if (d.status === 'question') {
+    att.status = 'pending';
+    att.result = '⚑ Agent needs clarification: ' + (d.message||'');
+    att.aiResultFormatted = `<div style="background:var(--accent-bg);border-left:3px solid var(--accent);padding:9px 11px;border-radius:4px;font-size:12px;color:var(--text)">
+      <div style="font-weight:700;color:var(--accent);margin-bottom:5px">Agent needs clarification:</div>
+      <div>${esc(d.message||'')}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn xs prim" onclick="replyToAgent('${att.id}','Yes')">Yes</button>
+        <button class="btn xs prim" onclick="replyToAgent('${att.id}','No')">No</button>
+        <button class="btn xs prim" onclick="replyToAgent('${att.id}','Proceed')">Proceed</button>
+        <button class="btn xs fail" onclick="replyToAgent('${att.id}','Cancel')">Cancel</button>
+      </div>
+    </div>`;
+    renderWork(); renderSidebar();
+    return;
+  }
+
+  if (d.status === 'done') {
+    att.status = 'ok';
+    att.result = d.plan || d.message || 'Applied.';
+    att.aiResultFormatted = `<span style="color:var(--green)">✓ ${esc(att.result)}</span>`;
+    // Build a diff summary from changedNodes
+    if (d.changedNodes && d.changedNodes.length > 0) {
+      att.diff = d.changedNodes.map(n => `+ updated: ${n}`);
+    }
+    // Update our local tree copy from the fresh tree Vibe sent back
+    if (d.vibeTree) {
+      vibeTree = d.vibeTree;
+      populateNodeSelector();
+    }
+    saveSessions();
+    renderWork(); renderSidebar();
+    return;
+  }
+
+  if (d.status === 'error') {
+    att.status = 'fail';
+    att.result = '⚠ Agent error: ' + (d.message||'Unknown error');
+    att.aiResultFormatted = `<span style="color:var(--red)">${esc(att.result)}</span>`;
+    renderWork(); renderSidebar();
+    return;
+  }
+}
+
+/* ══ Reply to an agent clarification question ══ */
+function replyToAgent(attId, reply) {
+  const s = sess(); if (!s) return;
+  let att = null, nid = null;
+  for (const [nodeId, arr] of Object.entries(s.history)) {
+    att = arr.find(a => a.id === attId);
+    if (att) { nid = nodeId; break; }
+  }
+  if (!att) return;
+
+  att.result = 'Sending reply: ' + reply + '…';
+  att.aiResultFormatted = `<div style="display:flex;align-items:center;gap:8px;color:var(--text2)"><div class="spin"><span></span><span></span><span></span></div> Sending reply…</div>`;
+  renderWork();
+
+  try {
+    window.parent.postMessage({
+      source: 'apui-vibe',
+      type: 'apui-run-agent',
+      prompt: att.prompt + '\n\nUser replied: ' + reply,
+      attemptId: att.id,
+      nodeId: nid,
+      sessionIntent: s.intent
+    }, '*');
+  } catch(err) {
+    att.status = 'fail';
+    att.result = '⚠ Could not reach Vibe agent: ' + err.message;
+    att.aiResultFormatted = `<span style="color:var(--red)">${esc(att.result)}</span>`;
+    renderWork(); renderSidebar();
+  }
+}
+
+/* ══ Push a node update to the parent Vibe app (fallback for non-agent paths) ══ */
 function pushNodeToVibe(nodeId, newCode) {
   try {
     window.parent.postMessage({
@@ -1154,8 +1114,6 @@ function pushNodeToVibe(nodeId, newCode) {
       nodeId,
       newCode
     }, '*');
-    // Ask Vibe to save to its storage source and refresh
-    requestVibeSaveAndReload();
   } catch(e) { console.warn('Could not postMessage to Vibe:', e); }
 }
 
@@ -1169,67 +1127,27 @@ function summarizePrompt(text) {
 }
 
 /* ══ AI node edit ══ */
-async function callNodeEdit(node, session, att) {
-  const systemPrompt = `You are an expert frontend developer. The user wants to edit a specific node in their Vibe project.
-Your job:
-1. Apply the requested change to the node's code.
-2. Return a JSON object with:
-   - "newCode": the complete updated code (same type as input)
-   - "summary": a 1-sentence plain-text description of what changed
-   - "diff": an array of diff lines (prefix "+" for additions, "-" for removals, " " for context)
-   
-Rules:
-- Keep the same code type (css/html/javascript).
-- Only change what is requested.
-- newCode must be complete, not a fragment.
-- diff should show the key lines changed (max 8 lines).
-- Return ONLY valid JSON, no markdown fences.`;
-
-  const userPrompt = `Project: ${vibeProjectId||'unknown'}
-Session intent: ${session.intent}
-Node: ${node.id} (${node.type})
-Description: ${node.description||'none'}
-
-Current code:
-${node.code||'// empty'}
-
-User request: ${att.prompt}
-
-Respond with JSON: {"newCode":"...","summary":"...","diff":["...","..."]}`;
-
-  const raw = await callAI(systemPrompt, userPrompt, true);
-  let parsed;
-  try {
-    let clean = raw.trim().replace(/^```json\s*/i,'').replace(/\s*```$/,'');
-    const s=clean.indexOf('{'), e=clean.lastIndexOf('}');
-    if(s!==-1&&e>s) clean=clean.slice(s,e+1);
-    parsed = JSON.parse(clean);
-  } catch(e) {
-    // Fallback: no JSON
-    return { summary: raw.slice(0,200), htmlSummary: esc(raw.slice(0,200)), diff:[], newCode:null };
-  }
-  const htmlSummary = `<span style="color:var(--green)">✓ ${esc(parsed.summary||'Applied.')}</span>`;
-  return { summary: parsed.summary||'Applied.', htmlSummary, diff: parsed.diff||[], newCode: parsed.newCode||null };
-}
-
-/* ══ Unified AI call (gemini or nscale) ══ */
-async function callAI(systemPrompt, userPrompt, forJson=false) {
-  readSettingsFromStorage(); // always pick up latest model/key/provider
-  if (effectiveProvider()==='nscale') {
-    return callNscaleAI(systemPrompt, userPrompt, forJson);
-  }
-  return callGeminiAI(systemPrompt, userPrompt, forJson);
-}
-
-async function callGeminiAI(systemPrompt, userPrompt, forJson=false) {
+/* ══ analyzeCurrentState still uses direct AI for analysis-only (no code changes) ══ */
+async function callAnalysisAI(systemPrompt, userPrompt) {
+  readSettingsFromStorage();
   const key = effectiveKey();
-  if (!key) throw new Error('Gemini API key not set. Tap the badge to configure.');
+  if (!key) throw new Error('No AI key configured.');
+  if (effectiveProvider() === 'nscale') {
+    const res = await fetch('https://api.nscale.com/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'meta-llama/Llama-3.3-70B-Instruct',messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}]})
+    });
+    if (!res.ok) throw new Error('nscale error: ' + await res.text());
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
   const model = effectiveModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const body = {
     contents:[{role:'user',parts:[{text:userPrompt}]}],
     systemInstruction:{parts:[{text:systemPrompt}]},
-    generationConfig: forJson ? {responseMimeType:'application/json'} : {}
+    generationConfig:{}
   };
   const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if (!res.ok) throw new Error('Gemini error: ' + await res.text());
@@ -1238,28 +1156,9 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson=false) {
   return data.candidates[0].content.parts[0].text;
 }
 
-async function callNscaleAI(systemPrompt, userPrompt, forJson=false) {
-  const key = effectiveKey();
-  if (!key) throw new Error('nscale API key not set. Tap the badge to configure.');
-  const res = await fetch(NSCALE_ENDPOINT,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-    body:JSON.stringify({model:NSCALE_MODEL,messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}]})
-  });
-  if (!res.ok) throw new Error('nscale error: ' + await res.text());
-  const data = await res.json();
-  let content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('No response from nscale');
-  if (forJson) {
-    const m = content.match(/```json\n([\s\S]*?)\n```/);
-    if (m) content = m[1];
-  }
-  return content;
-}
-
 /* ══ Utils ══ */
 function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
 </script>
 </body>
-          </html>
+  </html>
