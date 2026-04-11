@@ -8702,6 +8702,91 @@ function handleApuiMessage(e) {
             }
             break;
         }
+
+        // APUI sends a prompt to be run through the native Vibe agent
+        case 'apui-run-agent': {
+            const { prompt: agentPromptText, attemptId, nodeId: focusNodeId, sessionIntent } = d;
+            if (!agentPromptText) break;
+
+            const apuiFrame = document.getElementById('apui-frame');
+
+            // Build a context-rich prompt that includes the node focus and session intent
+            let enrichedPrompt = agentPromptText;
+            if (focusNodeId) enrichedPrompt = `[Focused node: ${focusNodeId}] ${enrichedPrompt}`;
+            if (sessionIntent) enrichedPrompt = `[Session goal: ${sessionIntent}]\n${enrichedPrompt}`;
+
+            // Notify APUI that the agent has started
+            if (apuiFrame?.contentWindow) {
+                apuiFrame.contentWindow.postMessage({
+                    type: 'apui-agent-status',
+                    attemptId,
+                    status: 'running',
+                    message: 'Agent is processing your request…'
+                }, '*');
+            }
+
+            // Run through the full native Vibe agent pipeline
+            (async () => {
+                try {
+                    const systemPrompt = getAgentSystemPrompt();
+                    const fullTreeString = JSON.stringify(vibeTree, null, 2);
+                    const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+
+                    const userPrompt = `User Request: "${enrichedPrompt}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
+
+                    const rawResponse = await callAI(systemPrompt, userPrompt, true);
+                    const agentDecision = JSON.parse(rawResponse);
+
+                    if (agentDecision.question) {
+                        // Agent needs clarification — send question back to APUI
+                        if (apuiFrame?.contentWindow) {
+                            apuiFrame.contentWindow.postMessage({
+                                type: 'apui-agent-status',
+                                attemptId,
+                                status: 'question',
+                                message: agentDecision.question
+                            }, '*');
+                        }
+                        return;
+                    }
+
+                    // Collect which nodes were changed
+                    const changedNodes = [];
+                    executeAgentPlan(agentDecision, (msg, type) => {
+                        // Extract node IDs from action log messages
+                        const nodeMatch = msg.match(/`([^`]+)`/);
+                        if (nodeMatch && type === 'action') changedNodes.push(nodeMatch[1]);
+                    });
+
+                    // Save to storage
+                    autoSaveProject();
+
+                    // Send success + updated tree back to APUI
+                    if (apuiFrame?.contentWindow) {
+                        apuiFrame.contentWindow.postMessage({
+                            type: 'apui-agent-status',
+                            attemptId,
+                            status: 'done',
+                            plan: agentDecision.plan,
+                            changedNodes,
+                            message: agentDecision.plan || 'Changes applied.',
+                            vibeTree: JSON.parse(JSON.stringify(vibeTree)),
+                            projectId: currentProjectId
+                        }, '*');
+                    }
+                } catch (err) {
+                    if (apuiFrame?.contentWindow) {
+                        apuiFrame.contentWindow.postMessage({
+                            type: 'apui-agent-status',
+                            attemptId,
+                            status: 'error',
+                            message: err.message || 'Agent failed.'
+                        }, '*');
+                    }
+                }
+            })();
+            break;
+        }
     }
 }
 
@@ -8731,4 +8816,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                     }
+                  }
