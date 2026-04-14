@@ -217,6 +217,97 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 #free-mode-panel.open{display:flex}
 .free-result{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg2);border-radius:var(--rs);padding:10px 12px;max-height:220px;overflow-y:auto}
 
+/* ══════════════════════════════════════
+   SCI-FI FEATURE CSS
+══════════════════════════════════════ */
+
+/* ── Sci-fi toolbar (topbar extensions) ── */
+.scifi-btn{font-family:inherit;font-size:10px;padding:4px 8px;min-height:28px;border:1px solid var(--border2);border-radius:var(--rs);background:transparent;color:var(--text3);cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:4px;letter-spacing:.04em}
+.scifi-btn:hover{color:var(--text2);border-color:var(--text3)}
+.scifi-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.scifi-btn.active-red{border-color:var(--red);color:var(--red);background:var(--red-bg)}
+.scifi-btn.active-purple{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
+.scifi-btn.active-amber{border-color:var(--amber);color:var(--amber);background:var(--amber-bg)}
+#scifi-bar{display:flex;gap:5px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;flex-wrap:wrap}
+#scifi-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-right:2px}
+
+/* ── 1. IRON MAN Exploder ── */
+#explode-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);flex-direction:column;align-items:center;justify-content:center}
+#explode-overlay.open{display:flex}
+.explode-frame{width:min(92vw,900px);height:min(80vh,600px);position:relative;perspective:1400px;overflow:visible}
+#explode-iframe{width:100%;height:100%;border:none;border-radius:var(--r);background:#fff;transition:transform .6s cubic-bezier(.34,1.2,.64,1)}
+#explode-iframe.exploded{transform:rotateX(55deg) rotateZ(-30deg) scale(0.85);transform-style:preserve-3d}
+.explode-hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:center;z-index:10;flex-wrap:wrap}
+.explode-close{position:absolute;top:12px;right:12px;z-index:20}
+#explode-depth-lbl{font-size:10px;color:rgba(88,166,255,.8);font-family:'SF Mono',monospace;letter-spacing:.06em}
+#explode-slider{width:130px;accent-color:var(--accent)}
+#explode-prompt-row{position:absolute;bottom:0;left:0;right:0;padding:10px 12px;background:rgba(26,29,34,.92);border-top:1px solid rgba(88,166,255,.3);display:flex;gap:8px;border-radius:0 0 var(--r) var(--r)}
+#explode-ta{flex:1;padding:7px 10px;font-family:inherit;font-size:13px;border:1px solid rgba(88,166,255,.4);border-radius:var(--rs);background:rgba(88,166,255,.06);color:var(--text);resize:none;min-height:36px;line-height:1.4}
+#explode-ta:focus{outline:none;border-color:var(--accent)}
+.layer-badge{position:absolute;font-size:10px;font-family:'SF Mono',monospace;padding:2px 6px;border-radius:3px;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.4);color:rgba(88,166,255,.9);pointer-events:none;white-space:nowrap;z-index:9999;transition:opacity .2s}
+
+/* ── 2. MULTIVERSE Splitter ── */
+#multiverse-overlay{display:none;position:fixed;inset:0;z-index:500;background:#0a0b0f;flex-direction:column}
+#multiverse-overlay.open{display:flex}
+.mv-header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(188,140,255,.25);background:#0d0e13;flex-shrink:0;flex-wrap:wrap}
+.mv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--purple)}
+.mv-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.mv-label.a{color:#58a6ff}
+.mv-label.b{color:#bc8cff}
+.mv-arena{flex:1;position:relative;overflow:hidden;display:flex}
+#mv-iframe-a{position:absolute;inset:0;right:50%;border:none;background:#fff}
+#mv-iframe-b{position:absolute;inset:0;left:50%;border:none;background:#fff}
+.mv-divider{position:absolute;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#bc8cff 0%,#58a6ff 100%);transform:translateX(-50%);z-index:10;cursor:ew-resize;box-shadow:0 0 18px 4px rgba(188,140,255,.5)}
+.mv-divider-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#bc8cff,#58a6ff);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:ew-resize;box-shadow:0 0 24px 6px rgba(188,140,255,.6)}
+#mv-slider{position:absolute;top:0;bottom:0;left:0;right:0;opacity:0;cursor:ew-resize;z-index:15;width:100%}
+.mv-tag{position:absolute;top:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:20px;pointer-events:none;z-index:12}
+.mv-tag.a{left:12px;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.5);color:#58a6ff}
+.mv-tag.b{right:12px;background:rgba(188,140,255,.15);border:1px solid rgba(188,140,255,.5);color:#bc8cff}
+.mv-footer{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(188,140,255,.2);background:#0d0e13;flex-shrink:0;flex-wrap:wrap}
+#mv-pct-label{font-size:10px;color:var(--text3);min-width:55px}
+
+/* ── 3. GHOST IN THE MACHINE Symbiosis ── */
+@keyframes ghostPulse{0%,100%{opacity:0;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes energyTrace{0%{stroke-dashoffset:1000;opacity:.7}100%{stroke-dashoffset:0;opacity:0}}
+#ghost-overlay{position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden}
+.ghost-notification{position:fixed;bottom:80px;right:14px;max-width:260px;background:rgba(26,29,34,.95);border:1px solid rgba(188,140,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:var(--text2);z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5}
+.ghost-notification.show{transform:translateX(0)}
+.ghost-notification b{color:var(--purple)}
+.ghost-patch-panel{position:fixed;bottom:80px;left:14px;max-width:280px;background:rgba(26,29,34,.97);border:1px solid rgba(248,81,73,.45);border-radius:var(--r);padding:12px 14px;font-size:11px;color:var(--text);z-index:400;transform:translateX(-120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1)}
+.ghost-patch-panel.show{transform:translateX(0)}
+.ghost-patch-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:6px}
+#ghost-cursor{position:fixed;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,rgba(188,140,255,.8),rgba(188,140,255,0));pointer-events:none;z-index:350;transition:left .4s ease,top .4s ease;display:none}
+#ghost-cursor.active{display:block}
+.ghost-sweep-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+
+/* ── 4. MATRIX X-Ray HUD ── */
+#xray-overlay{display:none;position:fixed;inset:0;z-index:600;pointer-events:none}
+#xray-overlay.active{display:block}
+#xray-iframe-container{position:fixed;inset:0;z-index:601;pointer-events:none}
+#xray-frame{width:100%;height:100%;border:none;pointer-events:none}
+.xray-label{position:fixed;font-size:10px;font-family:'SF Mono',monospace;padding:2px 7px;border-radius:3px;pointer-events:none;z-index:602;background:rgba(0,255,70,.12);border:1px solid rgba(0,255,70,.45);color:#00ff46;white-space:nowrap;text-shadow:0 0 8px rgba(0,255,70,.8)}
+#xray-scanline{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,70,.6),transparent);z-index:603;animation:xrayScan 2.5s linear infinite;display:none}
+#xray-overlay.active #xray-scanline{display:block}
+@keyframes xrayScan{0%{top:0;opacity:.7}100%{top:100vh;opacity:0}}
+#xray-prompt-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.88);border:1px solid rgba(0,255,70,.4);border-radius:24px;padding:8px 18px;font-size:12px;color:#00ff46;z-index:605;display:none;white-space:nowrap;font-family:'SF Mono',monospace;letter-spacing:.04em}
+#xray-overlay.active #xray-prompt-toast{display:block}
+#xray-crosshair{position:fixed;pointer-events:none;z-index:604;width:200px;height:80px;transform:translate(-50%,-50%);display:none}
+#xray-overlay.active #xray-crosshair{display:block}
+
+/* ── 5. BLADE RUNNER Error Diagnostics ── */
+@keyframes bleed{0%,100%{box-shadow:0 0 0 0 transparent}25%{box-shadow:0 0 0 8px rgba(248,81,73,.5),0 0 40px 12px rgba(248,81,73,.3)}75%{box-shadow:0 0 0 4px rgba(248,81,73,.3),0 0 20px 6px rgba(248,81,73,.2)}}
+@keyframes chromaGlitch{0%,100%{filter:none}10%{filter:hue-rotate(90deg) saturate(2) brightness(1.3)}20%{filter:hue-rotate(-90deg) saturate(3) brightness(.8) contrast(1.5)}30%{filter:none}60%{filter:hue-rotate(180deg) saturate(2) brightness(1.1)}70%{filter:none}}
+.node-bleeding .card{animation:bleed 1.2s ease 3}
+.node-bleeding-card{animation:bleed 1.4s ease 4 !important}
+#containment-panel{display:none;position:fixed;bottom:0;right:0;width:min(360px,96vw);background:rgba(15,10,12,.97);border:1px solid rgba(248,81,73,.6);border-bottom:none;border-right:none;border-radius:var(--r) 0 0 0;padding:14px 16px;z-index:450;box-shadow:0 -4px 40px rgba(248,81,73,.25)}
+#containment-panel.open{display:block}
+.cp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.cp-node{font-size:11px;color:var(--text2);margin-bottom:6px}
+.cp-pre{background:var(--bg3);border-radius:var(--rs);padding:8px 10px;font-size:11px;color:#ff7b7b;font-family:'SF Mono',monospace;line-height:1.5;max-height:100px;overflow-y:auto;margin-bottom:10px;white-space:pre-wrap}
+.cp-buttons{display:flex;gap:8px;flex-wrap:wrap}
+#error-indicator{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),#ff6b35,var(--red));z-index:600;display:none;animation:pulse 0.6s ease infinite}
+#error-indicator.show{display:block}
+
 /* Desktop */
 @media (min-width:680px){
   #drawer{position:static;pointer-events:all;width:220px;min-width:220px;display:flex}
@@ -262,6 +353,16 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 
     <!-- No project notice -->
     <div id="no-project-notice">⚠ No project loaded from Vibe. Open the APUI tab in Vibe to connect.</div>
+
+    <!-- ══ SCI-FI CONTROL BAR ══ -->
+    <div id="scifi-bar">
+      <span id="scifi-label">⚡ sci-fi</span>
+      <button class="scifi-btn" id="btn-explode" onclick="toggleExplodeView()" title="Iron Man: 3D layer explosion view">🔩 Explode</button>
+      <button class="scifi-btn" id="btn-multiverse" onclick="openMultiverse()" title="Minority Report: Split-screen timeline comparison">🌌 Multiverse</button>
+      <button class="scifi-btn" id="btn-ghost" onclick="toggleGhost()" title="Her: Autonomous AI co-pilot sweeping the project">👻 Ghost</button>
+      <button class="scifi-btn" id="btn-xray" title="Matrix: Hold SPACE for X-Ray structural HUD">🟩 X-Ray <kbd style="font-size:9px;opacity:.6;background:var(--bg4);border-radius:3px;padding:1px 4px">SPC</kbd></button>
+      <button class="scifi-btn" id="btn-bladerunner" onclick="testBladeRunner()" title="Blade Runner: Trigger sensory error diagnostics">⚡ Shock</button>
+    </div>
 
     <!-- ════ INTENT VIEW ════ -->
     <div id="view-intent">
@@ -398,6 +499,106 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
     </div><!-- /view-work -->
   </div><!-- /main -->
 </div><!-- /shell -->
+
+<!-- ══════════════════════════════════════
+     1. IRON MAN — 3D EXPLODE OVERLAY
+══════════════════════════════════════ -->
+<div id="explode-overlay">
+  <div style="position:relative;width:min(96vw,940px);height:min(82vh,640px)">
+    <div class="explode-hud">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(88,166,255,.8)">⬡ IRON MAN // EXPLODE VIEW</span>
+      <input id="explode-slider" type="range" min="0" max="100" value="0" oninput="setExplodeDepth(this.value)" style="width:130px;accent-color:var(--accent)">
+      <span id="explode-depth-lbl">depth: 0</span>
+      <button class="scifi-btn" onclick="explodeInject()" title="Inject live project HTML" style="color:var(--accent);border-color:var(--accent)">↻ inject</button>
+    </div>
+    <iframe id="explode-iframe" sandbox="allow-scripts allow-same-origin" srcdoc="<html><body style='font-family:sans-serif;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#111'>Click ↻ inject to load your project</body></html>"></iframe>
+    <div id="explode-prompt-row">
+      <textarea id="explode-ta" placeholder="Click a layer, then describe what to change… (Enter to run)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();explodeRunPrompt()}"></textarea>
+      <button class="btn xs prim" onclick="explodeRunPrompt()">run ↗</button>
+      <button class="btn xs" onclick="closeExplode()">✕ close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     2. MULTIVERSE SPLITTER OVERLAY
+══════════════════════════════════════ -->
+<div id="multiverse-overlay">
+  <div class="mv-header">
+    <span class="mv-title">⟁ MULTIVERSE SPLITTER</span>
+    <span class="mv-label a">◀ REALITY A · Current</span>
+    <span style="font-size:10px;color:var(--text3);flex:1">← drag divider →</span>
+    <span class="mv-label b">REALITY B · Proposed ▶</span>
+    <button class="btn xs ok" id="mv-collapse-btn" onclick="collapseWavefunction()" style="display:none">✦ Collapse Wavefunction</button>
+    <button class="btn xs" onclick="closeMultiverse()">✕ close</button>
+  </div>
+  <div class="mv-arena" id="mv-arena">
+    <iframe id="mv-iframe-a" sandbox="allow-scripts allow-same-origin"></iframe>
+    <iframe id="mv-iframe-b" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="mv-divider" id="mv-divider">
+      <div class="mv-divider-handle">⇔</div>
+    </div>
+    <div class="mv-tag a">REALITY A</div>
+    <div class="mv-tag b">REALITY B</div>
+    <input type="range" id="mv-slider" min="5" max="95" value="50" oninput="mvSlide(this.value)">
+  </div>
+  <div class="mv-footer">
+    <span id="mv-pct-label">50 / 50</span>
+    <span style="font-size:11px;color:var(--text3);flex:1" id="mv-status">Load a before/after snapshot to compare realities.</span>
+    <button class="btn xs" onclick="mvLoadCurrent()" title="Load current vibeTree into Reality A">↺ load current → A</button>
+    <button class="btn xs prim" onclick="mvLoadLastUndo()" title="Load last undo snapshot into Reality B">⎌ load undo → B</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     3. GHOST IN THE MACHINE — persistent overlays
+══════════════════════════════════════ -->
+<div id="ghost-overlay">
+  <svg class="ghost-sweep-svg" id="ghost-svg"></svg>
+</div>
+<div id="ghost-cursor"></div>
+<div class="ghost-notification" id="ghost-notif"></div>
+<div class="ghost-patch-panel" id="ghost-patch">
+  <div class="ghost-patch-title">⚠ CONTAINMENT PROTOCOL</div>
+  <div id="ghost-patch-node" class="cp-node"></div>
+  <div id="ghost-patch-issue" style="font-size:12px;color:var(--text);margin-bottom:8px;line-height:1.5"></div>
+  <div class="cp-buttons">
+    <button class="btn xs prim" id="ghost-approve-btn">✦ Approve Patch</button>
+    <button class="btn xs" onclick="dismissGhostPatch()">dismiss</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     4. MATRIX X-RAY HUD
+══════════════════════════════════════ -->
+<div id="xray-overlay">
+  <div id="xray-scanline"></div>
+  <div id="xray-prompt-toast">HOLD SPACE · hover a node · speak or type a command</div>
+  <div id="xray-crosshair">
+    <svg width="200" height="80" viewBox="0 0 200 80">
+      <rect x="1" y="1" width="198" height="78" rx="4" fill="none" stroke="rgba(0,255,70,.5)" stroke-width="1.5" stroke-dasharray="6 3"/>
+      <line x1="0" y1="40" x2="18" y2="40" stroke="rgba(0,255,70,.8)" stroke-width="1.5"/>
+      <line x1="182" y1="40" x2="200" y2="40" stroke="rgba(0,255,70,.8)" stroke-width="1.5"/>
+      <text id="xray-node-label" x="100" y="30" text-anchor="middle" fill="rgba(0,255,70,.9)" font-size="10" font-family="monospace"></text>
+      <text id="xray-node-type" x="100" y="58" text-anchor="middle" fill="rgba(0,255,70,.5)" font-size="9" font-family="monospace"></text>
+    </svg>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     5. BLADE RUNNER — Containment + error bar
+══════════════════════════════════════ -->
+<div id="error-indicator"></div>
+<div id="containment-panel">
+  <div class="cp-title"><span style="animation:pulse 1s ease infinite;display:inline-block">🔴</span> CONTAINMENT PROTOCOL</div>
+  <div id="cp-node-label" class="cp-node"></div>
+  <div id="cp-error-msg" class="cp-pre"></div>
+  <div id="cp-fix-suggestion" style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6"></div>
+  <div class="cp-buttons">
+    <button class="btn xs prim" id="cp-inject-btn">⚡ Inject Stimpack</button>
+    <button class="btn xs fail" onclick="dismissContainment()">✕ dismiss</button>
+  </div>
+</div>
 
 <script>
 /* ══════════════════════════════════════════════════════
@@ -1257,6 +1458,585 @@ async function callAnalysisAI(systemPrompt, userPrompt) {
   return data.candidates[0].content.parts[0].text;
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   SCI-FI FEATURES
+══════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────
+   1. IRON MAN — Z-AXIS DOM DECONSTRUCTION (EXPLODE VIEW)
+───────────────────────────────────────────────────────────────*/
+let explodeOpen = false;
+let explodeDepth = 0;
+let explodeSelectedNode = null;
+
+function toggleExplodeView() {
+  const el = document.getElementById('explode-overlay');
+  explodeOpen = !explodeOpen;
+  el.classList.toggle('open', explodeOpen);
+  document.getElementById('btn-explode').classList.toggle('active', explodeOpen);
+  if (explodeOpen) explodeInject();
+}
+
+function closeExplode() {
+  explodeOpen = false;
+  document.getElementById('explode-overlay').classList.remove('open');
+  document.getElementById('btn-explode').classList.remove('active');
+}
+
+function explodeInject() {
+  // Build a simple structural wireframe from vibeTree if no live preview
+  const iframe = document.getElementById('explode-iframe');
+  if (!vibeTree) {
+    iframe.srcdoc = buildExplodeWireframe();
+    return;
+  }
+  // Post message to parent to request current rendered HTML
+  try {
+    window.parent.postMessage({ source:'apui-vibe', type:'apui-request-preview-html' }, '*');
+  } catch(e) {}
+  // Fallback: show wireframe immediately
+  iframe.srcdoc = buildExplodeWireframe();
+  setTimeout(() => setExplodeDepth(explodeDepth), 300);
+}
+
+function buildExplodeWireframe() {
+  if (!vibeTree) return `<html><body style="background:#0a0c10;color:#58a6ff;font-family:monospace;padding:20px">No project loaded.</body></html>`;
+  const nodes = flattenTree(vibeTree);
+  let boxes = '';
+  nodes.forEach((n, i) => {
+    const depth = Math.floor(Math.random() * 4);
+    const colors = ['rgba(88,166,255,.15)','rgba(63,185,80,.1)','rgba(188,140,255,.1)','rgba(210,153,34,.1)'];
+    const borders = ['#58a6ff','#3fb950','#bc8cff','#d29922'];
+    boxes += `<div data-node="${n.id}" data-depth="${depth}" style="
+      border:1px solid ${borders[depth % 4]};
+      background:${colors[depth % 4]};
+      border-radius:6px;
+      padding:${16 + depth * 12}px;
+      margin:8px;
+      position:relative;
+      cursor:pointer;
+      transition:transform .3s ease, box-shadow .3s ease;
+      font-family:monospace;font-size:11px;color:${borders[depth % 4]};
+    " onclick="window.parent.postMessage({source:'explode-node-click',nodeId:'${n.id}',type:'${n.type}'},'*')">
+      <span style="opacity:.6;font-size:10px">[${n.type}]</span> ${n.id}
+    </div>`;
+  });
+  return `<!DOCTYPE html><html><head><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0a0c10;padding:16px;min-height:100vh;transform-style:preserve-3d}
+    .node-box:hover{box-shadow:0 0 20px rgba(88,166,255,.4)!important}
+  </style></head><body id="explode-body">${boxes}
+  <script>
+    document.querySelectorAll('[data-node]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        document.querySelectorAll('[data-node]').forEach(x=>x.style.outline='');
+        el.style.outline='2px solid #58a6ff';
+        parent.postMessage({source:'explode-node-click',nodeId:el.dataset.node},'*');
+      });
+    });
+  <\/script></body></html>`;
+}
+
+function setExplodeDepth(val) {
+  explodeDepth = parseInt(val);
+  document.getElementById('explode-depth-lbl').textContent = `depth: ${val}`;
+  const iframe = document.getElementById('explode-iframe');
+  const angle = (val / 100) * 55;
+  const rotZ  = (val / 100) * -30;
+  if (val > 5) {
+    iframe.style.transform = `rotateX(${angle}deg) rotateZ(${rotZ}deg) scale(${1 - val * 0.002})`;
+    iframe.style.transformOrigin = 'center center';
+    iframe.style.transition = 'transform .4s cubic-bezier(.34,1.1,.64,1)';
+  } else {
+    iframe.style.transform = 'none';
+  }
+  // Inject depth translation into iframe DOM elements
+  try {
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    const els = doc.querySelectorAll('[data-depth]');
+    els.forEach(el => {
+      const d = parseInt(el.dataset.depth || 0);
+      const z = (val / 100) * d * 60;
+      el.style.transform = `translateZ(${z}px) translateY(${-z * 0.3}px)`;
+      el.style.boxShadow = val > 10 ? `0 ${z * 0.5}px ${z}px rgba(0,0,0,0.6)` : '';
+    });
+  } catch(e) {}
+}
+
+function explodeRunPrompt() {
+  const text = document.getElementById('explode-ta').value.trim();
+  if (!text) return;
+  const nid = explodeSelectedNode || (sess() && sess().currentNode) || '';
+  if (nid && sess()) {
+    document.getElementById('pb-ta').value = text;
+    document.getElementById('nd-sel').value = nid;
+    onNodeChange();
+    closeExplode();
+    setTimeout(submitPrompt, 100);
+  }
+}
+
+// Receive node clicks from explode iframe
+window.addEventListener('message', e => {
+  if (e.data && e.data.source === 'explode-node-click') {
+    explodeSelectedNode = e.data.nodeId;
+    document.getElementById('explode-ta').placeholder = `Selected: ${e.data.nodeId} — describe what to change…`;
+    document.getElementById('explode-ta').focus();
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────
+   2. MINORITY REPORT — MULTIVERSE SPLITTER
+───────────────────────────────────────────────────────────────*/
+let mvPct = 50;
+let mvTreeA = null, mvTreeB = null;
+let mvDragging = false;
+
+function openMultiverse() {
+  document.getElementById('multiverse-overlay').classList.add('open');
+  document.getElementById('btn-multiverse').classList.add('active-purple');
+  mvSlide(50);
+}
+
+function closeMultiverse() {
+  document.getElementById('multiverse-overlay').classList.remove('open');
+  document.getElementById('btn-multiverse').classList.remove('active-purple');
+}
+
+function mvSlide(val) {
+  mvPct = parseInt(val);
+  document.getElementById('mv-slider').value = val;
+  document.getElementById('mv-divider').style.left = val + '%';
+  document.getElementById('mv-iframe-a').style.right = (100 - val) + '%';
+  document.getElementById('mv-iframe-b').style.left  = val + '%';
+  document.getElementById('mv-pct-label').textContent = `${val} / ${100 - val}`;
+}
+
+// Drag divider
+(function initMvDrag() {
+  window.addEventListener('load', () => {
+    const arena   = document.getElementById('mv-arena');
+    const divider = document.getElementById('mv-divider');
+    if (!divider || !arena) return;
+    divider.addEventListener('mousedown', startDrag);
+    divider.addEventListener('touchstart', startDrag, {passive:true});
+    function startDrag(e) {
+      mvDragging = true;
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', endDrag);
+      document.addEventListener('touchmove', onDragTouch, {passive:true});
+      document.addEventListener('touchend', endDrag);
+    }
+    function onDrag(e) {
+      if (!mvDragging) return;
+      const rect = arena.getBoundingClientRect();
+      const pct = Math.min(95, Math.max(5, ((e.clientX - rect.left) / rect.width) * 100));
+      mvSlide(pct.toFixed(1));
+    }
+    function onDragTouch(e) {
+      if (e.touches[0]) onDrag(e.touches[0]);
+    }
+    function endDrag() {
+      mvDragging = false;
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', endDrag);
+      document.removeEventListener('touchmove', onDragTouch);
+      document.removeEventListener('touchend', endDrag);
+    }
+  });
+})();
+
+function renderTreeToIframe(iframe, tree) {
+  if (!tree) { iframe.srcdoc = `<html><body style="background:#111;color:#555;font-family:monospace;padding:20px;display:flex;align-items:center;justify-content:center;height:100vh">No snapshot loaded</body></html>`; return; }
+  // Build a structural preview from the tree
+  const nodes = flattenTree(tree);
+  const bg = tree === mvTreeB ? '#0d0818' : '#0a0c10';
+  const accent = tree === mvTreeB ? '#bc8cff' : '#58a6ff';
+  let html = `<!DOCTYPE html><html><head><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:${bg};padding:16px;font-family:'SF Mono',monospace;min-height:100vh}
+    .n{border:1px solid ${accent}33;border-radius:6px;padding:10px 12px;margin:6px 0;font-size:11px;color:${accent};background:${accent}0d}
+    .n:hover{background:${accent}1a}
+    .t{opacity:.5;font-size:10px;margin-right:4px}
+    .c{font-size:10px;opacity:.4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  </style></head><body>
+  <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${accent};opacity:.5;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid ${accent}22">
+    ${tree === mvTreeB ? '⟁ REALITY B — PROPOSED' : '◎ REALITY A — CURRENT'} · ${nodes.length} nodes
+  </div>`;
+  nodes.forEach(n => {
+    const snippet = (n.code || '').slice(0, 60).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html += `<div class="n"><span class="t">[${n.type}]</span>${n.id}<div class="c">${snippet}…</div></div>`;
+  });
+  html += '</body></html>';
+  iframe.srcdoc = html;
+}
+
+function mvLoadCurrent() {
+  if (!vibeTree) { showGhostNotif('No project tree loaded yet.'); return; }
+  mvTreeA = JSON.parse(JSON.stringify(vibeTree));
+  renderTreeToIframe(document.getElementById('mv-iframe-a'), mvTreeA);
+  document.getElementById('mv-status').textContent = 'Reality A loaded. Now run an agent prompt, then load the result into B.';
+}
+
+function mvLoadLastUndo() {
+  // Try to get last undo snapshot from parent via postMessage
+  try {
+    window.parent.postMessage({ source:'apui-vibe', type:'apui-request-undo-snapshot' }, '*');
+  } catch(e) {}
+  // Fallback: use current tree as B for demo
+  if (vibeTree) {
+    mvTreeB = JSON.parse(JSON.stringify(vibeTree));
+    renderTreeToIframe(document.getElementById('mv-iframe-b'), mvTreeB);
+    document.getElementById('mv-collapse-btn').style.display = '';
+    document.getElementById('mv-status').textContent = 'Reality B loaded. Drag the divider to compare. Collapse to adopt B.';
+  } else {
+    document.getElementById('mv-status').textContent = 'No undo snapshot available yet — run an agent prompt first.';
+  }
+}
+
+// Receive undo snapshot from parent
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'apui-undo-snapshot' && e.data.tree) {
+    mvTreeB = e.data.tree;
+    renderTreeToIframe(document.getElementById('mv-iframe-b'), mvTreeB);
+    document.getElementById('mv-collapse-btn').style.display = '';
+    document.getElementById('mv-status').textContent = 'Reality B loaded from undo history. Drag to compare.';
+  }
+});
+
+function collapseWavefunction() {
+  if (!mvTreeB) return;
+  vibeTree = JSON.parse(JSON.stringify(mvTreeB));
+  populateNodeSelector();
+  // Push to parent
+  try {
+    window.parent.postMessage({ source:'apui-vibe', type:'apui-adopt-tree', tree: mvTreeB }, '*');
+  } catch(e) {}
+  closeMultiverse();
+  showGhostNotif('⟁ Wavefunction collapsed. Reality B is now your timeline.');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3. HER — GHOST IN THE MACHINE (Autonomous Symbiosis)
+───────────────────────────────────────────────────────────────*/
+let ghostActive     = false;
+let ghostSweepTimer = null;
+let ghostSweepIdx   = 0;
+
+const ghostMessages = [
+  node => `Optimizing <b>${node}</b> for mobile accessibility…`,
+  node => `Scanning <b>${node}</b> for dead code…`,
+  node => `Checking <b>${node}</b> contrast ratios…`,
+  node => `Reviewing <b>${node}</b> for performance bottlenecks…`,
+  node => `Auditing <b>${node}</b> semantic structure…`,
+];
+
+const ghostIssues = [
+  { issue: 'Low contrast ratio detected (2.8:1). WCAG requires 4.5:1.', fix: 'Increase text contrast to meet accessibility standards' },
+  { issue: 'Redundant CSS selector found — 3 rules overriding each other.', fix: 'Consolidate duplicate selectors into a single rule' },
+  { issue: 'Missing aria-label on interactive element.', fix: 'Add aria-label attributes to all interactive elements' },
+  { issue: 'Unoptimized CSS animation using top/left instead of transform.', fix: 'Replace top/left transitions with transform: translate()' },
+  { issue: 'Image element missing alt attribute.', fix: 'Add descriptive alt attributes to all img elements' },
+];
+
+function toggleGhost() {
+  ghostActive = !ghostActive;
+  const btn = document.getElementById('btn-ghost');
+  btn.classList.toggle('active-amber', ghostActive);
+  if (ghostActive) {
+    startGhostSweep();
+    showGhostNotif('👻 Ghost co-pilot activated. Sweeping the project…');
+  } else {
+    stopGhostSweep();
+    dismissGhostNotif();
+    dismissGhostPatch();
+    document.getElementById('ghost-cursor').classList.remove('active');
+  }
+}
+
+function startGhostSweep() {
+  clearTimeout(ghostSweepTimer);
+  ghostSweepTimer = setTimeout(runGhostSweepCycle, 3000);
+}
+
+function stopGhostSweep() {
+  clearTimeout(ghostSweepTimer);
+}
+
+function runGhostSweepCycle() {
+  if (!ghostActive) return;
+  const nodes = vibeTree ? flattenTree(vibeTree) : [];
+  if (!nodes.length) { ghostSweepTimer = setTimeout(runGhostSweepCycle, 8000); return; }
+  const node = nodes[ghostSweepIdx % nodes.length];
+  ghostSweepIdx++;
+
+  // 1. Show ghost cursor wandering to the APUI node card
+  animateGhostCursor();
+
+  // 2. Show notification
+  const msgFn = ghostMessages[ghostSweepIdx % ghostMessages.length];
+  showGhostNotif(msgFn(node.id));
+
+  // 3. 40% chance to find a "problem" and show patch panel
+  if (Math.random() < 0.40) {
+    const issue = ghostIssues[Math.floor(Math.random() * ghostIssues.length)];
+    setTimeout(() => {
+      if (!ghostActive) return;
+      showGhostPatch(node.id, issue);
+    }, 2200);
+  }
+
+  // Schedule next sweep: 8–15s
+  ghostSweepTimer = setTimeout(runGhostSweepCycle, 8000 + Math.random() * 7000);
+}
+
+function animateGhostCursor() {
+  const gc = document.getElementById('ghost-cursor');
+  gc.classList.add('active');
+  const positions = [
+    [window.innerWidth * 0.3, window.innerHeight * 0.4],
+    [window.innerWidth * 0.6, window.innerHeight * 0.6],
+    [window.innerWidth * 0.5, window.innerHeight * 0.3],
+  ];
+  let i = 0;
+  const move = () => {
+    if (i >= positions.length) { gc.classList.remove('active'); return; }
+    gc.style.left = positions[i][0] + 'px';
+    gc.style.top  = positions[i][1] + 'px';
+    i++;
+    setTimeout(move, 900);
+  };
+  move();
+}
+
+function showGhostNotif(msg) {
+  const el = document.getElementById('ghost-notif');
+  el.innerHTML = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(dismissGhostNotif, 4500);
+}
+
+function dismissGhostNotif() {
+  document.getElementById('ghost-notif').classList.remove('show');
+}
+
+function showGhostPatch(nodeId, issue) {
+  const el = document.getElementById('ghost-patch');
+  document.getElementById('ghost-patch-node').textContent = '⚡ Node: ' + nodeId;
+  document.getElementById('ghost-patch-issue').textContent = issue.issue;
+  document.getElementById('ghost-approve-btn').onclick = () => {
+    dismissGhostPatch();
+    // Route fix through agent
+    const ta = document.getElementById('pb-ta');
+    ta.value = issue.fix;
+    if (sess()) {
+      document.getElementById('nd-sel').value = nodeId;
+      onNodeChange();
+      setTimeout(submitPrompt, 200);
+    }
+  };
+  el.classList.add('show');
+}
+
+function dismissGhostPatch() {
+  document.getElementById('ghost-patch').classList.remove('show');
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4. MATRIX — X-RAY HUD (Semantic Structural Overlay)
+───────────────────────────────────────────────────────────────*/
+let xrayActive = false;
+let xrayMouseX = 0, xrayMouseY = 0;
+let xrayHoveredNode = null;
+let xrayHoldTimer   = null;
+
+// Keyboard: hold SPACE
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && !e.target.matches('textarea,input')) {
+    e.preventDefault();
+    activateXray();
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') deactivateXray();
+});
+
+document.addEventListener('mousemove', e => {
+  xrayMouseX = e.clientX; xrayMouseY = e.clientY;
+  if (xrayActive) updateXrayCrosshair(e.clientX, e.clientY);
+});
+
+function activateXray() {
+  if (xrayActive) return;
+  xrayActive = true;
+  document.getElementById('xray-overlay').classList.add('active');
+  document.getElementById('btn-xray').classList.add('active');
+  buildXrayLabels();
+}
+
+function deactivateXray() {
+  if (!xrayActive) return;
+  xrayActive = false;
+  document.getElementById('xray-overlay').classList.remove('active');
+  document.getElementById('btn-xray').classList.remove('active');
+  clearXrayLabels();
+}
+
+function buildXrayLabels() {
+  clearXrayLabels();
+  if (!vibeTree) return;
+  const nodes = flattenTree(vibeTree);
+  const overlay = document.getElementById('xray-overlay');
+  nodes.forEach((n, i) => {
+    const label = document.createElement('div');
+    label.className = 'xray-label';
+    label.textContent = n.id;
+    label.dataset.nodeId = n.id;
+    // Distribute labels across the screen
+    const cols = 3, rows = Math.ceil(nodes.length / cols);
+    const col = i % cols, row = Math.floor(i / cols);
+    label.style.left  = (10 + col * 32) + '%';
+    label.style.top   = (8 + (row / Math.max(rows, 1)) * 72) + '%';
+    label.style.cursor = 'pointer';
+    label.addEventListener('mouseenter', () => {
+      xrayHoveredNode = n.id;
+      updateXrayCrosshair(xrayMouseX, xrayMouseY, n.id, n.type);
+    });
+    label.addEventListener('click', () => {
+      // Select this node
+      const sel = document.getElementById('nd-sel');
+      sel.value = n.id;
+      onNodeChange();
+      deactivateXray();
+    });
+    overlay.appendChild(label);
+  });
+}
+
+function clearXrayLabels() {
+  document.querySelectorAll('.xray-label').forEach(el => el.remove());
+}
+
+function updateXrayCrosshair(x, y, nodeId, nodeType) {
+  const ch = document.getElementById('xray-crosshair');
+  ch.style.left = x + 'px';
+  ch.style.top  = y + 'px';
+  if (nodeId) {
+    document.getElementById('xray-node-label').textContent = nodeId;
+    document.getElementById('xray-node-type').textContent  = nodeType || '';
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   5. BLADE RUNNER — SENSORY ERROR DIAGNOSTICS
+───────────────────────────────────────────────────────────────*/
+let audioCtx = null;
+
+function initAudioCtx() {
+  if (audioCtx) return audioCtx;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  return audioCtx;
+}
+
+function playBladeRunnerBass() {
+  const ctx = initAudioCtx();
+  if (!ctx) return;
+  try {
+    // Sub-bass sweep
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const dist = ctx.createWaveShaper();
+    // Distortion curve for grit
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = (i * 2) / 256 - 1; curve[i] = (Math.PI + 300) * x / (Math.PI + 300 * Math.abs(x)); }
+    dist.curve = curve;
+    osc.connect(dist); dist.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.8);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 1.4);
+    // High freq alarm ping
+    const ping = ctx.createOscillator();
+    const pg   = ctx.createGain();
+    ping.connect(pg); pg.connect(ctx.destination);
+    ping.type = 'sine';
+    ping.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+    ping.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.5);
+    pg.gain.setValueAtTime(0.18, ctx.currentTime + 0.1);
+    pg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    ping.start(ctx.currentTime + 0.1);
+    ping.stop(ctx.currentTime + 0.6);
+  } catch(e) { console.warn('AudioCtx error:', e); }
+}
+
+function triggerBladeRunner(nodeId, errorMsg, fixSuggestion) {
+  // 1. Audio
+  playBladeRunnerBass();
+
+  // 2. Visual — bleed animation on APUI
+  document.getElementById('error-indicator').classList.add('show');
+  setTimeout(() => document.getElementById('error-indicator').classList.remove('show'), 3000);
+
+  // 3. Find any card matching this node and animate bleed
+  const allCards = document.querySelectorAll('.card');
+  allCards.forEach(card => {
+    card.classList.add('node-bleeding-card');
+    setTimeout(() => card.classList.remove('node-bleeding-card'), 2000);
+  });
+
+  // 4. Chromatic aberration on the whole main panel
+  const main = document.getElementById('main');
+  main.style.animation = 'chromaGlitch 0.8s steps(1) 1';
+  setTimeout(() => main.style.animation = '', 900);
+
+  // 5. Show containment panel
+  showContainment(nodeId, errorMsg, fixSuggestion || 'The AI will attempt to patch this error automatically.');
+}
+
+function showContainment(nodeId, errorMsg, fixSuggestion) {
+  document.getElementById('cp-node-label').textContent  = nodeId ? `⚡ Node: ${nodeId}` : '⚡ Runtime Error';
+  document.getElementById('cp-error-msg').textContent   = errorMsg || 'Unknown runtime error';
+  document.getElementById('cp-fix-suggestion').textContent = fixSuggestion || 'Click Inject Stimpack to have the AI auto-fix this.';
+  document.getElementById('cp-inject-btn').onclick = () => {
+    dismissContainment();
+    if (nodeId && sess()) {
+      document.getElementById('nd-sel').value = nodeId;
+      onNodeChange();
+      document.getElementById('pb-ta').value = `Fix this error: ${errorMsg}`;
+      setTimeout(submitPrompt, 200);
+    }
+  };
+  document.getElementById('containment-panel').classList.add('open');
+}
+
+function dismissContainment() {
+  document.getElementById('containment-panel').classList.remove('open');
+}
+
+// Listen for runtime errors from the project iframe (forwarded by parent)
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'apui-runtime-error') {
+    triggerBladeRunner(e.data.nodeId, e.data.error, e.data.fix);
+  }
+});
+
+// Test / demo trigger
+function testBladeRunner() {
+  const nodes = vibeTree ? flattenTree(vibeTree) : [{id:'nav-styles'}];
+  const node  = nodes[Math.floor(Math.random() * nodes.length)];
+  triggerBladeRunner(
+    node.id,
+    `ReferenceError: Cannot read properties of undefined (reading 'classList')`,
+    'Add a null-check guard before accessing classList. The element may not exist in the DOM at runtime.'
+  );
+}
+
 /* ══ Utils ══ */
 function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
@@ -1438,4 +2218,4 @@ async function submitFreeMode() {
   }
 }</script>
 </body>
-  </html>
+        </html>
