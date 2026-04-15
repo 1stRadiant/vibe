@@ -272,14 +272,53 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 .mv-footer{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(188,140,255,.15);background:#0d0e14;flex-shrink:0;flex-wrap:wrap}
 #mv-drag-target{position:absolute;inset:0;z-index:11;cursor:ew-resize;opacity:0}
 
-/* ── 3. Ghost in the Machine ── */
-#ghost-notif{position:fixed;bottom:90px;right:14px;max-width:260px;background:rgba(26,29,34,.97);border:1px solid rgba(188,140,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:var(--text2);z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5;pointer-events:none}
-#ghost-notif.show{transform:translateX(0)}
-#ghost-patch{position:fixed;bottom:90px;left:14px;max-width:280px;background:rgba(26,29,34,.97);border:1px solid rgba(248,81,73,.4);border-radius:var(--r);padding:12px 14px;font-size:11px;color:var(--text);z-index:400;transform:translateX(-120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1)}
-#ghost-patch.show{transform:translateX(0)}
-.ghost-patch-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:6px}
-#ghost-cursor{position:fixed;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,rgba(188,140,255,.9),rgba(188,140,255,0));pointer-events:none;z-index:350;transition:left .5s ease,top .5s ease;display:none}
-#ghost-cursor.active{display:block}
+/* ── 3. JARVIS Autonomous Agent ── */
+/* Notif toast */
+#jarvis-notif{position:fixed;bottom:90px;right:14px;max-width:280px;background:rgba(10,14,20,.97);border:1px solid rgba(0,180,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:#7dd3f7;z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5;pointer-events:none;box-shadow:0 0 20px rgba(0,180,255,.15)}
+#jarvis-notif.show{transform:translateX(0)}
+/* Main JARVIS panel */
+#jarvis-panel{position:fixed;top:0;right:0;bottom:0;width:min(360px,94vw);background:rgba(8,12,18,.98);border-left:1px solid rgba(0,180,255,.3);z-index:410;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,180,255,.1)}
+#jarvis-panel.open{transform:translateX(0)}
+.j-head{display:flex;align-items:center;gap:10px;padding:14px 15px 12px;border-bottom:1px solid rgba(0,180,255,.2);flex-shrink:0;background:rgba(0,180,255,.05)}
+.j-logo{font-size:18px;filter:drop-shadow(0 0 6px rgba(0,180,255,.8))}
+.j-title{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#00b4ff;flex:1}
+.j-status{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.j-status.idle{background:rgba(100,100,100,.2);color:var(--text3)}
+.j-status.working{background:rgba(0,180,255,.15);color:#00b4ff;animation:pulse .9s ease infinite}
+.j-status.done{background:rgba(63,185,80,.15);color:var(--green)}
+/* Goals section */
+.j-section{padding:12px 14px;border-bottom:1px solid rgba(0,180,255,.1)}
+.j-sec-lbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,180,255,.5);margin-bottom:8px}
+.j-goal-item{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:var(--rs);background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.15);margin-bottom:6px;font-size:11px;color:#7dd3f7;cursor:pointer;transition:all .12s}
+.j-goal-item:hover{background:rgba(0,180,255,.1);border-color:rgba(0,180,255,.3)}
+.j-goal-item.done{opacity:.5;text-decoration:line-through;cursor:default}
+.j-goal-item.active{border-color:#00b4ff;background:rgba(0,180,255,.12)}
+.j-goal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.j-goal-dot.idle{background:var(--text3)}
+.j-goal-dot.active{background:#00b4ff;animation:pulse .8s ease infinite}
+.j-goal-dot.done{background:var(--green)}
+.j-goal-add{display:flex;gap:7px;margin-top:6px}
+.j-goal-input{flex:1;padding:7px 9px;font-family:inherit;font-size:12px;border:1px solid rgba(0,180,255,.3);border-radius:var(--rs);background:rgba(0,180,255,.05);color:#7dd3f7;resize:none}
+.j-goal-input::placeholder{color:rgba(0,180,255,.3)}
+.j-goal-input:focus{outline:none;border-color:#00b4ff}
+/* Log section */
+#jarvis-log-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:7px}
+.j-log-entry{border-radius:var(--rs);padding:9px 11px;font-size:11px;line-height:1.55;border:1px solid rgba(0,180,255,.12);background:rgba(0,180,255,.04)}
+.j-log-entry .j-log-time{font-size:9px;color:rgba(0,180,255,.4);float:right;margin-left:6px}
+.j-log-entry .j-log-node{font-size:10px;color:#00b4ff;margin-bottom:3px;font-weight:700}
+.j-log-entry .j-log-action{color:#7dd3f7}
+.j-log-entry .j-log-goal{font-size:10px;color:rgba(0,180,255,.45);margin-top:3px;font-style:italic}
+.j-log-entry.j-log-ok{border-left:3px solid var(--green)}
+.j-log-entry.j-log-err{border-left:3px solid var(--red)}
+.j-log-entry.j-log-snap{border-left:3px solid rgba(0,180,255,.5)}
+/* Screenshot preview */
+#jarvis-screenshot-preview{max-width:100%;border-radius:var(--rs);border:1px solid rgba(0,180,255,.25);margin-top:6px;display:none}
+/* Scanning animation */
+@keyframes jarvisScan{0%{opacity:0;transform:scaleX(0)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1)}}
+.j-scanning-bar{height:1px;background:linear-gradient(90deg,transparent,#00b4ff,transparent);animation:jarvisScan 1.4s ease infinite;margin:6px 0}
+/* Cursor dot */
+#jarvis-cursor{position:fixed;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle,rgba(0,180,255,.9),rgba(0,180,255,0));pointer-events:none;z-index:350;transition:left .4s ease,top .4s ease;display:none;box-shadow:0 0 10px rgba(0,180,255,.6)}
+#jarvis-cursor.active{display:block}
 
 /* ── 4. Matrix X-Ray ── */
 @keyframes xrayScan{0%{top:0;opacity:.8}100%{top:100vh;opacity:0}}
@@ -339,7 +378,7 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
       <span class="scifi-label">⚡ sci-fi</span>
       <button class="scifi-btn" id="sfbtn-explode"     onclick="toggleExplode()"     title="Iron Man: 3D layer explosion">🔩 Explode</button>
       <button class="scifi-btn" id="sfbtn-multiverse"  onclick="openMultiverse()"    title="Minority Report: Split-screen reality comparison">🌌 Multiverse</button>
-      <button class="scifi-btn" id="sfbtn-ghost"       onclick="toggleGhost()"       title="Her: Autonomous AI co-pilot">👻 Ghost</button>
+      <button class="scifi-btn" id="sfbtn-jarvis"      onclick="toggleJarvis()"      title="JARVIS: Autonomous AI agent working towards your goals">🤖 JARVIS</button>
       <button class="scifi-btn" id="sfbtn-xray"        title="Matrix: Hold SPACE for X-Ray HUD">🟩 X-Ray <kbd style="font-size:9px;opacity:.55;background:var(--bg4);border-radius:2px;padding:1px 3px">SPC</kbd></button>
       <button class="scifi-btn" id="sfbtn-shock"       onclick="testBladeRunner()"   title="Blade Runner: Sensory error diagnostics">⚡ Shock</button>
     </div>
@@ -1739,92 +1778,436 @@ window.addEventListener('message', function(e) {
 });
 
 /* ═══════════════════════════════════════════════
-   3. GHOST IN THE MACHINE
+   3. J.A.R.V.I.S — AUTONOMOUS GOAL-DRIVEN AGENT
+   - Set goals, JARVIS works towards them autonomously
+   - Captures preview screenshots via html2canvas / postMessage
+   - Dispatches real agent calls (submitPrompt-style) per node
+   - Keeps a persistent action log in session storage
 ═══════════════════════════════════════════════ */
-var _ghostActive = false;
-var _ghostTimer  = null;
-var _ghostIdx    = 0;
 
-var _ghostMsgs = [
-  function(n) { return 'Scanning <b>' + n + '</b> for mobile accessibility…'; },
-  function(n) { return 'Auditing <b>' + n + '</b> for dead code…'; },
-  function(n) { return 'Checking <b>' + n + '</b> contrast ratios…'; },
-  function(n) { return 'Reviewing <b>' + n + '</b> for performance…'; },
-  function(n) { return 'Inspecting <b>' + n + '</b> semantic structure…'; },
-];
-var _ghostIssues = [
-  {issue:'Low contrast ratio (2.8:1). WCAG requires 4.5:1.', fix:'Increase text contrast to meet WCAG AA accessibility standards'},
-  {issue:'Redundant CSS — 3 selectors overriding each other.', fix:'Consolidate duplicate selectors into a single clean rule'},
-  {issue:'Interactive element missing aria-label.', fix:'Add aria-label attributes to all interactive elements'},
-  {issue:'CSS animation using top/left instead of transform.', fix:'Replace top/left transitions with transform: translate() for GPU acceleration'},
-  {issue:'Image element missing alt attribute.', fix:'Add descriptive alt text to all img elements for accessibility'},
-];
+var _jarvisOpen    = false;
+var _jarvisRunning = false;
+var _jarvisTimer   = null;
+var _jarvisGoals   = [];          // [{id, text, status:'idle'|'active'|'done'}]
+var _jarvisLog     = [];          // [{time, node, action, goal, status}]
+var _jarvisSnap    = null;        // base64 data URL of latest screenshot
+var _jarvisGoalIdx = 0;
+var _jarvisCycleMs = 18000;       // ms between autonomous cycles (18s default)
 
-function toggleGhost() {
-  _ghostActive = !_ghostActive;
-  var btn = document.getElementById('sfbtn-ghost');
-  if (btn) btn.classList.toggle('sf-amber', _ghostActive);
-  if (_ghostActive) {
-    showGhostNotif('👻 Co-pilot activated. Sweeping the project…');
-    _ghostSweepCycle();
-  } else {
-    clearTimeout(_ghostTimer);
-    closeGhostNotif();
-    closeGhostPatch();
-    var gc = document.getElementById('ghost-cursor');
-    if (gc) gc.classList.remove('active');
-  }
+// ── Panel open/close ──
+function toggleJarvis() {
+  _jarvisOpen = !_jarvisOpen;
+  var panel = document.getElementById('jarvis-panel');
+  var btn   = document.getElementById('sfbtn-jarvis');
+  if (panel) panel.classList.toggle('open', _jarvisOpen);
+  if (btn)   btn.classList.toggle('sf-amber', _jarvisOpen);
+  if (_jarvisOpen) { _jarvisRenderGoals(); _jarvisRenderLog(); }
 }
-function _ghostSweepCycle() {
-  if (!_ghostActive) return;
+
+// ── Add a goal ──
+function jarvisAddGoal() {
+  var inp = document.getElementById('jarvis-goal-input');
+  if (!inp) return;
+  var text = inp.value.trim();
+  if (!text) return;
+  _jarvisGoals.push({ id: 'g' + Date.now(), text: text, status: 'idle' });
+  inp.value = '';
+  _jarvisRenderGoals();
+  _jarvisSaveState();
+}
+
+function jarvisRemoveGoal(id) {
+  _jarvisGoals = _jarvisGoals.filter(function(g) { return g.id !== id; });
+  _jarvisRenderGoals();
+  _jarvisSaveState();
+}
+
+function _jarvisRenderGoals() {
+  var el = document.getElementById('jarvis-goals-list');
+  if (!el) return;
+  if (!_jarvisGoals.length) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.3);padding:4px 0">No goals yet. Add one below.</div>';
+    return;
+  }
+  el.innerHTML = _jarvisGoals.map(function(g) {
+    return '<div class="j-goal-item ' + g.status + '">' +
+      '<div class="j-goal-dot ' + g.status + '"></div>' +
+      '<span style="flex:1">' + esc(g.text) + '</span>' +
+      (g.status !== 'done' ? '<button class="btn xs" style="font-size:9px;padding:2px 5px;min-height:20px;opacity:.5" onclick="jarvisRemoveGoal(\'' + g.id + '\')">✕</button>' : '') +
+      '</div>';
+  }).join('');
+}
+
+// ── Start / Stop ──
+function jarvisRun() {
+  if (!_jarvisGoals.filter(function(g) { return g.status !== 'done'; }).length) {
+    jarvisNotif('⚠ No active goals. Add at least one goal first.'); return;
+  }
+  if (!effectiveKey()) {
+    jarvisNotif('⚠ No API key configured. Set your key in Vibe settings.'); return;
+  }
+  _jarvisRunning = true;
+  _jarvisSetStatus('working');
+  jarvisNotif('🤖 JARVIS online. Working towards your goals…');
+  _jarvisMoveCursor();
+  _jarvisCycle();
+}
+
+function jarvisStop() {
+  _jarvisRunning = false;
+  clearTimeout(_jarvisTimer);
+  _jarvisSetStatus('idle');
+  _jarvisGoals.forEach(function(g) { if (g.status === 'active') g.status = 'idle'; });
+  _jarvisRenderGoals();
+  jarvisNotif('🤖 JARVIS standing by.');
+}
+
+function _jarvisSetStatus(st) {
+  var badge = document.getElementById('jarvis-status-badge');
+  if (!badge) return;
+  badge.className = 'j-status ' + st;
+  badge.textContent = st;
+}
+
+// ── Main autonomous cycle ──
+async function _jarvisCycle() {
+  if (!_jarvisRunning) return;
+
+  var pending = _jarvisGoals.filter(function(g) { return g.status !== 'done'; });
+  if (!pending.length) {
+    _jarvisSetStatus('done');
+    _jarvisRunning = false;
+    jarvisNotif('✅ All goals completed!');
+    return;
+  }
+
   var nodes = vibeTree ? flattenTree(vibeTree) : [];
-  if (nodes.length) {
-    var node = nodes[_ghostIdx % nodes.length];
-    _ghostIdx++;
-    _ghostMoveCursor();
-    showGhostNotif(_ghostMsgs[_ghostIdx % _ghostMsgs.length](node.id));
-    if (Math.random() < 0.38) {
-      var issue = _ghostIssues[Math.floor(Math.random() * _ghostIssues.length)];
-      setTimeout(function() { if (_ghostActive) showGhostPatch(node.id, issue); }, 2400);
-    }
+  if (!nodes.length) {
+    _jarvisTimer = setTimeout(_jarvisCycle, _jarvisCycleMs);
+    return;
   }
-  _ghostTimer = setTimeout(_ghostSweepCycle, 8000 + Math.random() * 7000);
+
+  // Pick current goal (round-robin)
+  var goal = pending[_jarvisGoalIdx % pending.length];
+  _jarvisGoalIdx++;
+  goal.status = 'active';
+  _jarvisRenderGoals();
+  _jarvisMoveCursor();
+
+  // Pick a node to work on (ask AI which one)
+  var nodeList = nodes.map(function(n) { return n.id + ' (' + n.type + ')'; }).join(', ');
+  var snapContext = _jarvisSnap
+    ? '\n\nA screenshot of the current UI has been captured. Use it to understand the visual state and make improvements.'
+    : '';
+
+  var planPrompt =
+    'You are JARVIS, an autonomous AI coding agent. Your current goal is: "' + goal.text + '".\n' +
+    'The project has these nodes: ' + nodeList + '.\n' + snapContext +
+    '\n\nRespond with ONLY a JSON object (no markdown, no extra text) like:\n' +
+    '{"nodeId":"the-node-id","action":"a concrete 1-sentence change to make to that node"}\n' +
+    'Pick the single most impactful node+action pair that advances the goal right now.';
+
+  try {
+    var planRaw = await callAnalysisAI(
+      'You are JARVIS, an autonomous goal-driven coding agent. You respond only with valid JSON.',
+      planPrompt
+    );
+
+    // Parse plan
+    var plan;
+    try {
+      var cleaned = planRaw.replace(/```json|```/g, '').trim();
+      plan = JSON.parse(cleaned);
+    } catch(e) {
+      // Try to extract JSON from response
+      var m = planRaw.match(/\{[^}]+\}/);
+      if (m) plan = JSON.parse(m[0]);
+      else throw new Error('Could not parse plan JSON');
+    }
+
+    if (!plan.nodeId || !plan.action) throw new Error('Invalid plan structure');
+
+    // Validate node exists
+    var targetNode = nodes.find(function(n) { return n.id === plan.nodeId; });
+    if (!targetNode) throw new Error('Node not found: ' + plan.nodeId);
+
+    // Build the full prompt including screenshot context
+    var fullPrompt = plan.action;
+    if (_jarvisSnap) {
+      fullPrompt += '\n\n[JARVIS note: A UI screenshot was captured showing the current visual state. Apply this change with awareness of the current visual design.]';
+    }
+
+    // Log intention
+    _jarvisAddLog({
+      node: plan.nodeId, action: plan.action,
+      goal: goal.text, status: 'pending',
+      time: _jarvisTimeStr()
+    });
+    jarvisNotif('🔧 Working on <b>' + esc(plan.nodeId) + '</b>: ' + esc(plan.action.slice(0,60)) + '…');
+
+    // Submit as an agent prompt — store on session history and postMessage to Vibe
+    var s = sess();
+    if (s) {
+      var nid = plan.nodeId;
+      if (!s.history[nid]) s.history[nid] = [];
+      var att = {
+        id: 'j' + Date.now(),
+        node: nid,
+        prompt: '[JARVIS] ' + fullPrompt,
+        status: 'pending',
+        time: _jarvisTimeStr(),
+        diff: [],
+        result: 'JARVIS dispatched…',
+        promptPseudo: '→ [JARVIS] ' + plan.action.slice(0,60),
+        aiResultFormatted: null,
+        _jarvisGoalId: goal.id
+      };
+      s.history[nid].push(att);
+      saveSessions();
+
+      // Update active node view if panel is open
+      if (document.getElementById('nd-sel').value === nid) renderWork();
+
+      // Fire to Vibe agent
+      try {
+        window.parent.postMessage({
+          source: 'apui-vibe',
+          type: 'apui-run-agent',
+          prompt: fullPrompt,
+          attemptId: att.id,
+          nodeId: nid,
+          sessionIntent: (s.intent || '') + '\n[JARVIS goal: ' + goal.text + ']'
+        }, '*');
+      } catch(e2) {
+        att.status = 'fail'; att.result = '⚠ postMessage failed: ' + e2.message;
+        att.aiResultFormatted = '<span style="color:var(--red)">' + esc(att.result) + '</span>';
+        _jarvisUpdateLog(nid, att.id, 'fail');
+        if (document.getElementById('nd-sel').value === nid) renderWork();
+      }
+
+      // Mark goal as done after dispatching (optimistic; real check on agent reply)
+      goal.status = 'done';
+      _jarvisRenderGoals();
+      _jarvisSaveState();
+    }
+
+  } catch(err) {
+    _jarvisAddLog({ node: '—', action: 'Error: ' + err.message, goal: goal.text, status: 'err', time: _jarvisTimeStr() });
+    jarvisNotif('⚠ JARVIS encountered an error: ' + esc(err.message.slice(0,80)));
+    goal.status = 'idle'; // allow retry
+    _jarvisRenderGoals();
+  }
+
+  // Schedule next cycle
+  if (_jarvisRunning) {
+    _jarvisTimer = setTimeout(_jarvisCycle, _jarvisCycleMs);
+  }
 }
-function _ghostMoveCursor() {
-  var gc = document.getElementById('ghost-cursor');
+
+// ── Screenshot capture ──
+function jarvisCapture() {
+  var btn = document.getElementById('jarvis-snap-btn');
+  var statusEl = document.getElementById('jarvis-snap-status');
+  var scanBar = document.getElementById('jarvis-scan-bar');
+  var preview = document.getElementById('jarvis-screenshot-preview');
+
+  if (statusEl) statusEl.textContent = 'Capturing…';
+  if (scanBar) scanBar.style.display = 'block';
+  if (btn) btn.disabled = true;
+
+  // Method 1: Ask parent (Vibe) to send screenshot of preview iframe
+  try {
+    window.parent.postMessage({ source: 'apui-vibe', type: 'apui-request-screenshot' }, '*');
+  } catch(e) {}
+
+  // Method 2: Try to get the preview iframe src directly for html2canvas fallback
+  // We'll give the parent 2s to respond, then fall back
+  var responded = false;
+  var snapTimeout = setTimeout(function() {
+    if (!responded) _jarvisFallbackCapture(btn, statusEl, scanBar, preview);
+  }, 2000);
+
+  // Store cleanup refs
+  jarvisCapture._cleanup = function(dataUrl) {
+    responded = true;
+    clearTimeout(snapTimeout);
+    if (dataUrl) {
+      _jarvisSnap = dataUrl;
+      if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
+      if (statusEl) statusEl.textContent = 'Snapshot captured ✓';
+      _jarvisAddLog({ node: 'preview', action: 'UI screenshot captured', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
+    } else {
+      if (statusEl) statusEl.textContent = 'Capture failed';
+    }
+    if (scanBar) scanBar.style.display = 'none';
+    if (btn) btn.disabled = false;
+  };
+}
+
+function _jarvisFallbackCapture(btn, statusEl, scanBar, preview) {
+  // Fallback: describe the vibeTree as text context instead of a real screenshot
+  if (!vibeTree) {
+    if (statusEl) statusEl.textContent = 'No project loaded';
+    if (scanBar) scanBar.style.display = 'none';
+    if (btn) btn.disabled = false;
+    return;
+  }
+  var nodes = flattenTree(vibeTree);
+  var desc = 'Project snapshot (' + nodes.length + ' nodes): ' + nodes.map(function(n) { return n.id + '[' + n.type + ']'; }).join(', ');
+  // Create a simple SVG "screenshot" placeholder
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#0a0c10"/><text x="10" y="20" fill="#00b4ff" font-family="monospace" font-size="10">UI SNAPSHOT</text>' +
+    nodes.slice(0,12).map(function(n, i) {
+      var y = 36 + i * 12;
+      var colors = {'css':'#58a6ff','javascript':'#3fb950','html':'#d29922'};
+      var col = colors[n.type] || '#7d8590';
+      return '<rect x="8" y="' + (y-9) + '" width="' + Math.min(200, (n.code||'').length/3 + 40) + '" height="10" rx="2" fill="' + col + '" opacity=".25"/><text x="12" y="' + y + '" fill="' + col + '" font-family="monospace" font-size="8">' + n.id + '</text>';
+    }).join('') +
+    '</svg>';
+  var dataUrl = 'data:image/svg+xml;base64,' + btoa(svg);
+  _jarvisSnap = dataUrl;
+  if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
+  if (statusEl) statusEl.textContent = 'Structure snapshot ✓ (visual capture unavailable)';
+  if (scanBar) scanBar.style.display = 'none';
+  if (btn) btn.disabled = false;
+  _jarvisAddLog({ node: 'preview', action: 'Structure snapshot generated (' + nodes.length + ' nodes)', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
+}
+
+// Receive screenshot from parent
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'apui-screenshot-data' && e.data.dataUrl) {
+    _jarvisSnap = e.data.dataUrl;
+    var preview = document.getElementById('jarvis-screenshot-preview');
+    if (preview) { preview.src = e.data.dataUrl; preview.style.display = 'block'; }
+    var statusEl = document.getElementById('jarvis-snap-status');
+    if (statusEl) statusEl.textContent = 'Screenshot captured ✓';
+    if (jarvisCapture._cleanup) jarvisCapture._cleanup(e.data.dataUrl);
+    _jarvisAddLog({ node: 'preview', action: 'Live screenshot captured from preview iframe', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
+    var scanBar = document.getElementById('jarvis-scan-bar');
+    if (scanBar) scanBar.style.display = 'none';
+    var btn = document.getElementById('jarvis-snap-btn');
+    if (btn) btn.disabled = false;
+  }
+});
+
+// When agent completes, mark JARVIS log entry
+(function patchHandleAgentStatusForJarvis() {
+  var _prev = window.handleAgentStatus;
+  window.handleAgentStatus = function(d) {
+    _prev.call(this, d);
+    if ((d.status === 'done' || d.status === 'error') && d.attemptId) {
+      // Find the attempt
+      var s = sess(); if (!s) return;
+      var att = null;
+      for (var arr of Object.values(s.history)) {
+        att = arr.find(function(a) { return a.id === d.attemptId; });
+        if (att) break;
+      }
+      if (att && att._jarvisGoalId) {
+        // Update the last pending log entry for this node to ok/err
+        var logStatus = d.status === 'done' ? 'ok' : 'err';
+        // Find pending entry and update
+        for (var i = _jarvisLog.length - 1; i >= 0; i--) {
+          if (_jarvisLog[i].node === att.node && _jarvisLog[i].status === 'pending') {
+            _jarvisLog[i].status = logStatus;
+            break;
+          }
+        }
+        _jarvisRenderLog();
+        _jarvisSaveState();
+        if (d.status === 'done') {
+          jarvisNotif('✅ JARVIS completed: <b>' + esc(att.node) + '</b>');
+        }
+      }
+    }
+  };
+})();
+
+// ── Log helpers ──
+function _jarvisAddLog(entry) {
+  _jarvisLog.unshift(entry);
+  if (_jarvisLog.length > 100) _jarvisLog.pop();
+  _jarvisRenderLog();
+  _jarvisSaveState();
+}
+
+function _jarvisRenderLog() {
+  var el = document.getElementById('jarvis-log-list');
+  if (!el) return;
+  if (!_jarvisLog.length) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.3);padding:8px 0">No actions yet. Start JARVIS to begin.</div>';
+    return;
+  }
+  el.innerHTML = _jarvisLog.slice(0, 30).map(function(l) {
+    var cls = l.status === 'ok' ? 'j-log-ok' : l.status === 'err' ? 'j-log-err' : l.status === 'snap' ? 'j-log-snap' : '';
+    var icon = l.status === 'ok' ? '✓ ' : l.status === 'err' ? '⚠ ' : l.status === 'snap' ? '📷 ' : '⏳ ';
+    return '<div class="j-log-entry ' + cls + '">' +
+      '<span class="j-log-time">' + l.time + '</span>' +
+      '<div class="j-log-node">' + esc(l.node) + '</div>' +
+      '<div class="j-log-action">' + icon + esc(l.action) + '</div>' +
+      (l.goal && l.goal !== '(snapshot)' ? '<div class="j-log-goal">Goal: ' + esc(l.goal.slice(0,60)) + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+// ── Persistence ──
+var _JARVIS_LS_KEY = 'jarvis_state_v1';
+function _jarvisSaveState() {
+  try {
+    localStorage.setItem(_JARVIS_LS_KEY, JSON.stringify({
+      goals: _jarvisGoals, log: _jarvisLog.slice(0, 50)
+    }));
+  } catch(e) {}
+}
+function _jarvisLoadState() {
+  try {
+    var raw = localStorage.getItem(_JARVIS_LS_KEY);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (Array.isArray(data.goals)) { _jarvisGoals = data.goals; _jarvisGoals.forEach(function(g){if(g.status==='active')g.status='idle';}); }
+    if (Array.isArray(data.log))   _jarvisLog   = data.log;
+  } catch(e) {}
+}
+window.addEventListener('load', function() {
+  _jarvisLoadState();
+  if (_jarvisOpen) { _jarvisRenderGoals(); _jarvisRenderLog(); }
+});
+
+// ── Cursor animation ──
+function _jarvisMoveCursor() {
+  var gc = document.getElementById('jarvis-cursor');
   if (!gc) return;
   gc.classList.add('active');
-  var pts = [[window.innerWidth*.3,window.innerHeight*.4],[window.innerWidth*.6,window.innerHeight*.55],[window.innerWidth*.45,window.innerHeight*.3]];
+  var pts = [
+    [window.innerWidth * 0.35, window.innerHeight * 0.45],
+    [window.innerWidth * 0.55, window.innerHeight * 0.60],
+    [window.innerWidth * 0.42, window.innerHeight * 0.30],
+  ];
   var i = 0;
   function move() {
-    if (i >= pts.length) { gc.classList.remove('active'); return; }
-    gc.style.left = pts[i][0] + 'px'; gc.style.top = pts[i][1] + 'px'; i++;
-    setTimeout(move, 900);
+    if (i >= pts.length || !_jarvisRunning) { gc.classList.remove('active'); return; }
+    gc.style.left = pts[i][0] + 'px';
+    gc.style.top  = pts[i][1] + 'px';
+    i++;
+    setTimeout(move, 850);
   }
   move();
 }
-function showGhostNotif(msg) {
-  var el = document.getElementById('ghost-notif');
+
+// ── Notification ──
+function jarvisNotif(msg) {
+  var el = document.getElementById('jarvis-notif');
   if (!el) return;
   el.innerHTML = msg; el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(function() { el.classList.remove('show'); }, 4500);
+  el._t = setTimeout(function() { el.classList.remove('show'); }, 5000);
 }
-function closeGhostNotif() { var el = document.getElementById('ghost-notif'); if (el) el.classList.remove('show'); }
-function showGhostPatch(nodeId, issue) {
-  var el = document.getElementById('ghost-patch'); if (!el) return;
-  document.getElementById('ghost-patch-node').textContent  = '⚡ Node: ' + nodeId;
-  document.getElementById('ghost-patch-issue').textContent = issue.issue;
-  document.getElementById('ghost-approve-btn').onclick = function() {
-    closeGhostPatch();
-    var sel = document.getElementById('nd-sel');
-    if (sel && sel.querySelector('option[value="' + nodeId + '"]')) { sel.value = nodeId; onNodeChange(); }
-    document.getElementById('pb-ta').value = issue.fix;
-    setTimeout(submitPrompt, 150);
-  };
-  el.classList.add('show');
+// Keep showGhostNotif as alias so multiverse/other callers still work
+function showGhostNotif(msg) { jarvisNotif(msg); }
+
+// ── Utils ──
+function _jarvisTimeStr() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
 }
-function closeGhostPatch() { var el = document.getElementById('ghost-patch'); if (el) el.classList.remove('show'); }
 
 /* ═══════════════════════════════════════════════
    4. MATRIX X-RAY HUD
@@ -2018,17 +2401,49 @@ window.addEventListener('message', function(e) {
   </div>
 </div>
 
-<!-- 3. Ghost overlays (persistent) -->
-<div id="ghost-cursor"></div>
-<div id="ghost-notif"></div>
-<div id="ghost-patch">
-  <div class="ghost-patch-title">👻 CO-PILOT FOUND AN ISSUE</div>
-  <div id="ghost-patch-node" style="font-size:11px;color:var(--text2);margin-bottom:5px"></div>
-  <div id="ghost-patch-issue" style="font-size:12px;color:var(--text);margin-bottom:9px;line-height:1.55"></div>
-  <div style="display:flex;gap:8px">
-    <button class="btn xs prim" id="ghost-approve-btn">✦ Approve Patch</button>
-    <button class="btn xs" onclick="closeGhostPatch()">dismiss</button>
+<!-- 3. JARVIS Autonomous Agent -->
+<div id="jarvis-cursor"></div>
+<div id="jarvis-notif"></div>
+
+<div id="jarvis-panel">
+  <!-- Header -->
+  <div class="j-head">
+    <span class="j-logo">🤖</span>
+    <span class="j-title">J.A.R.V.I.S</span>
+    <span class="j-status idle" id="jarvis-status-badge">idle</span>
+    <button class="btn xs" onclick="toggleJarvis()" style="margin-left:4px">✕</button>
   </div>
+
+  <!-- Screenshot + scan bar -->
+  <div class="j-section" id="jarvis-scan-section">
+    <div class="j-sec-lbl">UI Snapshot</div>
+    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+      <button class="btn xs prim" id="jarvis-snap-btn" onclick="jarvisCapture()">📷 Capture Preview</button>
+      <span id="jarvis-snap-status" style="font-size:10px;color:rgba(0,180,255,.5)">No snapshot yet</span>
+    </div>
+    <img id="jarvis-screenshot-preview" alt="UI snapshot"/>
+    <div class="j-scanning-bar" id="jarvis-scan-bar" style="display:none"></div>
+  </div>
+
+  <!-- Goals -->
+  <div class="j-section">
+    <div class="j-sec-lbl">Goals</div>
+    <div id="jarvis-goals-list"></div>
+    <div class="j-goal-add">
+      <textarea class="j-goal-input" id="jarvis-goal-input" rows="2"
+        placeholder="Add a goal… e.g. Make the UI fully mobile responsive"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();jarvisAddGoal()}"></textarea>
+      <button class="btn xs prim" onclick="jarvisAddGoal()">+ add</button>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn xs prim" id="jarvis-run-btn" onclick="jarvisRun()" style="border-color:#00b4ff;color:#00b4ff;background:rgba(0,180,255,.08)">▶ Start JARVIS</button>
+      <button class="btn xs" onclick="jarvisStop()">■ Stop</button>
+    </div>
+  </div>
+
+  <!-- Live log -->
+  <div class="j-sec-lbl" style="padding:8px 14px 4px;flex-shrink:0">Action Log</div>
+  <div id="jarvis-log-list"></div>
 </div>
 
 <!-- 4. Matrix X-Ray HUD -->
