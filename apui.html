@@ -190,124 +190,6 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 /* No-project notice */
 #no-project-notice{display:none;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--rs);padding:9px 13px;font-size:12px;color:var(--amber);margin:10px 12px 0;flex-shrink:0}
 
-/* AI suggestion pills */
-.pill.ai-pill{border-color:var(--purple);color:var(--purple);background:transparent;border-style:dashed}
-.pill.ai-pill:active{background:var(--purple-bg)}
-
-/* Voice button recording state */
-#voice-btn.recording{background:var(--red-bg) !important;border-color:var(--red) !important;color:var(--red) !important;animation:pulse 0.8s ease infinite}
-
-/* Heatmap node pills */
-.node-heat-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);font-family:inherit;transition:all .12s;white-space:nowrap}
-.node-heat-pill:active{opacity:.75}
-
-/* Log tab */
-.log-entry{font-size:11px;padding:6px 8px;border-radius:4px;margin-bottom:5px;background:var(--bg3);border-left:3px solid var(--border2);line-height:1.55}
-.log-entry.log-ok{border-left-color:var(--green)}
-.log-entry.log-fail{border-left-color:var(--red)}
-.log-entry.log-pending{border-left-color:var(--amber)}
-.log-time{color:var(--text3);font-size:10px;margin-left:5px}
-
-/* Free mode / global badge */
-.badge.purple{background:var(--purple-bg);color:var(--purple)}
-.badge.global{background:var(--purple-bg);color:var(--purple)}
-
-/* Free-mode panel */
-#free-mode-panel{display:none;padding:10px 13px 13px;background:var(--bg3);border-top:1px solid var(--border);flex-direction:column;gap:7px}
-#free-mode-panel.open{display:flex}
-.free-result{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg2);border-radius:var(--rs);padding:10px 12px;max-height:220px;overflow-y:auto}
-
-/* ══════════════════════════════════════
-   SCI-FI FEATURE CSS
-══════════════════════════════════════ */
-
-/* ── Sci-fi toolbar (topbar extensions) ── */
-.scifi-btn{font-family:inherit;font-size:10px;padding:4px 8px;min-height:28px;border:1px solid var(--border2);border-radius:var(--rs);background:transparent;color:var(--text3);cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:4px;letter-spacing:.04em}
-.scifi-btn:hover{color:var(--text2);border-color:var(--text3)}
-.scifi-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
-.scifi-btn.active-red{border-color:var(--red);color:var(--red);background:var(--red-bg)}
-.scifi-btn.active-purple{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
-.scifi-btn.active-amber{border-color:var(--amber);color:var(--amber);background:var(--amber-bg)}
-#scifi-bar{display:flex;gap:5px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;flex-wrap:wrap}
-#scifi-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-right:2px}
-
-/* ── 1. IRON MAN Exploder ── */
-#explode-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.85);flex-direction:column;align-items:center;justify-content:center}
-#explode-overlay.open{display:flex}
-.explode-frame{width:min(92vw,900px);height:min(80vh,600px);position:relative;perspective:1400px;overflow:visible}
-#explode-iframe{width:100%;height:100%;border:none;border-radius:var(--r);background:#fff;transition:transform .6s cubic-bezier(.34,1.2,.64,1)}
-#explode-iframe.exploded{transform:rotateX(55deg) rotateZ(-30deg) scale(0.85);transform-style:preserve-3d}
-.explode-hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:center;z-index:10;flex-wrap:wrap}
-.explode-close{position:absolute;top:12px;right:12px;z-index:20}
-#explode-depth-lbl{font-size:10px;color:rgba(88,166,255,.8);font-family:'SF Mono',monospace;letter-spacing:.06em}
-#explode-slider{width:130px;accent-color:var(--accent)}
-#explode-prompt-row{position:absolute;bottom:0;left:0;right:0;padding:10px 12px;background:rgba(26,29,34,.92);border-top:1px solid rgba(88,166,255,.3);display:flex;gap:8px;border-radius:0 0 var(--r) var(--r)}
-#explode-ta{flex:1;padding:7px 10px;font-family:inherit;font-size:13px;border:1px solid rgba(88,166,255,.4);border-radius:var(--rs);background:rgba(88,166,255,.06);color:var(--text);resize:none;min-height:36px;line-height:1.4}
-#explode-ta:focus{outline:none;border-color:var(--accent)}
-.layer-badge{position:absolute;font-size:10px;font-family:'SF Mono',monospace;padding:2px 6px;border-radius:3px;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.4);color:rgba(88,166,255,.9);pointer-events:none;white-space:nowrap;z-index:9999;transition:opacity .2s}
-
-/* ── 2. MULTIVERSE Splitter ── */
-#multiverse-overlay{display:none;position:fixed;inset:0;z-index:500;background:#0a0b0f;flex-direction:column}
-#multiverse-overlay.open{display:flex}
-.mv-header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(188,140,255,.25);background:#0d0e13;flex-shrink:0;flex-wrap:wrap}
-.mv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--purple)}
-.mv-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.mv-label.a{color:#58a6ff}
-.mv-label.b{color:#bc8cff}
-.mv-arena{flex:1;position:relative;overflow:hidden;display:flex}
-#mv-iframe-a{position:absolute;inset:0;right:50%;border:none;background:#fff}
-#mv-iframe-b{position:absolute;inset:0;left:50%;border:none;background:#fff}
-.mv-divider{position:absolute;top:0;bottom:0;width:4px;background:linear-gradient(180deg,#bc8cff 0%,#58a6ff 100%);transform:translateX(-50%);z-index:10;cursor:ew-resize;box-shadow:0 0 18px 4px rgba(188,140,255,.5)}
-.mv-divider-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#bc8cff,#58a6ff);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:ew-resize;box-shadow:0 0 24px 6px rgba(188,140,255,.6)}
-#mv-slider{position:absolute;top:0;bottom:0;left:0;right:0;opacity:0;cursor:ew-resize;z-index:15;width:100%}
-.mv-tag{position:absolute;top:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:20px;pointer-events:none;z-index:12}
-.mv-tag.a{left:12px;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.5);color:#58a6ff}
-.mv-tag.b{right:12px;background:rgba(188,140,255,.15);border:1px solid rgba(188,140,255,.5);color:#bc8cff}
-.mv-footer{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(188,140,255,.2);background:#0d0e13;flex-shrink:0;flex-wrap:wrap}
-#mv-pct-label{font-size:10px;color:var(--text3);min-width:55px}
-
-/* ── 3. GHOST IN THE MACHINE Symbiosis ── */
-@keyframes ghostPulse{0%,100%{opacity:0;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
-@keyframes energyTrace{0%{stroke-dashoffset:1000;opacity:.7}100%{stroke-dashoffset:0;opacity:0}}
-#ghost-overlay{position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden}
-.ghost-notification{position:fixed;bottom:80px;right:14px;max-width:260px;background:rgba(26,29,34,.95);border:1px solid rgba(188,140,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:var(--text2);z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5}
-.ghost-notification.show{transform:translateX(0)}
-.ghost-notification b{color:var(--purple)}
-.ghost-patch-panel{position:fixed;bottom:80px;left:14px;max-width:280px;background:rgba(26,29,34,.97);border:1px solid rgba(248,81,73,.45);border-radius:var(--r);padding:12px 14px;font-size:11px;color:var(--text);z-index:400;transform:translateX(-120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1)}
-.ghost-patch-panel.show{transform:translateX(0)}
-.ghost-patch-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:6px}
-#ghost-cursor{position:fixed;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle,rgba(188,140,255,.8),rgba(188,140,255,0));pointer-events:none;z-index:350;transition:left .4s ease,top .4s ease;display:none}
-#ghost-cursor.active{display:block}
-.ghost-sweep-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-
-/* ── 4. MATRIX X-Ray HUD ── */
-#xray-overlay{display:none;position:fixed;inset:0;z-index:600;pointer-events:none}
-#xray-overlay.active{display:block}
-#xray-iframe-container{position:fixed;inset:0;z-index:601;pointer-events:none}
-#xray-frame{width:100%;height:100%;border:none;pointer-events:none}
-.xray-label{position:fixed;font-size:10px;font-family:'SF Mono',monospace;padding:2px 7px;border-radius:3px;pointer-events:none;z-index:602;background:rgba(0,255,70,.12);border:1px solid rgba(0,255,70,.45);color:#00ff46;white-space:nowrap;text-shadow:0 0 8px rgba(0,255,70,.8)}
-#xray-scanline{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,70,.6),transparent);z-index:603;animation:xrayScan 2.5s linear infinite;display:none}
-#xray-overlay.active #xray-scanline{display:block}
-@keyframes xrayScan{0%{top:0;opacity:.7}100%{top:100vh;opacity:0}}
-#xray-prompt-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.88);border:1px solid rgba(0,255,70,.4);border-radius:24px;padding:8px 18px;font-size:12px;color:#00ff46;z-index:605;display:none;white-space:nowrap;font-family:'SF Mono',monospace;letter-spacing:.04em}
-#xray-overlay.active #xray-prompt-toast{display:block}
-#xray-crosshair{position:fixed;pointer-events:none;z-index:604;width:200px;height:80px;transform:translate(-50%,-50%);display:none}
-#xray-overlay.active #xray-crosshair{display:block}
-
-/* ── 5. BLADE RUNNER Error Diagnostics ── */
-@keyframes bleed{0%,100%{box-shadow:0 0 0 0 transparent}25%{box-shadow:0 0 0 8px rgba(248,81,73,.5),0 0 40px 12px rgba(248,81,73,.3)}75%{box-shadow:0 0 0 4px rgba(248,81,73,.3),0 0 20px 6px rgba(248,81,73,.2)}}
-@keyframes chromaGlitch{0%,100%{filter:none}10%{filter:hue-rotate(90deg) saturate(2) brightness(1.3)}20%{filter:hue-rotate(-90deg) saturate(3) brightness(.8) contrast(1.5)}30%{filter:none}60%{filter:hue-rotate(180deg) saturate(2) brightness(1.1)}70%{filter:none}}
-.node-bleeding .card{animation:bleed 1.2s ease 3}
-.node-bleeding-card{animation:bleed 1.4s ease 4 !important}
-#containment-panel{display:none;position:fixed;bottom:0;right:0;width:min(360px,96vw);background:rgba(15,10,12,.97);border:1px solid rgba(248,81,73,.6);border-bottom:none;border-right:none;border-radius:var(--r) 0 0 0;padding:14px 16px;z-index:450;box-shadow:0 -4px 40px rgba(248,81,73,.25)}
-#containment-panel.open{display:block}
-.cp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:7px}
-.cp-node{font-size:11px;color:var(--text2);margin-bottom:6px}
-.cp-pre{background:var(--bg3);border-radius:var(--rs);padding:8px 10px;font-size:11px;color:#ff7b7b;font-family:'SF Mono',monospace;line-height:1.5;max-height:100px;overflow-y:auto;margin-bottom:10px;white-space:pre-wrap}
-.cp-buttons{display:flex;gap:8px;flex-wrap:wrap}
-#error-indicator{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),#ff6b35,var(--red));z-index:600;display:none;animation:pulse 0.6s ease infinite}
-#error-indicator.show{display:block}
-
 /* Desktop */
 @media (min-width:680px){
   #drawer{position:static;pointer-events:all;width:220px;min-width:220px;display:flex}
@@ -319,6 +201,107 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
   .work-scroll{padding:14px 16px}
   .prompt-bar{padding:10px 14px;padding-bottom:10px}
 }
+
+/* ═══════════════════════════════════════════
+   FEATURE CSS — v7 (all features)
+═══════════════════════════════════════════ */
+
+/* ── AI suggestion pills ── */
+.pill.ai-pill{border-color:var(--purple);color:var(--purple);background:transparent;border-style:dashed}
+.pill.ai-pill:active{background:var(--purple-bg)}
+
+/* ── Voice btn recording ── */
+#voice-btn.recording{background:var(--red-bg)!important;border-color:var(--red)!important;color:var(--red)!important;animation:pulse .8s ease infinite}
+
+/* ── Heatmap node pills ── */
+.node-heat-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);font-family:inherit;transition:all .12s;white-space:nowrap}
+.node-heat-pill:active{opacity:.75}
+
+/* ── Change log tab ── */
+.log-entry{font-size:11px;padding:6px 8px;border-radius:4px;margin-bottom:5px;background:var(--bg3);border-left:3px solid var(--border2);line-height:1.55}
+.log-entry.log-ok{border-left-color:var(--green)}
+.log-entry.log-fail{border-left-color:var(--red)}
+.log-time{color:var(--text3);font-size:10px;margin-left:5px}
+
+/* ── Global mode badge ── */
+.badge.purple,.badge.global{background:var(--purple-bg);color:var(--purple)}
+
+/* ── Free mode ── */
+#free-mode-panel{display:none;padding:10px 13px 13px;background:var(--bg3);border-top:1px solid var(--border);flex-direction:column;gap:7px}
+#free-mode-panel.open{display:flex}
+.free-result{font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg2);border-radius:var(--rs);padding:10px 12px;max-height:220px;overflow-y:auto}
+
+/* ══ SCI-FI FEATURES ══ */
+
+/* ── Sci-fi toolbar ── */
+.scifi-btn{font-family:inherit;font-size:10px;padding:4px 8px;min-height:28px;border:1px solid var(--border2);border-radius:var(--rs);background:transparent;color:var(--text3);cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:4px;letter-spacing:.04em}
+.scifi-btn:hover{color:var(--text2);border-color:var(--text3)}
+.scifi-btn.sf-on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.scifi-btn.sf-purple{border-color:var(--purple);color:var(--purple);background:var(--purple-bg)}
+.scifi-btn.sf-amber{border-color:var(--amber);color:var(--amber);background:var(--amber-bg)}
+.scifi-btn.sf-red{border-color:var(--red);color:var(--red);background:var(--red-bg)}
+#scifi-bar{display:flex;gap:5px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;flex-wrap:wrap}
+.scifi-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-right:2px}
+
+/* ── 1. Iron Man Explode ── */
+#explode-overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.9);flex-direction:column;align-items:center;justify-content:center;perspective:1400px}
+#explode-overlay.open{display:flex}
+.explode-wrap{width:min(95vw,920px);height:min(80vh,620px);position:relative}
+.explode-hud{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;z-index:10;flex-wrap:wrap;pointer-events:all}
+#explode-iframe{width:100%;height:100%;border:none;border-radius:var(--r);background:#0a0c10;transition:transform .5s cubic-bezier(.34,1.1,.64,1);transform-style:preserve-3d}
+#explode-depth-lbl{font-size:10px;color:rgba(88,166,255,.8);font-family:inherit;letter-spacing:.04em}
+#explode-prompt-row{position:absolute;bottom:0;left:0;right:0;padding:10px 12px;background:rgba(10,12,16,.95);border-top:1px solid rgba(88,166,255,.25);display:flex;gap:8px;border-radius:0 0 var(--r) var(--r)}
+#explode-ta{flex:1;padding:7px 10px;font-family:inherit;font-size:13px;border:1px solid rgba(88,166,255,.35);border-radius:var(--rs);background:rgba(88,166,255,.05);color:var(--text);resize:none;min-height:36px;line-height:1.4}
+#explode-ta:focus{outline:none;border-color:var(--accent)}
+
+/* ── 2. Multiverse Splitter ── */
+#multiverse-overlay{display:none;position:fixed;inset:0;z-index:500;background:#08090d;flex-direction:column}
+#multiverse-overlay.open{display:flex}
+.mv-header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(188,140,255,.2);background:#0d0e14;flex-shrink:0;flex-wrap:wrap}
+.mv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--purple)}
+.mv-lbl-a{font-size:10px;font-weight:700;letter-spacing:.07em;color:#58a6ff}
+.mv-lbl-b{font-size:10px;font-weight:700;letter-spacing:.07em;color:#bc8cff}
+.mv-arena{flex:1;position:relative;overflow:hidden}
+#mv-iframe-a{position:absolute;inset:0;right:50%;border:none;background:#0a0c10}
+#mv-iframe-b{position:absolute;inset:0;left:50%;border:none;background:#0a0c10}
+.mv-divider{position:absolute;top:0;bottom:0;width:4px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,#bc8cff,#58a6ff);z-index:10;cursor:ew-resize;box-shadow:0 0 20px 4px rgba(188,140,255,.45)}
+.mv-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#bc8cff,#58a6ff);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:ew-resize;box-shadow:0 0 20px 5px rgba(188,140,255,.5)}
+.mv-tag{position:absolute;top:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:20px;pointer-events:none;z-index:12}
+.mv-tag.a{left:12px;background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.4);color:#58a6ff}
+.mv-tag.b{right:12px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.4);color:#bc8cff}
+.mv-footer{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(188,140,255,.15);background:#0d0e14;flex-shrink:0;flex-wrap:wrap}
+#mv-drag-target{position:absolute;inset:0;z-index:11;cursor:ew-resize;opacity:0}
+
+/* ── 3. Ghost in the Machine ── */
+#ghost-notif{position:fixed;bottom:90px;right:14px;max-width:260px;background:rgba(26,29,34,.97);border:1px solid rgba(188,140,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:var(--text2);z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5;pointer-events:none}
+#ghost-notif.show{transform:translateX(0)}
+#ghost-patch{position:fixed;bottom:90px;left:14px;max-width:280px;background:rgba(26,29,34,.97);border:1px solid rgba(248,81,73,.4);border-radius:var(--r);padding:12px 14px;font-size:11px;color:var(--text);z-index:400;transform:translateX(-120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1)}
+#ghost-patch.show{transform:translateX(0)}
+.ghost-patch-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:6px}
+#ghost-cursor{position:fixed;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,rgba(188,140,255,.9),rgba(188,140,255,0));pointer-events:none;z-index:350;transition:left .5s ease,top .5s ease;display:none}
+#ghost-cursor.active{display:block}
+
+/* ── 4. Matrix X-Ray ── */
+@keyframes xrayScan{0%{top:0;opacity:.8}100%{top:100vh;opacity:0}}
+#xray-overlay{display:none;position:fixed;inset:0;z-index:600;pointer-events:none}
+#xray-overlay.xon{display:block}
+#xray-scanline{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,255,70,.7),transparent);animation:xrayScan 2.5s linear infinite;z-index:603}
+.xray-lbl{position:fixed;font-size:10px;font-family:inherit;padding:2px 7px;border-radius:3px;pointer-events:none;z-index:602;background:rgba(0,255,70,.1);border:1px solid rgba(0,255,70,.45);color:#00ff46;white-space:nowrap;text-shadow:0 0 8px rgba(0,255,70,.7)}
+#xray-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);border:1px solid rgba(0,255,70,.4);border-radius:24px;padding:8px 18px;font-size:12px;color:#00ff46;z-index:605;white-space:nowrap;font-family:inherit;letter-spacing:.04em;pointer-events:none}
+#xray-crosshair{position:fixed;pointer-events:none;z-index:604;transform:translate(-50%,-50%)}
+
+/* ── 5. Blade Runner ── */
+@keyframes bladeBleed{0%,100%{box-shadow:none}25%{box-shadow:0 0 0 6px rgba(248,81,73,.4),0 0 30px 10px rgba(248,81,73,.25)}75%{box-shadow:0 0 0 3px rgba(248,81,73,.25)}}
+@keyframes chromaGlitch{0%,100%{filter:none}12%{filter:hue-rotate(90deg) saturate(2) brightness(1.3)}22%{filter:hue-rotate(-90deg) saturate(3) brightness(.8)}32%{filter:none}65%{filter:hue-rotate(180deg) saturate(2)}70%{filter:none}}
+.bleed-card{animation:bladeBleed 1.3s ease 3!important}
+#error-bar{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),#ff6b35,var(--red));z-index:700;display:none;animation:pulse .5s ease infinite}
+#error-bar.show{display:block}
+#containment{display:none;position:fixed;bottom:0;right:0;width:min(360px,96vw);background:rgba(12,8,10,.98);border:1px solid rgba(248,81,73,.5);border-bottom:none;border-right:none;border-radius:var(--r) 0 0 0;padding:14px 16px;z-index:450;box-shadow:-4px -4px 40px rgba(248,81,73,.2)}
+#containment.open{display:block}
+.ct-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ct-node{font-size:11px;color:var(--text2);margin-bottom:5px}
+.ct-err{background:var(--bg3);border-radius:var(--rs);padding:8px 10px;font-size:11px;color:#ff7b7b;font-family:inherit;line-height:1.5;max-height:90px;overflow-y:auto;margin-bottom:8px;white-space:pre-wrap}
+.ct-fix{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -351,18 +334,18 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
       <button class="btn sm" id="btn-intent" style="display:none" onclick="goToIntent()">← intent</button>
     </div>
 
+    <!-- Sci-Fi toolbar -->
+    <div id="scifi-bar">
+      <span class="scifi-label">⚡ sci-fi</span>
+      <button class="scifi-btn" id="sfbtn-explode"     onclick="toggleExplode()"     title="Iron Man: 3D layer explosion">🔩 Explode</button>
+      <button class="scifi-btn" id="sfbtn-multiverse"  onclick="openMultiverse()"    title="Minority Report: Split-screen reality comparison">🌌 Multiverse</button>
+      <button class="scifi-btn" id="sfbtn-ghost"       onclick="toggleGhost()"       title="Her: Autonomous AI co-pilot">👻 Ghost</button>
+      <button class="scifi-btn" id="sfbtn-xray"        title="Matrix: Hold SPACE for X-Ray HUD">🟩 X-Ray <kbd style="font-size:9px;opacity:.55;background:var(--bg4);border-radius:2px;padding:1px 3px">SPC</kbd></button>
+      <button class="scifi-btn" id="sfbtn-shock"       onclick="testBladeRunner()"   title="Blade Runner: Sensory error diagnostics">⚡ Shock</button>
+    </div>
+
     <!-- No project notice -->
     <div id="no-project-notice">⚠ No project loaded from Vibe. Open the APUI tab in Vibe to connect.</div>
-
-    <!-- ══ SCI-FI CONTROL BAR ══ -->
-    <div id="scifi-bar">
-      <span id="scifi-label">⚡ sci-fi</span>
-      <button class="scifi-btn" id="btn-explode" onclick="toggleExplodeView()" title="Iron Man: 3D layer explosion view">🔩 Explode</button>
-      <button class="scifi-btn" id="btn-multiverse" onclick="openMultiverse()" title="Minority Report: Split-screen timeline comparison">🌌 Multiverse</button>
-      <button class="scifi-btn" id="btn-ghost" onclick="toggleGhost()" title="Her: Autonomous AI co-pilot sweeping the project">👻 Ghost</button>
-      <button class="scifi-btn" id="btn-xray" title="Matrix: Hold SPACE for X-Ray structural HUD">🟩 X-Ray <kbd style="font-size:9px;opacity:.6;background:var(--bg4);border-radius:3px;padding:1px 4px">SPC</kbd></button>
-      <button class="scifi-btn" id="btn-bladerunner" onclick="testBladeRunner()" title="Blade Runner: Trigger sensory error diagnostics">⚡ Shock</button>
-    </div>
 
     <!-- ════ INTENT VIEW ════ -->
     <div id="view-intent">
@@ -480,14 +463,14 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
             onkeydown="onPbKey(event)"></textarea>
           <button id="run-btn" class="btn prim" onclick="submitPrompt()" style="padding:10px 16px;min-height:44px;align-self:flex-end;flex-shrink:0">run ↗</button>
         </div>
-        <!-- Free-mode toggle row -->
+        <!-- Free mode toggle -->
         <div style="display:flex;align-items:center;gap:8px;padding-top:2px">
-          <button class="btn xs" id="free-mode-btn" onclick="toggleFreeMode()" title="Ask anything unrelated to the project — fresh context, no node bias" style="border-color:var(--purple);color:var(--purple)">🧠 free mode</button>
-          <span style="font-size:10px;color:var(--text3)">Ask something unrelated to reset context</span>
+          <button class="btn xs" id="free-mode-btn" onclick="toggleFreeMode()" style="border-color:var(--purple);color:var(--purple)">🧠 free mode</button>
+          <span style="font-size:10px;color:var(--text3)">Ask something unrelated — fresh context</span>
         </div>
-        <!-- Free-mode panel -->
+        <!-- Free mode panel -->
         <div id="free-mode-panel">
-          <textarea id="free-ta" class="pb-ta" rows="2" placeholder="Ask anything: math, writing, general questions… (no project context)" onkeydown="onFreeModeKey(event)" style="max-height:90px"></textarea>
+          <textarea id="free-ta" class="pb-ta" rows="2" placeholder="Ask anything unrelated to the project…" onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();submitFreeMode()}" style="max-height:90px"></textarea>
           <div style="display:flex;gap:7px;align-items:center">
             <button class="btn xs prim" onclick="submitFreeMode()">ask ↗</button>
             <span id="free-status" style="font-size:11px;color:var(--text3)"></span>
@@ -499,106 +482,6 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
     </div><!-- /view-work -->
   </div><!-- /main -->
 </div><!-- /shell -->
-
-<!-- ══════════════════════════════════════
-     1. IRON MAN — 3D EXPLODE OVERLAY
-══════════════════════════════════════ -->
-<div id="explode-overlay">
-  <div style="position:relative;width:min(96vw,940px);height:min(82vh,640px)">
-    <div class="explode-hud">
-      <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(88,166,255,.8)">⬡ IRON MAN // EXPLODE VIEW</span>
-      <input id="explode-slider" type="range" min="0" max="100" value="0" oninput="setExplodeDepth(this.value)" style="width:130px;accent-color:var(--accent)">
-      <span id="explode-depth-lbl">depth: 0</span>
-      <button class="scifi-btn" onclick="explodeInject()" title="Inject live project HTML" style="color:var(--accent);border-color:var(--accent)">↻ inject</button>
-    </div>
-    <iframe id="explode-iframe" sandbox="allow-scripts allow-same-origin" srcdoc="<html><body style='font-family:sans-serif;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#111'>Click ↻ inject to load your project</body></html>"></iframe>
-    <div id="explode-prompt-row">
-      <textarea id="explode-ta" placeholder="Click a layer, then describe what to change… (Enter to run)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();explodeRunPrompt()}"></textarea>
-      <button class="btn xs prim" onclick="explodeRunPrompt()">run ↗</button>
-      <button class="btn xs" onclick="closeExplode()">✕ close</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     2. MULTIVERSE SPLITTER OVERLAY
-══════════════════════════════════════ -->
-<div id="multiverse-overlay">
-  <div class="mv-header">
-    <span class="mv-title">⟁ MULTIVERSE SPLITTER</span>
-    <span class="mv-label a">◀ REALITY A · Current</span>
-    <span style="font-size:10px;color:var(--text3);flex:1">← drag divider →</span>
-    <span class="mv-label b">REALITY B · Proposed ▶</span>
-    <button class="btn xs ok" id="mv-collapse-btn" onclick="collapseWavefunction()" style="display:none">✦ Collapse Wavefunction</button>
-    <button class="btn xs" onclick="closeMultiverse()">✕ close</button>
-  </div>
-  <div class="mv-arena" id="mv-arena">
-    <iframe id="mv-iframe-a" sandbox="allow-scripts allow-same-origin"></iframe>
-    <iframe id="mv-iframe-b" sandbox="allow-scripts allow-same-origin"></iframe>
-    <div class="mv-divider" id="mv-divider">
-      <div class="mv-divider-handle">⇔</div>
-    </div>
-    <div class="mv-tag a">REALITY A</div>
-    <div class="mv-tag b">REALITY B</div>
-    <input type="range" id="mv-slider" min="5" max="95" value="50" oninput="mvSlide(this.value)">
-  </div>
-  <div class="mv-footer">
-    <span id="mv-pct-label">50 / 50</span>
-    <span style="font-size:11px;color:var(--text3);flex:1" id="mv-status">Load a before/after snapshot to compare realities.</span>
-    <button class="btn xs" onclick="mvLoadCurrent()" title="Load current vibeTree into Reality A">↺ load current → A</button>
-    <button class="btn xs prim" onclick="mvLoadLastUndo()" title="Load last undo snapshot into Reality B">⎌ load undo → B</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     3. GHOST IN THE MACHINE — persistent overlays
-══════════════════════════════════════ -->
-<div id="ghost-overlay">
-  <svg class="ghost-sweep-svg" id="ghost-svg"></svg>
-</div>
-<div id="ghost-cursor"></div>
-<div class="ghost-notification" id="ghost-notif"></div>
-<div class="ghost-patch-panel" id="ghost-patch">
-  <div class="ghost-patch-title">⚠ CONTAINMENT PROTOCOL</div>
-  <div id="ghost-patch-node" class="cp-node"></div>
-  <div id="ghost-patch-issue" style="font-size:12px;color:var(--text);margin-bottom:8px;line-height:1.5"></div>
-  <div class="cp-buttons">
-    <button class="btn xs prim" id="ghost-approve-btn">✦ Approve Patch</button>
-    <button class="btn xs" onclick="dismissGhostPatch()">dismiss</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     4. MATRIX X-RAY HUD
-══════════════════════════════════════ -->
-<div id="xray-overlay">
-  <div id="xray-scanline"></div>
-  <div id="xray-prompt-toast">HOLD SPACE · hover a node · speak or type a command</div>
-  <div id="xray-crosshair">
-    <svg width="200" height="80" viewBox="0 0 200 80">
-      <rect x="1" y="1" width="198" height="78" rx="4" fill="none" stroke="rgba(0,255,70,.5)" stroke-width="1.5" stroke-dasharray="6 3"/>
-      <line x1="0" y1="40" x2="18" y2="40" stroke="rgba(0,255,70,.8)" stroke-width="1.5"/>
-      <line x1="182" y1="40" x2="200" y2="40" stroke="rgba(0,255,70,.8)" stroke-width="1.5"/>
-      <text id="xray-node-label" x="100" y="30" text-anchor="middle" fill="rgba(0,255,70,.9)" font-size="10" font-family="monospace"></text>
-      <text id="xray-node-type" x="100" y="58" text-anchor="middle" fill="rgba(0,255,70,.5)" font-size="9" font-family="monospace"></text>
-    </svg>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     5. BLADE RUNNER — Containment + error bar
-══════════════════════════════════════ -->
-<div id="error-indicator"></div>
-<div id="containment-panel">
-  <div class="cp-title"><span style="animation:pulse 1s ease infinite;display:inline-block">🔴</span> CONTAINMENT PROTOCOL</div>
-  <div id="cp-node-label" class="cp-node"></div>
-  <div id="cp-error-msg" class="cp-pre"></div>
-  <div id="cp-fix-suggestion" style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6"></div>
-  <div class="cp-buttons">
-    <button class="btn xs prim" id="cp-inject-btn">⚡ Inject Stimpack</button>
-    <button class="btn xs fail" onclick="dismissContainment()">✕ dismiss</button>
-  </div>
-</div>
 
 <script>
 /* ══════════════════════════════════════════════════════
@@ -721,8 +604,9 @@ function flattenTree(node, list=[]) {
 function populateNodeSelector() {
   const sel = document.getElementById('nd-sel');
   const prev = sel.value;
-  sel.innerHTML = '<option value="__GLOBAL__">🌐 Entire Project</option>';
+  sel.innerHTML = '';
   if (!vibeTree) {
+    // Fallback demo nodes when no tree connected
     const demo = ['nav-styles (css)','hero-section (html)','main-script (js)','card-grid (html)','theme-vars (css)'];
     demo.forEach(d => {
       const [id, t] = d.split(' ');
@@ -903,26 +787,11 @@ function renderWork() {
   const nid = s.currentNode;
 
   document.getElementById('intent-display').textContent = s.intent;
-  document.getElementById('state-lbl').textContent = 'current state · ' + (nid === '__GLOBAL__' ? 'entire project' : nid);
-  document.getElementById('att-lbl').textContent   = 'attempts · ' + (nid === '__GLOBAL__' ? 'entire project' : nid);
-  document.getElementById('tb-node').textContent   = nid === '__GLOBAL__' ? '🌐 Global' : nid;
+  document.getElementById('state-lbl').textContent = 'current state · ' + nid;
+  document.getElementById('att-lbl').textContent   = 'attempts · ' + nid;
+  document.getElementById('tb-node').textContent   = nid;
   document.getElementById('pb-sess').textContent   = s.name;
   document.getElementById('nd-sel').value          = nid;
-
-  if (nid === '__GLOBAL__') {
-    document.getElementById('sp-prose').innerHTML =
-      `<b>Project-Wide Mode</b><br><span style="color:var(--text3)">The AI will analyze the entire Vibe Tree and autonomously decide which nodes to create, update, or delete.</span>`;
-    document.getElementById('sp-pseudo').innerHTML = `<span class="pc">// Entire project hierarchy</span>`;
-    document.getElementById('sp-code').textContent = vibeTree ? JSON.stringify(vibeTree, null, 2) : '// No project tree loaded';
-    const badge = document.getElementById('state-badge');
-    badge.textContent = 'global';
-    badge.className = 'badge purple';
-    renderDiff(nid);
-    renderQuickPills(nid);
-    renderAtts(nid);
-    renderLog(nid);
-    return;
-  }
 
   // Fill description / pseudo / code from live tree if available
   const node = getNodeFromTree(nid);
@@ -960,9 +829,6 @@ function renderWork() {
 
   // Attempts
   renderAtts(nid);
-
-  // Log
-  renderLog(nid);
 }
 
 /* ══ Generate pseudo code from raw source ══ */
@@ -1230,8 +1096,6 @@ function onNodeChange() {
   // Clear AI state panel
   document.getElementById('sp-ai-state').innerHTML = '<div class="empty">Click <b>✦ analyze</b> to get an AI description of the current node state.</div>';
   renderWork();
-  // Auto-generate proactive AI suggestions
-  setTimeout(() => generateProactiveSuggestions(s.currentNode), 600);
 }
 
 /* ══ Prompt submission — routes through Vibe's native agent ══ */
@@ -1317,46 +1181,11 @@ function handleAgentStatus(d) {
   if (d.status === 'done') {
     att.status = 'ok';
     att.result = d.plan || d.message || 'Applied.';
-    att.changedNodes = d.changedNodes || [];
-
-    // Build heatmap pills for changed nodes
-    let nodesHtml = '';
-    if (att.changedNodes.length > 0) {
-      nodesHtml = `<div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap;">` +
-        att.changedNodes.map(n =>
-          `<button class="node-heat-pill" onclick="document.getElementById('nd-sel').value='${n}';onNodeChange();" title="Jump to ${n}">✏️ ${esc(n)}</button>`
-        ).join('') +
-        `</div>`;
-    }
-    att.aiResultFormatted = `<span style="color:var(--green)">✓ ${esc(att.result)}</span>${nodesHtml}`;
-
+    att.aiResultFormatted = `<span style="color:var(--green)">✓ ${esc(att.result)}</span>`;
     // Build a diff summary from changedNodes
     if (d.changedNodes && d.changedNodes.length > 0) {
       att.diff = d.changedNodes.map(n => `+ updated: ${n}`);
     }
-
-    // Write to per-node change log
-    const logEntry = {
-      ts: new Date().toISOString(),
-      time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
-      date: new Date().toLocaleDateString([],{month:'short',day:'numeric'}),
-      prompt: att.prompt,
-      result: att.result,
-      status: 'ok',
-      changedNodes: att.changedNodes
-    };
-    if (!s.nodeLogs) s.nodeLogs = {};
-    const logNode = att.node || s.currentNode;
-    if (!s.nodeLogs[logNode]) s.nodeLogs[logNode] = [];
-    s.nodeLogs[logNode].unshift(logEntry);
-    // Also log on each changed node if global
-    if (logNode === '__GLOBAL__') {
-      att.changedNodes.forEach(n => {
-        if (!s.nodeLogs[n]) s.nodeLogs[n] = [];
-        s.nodeLogs[n].unshift({...logEntry});
-      });
-    }
-
     // Update our local tree copy from the fresh tree Vibe sent back
     if (d.vibeTree) {
       vibeTree = d.vibeTree;
@@ -1458,764 +1287,775 @@ async function callAnalysisAI(systemPrompt, userPrompt) {
   return data.candidates[0].content.parts[0].text;
 }
 
-
-/* ══════════════════════════════════════════════════════════════
-   SCI-FI FEATURES
-══════════════════════════════════════════════════════════════ */
-
-/* ─────────────────────────────────────────────────────────────
-   1. IRON MAN — Z-AXIS DOM DECONSTRUCTION (EXPLODE VIEW)
-───────────────────────────────────────────────────────────────*/
-let explodeOpen = false;
-let explodeDepth = 0;
-let explodeSelectedNode = null;
-
-function toggleExplodeView() {
-  const el = document.getElementById('explode-overlay');
-  explodeOpen = !explodeOpen;
-  el.classList.toggle('open', explodeOpen);
-  document.getElementById('btn-explode').classList.toggle('active', explodeOpen);
-  if (explodeOpen) explodeInject();
-}
-
-function closeExplode() {
-  explodeOpen = false;
-  document.getElementById('explode-overlay').classList.remove('open');
-  document.getElementById('btn-explode').classList.remove('active');
-}
-
-function explodeInject() {
-  // Build a simple structural wireframe from vibeTree if no live preview
-  const iframe = document.getElementById('explode-iframe');
-  if (!vibeTree) {
-    iframe.srcdoc = buildExplodeWireframe();
-    return;
-  }
-  // Post message to parent to request current rendered HTML
-  try {
-    window.parent.postMessage({ source:'apui-vibe', type:'apui-request-preview-html' }, '*');
-  } catch(e) {}
-  // Fallback: show wireframe immediately
-  iframe.srcdoc = buildExplodeWireframe();
-  setTimeout(() => setExplodeDepth(explodeDepth), 300);
-}
-
-function buildExplodeWireframe() {
-  if (!vibeTree) return `<html><body style="background:#0a0c10;color:#58a6ff;font-family:monospace;padding:20px">No project loaded.</body></html>`;
-  const nodes = flattenTree(vibeTree);
-  let boxes = '';
-  nodes.forEach((n, i) => {
-    const depth = Math.floor(Math.random() * 4);
-    const colors = ['rgba(88,166,255,.15)','rgba(63,185,80,.1)','rgba(188,140,255,.1)','rgba(210,153,34,.1)'];
-    const borders = ['#58a6ff','#3fb950','#bc8cff','#d29922'];
-    boxes += `<div data-node="${n.id}" data-depth="${depth}" style="
-      border:1px solid ${borders[depth % 4]};
-      background:${colors[depth % 4]};
-      border-radius:6px;
-      padding:${16 + depth * 12}px;
-      margin:8px;
-      position:relative;
-      cursor:pointer;
-      transition:transform .3s ease, box-shadow .3s ease;
-      font-family:monospace;font-size:11px;color:${borders[depth % 4]};
-    " onclick="window.parent.postMessage({source:'explode-node-click',nodeId:'${n.id}',type:'${n.type}'},'*')">
-      <span style="opacity:.6;font-size:10px">[${n.type}]</span> ${n.id}
-    </div>`;
-  });
-  return `<!DOCTYPE html><html><head><style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#0a0c10;padding:16px;min-height:100vh;transform-style:preserve-3d}
-    .node-box:hover{box-shadow:0 0 20px rgba(88,166,255,.4)!important}
-  </style></head><body id="explode-body">${boxes}
-  <script>
-    document.querySelectorAll('[data-node]').forEach(el=>{
-      el.addEventListener('click',()=>{
-        document.querySelectorAll('[data-node]').forEach(x=>x.style.outline='');
-        el.style.outline='2px solid #58a6ff';
-        parent.postMessage({source:'explode-node-click',nodeId:el.dataset.node},'*');
-      });
-    });
-  <\/script></body></html>`;
-}
-
-function setExplodeDepth(val) {
-  explodeDepth = parseInt(val);
-  document.getElementById('explode-depth-lbl').textContent = `depth: ${val}`;
-  const iframe = document.getElementById('explode-iframe');
-  const angle = (val / 100) * 55;
-  const rotZ  = (val / 100) * -30;
-  if (val > 5) {
-    iframe.style.transform = `rotateX(${angle}deg) rotateZ(${rotZ}deg) scale(${1 - val * 0.002})`;
-    iframe.style.transformOrigin = 'center center';
-    iframe.style.transition = 'transform .4s cubic-bezier(.34,1.1,.64,1)';
-  } else {
-    iframe.style.transform = 'none';
-  }
-  // Inject depth translation into iframe DOM elements
-  try {
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    const els = doc.querySelectorAll('[data-depth]');
-    els.forEach(el => {
-      const d = parseInt(el.dataset.depth || 0);
-      const z = (val / 100) * d * 60;
-      el.style.transform = `translateZ(${z}px) translateY(${-z * 0.3}px)`;
-      el.style.boxShadow = val > 10 ? `0 ${z * 0.5}px ${z}px rgba(0,0,0,0.6)` : '';
-    });
-  } catch(e) {}
-}
-
-function explodeRunPrompt() {
-  const text = document.getElementById('explode-ta').value.trim();
-  if (!text) return;
-  const nid = explodeSelectedNode || (sess() && sess().currentNode) || '';
-  if (nid && sess()) {
-    document.getElementById('pb-ta').value = text;
-    document.getElementById('nd-sel').value = nid;
-    onNodeChange();
-    closeExplode();
-    setTimeout(submitPrompt, 100);
-  }
-}
-
-// Receive node clicks from explode iframe
-window.addEventListener('message', e => {
-  if (e.data && e.data.source === 'explode-node-click') {
-    explodeSelectedNode = e.data.nodeId;
-    document.getElementById('explode-ta').placeholder = `Selected: ${e.data.nodeId} — describe what to change…`;
-    document.getElementById('explode-ta').focus();
-  }
-});
-
-/* ─────────────────────────────────────────────────────────────
-   2. MINORITY REPORT — MULTIVERSE SPLITTER
-───────────────────────────────────────────────────────────────*/
-let mvPct = 50;
-let mvTreeA = null, mvTreeB = null;
-let mvDragging = false;
-
-function openMultiverse() {
-  document.getElementById('multiverse-overlay').classList.add('open');
-  document.getElementById('btn-multiverse').classList.add('active-purple');
-  mvSlide(50);
-}
-
-function closeMultiverse() {
-  document.getElementById('multiverse-overlay').classList.remove('open');
-  document.getElementById('btn-multiverse').classList.remove('active-purple');
-}
-
-function mvSlide(val) {
-  mvPct = parseInt(val);
-  document.getElementById('mv-slider').value = val;
-  document.getElementById('mv-divider').style.left = val + '%';
-  document.getElementById('mv-iframe-a').style.right = (100 - val) + '%';
-  document.getElementById('mv-iframe-b').style.left  = val + '%';
-  document.getElementById('mv-pct-label').textContent = `${val} / ${100 - val}`;
-}
-
-// Drag divider
-(function initMvDrag() {
-  window.addEventListener('load', () => {
-    const arena   = document.getElementById('mv-arena');
-    const divider = document.getElementById('mv-divider');
-    if (!divider || !arena) return;
-    divider.addEventListener('mousedown', startDrag);
-    divider.addEventListener('touchstart', startDrag, {passive:true});
-    function startDrag(e) {
-      mvDragging = true;
-      document.addEventListener('mousemove', onDrag);
-      document.addEventListener('mouseup', endDrag);
-      document.addEventListener('touchmove', onDragTouch, {passive:true});
-      document.addEventListener('touchend', endDrag);
-    }
-    function onDrag(e) {
-      if (!mvDragging) return;
-      const rect = arena.getBoundingClientRect();
-      const pct = Math.min(95, Math.max(5, ((e.clientX - rect.left) / rect.width) * 100));
-      mvSlide(pct.toFixed(1));
-    }
-    function onDragTouch(e) {
-      if (e.touches[0]) onDrag(e.touches[0]);
-    }
-    function endDrag() {
-      mvDragging = false;
-      document.removeEventListener('mousemove', onDrag);
-      document.removeEventListener('mouseup', endDrag);
-      document.removeEventListener('touchmove', onDragTouch);
-      document.removeEventListener('touchend', endDrag);
-    }
-  });
-})();
-
-function renderTreeToIframe(iframe, tree) {
-  if (!tree) { iframe.srcdoc = `<html><body style="background:#111;color:#555;font-family:monospace;padding:20px;display:flex;align-items:center;justify-content:center;height:100vh">No snapshot loaded</body></html>`; return; }
-  // Build a structural preview from the tree
-  const nodes = flattenTree(tree);
-  const bg = tree === mvTreeB ? '#0d0818' : '#0a0c10';
-  const accent = tree === mvTreeB ? '#bc8cff' : '#58a6ff';
-  let html = `<!DOCTYPE html><html><head><style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{background:${bg};padding:16px;font-family:'SF Mono',monospace;min-height:100vh}
-    .n{border:1px solid ${accent}33;border-radius:6px;padding:10px 12px;margin:6px 0;font-size:11px;color:${accent};background:${accent}0d}
-    .n:hover{background:${accent}1a}
-    .t{opacity:.5;font-size:10px;margin-right:4px}
-    .c{font-size:10px;opacity:.4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  </style></head><body>
-  <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${accent};opacity:.5;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid ${accent}22">
-    ${tree === mvTreeB ? '⟁ REALITY B — PROPOSED' : '◎ REALITY A — CURRENT'} · ${nodes.length} nodes
-  </div>`;
-  nodes.forEach(n => {
-    const snippet = (n.code || '').slice(0, 60).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    html += `<div class="n"><span class="t">[${n.type}]</span>${n.id}<div class="c">${snippet}…</div></div>`;
-  });
-  html += '</body></html>';
-  iframe.srcdoc = html;
-}
-
-function mvLoadCurrent() {
-  if (!vibeTree) { showGhostNotif('No project tree loaded yet.'); return; }
-  mvTreeA = JSON.parse(JSON.stringify(vibeTree));
-  renderTreeToIframe(document.getElementById('mv-iframe-a'), mvTreeA);
-  document.getElementById('mv-status').textContent = 'Reality A loaded. Now run an agent prompt, then load the result into B.';
-}
-
-function mvLoadLastUndo() {
-  // Try to get last undo snapshot from parent via postMessage
-  try {
-    window.parent.postMessage({ source:'apui-vibe', type:'apui-request-undo-snapshot' }, '*');
-  } catch(e) {}
-  // Fallback: use current tree as B for demo
-  if (vibeTree) {
-    mvTreeB = JSON.parse(JSON.stringify(vibeTree));
-    renderTreeToIframe(document.getElementById('mv-iframe-b'), mvTreeB);
-    document.getElementById('mv-collapse-btn').style.display = '';
-    document.getElementById('mv-status').textContent = 'Reality B loaded. Drag the divider to compare. Collapse to adopt B.';
-  } else {
-    document.getElementById('mv-status').textContent = 'No undo snapshot available yet — run an agent prompt first.';
-  }
-}
-
-// Receive undo snapshot from parent
-window.addEventListener('message', e => {
-  if (e.data && e.data.type === 'apui-undo-snapshot' && e.data.tree) {
-    mvTreeB = e.data.tree;
-    renderTreeToIframe(document.getElementById('mv-iframe-b'), mvTreeB);
-    document.getElementById('mv-collapse-btn').style.display = '';
-    document.getElementById('mv-status').textContent = 'Reality B loaded from undo history. Drag to compare.';
-  }
-});
-
-function collapseWavefunction() {
-  if (!mvTreeB) return;
-  vibeTree = JSON.parse(JSON.stringify(mvTreeB));
-  populateNodeSelector();
-  // Push to parent
-  try {
-    window.parent.postMessage({ source:'apui-vibe', type:'apui-adopt-tree', tree: mvTreeB }, '*');
-  } catch(e) {}
-  closeMultiverse();
-  showGhostNotif('⟁ Wavefunction collapsed. Reality B is now your timeline.');
-}
-
-/* ─────────────────────────────────────────────────────────────
-   3. HER — GHOST IN THE MACHINE (Autonomous Symbiosis)
-───────────────────────────────────────────────────────────────*/
-let ghostActive     = false;
-let ghostSweepTimer = null;
-let ghostSweepIdx   = 0;
-
-const ghostMessages = [
-  node => `Optimizing <b>${node}</b> for mobile accessibility…`,
-  node => `Scanning <b>${node}</b> for dead code…`,
-  node => `Checking <b>${node}</b> contrast ratios…`,
-  node => `Reviewing <b>${node}</b> for performance bottlenecks…`,
-  node => `Auditing <b>${node}</b> semantic structure…`,
-];
-
-const ghostIssues = [
-  { issue: 'Low contrast ratio detected (2.8:1). WCAG requires 4.5:1.', fix: 'Increase text contrast to meet accessibility standards' },
-  { issue: 'Redundant CSS selector found — 3 rules overriding each other.', fix: 'Consolidate duplicate selectors into a single rule' },
-  { issue: 'Missing aria-label on interactive element.', fix: 'Add aria-label attributes to all interactive elements' },
-  { issue: 'Unoptimized CSS animation using top/left instead of transform.', fix: 'Replace top/left transitions with transform: translate()' },
-  { issue: 'Image element missing alt attribute.', fix: 'Add descriptive alt attributes to all img elements' },
-];
-
-function toggleGhost() {
-  ghostActive = !ghostActive;
-  const btn = document.getElementById('btn-ghost');
-  btn.classList.toggle('active-amber', ghostActive);
-  if (ghostActive) {
-    startGhostSweep();
-    showGhostNotif('👻 Ghost co-pilot activated. Sweeping the project…');
-  } else {
-    stopGhostSweep();
-    dismissGhostNotif();
-    dismissGhostPatch();
-    document.getElementById('ghost-cursor').classList.remove('active');
-  }
-}
-
-function startGhostSweep() {
-  clearTimeout(ghostSweepTimer);
-  ghostSweepTimer = setTimeout(runGhostSweepCycle, 3000);
-}
-
-function stopGhostSweep() {
-  clearTimeout(ghostSweepTimer);
-}
-
-function runGhostSweepCycle() {
-  if (!ghostActive) return;
-  const nodes = vibeTree ? flattenTree(vibeTree) : [];
-  if (!nodes.length) { ghostSweepTimer = setTimeout(runGhostSweepCycle, 8000); return; }
-  const node = nodes[ghostSweepIdx % nodes.length];
-  ghostSweepIdx++;
-
-  // 1. Show ghost cursor wandering to the APUI node card
-  animateGhostCursor();
-
-  // 2. Show notification
-  const msgFn = ghostMessages[ghostSweepIdx % ghostMessages.length];
-  showGhostNotif(msgFn(node.id));
-
-  // 3. 40% chance to find a "problem" and show patch panel
-  if (Math.random() < 0.40) {
-    const issue = ghostIssues[Math.floor(Math.random() * ghostIssues.length)];
-    setTimeout(() => {
-      if (!ghostActive) return;
-      showGhostPatch(node.id, issue);
-    }, 2200);
-  }
-
-  // Schedule next sweep: 8–15s
-  ghostSweepTimer = setTimeout(runGhostSweepCycle, 8000 + Math.random() * 7000);
-}
-
-function animateGhostCursor() {
-  const gc = document.getElementById('ghost-cursor');
-  gc.classList.add('active');
-  const positions = [
-    [window.innerWidth * 0.3, window.innerHeight * 0.4],
-    [window.innerWidth * 0.6, window.innerHeight * 0.6],
-    [window.innerWidth * 0.5, window.innerHeight * 0.3],
-  ];
-  let i = 0;
-  const move = () => {
-    if (i >= positions.length) { gc.classList.remove('active'); return; }
-    gc.style.left = positions[i][0] + 'px';
-    gc.style.top  = positions[i][1] + 'px';
-    i++;
-    setTimeout(move, 900);
-  };
-  move();
-}
-
-function showGhostNotif(msg) {
-  const el = document.getElementById('ghost-notif');
-  el.innerHTML = msg;
-  el.classList.add('show');
-  clearTimeout(el._timer);
-  el._timer = setTimeout(dismissGhostNotif, 4500);
-}
-
-function dismissGhostNotif() {
-  document.getElementById('ghost-notif').classList.remove('show');
-}
-
-function showGhostPatch(nodeId, issue) {
-  const el = document.getElementById('ghost-patch');
-  document.getElementById('ghost-patch-node').textContent = '⚡ Node: ' + nodeId;
-  document.getElementById('ghost-patch-issue').textContent = issue.issue;
-  document.getElementById('ghost-approve-btn').onclick = () => {
-    dismissGhostPatch();
-    // Route fix through agent
-    const ta = document.getElementById('pb-ta');
-    ta.value = issue.fix;
-    if (sess()) {
-      document.getElementById('nd-sel').value = nodeId;
-      onNodeChange();
-      setTimeout(submitPrompt, 200);
-    }
-  };
-  el.classList.add('show');
-}
-
-function dismissGhostPatch() {
-  document.getElementById('ghost-patch').classList.remove('show');
-}
-
-/* ─────────────────────────────────────────────────────────────
-   4. MATRIX — X-RAY HUD (Semantic Structural Overlay)
-───────────────────────────────────────────────────────────────*/
-let xrayActive = false;
-let xrayMouseX = 0, xrayMouseY = 0;
-let xrayHoveredNode = null;
-let xrayHoldTimer   = null;
-
-// Keyboard: hold SPACE
-document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !e.repeat && !e.target.matches('textarea,input')) {
-    e.preventDefault();
-    activateXray();
-  }
-});
-document.addEventListener('keyup', e => {
-  if (e.code === 'Space') deactivateXray();
-});
-
-document.addEventListener('mousemove', e => {
-  xrayMouseX = e.clientX; xrayMouseY = e.clientY;
-  if (xrayActive) updateXrayCrosshair(e.clientX, e.clientY);
-});
-
-function activateXray() {
-  if (xrayActive) return;
-  xrayActive = true;
-  document.getElementById('xray-overlay').classList.add('active');
-  document.getElementById('btn-xray').classList.add('active');
-  buildXrayLabels();
-}
-
-function deactivateXray() {
-  if (!xrayActive) return;
-  xrayActive = false;
-  document.getElementById('xray-overlay').classList.remove('active');
-  document.getElementById('btn-xray').classList.remove('active');
-  clearXrayLabels();
-}
-
-function buildXrayLabels() {
-  clearXrayLabels();
-  if (!vibeTree) return;
-  const nodes = flattenTree(vibeTree);
-  const overlay = document.getElementById('xray-overlay');
-  nodes.forEach((n, i) => {
-    const label = document.createElement('div');
-    label.className = 'xray-label';
-    label.textContent = n.id;
-    label.dataset.nodeId = n.id;
-    // Distribute labels across the screen
-    const cols = 3, rows = Math.ceil(nodes.length / cols);
-    const col = i % cols, row = Math.floor(i / cols);
-    label.style.left  = (10 + col * 32) + '%';
-    label.style.top   = (8 + (row / Math.max(rows, 1)) * 72) + '%';
-    label.style.cursor = 'pointer';
-    label.addEventListener('mouseenter', () => {
-      xrayHoveredNode = n.id;
-      updateXrayCrosshair(xrayMouseX, xrayMouseY, n.id, n.type);
-    });
-    label.addEventListener('click', () => {
-      // Select this node
-      const sel = document.getElementById('nd-sel');
-      sel.value = n.id;
-      onNodeChange();
-      deactivateXray();
-    });
-    overlay.appendChild(label);
-  });
-}
-
-function clearXrayLabels() {
-  document.querySelectorAll('.xray-label').forEach(el => el.remove());
-}
-
-function updateXrayCrosshair(x, y, nodeId, nodeType) {
-  const ch = document.getElementById('xray-crosshair');
-  ch.style.left = x + 'px';
-  ch.style.top  = y + 'px';
-  if (nodeId) {
-    document.getElementById('xray-node-label').textContent = nodeId;
-    document.getElementById('xray-node-type').textContent  = nodeType || '';
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────
-   5. BLADE RUNNER — SENSORY ERROR DIAGNOSTICS
-───────────────────────────────────────────────────────────────*/
-let audioCtx = null;
-
-function initAudioCtx() {
-  if (audioCtx) return audioCtx;
-  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
-  return audioCtx;
-}
-
-function playBladeRunnerBass() {
-  const ctx = initAudioCtx();
-  if (!ctx) return;
-  try {
-    // Sub-bass sweep
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const dist = ctx.createWaveShaper();
-    // Distortion curve for grit
-    const curve = new Float32Array(256);
-    for (let i = 0; i < 256; i++) { const x = (i * 2) / 256 - 1; curve[i] = (Math.PI + 300) * x / (Math.PI + 300 * Math.abs(x)); }
-    dist.curve = curve;
-    osc.connect(dist); dist.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(80, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.8);
-    gain.gain.setValueAtTime(0, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 1.4);
-    // High freq alarm ping
-    const ping = ctx.createOscillator();
-    const pg   = ctx.createGain();
-    ping.connect(pg); pg.connect(ctx.destination);
-    ping.type = 'sine';
-    ping.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
-    ping.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.5);
-    pg.gain.setValueAtTime(0.18, ctx.currentTime + 0.1);
-    pg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    ping.start(ctx.currentTime + 0.1);
-    ping.stop(ctx.currentTime + 0.6);
-  } catch(e) { console.warn('AudioCtx error:', e); }
-}
-
-function triggerBladeRunner(nodeId, errorMsg, fixSuggestion) {
-  // 1. Audio
-  playBladeRunnerBass();
-
-  // 2. Visual — bleed animation on APUI
-  document.getElementById('error-indicator').classList.add('show');
-  setTimeout(() => document.getElementById('error-indicator').classList.remove('show'), 3000);
-
-  // 3. Find any card matching this node and animate bleed
-  const allCards = document.querySelectorAll('.card');
-  allCards.forEach(card => {
-    card.classList.add('node-bleeding-card');
-    setTimeout(() => card.classList.remove('node-bleeding-card'), 2000);
-  });
-
-  // 4. Chromatic aberration on the whole main panel
-  const main = document.getElementById('main');
-  main.style.animation = 'chromaGlitch 0.8s steps(1) 1';
-  setTimeout(() => main.style.animation = '', 900);
-
-  // 5. Show containment panel
-  showContainment(nodeId, errorMsg, fixSuggestion || 'The AI will attempt to patch this error automatically.');
-}
-
-function showContainment(nodeId, errorMsg, fixSuggestion) {
-  document.getElementById('cp-node-label').textContent  = nodeId ? `⚡ Node: ${nodeId}` : '⚡ Runtime Error';
-  document.getElementById('cp-error-msg').textContent   = errorMsg || 'Unknown runtime error';
-  document.getElementById('cp-fix-suggestion').textContent = fixSuggestion || 'Click Inject Stimpack to have the AI auto-fix this.';
-  document.getElementById('cp-inject-btn').onclick = () => {
-    dismissContainment();
-    if (nodeId && sess()) {
-      document.getElementById('nd-sel').value = nodeId;
-      onNodeChange();
-      document.getElementById('pb-ta').value = `Fix this error: ${errorMsg}`;
-      setTimeout(submitPrompt, 200);
-    }
-  };
-  document.getElementById('containment-panel').classList.add('open');
-}
-
-function dismissContainment() {
-  document.getElementById('containment-panel').classList.remove('open');
-}
-
-// Listen for runtime errors from the project iframe (forwarded by parent)
-window.addEventListener('message', e => {
-  if (e.data && e.data.type === 'apui-runtime-error') {
-    triggerBladeRunner(e.data.nodeId, e.data.error, e.data.fix);
-  }
-});
-
-// Test / demo trigger
-function testBladeRunner() {
-  const nodes = vibeTree ? flattenTree(vibeTree) : [{id:'nav-styles'}];
-  const node  = nodes[Math.floor(Math.random() * nodes.length)];
-  triggerBladeRunner(
-    node.id,
-    `ReferenceError: Cannot read properties of undefined (reading 'classList')`,
-    'Add a null-check guard before accessing classList. The element may not exist in the DOM at runtime.'
-  );
-}
-
 /* ══ Utils ══ */
 function esc(s)    { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
 function trunc(s,n){ const str=String(s||''); return str.length>n?str.slice(0,n)+'…':str }
 
-/* ══ Node Change Log ══ */
+/* ═══════════════════════════════════════════════════════════════
+   FEATURE JAVASCRIPT — v7
+   All functions below are additions; original code above is intact
+═══════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────
+   PATCH: populateNodeSelector with Global
+──────────────────────────────────────── */
+(function patchPopulateNodeSelector() {
+  const _orig = window.populateNodeSelector || function(){};
+  window.populateNodeSelector = function() {
+    const sel = document.getElementById('nd-sel');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="__GLOBAL__">🌐 Entire Project</option>';
+    const nodes = vibeTree ? flattenTree(vibeTree) : [];
+    if (!nodes.length) {
+      // demo fallback
+      ['nav-styles','hero-section','main-script','card-grid','theme-vars'].forEach(id => {
+        const o = document.createElement('option');
+        o.value = id; o.textContent = id; sel.appendChild(o);
+      });
+    } else {
+      nodes.forEach(n => {
+        const o = document.createElement('option');
+        o.value = n.id; o.textContent = n.id + ' (' + n.type + ')'; sel.appendChild(o);
+      });
+    }
+    if (prev && sel.querySelector('option[value="' + prev + '"]')) sel.value = prev;
+    else if (sel.options.length > 1) sel.value = sel.options[1].value; // skip __GLOBAL__ as default
+  };
+})();
+
+/* ───────────────────────────────────────
+   PATCH: renderWork — handle __GLOBAL__
+──────────────────────────────────────── */
+(function patchRenderWork() {
+  const _origRW = window.renderWork;
+  window.renderWork = function() {
+    const s = sess(); if (!s) return;
+    const nid = s.currentNode;
+    if (nid === '__GLOBAL__') {
+      // Update all labels
+      document.getElementById('state-lbl').textContent = 'current state · entire project';
+      document.getElementById('att-lbl').textContent   = 'attempts · entire project';
+      document.getElementById('tb-node').textContent   = '🌐 Global';
+      document.getElementById('pb-sess').textContent   = s.name;
+      document.getElementById('nd-sel').value          = '__GLOBAL__';
+      document.getElementById('intent-display').textContent = s.intent;
+      const badge = document.getElementById('state-badge');
+      badge.textContent = 'global'; badge.className = 'badge purple';
+      document.getElementById('sp-prose').innerHTML =
+        '<b>Project-Wide Mode</b><br><span style="color:var(--text3)">The AI will analyze the entire Vibe Tree and autonomously decide which nodes to create, update, or delete.</span>';
+      document.getElementById('sp-pseudo').innerHTML = '<span class="pc">// Entire project hierarchy</span>';
+      document.getElementById('sp-code').textContent = vibeTree ? JSON.stringify(vibeTree, null, 2) : '// No project tree loaded';
+      renderDiff(nid);
+      renderQuickPills(nid);
+      renderAtts(nid);
+      renderLog(nid);
+      return;
+    }
+    // Call original for normal nodes, then add log
+    _origRW.call(this);
+    renderLog(nid);
+  };
+})();
+
+/* ───────────────────────────────────────
+   PATCH: onNodeChange — proactive suggestions
+──────────────────────────────────────── */
+(function patchOnNodeChange() {
+  const _orig = window.onNodeChange;
+  window.onNodeChange = function() {
+    _orig.call(this);
+    const s = sess();
+    if (s) setTimeout(function() { generateSuggestions(s.currentNode); }, 600);
+  };
+})();
+
+/* ───────────────────────────────────────
+   PATCH: handleAgentStatus — heatmap + log
+──────────────────────────────────────── */
+(function patchHandleAgentStatus() {
+  const _orig = window.handleAgentStatus;
+  window.handleAgentStatus = function(d) {
+    if (d.status === 'done') {
+      const s = sess(); if (!s) return;
+      let att = null;
+      for (const arr of Object.values(s.history)) {
+        att = arr.find(a => a.id === d.attemptId);
+        if (att) break;
+      }
+      if (att) {
+        att.changedNodes = d.changedNodes || [];
+        // Build heatmap HTML
+        let heatHtml = '';
+        if (att.changedNodes.length) {
+          heatHtml = '<div style="margin-top:8px;display:flex;gap:5px;flex-wrap:wrap">' +
+            att.changedNodes.map(function(n) {
+              return '<button class="node-heat-pill" onclick="document.getElementById(\'nd-sel\').value=\'' + n + '\';onNodeChange()">✏️ ' + esc(n) + '</button>';
+            }).join('') + '</div>';
+        }
+        att.aiResultFormatted = '<span style="color:var(--green)">✓ ' + esc(att.result || d.plan || d.message || 'Applied.') + '</span>' + heatHtml;
+
+        // Write change log
+        if (!s.nodeLogs) s.nodeLogs = {};
+        const logNode = att.node || s.currentNode;
+        const entry = {
+          ts: new Date().toISOString(),
+          time: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),
+          date: new Date().toLocaleDateString([], {month:'short',day:'numeric'}),
+          prompt: att.prompt, result: att.result || 'Applied.', status: 'ok',
+          changedNodes: att.changedNodes
+        };
+        if (!s.nodeLogs[logNode]) s.nodeLogs[logNode] = [];
+        s.nodeLogs[logNode].unshift(entry);
+        if (logNode === '__GLOBAL__') {
+          att.changedNodes.forEach(function(n) {
+            if (!s.nodeLogs[n]) s.nodeLogs[n] = [];
+            s.nodeLogs[n].unshift(Object.assign({}, entry));
+          });
+        }
+      }
+    }
+    _orig.call(this, d);
+  };
+})();
+
+/* ───────────────────────────────────────
+   NODE CHANGE LOG
+──────────────────────────────────────── */
 function renderLog(nid) {
   const s = sess(); if (!s) return;
   const logs = (s.nodeLogs && s.nodeLogs[nid]) || [];
   const emptyEl   = document.getElementById('log-empty');
   const entriesEl = document.getElementById('log-entries');
-  if (!logs.length) {
-    emptyEl.style.display = 'block';
-    entriesEl.innerHTML = '';
-    return;
-  }
+  if (!emptyEl || !entriesEl) return;
+  if (!logs.length) { emptyEl.style.display = 'block'; entriesEl.innerHTML = ''; return; }
   emptyEl.style.display = 'none';
-  entriesEl.innerHTML = logs.map(l => {
-    const changedHtml = l.changedNodes && l.changedNodes.length
-      ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${l.changedNodes.map(n=>`<button class="node-heat-pill" style="font-size:10px;padding:2px 7px" onclick="document.getElementById('nd-sel').value='${n}';onNodeChange()">✏️ ${esc(n)}</button>`).join('')}</div>`
-      : '';
-    return `<div class="log-entry log-${l.status}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <span style="color:var(--text);flex:1">${esc(trunc(l.prompt,80))}</span>
-        <span class="log-time">${l.date} ${l.time}</span>
-      </div>
-      <div style="color:var(--text3);font-size:10px;margin-top:2px">${esc(trunc(l.result,60))}</div>
-      ${changedHtml}
-    </div>`;
+  entriesEl.innerHTML = logs.map(function(l) {
+    const nodesHtml = (l.changedNodes && l.changedNodes.length)
+      ? '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">' +
+        l.changedNodes.map(function(n) {
+          return '<button class="node-heat-pill" style="font-size:10px;padding:2px 7px" onclick="document.getElementById(\'nd-sel\').value=\'' + n + '\';onNodeChange()">✏️ ' + esc(n) + '</button>';
+        }).join('') + '</div>' : '';
+    return '<div class="log-entry log-' + l.status + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--text);flex:1">' + esc(trunc(l.prompt,80)) + '</span>' +
+      '<span class="log-time">' + l.date + ' ' + l.time + '</span></div>' +
+      '<div style="color:var(--text3);font-size:10px;margin-top:2px">' + esc(trunc(l.result,60)) + '</div>' +
+      nodesHtml + '</div>';
   }).join('');
 }
 
-/* ══ Proactive AI Suggestions ══ */
-let _lastSuggestNode = null;
-async function generateProactiveSuggestions(nid) {
-  if (nid === '__GLOBAL__') return;
+/* ───────────────────────────────────────
+   PROACTIVE AI SUGGESTIONS
+──────────────────────────────────────── */
+var _lastSuggestNode = null;
+function generateSuggestions(nid) {
+  if (nid === '__GLOBAL__' || nid === _lastSuggestNode) return;
   if (!effectiveKey()) return;
-  const node = getNodeFromTree(nid);
+  var node = getNodeFromTree(nid);
   if (!node || !node.code) return;
-  // Avoid redundant calls
-  if (_lastSuggestNode === nid) return;
   _lastSuggestNode = nid;
 
-  const sysPrompt = `You are a UI/UX expert. Given this code node, suggest exactly 3 brief, actionable improvements (max 6 words each). Reply with ONLY a comma-separated list, no numbering, no quotes, no extra text.`;
-  const userPrompt = `Node: ${node.id} (${node.type})\nCode:\n${node.code.slice(0,800)}`;
-
-  try {
-    const res = await callAnalysisAI(sysPrompt, userPrompt);
-    const suggestions = res.split(',').map(s => s.trim().replace(/^["'`]|["'`]$/g, '').trim()).filter(Boolean).slice(0,3);
-    if (!suggestions.length) return;
-
-    // Remove old AI pills
-    document.querySelectorAll('.ai-pill').forEach(el => el.remove());
-
-    const allSection = document.getElementById('quick-all-section');
-    const pillRow    = document.getElementById('all-pills');
-    const emptyEl    = document.getElementById('quick-empty');
-
-    // Check current node still matches
-    const s = sess();
+  callAnalysisAI(
+    'You are a UI/UX expert. Given this code node, suggest exactly 3 brief actionable improvements, max 6 words each. Reply ONLY with a comma-separated list, no quotes, no numbering.',
+    'Node: ' + node.id + ' (' + node.type + ')\nCode:\n' + node.code.slice(0, 700)
+  ).then(function(res) {
+    var s = sess();
     if (!s || s.currentNode !== nid) return;
-
-    emptyEl.style.display = 'none';
-    allSection.style.display = '';
-
-    suggestions.forEach(sug => {
-      const btn = document.createElement('button');
+    var sugs = res.split(',').map(function(x) { return x.trim().replace(/^['"]/,'').replace(/['"]$/,''); }).filter(Boolean).slice(0,3);
+    if (!sugs.length) return;
+    document.querySelectorAll('.ai-pill').forEach(function(el) { el.remove(); });
+    var allSection = document.getElementById('quick-all-section');
+    var pillRow    = document.getElementById('all-pills');
+    var emptyEl    = document.getElementById('quick-empty');
+    if (!pillRow) return;
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (allSection) allSection.style.display = '';
+    sugs.forEach(function(sug) {
+      var btn = document.createElement('button');
       btn.className = 'pill ai-pill';
-      btn.innerHTML = `✨ ${esc(sug)}`;
       btn.title = sug;
-      btn.onclick = () => {
-        document.getElementById('pb-ta').value = sug;
-        document.getElementById('pb-ta').focus();
-      };
+      btn.innerHTML = '✨ ' + esc(sug);
+      btn.onclick = function() { document.getElementById('pb-ta').value = sug; document.getElementById('pb-ta').focus(); };
       pillRow.appendChild(btn);
     });
-  } catch(e) { /* silently fail */ }
+  }).catch(function() {});
 }
 
-/* ══ Voice Input (Web Speech API) ══ */
-let recognition = null;
-let isRecording  = false;
-
+/* ───────────────────────────────────────
+   VOICE INPUT
+──────────────────────────────────────── */
+var _recognition = null;
+var _isRecording  = false;
 (function initVoice() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return;
-  recognition = new SpeechRecognition();
-  recognition.continuous    = true;
-  recognition.interimResults = true;
-  recognition.onresult = (event) => {
-    let interim = '', final = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (event.results[i].isFinal) final  += event.results[i][0].transcript;
-      else                          interim += event.results[i][0].transcript;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  _recognition = new SR();
+  _recognition.continuous = true;
+  _recognition.interimResults = true;
+  _recognition.onresult = function(e) {
+    var interim = '', final = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
     }
-    const ta = document.getElementById('pb-ta');
-    if (final) ta.value = final + interim;
-    else       ta.value = interim;
+    document.getElementById('pb-ta').value = final + interim;
   };
-  recognition.onerror = () => stopVoice();
+  _recognition.onerror = function() { stopVoice(); };
 })();
 
 function startVoice() {
-  if (!recognition) { alert('Voice input not supported in this browser. Try Chrome or Edge.'); return; }
-  if (isRecording) return;
-  isRecording = true;
-  const btn = document.getElementById('voice-btn');
-  btn.classList.add('recording');
-  btn.textContent = '🔴';
+  if (!_recognition) { alert('Voice not supported. Try Chrome or Edge.'); return; }
+  if (_isRecording) return;
+  _isRecording = true;
+  var btn = document.getElementById('voice-btn');
+  if (btn) { btn.classList.add('recording'); btn.textContent = '🔴'; }
   document.getElementById('pb-ta').value = '';
-  recognition.start();
+  try { _recognition.start(); } catch(e) {}
 }
-
 function stopVoice() {
-  if (!isRecording) return;
-  isRecording = false;
-  const btn = document.getElementById('voice-btn');
-  btn.classList.remove('recording');
-  btn.textContent = '🎤';
-  try { recognition.stop(); } catch(e) {}
-  // Auto-submit after short pause to let final result settle
-  setTimeout(() => {
-    const ta = document.getElementById('pb-ta');
-    if (ta.value.trim()) submitPrompt();
+  if (!_isRecording) return;
+  _isRecording = false;
+  var btn = document.getElementById('voice-btn');
+  if (btn) { btn.classList.remove('recording'); btn.textContent = '🎤'; }
+  try { _recognition.stop(); } catch(e) {}
+  setTimeout(function() {
+    var ta = document.getElementById('pb-ta');
+    if (ta && ta.value.trim()) submitPrompt();
   }, 500);
 }
 
-/* ══ Free Mode (Context-free AI chat) ══ */
-let freeModeOpen = false;
-
+/* ───────────────────────────────────────
+   FREE MODE
+──────────────────────────────────────── */
+var _freeModeOpen = false;
 function toggleFreeMode() {
-  freeModeOpen = !freeModeOpen;
-  const panel = document.getElementById('free-mode-panel');
-  const btn   = document.getElementById('free-mode-btn');
-  if (freeModeOpen) {
-    panel.classList.add('open');
-    btn.style.background = 'var(--purple-bg)';
-    document.getElementById('free-ta').focus();
+  _freeModeOpen = !_freeModeOpen;
+  var panel = document.getElementById('free-mode-panel');
+  var btn   = document.getElementById('free-mode-btn');
+  if (panel) panel.classList.toggle('open', _freeModeOpen);
+  if (btn)   btn.style.background = _freeModeOpen ? 'var(--purple-bg)' : '';
+  if (_freeModeOpen) {
+    var ta = document.getElementById('free-ta');
+    if (ta) ta.focus();
   } else {
-    panel.classList.remove('open');
-    btn.style.background = '';
-    document.getElementById('free-result').style.display = 'none';
-    document.getElementById('free-result').textContent = '';
-    document.getElementById('free-status').textContent = '';
+    var res = document.getElementById('free-result');
+    var st  = document.getElementById('free-status');
+    if (res) { res.style.display = 'none'; res.innerHTML = ''; }
+    if (st)  st.textContent = '';
   }
 }
-
-function onFreeModeKey(e) {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitFreeMode(); }
-}
-
-async function submitFreeMode() {
-  const text = document.getElementById('free-ta').value.trim();
-  if (!text) { document.getElementById('free-ta').focus(); return; }
-  if (!effectiveKey()) {
-    document.getElementById('free-status').textContent = '⚠ No AI key configured.';
-    return;
-  }
-  const statusEl = document.getElementById('free-status');
-  const resultEl = document.getElementById('free-result');
+function submitFreeMode() {
+  var text = document.getElementById('free-ta').value.trim();
+  if (!text) return;
+  if (!effectiveKey()) { document.getElementById('free-status').textContent = '⚠ No API key.'; return; }
+  var statusEl = document.getElementById('free-status');
+  var resultEl = document.getElementById('free-result');
   statusEl.textContent = 'thinking…';
   resultEl.style.display = 'none';
-  resultEl.textContent = '';
+  callAnalysisAI('You are a helpful assistant. Answer clearly and concisely.', text)
+    .then(function(resp) {
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = esc(resp).replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+      statusEl.textContent = '';
+      document.getElementById('free-ta').value = '';
+    })
+    .catch(function(e) { statusEl.textContent = '⚠ ' + e.message; });
+}
 
-  try {
-    // Completely clean context — no project info injected
-    const resp = await callAnalysisAI(
-      'You are a helpful assistant. Answer clearly and concisely.',
-      text
-    );
-    resultEl.style.display = 'block';
-    resultEl.innerHTML = resp
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
-      .replace(/\n/g,'<br>');
-    statusEl.textContent = '';
-    document.getElementById('free-ta').value = '';
-  } catch(e) {
-    statusEl.textContent = '⚠ Error: ' + e.message;
+/* ═══════════════════════════════════════════════
+   1. IRON MAN — 3D EXPLODE VIEW
+═══════════════════════════════════════════════ */
+var _explodeOpen = false;
+var _explodeSelNode = null;
+var _explodeDepth = 0;
+
+function toggleExplode() {
+  _explodeOpen = !_explodeOpen;
+  var el = document.getElementById('explode-overlay');
+  var btn = document.getElementById('sfbtn-explode');
+  el.classList.toggle('open', _explodeOpen);
+  if (btn) btn.classList.toggle('sf-on', _explodeOpen);
+  if (_explodeOpen) explodeInject();
+}
+function closeExplode() {
+  _explodeOpen = false;
+  document.getElementById('explode-overlay').classList.remove('open');
+  var btn = document.getElementById('sfbtn-explode');
+  if (btn) btn.classList.remove('sf-on');
+}
+function explodeInject() {
+  var iframe = document.getElementById('explode-iframe');
+  var nodes = vibeTree ? flattenTree(vibeTree) : [];
+  if (!nodes.length) {
+    iframe.srcdoc = '<html><body style="background:#0a0c10;color:#58a6ff;font-family:monospace;padding:20px;display:flex;align-items:center;justify-content:center;height:100vh">No project loaded yet.</body></html>';
+    return;
   }
-}</script>
+  var colors   = ['rgba(88,166,255,.14)','rgba(63,185,80,.10)','rgba(188,140,255,.10)','rgba(210,153,34,.10)'];
+  var borders  = ['#58a6ff','#3fb950','#bc8cff','#d29922'];
+  var boxes = nodes.map(function(n, i) {
+    var d = i % 4;
+    return '<div data-node="' + n.id + '" data-depth="' + d + '" style="border:1px solid ' + borders[d] + ';background:' + colors[d] + ';border-radius:6px;padding:' + (12 + d * 10) + 'px;margin:6px;cursor:pointer;font-family:monospace;font-size:11px;color:' + borders[d] + ';transition:transform .3s ease,box-shadow .3s ease">' +
+      '<span style="opacity:.5;font-size:10px">[' + n.type + ']</span> ' + n.id +
+      '<div style="font-size:10px;opacity:.35;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (n.code || '').slice(0,50).replace(/</g,'&lt;') + '</div></div>';
+  }).join('');
+  var src = '<!DOCTYPE html><html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0a0c10;padding:14px;min-height:100vh;transform-style:preserve-3d}[data-node]:hover{box-shadow:0 0 16px rgba(88,166,255,.4)!important}</style></head><body id="eb">' + boxes + '<scr' + 'ipt>document.querySelectorAll("[data-node]").forEach(function(el){el.addEventListener("click",function(){document.querySelectorAll("[data-node]").forEach(function(x){x.style.outline=""});el.style.outline="2px solid #58a6ff";parent.postMessage({source:"explode-node-click",nodeId:el.dataset.node},"*")})});<\/scr' + 'ipt></body></html>';
+  iframe.srcdoc = src;
+  setTimeout(function() { setExplodeDepth(_explodeDepth); }, 400);
+}
+function setExplodeDepth(val) {
+  _explodeDepth = parseInt(val);
+  var lbl = document.getElementById('explode-depth-lbl');
+  if (lbl) lbl.textContent = 'depth: ' + val;
+  var iframe = document.getElementById('explode-iframe');
+  var angle = (val / 100) * 52;
+  var rotZ  = (val / 100) * -28;
+  iframe.style.transform = val > 3 ? 'rotateX(' + angle + 'deg) rotateZ(' + rotZ + 'deg) scale(' + (1 - val * 0.0018) + ')' : '';
+  try {
+    var doc = iframe.contentDocument;
+    if (!doc) return;
+    doc.querySelectorAll('[data-depth]').forEach(function(el) {
+      var d = parseInt(el.dataset.depth || 0);
+      var z = (val / 100) * d * 55;
+      el.style.transform = 'translateZ(' + z + 'px) translateY(' + (-z * 0.28) + 'px)';
+      el.style.boxShadow = val > 10 ? '0 ' + (z * 0.5) + 'px ' + z + 'px rgba(0,0,0,.6)' : '';
+    });
+  } catch(e) {}
+}
+function explodeRunPrompt() {
+  var text = document.getElementById('explode-ta').value.trim();
+  if (!text) return;
+  var nid = _explodeSelNode || (sess() && sess().currentNode) || '';
+  if (nid) {
+    document.getElementById('pb-ta').value = text;
+    var sel = document.getElementById('nd-sel');
+    if (sel.querySelector('option[value="' + nid + '"]')) { sel.value = nid; onNodeChange(); }
+    closeExplode();
+    setTimeout(submitPrompt, 80);
+  }
+}
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.source === 'explode-node-click') {
+    _explodeSelNode = e.data.nodeId;
+    var ta = document.getElementById('explode-ta');
+    if (ta) ta.placeholder = 'Selected: ' + e.data.nodeId + ' — describe what to change…';
+  }
+});
+
+/* ═══════════════════════════════════════════════
+   2. MULTIVERSE SPLITTER
+═══════════════════════════════════════════════ */
+var _mvPct = 50, _mvDragging = false, _mvTreeA = null, _mvTreeB = null;
+
+function openMultiverse() {
+  document.getElementById('multiverse-overlay').classList.add('open');
+  var btn = document.getElementById('sfbtn-multiverse');
+  if (btn) btn.classList.add('sf-purple');
+  mvSetPct(50);
+  // Wire up drag
+  var dragTarget = document.getElementById('mv-drag-target');
+  if (dragTarget && !dragTarget._wired) {
+    dragTarget._wired = true;
+    dragTarget.addEventListener('mousedown', function() { _mvDragging = true; });
+    dragTarget.addEventListener('touchstart', function() { _mvDragging = true; }, {passive:true});
+  }
+}
+function closeMultiverse() {
+  document.getElementById('multiverse-overlay').classList.remove('open');
+  var btn = document.getElementById('sfbtn-multiverse');
+  if (btn) btn.classList.remove('sf-purple');
+}
+function mvSetPct(pct) {
+  _mvPct = Math.min(95, Math.max(5, parseFloat(pct)));
+  var divider  = document.getElementById('mv-divider');
+  var iframeA  = document.getElementById('mv-iframe-a');
+  var iframeB  = document.getElementById('mv-iframe-b');
+  var lbl      = document.getElementById('mv-pct-lbl');
+  if (divider) divider.style.left = _mvPct + '%';
+  if (iframeA) iframeA.style.right = (100 - _mvPct) + '%';
+  if (iframeB) iframeB.style.left  = _mvPct + '%';
+  if (lbl) lbl.textContent = Math.round(_mvPct) + ' / ' + Math.round(100 - _mvPct);
+}
+document.addEventListener('mousemove', function(e) {
+  if (!_mvDragging) return;
+  var arena = document.getElementById('mv-arena');
+  if (!arena) return;
+  var rect = arena.getBoundingClientRect();
+  mvSetPct(((e.clientX - rect.left) / rect.width) * 100);
+});
+document.addEventListener('mouseup',  function() { _mvDragging = false; });
+document.addEventListener('touchmove', function(e) {
+  if (!_mvDragging || !e.touches[0]) return;
+  var arena = document.getElementById('mv-arena');
+  if (!arena) return;
+  var rect = arena.getBoundingClientRect();
+  mvSetPct(((e.touches[0].clientX - rect.left) / rect.width) * 100);
+}, {passive:true});
+document.addEventListener('touchend', function() { _mvDragging = false; });
+
+function mvRenderTree(iframe, tree, label, accentColor) {
+  if (!iframe) return;
+  if (!tree) {
+    iframe.srcdoc = '<html><body style="background:#0d0e14;color:#333;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;font-size:12px">No snapshot</body></html>';
+    return;
+  }
+  var nodes = flattenTree(tree);
+  var bg = label === 'B' ? '#0d0818' : '#0a0c10';
+  var items = nodes.map(function(n) {
+    return '<div style="border:1px solid ' + accentColor + '33;border-radius:5px;padding:9px 11px;margin:5px 0;font-size:11px;color:' + accentColor + ';background:' + accentColor + '0e"><span style="opacity:.45;font-size:10px">[' + n.type + ']</span> ' + n.id + '<div style="font-size:10px;opacity:.3;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (n.code || '').slice(0,55).replace(/</g,'&lt;') + '</div></div>';
+  }).join('');
+  iframe.srcdoc = '<!DOCTYPE html><html><head><style>*{box-sizing:border-box;margin:0;padding:0}body{background:' + bg + ';padding:14px;font-family:monospace}</style></head><body><div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + accentColor + ';opacity:.45;margin-bottom:9px;padding-bottom:6px;border-bottom:1px solid ' + accentColor + '22">REALITY ' + label + ' · ' + nodes.length + ' nodes</div>' + items + '</body></html>';
+}
+function mvLoadCurrent() {
+  if (!vibeTree) { showGhostNotif('No project tree loaded yet.'); return; }
+  _mvTreeA = JSON.parse(JSON.stringify(vibeTree));
+  mvRenderTree(document.getElementById('mv-iframe-a'), _mvTreeA, 'A', '#58a6ff');
+  document.getElementById('mv-status').textContent = 'Reality A loaded. Run a prompt then load undo → B.';
+}
+function mvLoadUndo() {
+  try { window.parent.postMessage({source:'apui-vibe', type:'apui-request-undo-snapshot'}, '*'); } catch(e) {}
+  if (vibeTree) {
+    _mvTreeB = JSON.parse(JSON.stringify(vibeTree));
+    mvRenderTree(document.getElementById('mv-iframe-b'), _mvTreeB, 'B', '#bc8cff');
+    var colBtn = document.getElementById('mv-collapse-btn');
+    if (colBtn) colBtn.style.display = '';
+    document.getElementById('mv-status').textContent = 'Reality B loaded. Drag divider to compare.';
+  }
+}
+function collapseWavefunction() {
+  if (!_mvTreeB) return;
+  vibeTree = JSON.parse(JSON.stringify(_mvTreeB));
+  populateNodeSelector();
+  try { window.parent.postMessage({source:'apui-vibe', type:'apui-adopt-tree', tree: _mvTreeB}, '*'); } catch(e) {}
+  closeMultiverse();
+  showGhostNotif('⟁ Wavefunction collapsed — Reality B is now your timeline.');
+}
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'apui-undo-snapshot' && e.data.tree) {
+    _mvTreeB = e.data.tree;
+    mvRenderTree(document.getElementById('mv-iframe-b'), _mvTreeB, 'B', '#bc8cff');
+    var cb = document.getElementById('mv-collapse-btn'); if (cb) cb.style.display = '';
+    document.getElementById('mv-status').textContent = 'Reality B loaded from undo history.';
+  }
+});
+
+/* ═══════════════════════════════════════════════
+   3. GHOST IN THE MACHINE
+═══════════════════════════════════════════════ */
+var _ghostActive = false;
+var _ghostTimer  = null;
+var _ghostIdx    = 0;
+
+var _ghostMsgs = [
+  function(n) { return 'Scanning <b>' + n + '</b> for mobile accessibility…'; },
+  function(n) { return 'Auditing <b>' + n + '</b> for dead code…'; },
+  function(n) { return 'Checking <b>' + n + '</b> contrast ratios…'; },
+  function(n) { return 'Reviewing <b>' + n + '</b> for performance…'; },
+  function(n) { return 'Inspecting <b>' + n + '</b> semantic structure…'; },
+];
+var _ghostIssues = [
+  {issue:'Low contrast ratio (2.8:1). WCAG requires 4.5:1.', fix:'Increase text contrast to meet WCAG AA accessibility standards'},
+  {issue:'Redundant CSS — 3 selectors overriding each other.', fix:'Consolidate duplicate selectors into a single clean rule'},
+  {issue:'Interactive element missing aria-label.', fix:'Add aria-label attributes to all interactive elements'},
+  {issue:'CSS animation using top/left instead of transform.', fix:'Replace top/left transitions with transform: translate() for GPU acceleration'},
+  {issue:'Image element missing alt attribute.', fix:'Add descriptive alt text to all img elements for accessibility'},
+];
+
+function toggleGhost() {
+  _ghostActive = !_ghostActive;
+  var btn = document.getElementById('sfbtn-ghost');
+  if (btn) btn.classList.toggle('sf-amber', _ghostActive);
+  if (_ghostActive) {
+    showGhostNotif('👻 Co-pilot activated. Sweeping the project…');
+    _ghostSweepCycle();
+  } else {
+    clearTimeout(_ghostTimer);
+    closeGhostNotif();
+    closeGhostPatch();
+    var gc = document.getElementById('ghost-cursor');
+    if (gc) gc.classList.remove('active');
+  }
+}
+function _ghostSweepCycle() {
+  if (!_ghostActive) return;
+  var nodes = vibeTree ? flattenTree(vibeTree) : [];
+  if (nodes.length) {
+    var node = nodes[_ghostIdx % nodes.length];
+    _ghostIdx++;
+    _ghostMoveCursor();
+    showGhostNotif(_ghostMsgs[_ghostIdx % _ghostMsgs.length](node.id));
+    if (Math.random() < 0.38) {
+      var issue = _ghostIssues[Math.floor(Math.random() * _ghostIssues.length)];
+      setTimeout(function() { if (_ghostActive) showGhostPatch(node.id, issue); }, 2400);
+    }
+  }
+  _ghostTimer = setTimeout(_ghostSweepCycle, 8000 + Math.random() * 7000);
+}
+function _ghostMoveCursor() {
+  var gc = document.getElementById('ghost-cursor');
+  if (!gc) return;
+  gc.classList.add('active');
+  var pts = [[window.innerWidth*.3,window.innerHeight*.4],[window.innerWidth*.6,window.innerHeight*.55],[window.innerWidth*.45,window.innerHeight*.3]];
+  var i = 0;
+  function move() {
+    if (i >= pts.length) { gc.classList.remove('active'); return; }
+    gc.style.left = pts[i][0] + 'px'; gc.style.top = pts[i][1] + 'px'; i++;
+    setTimeout(move, 900);
+  }
+  move();
+}
+function showGhostNotif(msg) {
+  var el = document.getElementById('ghost-notif');
+  if (!el) return;
+  el.innerHTML = msg; el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(function() { el.classList.remove('show'); }, 4500);
+}
+function closeGhostNotif() { var el = document.getElementById('ghost-notif'); if (el) el.classList.remove('show'); }
+function showGhostPatch(nodeId, issue) {
+  var el = document.getElementById('ghost-patch'); if (!el) return;
+  document.getElementById('ghost-patch-node').textContent  = '⚡ Node: ' + nodeId;
+  document.getElementById('ghost-patch-issue').textContent = issue.issue;
+  document.getElementById('ghost-approve-btn').onclick = function() {
+    closeGhostPatch();
+    var sel = document.getElementById('nd-sel');
+    if (sel && sel.querySelector('option[value="' + nodeId + '"]')) { sel.value = nodeId; onNodeChange(); }
+    document.getElementById('pb-ta').value = issue.fix;
+    setTimeout(submitPrompt, 150);
+  };
+  el.classList.add('show');
+}
+function closeGhostPatch() { var el = document.getElementById('ghost-patch'); if (el) el.classList.remove('show'); }
+
+/* ═══════════════════════════════════════════════
+   4. MATRIX X-RAY HUD
+═══════════════════════════════════════════════ */
+var _xrayActive = false, _xrayMx = 0, _xrayMy = 0;
+
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'Space' && !e.repeat && !e.target.matches('textarea,input,select')) {
+    e.preventDefault(); activateXray();
+  }
+});
+document.addEventListener('keyup', function(e) {
+  if (e.code === 'Space') deactivateXray();
+});
+document.addEventListener('mousemove', function(e) {
+  _xrayMx = e.clientX; _xrayMy = e.clientY;
+  if (_xrayActive) _xrayCrosshair(_xrayMx, _xrayMy);
+});
+
+function activateXray() {
+  if (_xrayActive) return;
+  _xrayActive = true;
+  var ov = document.getElementById('xray-overlay');
+  if (ov) ov.classList.add('xon');
+  var btn = document.getElementById('sfbtn-xray');
+  if (btn) btn.classList.add('sf-on');
+  _xrayBuildLabels();
+}
+function deactivateXray() {
+  if (!_xrayActive) return;
+  _xrayActive = false;
+  var ov = document.getElementById('xray-overlay');
+  if (ov) ov.classList.remove('xon');
+  var btn = document.getElementById('sfbtn-xray');
+  if (btn) btn.classList.remove('sf-on');
+  document.querySelectorAll('.xray-lbl').forEach(function(el) { el.remove(); });
+}
+function _xrayBuildLabels() {
+  document.querySelectorAll('.xray-lbl').forEach(function(el) { el.remove(); });
+  if (!vibeTree) return;
+  var nodes = flattenTree(vibeTree);
+  var ov = document.getElementById('xray-overlay');
+  nodes.forEach(function(n, i) {
+    var lbl = document.createElement('div');
+    lbl.className = 'xray-lbl';
+    lbl.textContent = n.id;
+    lbl.dataset.nid = n.id; lbl.dataset.ntype = n.type;
+    var cols = 3, rows = Math.ceil(nodes.length / cols);
+    lbl.style.left = (8 + (i % cols) * 31) + '%';
+    lbl.style.top  = (8 + (Math.floor(i / cols) / Math.max(rows,1)) * 70) + '%';
+    lbl.addEventListener('mouseenter', function() { _xrayCrosshair(_xrayMx, _xrayMy, n.id, n.type); });
+    lbl.addEventListener('click', function() {
+      var sel = document.getElementById('nd-sel');
+      if (sel && sel.querySelector('option[value="' + n.id + '"]')) { sel.value = n.id; onNodeChange(); }
+      deactivateXray();
+    });
+    ov.appendChild(lbl);
+  });
+}
+function _xrayCrosshair(x, y, nodeId, nodeType) {
+  var ch = document.getElementById('xray-crosshair');
+  if (!ch) return;
+  ch.style.left = x + 'px'; ch.style.top = y + 'px';
+  if (nodeId) {
+    var nl = document.getElementById('xray-node-lbl');
+    var nt = document.getElementById('xray-node-type');
+    if (nl) nl.textContent = nodeId;
+    if (nt) nt.textContent = nodeType || '';
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   5. BLADE RUNNER SENSORY DIAGNOSTICS
+═══════════════════════════════════════════════ */
+var _audioCtx = null;
+function _getAudioCtx() {
+  if (_audioCtx) return _audioCtx;
+  try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+  return _audioCtx;
+}
+function _playBladeSound() {
+  var ctx = _getAudioCtx(); if (!ctx) return;
+  try {
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(32, ctx.currentTime + 0.9);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 1.5);
+    var ping = ctx.createOscillator(), pg = ctx.createGain();
+    ping.connect(pg); pg.connect(ctx.destination);
+    ping.type = 'sine';
+    ping.frequency.setValueAtTime(920, ctx.currentTime + 0.08);
+    ping.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.55);
+    pg.gain.setValueAtTime(0.16, ctx.currentTime + 0.08);
+    pg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    ping.start(ctx.currentTime + 0.08); ping.stop(ctx.currentTime + 0.6);
+  } catch(e) {}
+}
+function triggerBladeRunner(nodeId, errorMsg, fixSuggestion) {
+  _playBladeSound();
+  var bar = document.getElementById('error-bar');
+  if (bar) { bar.classList.add('show'); setTimeout(function() { bar.classList.remove('show'); }, 3000); }
+  document.querySelectorAll('.card').forEach(function(c) {
+    c.classList.add('bleed-card');
+    setTimeout(function() { c.classList.remove('bleed-card'); }, 2200);
+  });
+  var main = document.getElementById('main');
+  if (main) { main.style.animation = 'chromaGlitch .7s steps(1) 1'; setTimeout(function() { main.style.animation = ''; }, 800); }
+  showContainment(nodeId, errorMsg, fixSuggestion || 'The AI will attempt to patch this error automatically.');
+}
+function showContainment(nodeId, err, fix) {
+  document.getElementById('ct-node').textContent = nodeId ? '⚡ Node: ' + nodeId : '⚡ Runtime Error';
+  document.getElementById('ct-err').textContent  = err || 'Unknown error';
+  document.getElementById('ct-fix').textContent  = fix || 'Click Inject Stimpack to auto-fix.';
+  document.getElementById('ct-inject-btn').onclick = function() {
+    closeContainment();
+    if (nodeId) {
+      var sel = document.getElementById('nd-sel');
+      if (sel && sel.querySelector('option[value="' + nodeId + '"]')) { sel.value = nodeId; onNodeChange(); }
+    }
+    document.getElementById('pb-ta').value = 'Fix this error: ' + (err || '');
+    setTimeout(submitPrompt, 150);
+  };
+  document.getElementById('containment').classList.add('open');
+}
+function closeContainment() { document.getElementById('containment').classList.remove('open'); }
+function testBladeRunner() {
+  var nodes = vibeTree ? flattenTree(vibeTree) : [{id:'nav-styles'}];
+  var n = nodes[Math.floor(Math.random() * nodes.length)];
+  triggerBladeRunner(n.id,
+    "ReferenceError: Cannot read properties of undefined (reading 'classList')",
+    'Add a null-check guard before accessing classList. The element may not exist in the DOM at runtime.'
+  );
+}
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'apui-runtime-error') {
+    triggerBladeRunner(e.data.nodeId, e.data.error, e.data.fix);
+  }
+});
+
+/* ── end feature js ── */
+</script>
+
+<!-- ═══════════════ SCI-FI OVERLAYS ═══════════════ -->
+
+<!-- 1. Iron Man Explode -->
+<div id="explode-overlay">
+  <div class="explode-wrap">
+    <div class="explode-hud">
+      <span style="font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(88,166,255,.75)">⬡ IRON MAN · EXPLODE VIEW</span>
+      <input type="range" id="explode-slider" min="0" max="100" value="0" oninput="setExplodeDepth(this.value)" style="width:120px;accent-color:var(--accent)">
+      <span id="explode-depth-lbl">depth: 0</span>
+      <button class="scifi-btn sf-on" onclick="explodeInject()">↻ inject</button>
+    </div>
+    <iframe id="explode-iframe" sandbox="allow-scripts allow-same-origin" srcdoc="<html><body style='background:#0a0c10;color:#555;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-size:12px'>Click ↻ inject to load your project structure</body></html>"></iframe>
+    <div id="explode-prompt-row">
+      <textarea id="explode-ta" placeholder="Click a layer, then describe what to change… (Enter to run)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();explodeRunPrompt()}"></textarea>
+      <button class="btn xs prim" onclick="explodeRunPrompt()">run ↗</button>
+      <button class="btn xs" onclick="closeExplode()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. Multiverse Splitter -->
+<div id="multiverse-overlay">
+  <div class="mv-header">
+    <span class="mv-title">⟁ MULTIVERSE SPLITTER</span>
+    <span class="mv-lbl-a">◀ REALITY A</span>
+    <span style="font-size:10px;color:var(--text3);flex:1;text-align:center">← drag divider →</span>
+    <span class="mv-lbl-b">REALITY B ▶</span>
+    <button class="btn xs ok" id="mv-collapse-btn" onclick="collapseWavefunction()" style="display:none">✦ Collapse Wavefunction</button>
+    <button class="btn xs" onclick="closeMultiverse()">✕</button>
+  </div>
+  <div class="mv-arena" id="mv-arena">
+    <iframe id="mv-iframe-a" sandbox="allow-scripts allow-same-origin"></iframe>
+    <iframe id="mv-iframe-b" sandbox="allow-scripts allow-same-origin"></iframe>
+    <div class="mv-divider" id="mv-divider"><div class="mv-handle">⇔</div></div>
+    <div class="mv-tag a">REALITY A</div>
+    <div class="mv-tag b">REALITY B</div>
+    <div id="mv-drag-target"></div>
+  </div>
+  <div class="mv-footer">
+    <span id="mv-pct-lbl" style="font-size:10px;color:var(--text3);min-width:50px">50 / 50</span>
+    <span id="mv-status" style="font-size:11px;color:var(--text3);flex:1">Load snapshots to compare realities.</span>
+    <button class="btn xs" onclick="mvLoadCurrent()">↺ current → A</button>
+    <button class="btn xs prim" onclick="mvLoadUndo()">⎌ undo → B</button>
+  </div>
+</div>
+
+<!-- 3. Ghost overlays (persistent) -->
+<div id="ghost-cursor"></div>
+<div id="ghost-notif"></div>
+<div id="ghost-patch">
+  <div class="ghost-patch-title">👻 CO-PILOT FOUND AN ISSUE</div>
+  <div id="ghost-patch-node" style="font-size:11px;color:var(--text2);margin-bottom:5px"></div>
+  <div id="ghost-patch-issue" style="font-size:12px;color:var(--text);margin-bottom:9px;line-height:1.55"></div>
+  <div style="display:flex;gap:8px">
+    <button class="btn xs prim" id="ghost-approve-btn">✦ Approve Patch</button>
+    <button class="btn xs" onclick="closeGhostPatch()">dismiss</button>
+  </div>
+</div>
+
+<!-- 4. Matrix X-Ray HUD -->
+<div id="xray-overlay">
+  <div id="xray-scanline"></div>
+  <div id="xray-toast">HOLD SPACE · hover node label · click to select</div>
+  <div id="xray-crosshair">
+    <svg width="180" height="60" viewBox="0 0 180 60">
+      <rect x="1" y="1" width="178" height="58" rx="4" fill="none" stroke="rgba(0,255,70,.5)" stroke-width="1" stroke-dasharray="5 3"/>
+      <text id="xray-node-lbl" x="90" y="24" text-anchor="middle" fill="rgba(0,255,70,.9)" font-size="10" font-family="monospace"></text>
+      <text id="xray-node-type" x="90" y="42" text-anchor="middle" fill="rgba(0,255,70,.45)" font-size="9" font-family="monospace"></text>
+    </svg>
+  </div>
+</div>
+
+<!-- 5. Blade Runner error bar + containment -->
+<div id="error-bar"></div>
+<div id="containment">
+  <div class="ct-title"><span style="animation:pulse .8s ease infinite;display:inline-block">🔴</span> CONTAINMENT PROTOCOL</div>
+  <div id="ct-node" class="ct-node"></div>
+  <div id="ct-err" class="ct-err"></div>
+  <div id="ct-fix" class="ct-fix"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn xs prim" id="ct-inject-btn">⚡ Inject Stimpack</button>
+    <button class="btn xs fail" onclick="closeContainment()">✕ dismiss</button>
+  </div>
+</div>
+
 </body>
-        </html>
+  </html>
