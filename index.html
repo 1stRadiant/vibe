@@ -1194,6 +1194,32 @@
                                     </div>
                                 </div>
 
+                                    <!-- ── Upload HTML File (from Start page) ── -->
+                                    <div class="accordion-item" id="upload-html-accordion-start">
+                                        <h2 class="accordion-header" id="headingUploadHtml">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseUploadHtml" aria-expanded="false">
+                                                <i class="bi bi-file-earmark-arrow-up me-2"></i> Import HTML File
+                                            </button>
+                                        </h2>
+                                        <div id="collapseUploadHtml" class="accordion-collapse collapse">
+                                            <div class="accordion-body">
+                                                <div id="start-drop-zone"
+                                                    style="border:2px dashed #3e4451;border-radius:8px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(97,175,239,.04);margin-bottom:12px"
+                                                    ondragover="event.preventDefault();this.style.borderColor='#61afef';this.style.background='rgba(97,175,239,.09)'"
+                                                    ondragleave="this.style.borderColor='#3e4451';this.style.background='rgba(97,175,239,.04)'"
+                                                    ondrop="handleStartDrop(event)"
+                                                    onclick="document.getElementById('start-html-input').click()">
+                                                    <i class="bi bi-file-earmark-code" style="font-size:2rem;color:#61afef;display:block;margin-bottom:8px"></i>
+                                                    <div style="font-weight:600;color:#abb2bf;margin-bottom:4px">Drop an HTML file here</div>
+                                                    <div style="font-size:0.82rem;color:#5c6370">or click to browse &middot; supports multiple files</div>
+                                                </div>
+                                                <input type="file" id="start-html-input" accept=".html,.htm,text/html" style="display:none" multiple>
+                                                <div id="start-upload-status" style="font-size:0.85rem;color:#98c379;min-height:20px;margin-bottom:6px"></div>
+                                                <div style="font-size:0.8rem;color:#5c6370">Loads the HTML directly into the editor. Multi-file projects: use the <b>Files</b> tab.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 <div id="start-page-generation-output" style="display: none;">
                                     <div id="generation-status-container">
                                         <h3 id="generation-status-text">Generating your project...</h3>
@@ -1542,31 +1568,51 @@
                         </div>
                         <div id="code" class="tab-content">
                             <div class="full-code-container">
-                                <h2>Vibe</h2>
-                                <div class="file-io-section">
-                                    <div class="file-upload-container">
-                                        <p>Load a single HTML file into the editor.</p>
-                                        <input type="file" id="html-file-input" accept=".html,text/html" style="display: none;">
-                                        <button id="upload-html-button" class="action-button"><i class="bi bi-file-earmark-code"></i> Upload HTML</button>
-                                    </div>
-                                    <div class="file-upload-container">
-                                        <p>Load a full website from a ZIP file.</p>
-                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display: none;">
-                                        <button id="upload-zip-button" class="action-button"><i class="bi bi-file-earmark-zip"></i> Upload ZIP</button>
-                                    </div>
-                                    <div class="file-upload-container">
-                                        <p>Download your current project as a ZIP.</p>
-                                        <button id="download-zip-button" class="action-button"><i class="bi bi-download"></i> Download ZIP</button>
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                                    <h2 style="margin:0">Full Code</h2>
+                                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                                        <!-- Upload HTML -->
+                                        <input type="file" id="html-file-input" accept=".html,.htm,text/html" style="display:none" multiple onchange="handleMultiHtmlUpload(this.files)">
+                                        <button id="upload-html-button" class="action-button" title="Upload one or more HTML files" onclick="document.getElementById('html-file-input').click()">
+                                            <i class="bi bi-file-earmark-arrow-up"></i> Upload HTML
+                                        </button>
+                                        <!-- Upload ZIP -->
+                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display:none">
+                                        <button id="upload-zip-button" class="action-button" title="Upload a ZIP of your project">
+                                            <i class="bi bi-file-earmark-zip"></i> Upload ZIP
+                                        </button>
+                                        <!-- Download ZIP -->
+                                        <button id="download-zip-button" class="action-button" title="Download project as ZIP">
+                                            <i class="bi bi-download"></i> Download ZIP
+                                        </button>
                                     </div>
                                 </div>
-                                <hr/>
+
+                                <!-- Drag-and-drop upload zone (shown when editor is empty or no project loaded) -->
+                                <div id="code-drop-zone"
+                                    style="border:2px dashed #3e4451;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:rgba(97,175,239,.03);margin-bottom:10px;transition:all .2s;display:none"
+                                    ondragover="event.preventDefault();this.style.borderColor='#61afef';this.style.background='rgba(97,175,239,.08)'"
+                                    ondragleave="this.style.borderColor='#3e4451';this.style.background='rgba(97,175,239,.03)'"
+                                    ondrop="handleCodeTabDrop(event)"
+                                    onclick="document.getElementById('html-file-input').click()">
+                                    <i class="bi bi-file-earmark-code" style="font-size:1.8rem;color:#61afef;display:block;margin-bottom:6px"></i>
+                                    <div style="font-weight:600;color:#abb2bf;margin-bottom:3px">Drop HTML files here to load them</div>
+                                    <div style="font-size:0.8rem;color:#5c6370">or click to browse · supports multiple files</div>
+                                </div>
+
+                                <!-- Upload status bar -->
+                                <div id="code-upload-status" style="font-size:0.82rem;color:#98c379;min-height:18px;margin-bottom:6px"></div>
+
+                                <!-- Uploaded file tabs (when multiple files loaded) -->
+                                <div id="code-file-tabs" style="display:none;border-bottom:1px solid #2d333b;margin-bottom:6px;overflow-x:auto;white-space:nowrap"></div>
+
                                 <div class="search-container">
                                     <input type="text" id="search-input" placeholder="Find in code...">
                                     <button id="find-prev-button" class="action-button">&lt; Prev</button>
                                     <button id="find-next-button" class="action-button">Next &gt;</button>
                                     <span id="search-results-count"></span>
                                 </div>
-                                <textarea id="full-code-editor"></textarea>
+                                <textarea id="full-code-editor" placeholder="Your project code will appear here. Upload an HTML file above or select a project to get started."></textarea>
                                 <div class="full-code-actions">
                                     <button id="update-tree-from-code-button" class="action-button">
                                         <i class="bi bi-arrow-clockwise"></i> Update from Code
@@ -1884,6 +1930,299 @@
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
+
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   HTML UPLOAD — works from Start page AND Code tab
+   Fixes showFullCode not populating the textarea
+═══════════════════════════════════════════════════════ */
+
+/* ── Shared: read a single HTML file and load it as a project ── */
+async function _loadHtmlFileIntoVibe(file, statusEl) {
+  if (!file) return;
+  if (statusEl) statusEl.textContent = 'Reading ' + file.name + '…';
+
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        var content = e.target.result;
+
+        // Re-use the existing handleFileUpload logic from app3.js by
+        // temporarily injecting the file into the hidden html-file-input
+        // OR call the same logic directly if accessible
+        if (typeof handleFileUpload === 'function' && document.getElementById('html-file-input')) {
+          // Inject file into the existing input and dispatch change
+          var dt = new DataTransfer();
+          dt.items.add(file);
+          document.getElementById('html-file-input').files = dt.files;
+          // Call the existing handler
+          await handleFileUpload();
+          if (statusEl) statusEl.textContent = '✓ ' + file.name + ' loaded!';
+          resolve(true);
+          return;
+        }
+
+        // Fallback: build vibeTree directly (mirrors app3.js handleFileUpload)
+        var baseId = file.name.replace(/\.(html|htm)$/i,'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+        var projectId = baseId || ('html-project-' + Date.now());
+
+        if (typeof vibeTree !== 'undefined') {
+          vibeTree = { id:'raw-'+projectId, type:'raw-html-container', description:'Uploaded: '+file.name, code:content, children:[] };
+        }
+
+        // Populate full-code-editor directly
+        var editor = document.getElementById('full-code-editor');
+        if (editor) {
+          editor.value = content;
+          editor.dispatchEvent(new Event('input'));
+        }
+
+        if (statusEl) statusEl.textContent = '✓ ' + file.name + ' loaded!';
+
+        // Switch to code tab so user sees the content
+        if (typeof switchToTab === 'function') switchToTab('code');
+        else {
+          // manual tab switch fallback
+          document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
+          var codeTab = document.getElementById('code');
+          if (codeTab) codeTab.classList.add('active');
+        }
+
+        resolve(true);
+      } catch(err) {
+        if (statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
+        resolve(false);
+      }
+    };
+    reader.onerror = function() {
+      if (statusEl) statusEl.textContent = '⚠ Could not read file.';
+      resolve(false);
+    };
+    reader.readAsText(file);
+  });
+}
+
+/* ── Handle multiple HTML files: show tabs in code tab ── */
+var _codeTabFiles = {};   // filename -> content
+var _codeTabActive = null;
+
+async function handleMultiHtmlUpload(files) {
+  if (!files || !files.length) return;
+  var statusEl = document.getElementById('code-upload-status');
+  var tabsEl   = document.getElementById('code-file-tabs');
+  var editor   = document.getElementById('full-code-editor');
+  var dropZone = document.getElementById('code-drop-zone');
+
+  if (files.length === 1) {
+    // Single file: use normal flow
+    await _loadHtmlFileIntoVibe(files[0], statusEl);
+    _showCodeDropZone(false);
+    return;
+  }
+
+  // Multiple files: load all into memory and show tabs
+  if (statusEl) statusEl.textContent = 'Loading ' + files.length + ' files…';
+  _codeTabFiles = {};
+  var promises = [];
+
+  Array.from(files).forEach(function(file) {
+    promises.push(new Promise(function(resolve) {
+      var r = new FileReader();
+      r.onload = function(e) { _codeTabFiles[file.name] = e.target.result; resolve(); };
+      r.onerror = resolve;
+      r.readAsText(file);
+    }));
+  });
+
+  await Promise.all(promises);
+
+  // Build file tabs
+  var names = Object.keys(_codeTabFiles);
+  _codeTabActive = names[0];
+
+  if (tabsEl) {
+    tabsEl.style.display = 'block';
+    tabsEl.innerHTML = names.map(function(name) {
+      return '<button class="code-file-tab' + (name === _codeTabActive ? ' active' : '') + '" ' +
+             'onclick="switchCodeFileTab(\'' + name.replace(/'/g,"\\'") + '\')" ' +
+             'title="' + name + '" ' +
+             'style="display:inline-block;padding:5px 12px;font-size:0.8rem;border:none;border-bottom:2px solid ' +
+             (name === _codeTabActive ? '#61afef' : 'transparent') +
+             ';background:transparent;color:' + (name === _codeTabActive ? '#61afef' : '#5c6370') +
+             ';cursor:pointer;white-space:nowrap">' +
+             name + '</button>';
+    }).join('');
+  }
+
+  if (editor) editor.value = _codeTabFiles[_codeTabActive] || '';
+  if (statusEl) statusEl.textContent = '✓ ' + names.length + ' files loaded. Click tabs to switch.';
+  _showCodeDropZone(false);
+
+  // Switch to code tab
+  if (typeof switchToTab === 'function') switchToTab('code');
+}
+
+function switchCodeFileTab(name) {
+  _codeTabActive = name;
+  var editor = document.getElementById('full-code-editor');
+  if (editor && _codeTabFiles[name]) editor.value = _codeTabFiles[name];
+  // Update tab styling
+  document.querySelectorAll('.code-file-tab').forEach(function(btn) {
+    var isActive = btn.textContent.trim() === name;
+    btn.style.borderBottomColor = isActive ? '#61afef' : 'transparent';
+    btn.style.color = isActive ? '#61afef' : '#5c6370';
+  });
+}
+
+/* ── Code tab drag-and-drop ── */
+function handleCodeTabDrop(event) {
+  event.preventDefault();
+  var zone = document.getElementById('code-drop-zone');
+  if (zone) { zone.style.borderColor = '#3e4451'; zone.style.background = 'rgba(97,175,239,.03)'; }
+  var files = event.dataTransfer.files;
+  if (!files.length) return;
+  // Filter to HTML only
+  var htmlFiles = Array.from(files).filter(function(f) {
+    return f.name.match(/\.html?$/i) || f.type === 'text/html';
+  });
+  if (!htmlFiles.length) {
+    var st = document.getElementById('code-upload-status');
+    if (st) st.textContent = '⚠ Only .html files are supported here. For ZIPs use the Upload ZIP button.';
+    return;
+  }
+  handleMultiHtmlUpload(htmlFiles);
+}
+
+function _showCodeDropZone(show) {
+  var z = document.getElementById('code-drop-zone');
+  if (z) z.style.display = show ? 'block' : 'none';
+}
+
+/* ── Start page drag-and-drop ── */
+function handleStartDrop(event) {
+  event.preventDefault();
+  var zone = document.getElementById('start-drop-zone');
+  if (zone) { zone.style.borderColor = '#3e4451'; zone.style.background = 'rgba(97,175,239,.04)'; }
+  var files = Array.from(event.dataTransfer.files).filter(function(f) {
+    return f.name.match(/\.html?$/i) || f.type === 'text/html';
+  });
+  if (!files.length) {
+    var st = document.getElementById('start-upload-status');
+    if (st) st.textContent = '⚠ Only HTML files are supported here.';
+    return;
+  }
+  handleStartHtmlUpload(files);
+}
+
+async function handleStartHtmlUpload(files) {
+  if (!files || !files.length) return;
+  var statusEl = document.getElementById('start-upload-status');
+  if (statusEl) statusEl.textContent = 'Loading…';
+
+  if (files.length === 1) {
+    await _loadHtmlFileIntoVibe(files[0], statusEl);
+  } else {
+    // Multiple files: load all and show in code tab with tabs
+    if (statusEl) statusEl.textContent = 'Loading ' + files.length + ' files…';
+    await handleMultiHtmlUpload(files);
+    if (statusEl) statusEl.textContent = '✓ ' + files.length + ' files loaded in Code tab.';
+  }
+}
+
+/* Wire up the start-html-input */
+document.addEventListener('DOMContentLoaded', function() {
+  var startInput = document.getElementById('start-html-input');
+  if (startInput) {
+    startInput.addEventListener('change', function() {
+      handleStartHtmlUpload(this.files);
+    });
+  }
+
+  /* ── Fix showFullCode not populating textarea ──
+     Patch switchToTab to ensure fullCodeEditor is always populated
+     when the code tab is activated                               */
+  var _origSwitchToTab = window.switchToTab;
+  if (typeof _origSwitchToTab === 'function') {
+    window.switchToTab = function(tabId) {
+      _origSwitchToTab(tabId);
+      if (tabId === 'code') {
+        // Ensure editor is populated even if showFullCode was called before DOM ready
+        setTimeout(function() {
+          var editor = document.getElementById('full-code-editor');
+          if (!editor) return;
+
+          // Show drop zone if editor is empty AND no project loaded
+          var isEmpty = !editor.value || editor.value.trim() === '';
+          _showCodeDropZone(isEmpty);
+
+          // If editor empty but vibeTree exists, populate it
+          if (isEmpty && typeof vibeTree !== 'undefined' && vibeTree) {
+            if (typeof showFullCode === 'function') {
+              showFullCode();
+            } else if (vibeTree.code) {
+              editor.value = vibeTree.code;
+            } else if (typeof generateFullCodeString === 'function') {
+              try { editor.value = generateFullCodeString(vibeTree); } catch(e) {}
+            }
+            _showCodeDropZone(!editor.value);
+          }
+        }, 50);
+      }
+    };
+  } else {
+    // app3.js not yet loaded — retry after it loads
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        var _origSWT = window.switchToTab;
+        if (typeof _origSWT === 'function') {
+          window.switchToTab = function(tabId) {
+            _origSWT(tabId);
+            if (tabId === 'code') {
+              setTimeout(function() {
+                var editor = document.getElementById('full-code-editor');
+                if (!editor) return;
+                _showCodeDropZone(!editor.value || !editor.value.trim());
+                if ((!editor.value || !editor.value.trim()) && typeof vibeTree !== 'undefined' && vibeTree) {
+                  if (typeof showFullCode === 'function') showFullCode();
+                  else if (vibeTree.code) editor.value = vibeTree.code;
+                }
+              }, 50);
+            }
+          };
+        }
+      }, 500);
+    });
+  }
+
+  /* ── Also handle clicks on the tab nav buttons directly ── */
+  document.querySelectorAll('.tab-button[data-tab="code"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setTimeout(function() {
+        var editor = document.getElementById('full-code-editor');
+        if (!editor) return;
+        var isEmpty = !editor.value || !editor.value.trim();
+        _showCodeDropZone(isEmpty);
+        if (isEmpty && typeof vibeTree !== 'undefined' && vibeTree) {
+          if (typeof showFullCode === 'function') showFullCode();
+          else if (vibeTree.code) editor.value = vibeTree.code;
+        }
+      }, 80);
+    });
+  });
+});
+
+/* ── Global drag-over on the full page — highlight drop zone ── */
+document.addEventListener('dragover', function(e) {
+  // Only activate when hovering over the code tab and it's active
+  var codeTab = document.getElementById('code');
+  if (codeTab && codeTab.classList.contains('active')) {
+    e.preventDefault();
+    _showCodeDropZone(true);
+  }
+});
+</script>
 
 </body>
     </html>
