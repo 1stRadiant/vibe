@@ -273,51 +273,70 @@ body{height:100%;height:-webkit-fill-available;font-family:'SF Mono','Fira Mono'
 #mv-drag-target{position:absolute;inset:0;z-index:11;cursor:ew-resize;opacity:0}
 
 /* ── 3. JARVIS Autonomous Agent ── */
-/* Notif toast */
-#jarvis-notif{position:fixed;bottom:90px;right:14px;max-width:280px;background:rgba(10,14,20,.97);border:1px solid rgba(0,180,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:#7dd3f7;z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.5;pointer-events:none;box-shadow:0 0 20px rgba(0,180,255,.15)}
+#jarvis-notif{position:fixed;bottom:90px;right:14px;max-width:300px;background:rgba(8,12,20,.97);border:1px solid rgba(0,180,255,.4);border-radius:var(--r);padding:10px 13px;font-size:11px;color:#7dd3f7;z-index:400;transform:translateX(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);line-height:1.55;pointer-events:none;box-shadow:0 0 24px rgba(0,180,255,.15)}
 #jarvis-notif.show{transform:translateX(0)}
-/* Main JARVIS panel */
-#jarvis-panel{position:fixed;top:0;right:0;bottom:0;width:min(360px,94vw);background:rgba(8,12,18,.98);border-left:1px solid rgba(0,180,255,.3);z-index:410;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,180,255,.1)}
+/* Verification request */
+#jarvis-verify{position:fixed;bottom:90px;left:14px;max-width:300px;background:rgba(8,12,20,.98);border:1px solid rgba(0,180,255,.5);border-radius:var(--r);padding:13px 15px;font-size:11px;color:#7dd3f7;z-index:410;transform:translateX(-120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);box-shadow:0 0 30px rgba(0,180,255,.2)}
+#jarvis-verify.show{transform:translateX(0)}
+.jv-title{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#00b4ff;margin-bottom:7px}
+/* Main panel */
+#jarvis-panel{position:fixed;top:0;right:0;bottom:0;width:min(380px,95vw);background:rgba(6,10,16,.99);border-left:1px solid rgba(0,180,255,.25);z-index:410;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 50px rgba(0,180,255,.12)}
 #jarvis-panel.open{transform:translateX(0)}
-.j-head{display:flex;align-items:center;gap:10px;padding:14px 15px 12px;border-bottom:1px solid rgba(0,180,255,.2);flex-shrink:0;background:rgba(0,180,255,.05)}
-.j-logo{font-size:18px;filter:drop-shadow(0 0 6px rgba(0,180,255,.8))}
-.j-title{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#00b4ff;flex:1}
-.j-status{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.j-status.idle{background:rgba(100,100,100,.2);color:var(--text3)}
-.j-status.working{background:rgba(0,180,255,.15);color:#00b4ff;animation:pulse .9s ease infinite}
-.j-status.done{background:rgba(63,185,80,.15);color:var(--green)}
-/* Goals section */
-.j-section{padding:12px 14px;border-bottom:1px solid rgba(0,180,255,.1)}
-.j-sec-lbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,180,255,.5);margin-bottom:8px}
-.j-goal-item{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:var(--rs);background:rgba(0,180,255,.06);border:1px solid rgba(0,180,255,.15);margin-bottom:6px;font-size:11px;color:#7dd3f7;cursor:pointer;transition:all .12s}
-.j-goal-item:hover{background:rgba(0,180,255,.1);border-color:rgba(0,180,255,.3)}
-.j-goal-item.done{opacity:.5;text-decoration:line-through;cursor:default}
-.j-goal-item.active{border-color:#00b4ff;background:rgba(0,180,255,.12)}
+.j-head{display:flex;align-items:center;gap:9px;padding:12px 14px 11px;border-bottom:1px solid rgba(0,180,255,.18);flex-shrink:0;background:rgba(0,180,255,.04)}
+.j-logo{font-size:17px;filter:drop-shadow(0 0 7px rgba(0,180,255,.9))}
+.j-title{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#00b4ff;flex:1}
+.j-status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.j-status-dot.idle{background:var(--text3)}
+.j-status-dot.thinking{background:#00b4ff;animation:pulse .6s ease infinite}
+.j-status-dot.working{background:#00b4ff;animation:pulse .4s ease infinite;box-shadow:0 0 8px #00b4ff}
+.j-status-dot.done{background:var(--green)}
+.j-status-dot.waiting{background:var(--amber);animation:pulse 1s ease infinite}
+.j-status-lbl{font-size:9px;color:rgba(0,180,255,.6);font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+/* Tabs inside panel */
+.j-tabs{display:flex;border-bottom:1px solid rgba(0,180,255,.15);flex-shrink:0}
+.j-tab{flex:1;padding:7px 4px;font-size:9px;font-weight:700;cursor:pointer;text-align:center;color:rgba(0,180,255,.35);border:none;background:transparent;font-family:inherit;text-transform:uppercase;letter-spacing:.07em;transition:all .1s;border-bottom:2px solid transparent}
+.j-tab.active{color:#00b4ff;border-bottom-color:#00b4ff}
+.j-tabpane{display:none;flex:1;overflow-y:auto;padding:10px 13px;flex-direction:column;gap:8px}
+.j-tabpane.active{display:flex}
+/* Sections */
+.j-sec-lbl{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(0,180,255,.4);margin-bottom:6px;flex-shrink:0}
+/* Goal items */
+.j-goal{display:flex;align-items:flex-start;gap:7px;padding:7px 9px;border-radius:var(--rs);background:rgba(0,180,255,.05);border:1px solid rgba(0,180,255,.12);font-size:11px;color:#7dd3f7;transition:all .12s}
+.j-goal.g-user{border-color:rgba(0,180,255,.25)}
+.j-goal.g-auto{border-color:rgba(188,140,255,.2);color:#bc8cff;background:rgba(188,140,255,.04)}
+.j-goal.g-done{opacity:.4}
+.j-goal.g-active{border-color:#00b4ff;background:rgba(0,180,255,.10);box-shadow:0 0 12px rgba(0,180,255,.12)}
 .j-goal-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
 .j-goal-dot.idle{background:var(--text3)}
-.j-goal-dot.active{background:#00b4ff;animation:pulse .8s ease infinite}
+.j-goal-dot.active{background:#00b4ff;animation:pulse .7s ease infinite}
 .j-goal-dot.done{background:var(--green)}
-.j-goal-add{display:flex;gap:7px;margin-top:6px}
-.j-goal-input{flex:1;padding:7px 9px;font-family:inherit;font-size:12px;border:1px solid rgba(0,180,255,.3);border-radius:var(--rs);background:rgba(0,180,255,.05);color:#7dd3f7;resize:none}
-.j-goal-input::placeholder{color:rgba(0,180,255,.3)}
+.j-goal-dot.auto{background:var(--purple)}
+.j-goal-input{width:100%;padding:7px 9px;font-family:inherit;font-size:12px;border:1px solid rgba(0,180,255,.25);border-radius:var(--rs);background:rgba(0,180,255,.04);color:#7dd3f7;resize:none;line-height:1.4}
+.j-goal-input::placeholder{color:rgba(0,180,255,.25)}
 .j-goal-input:focus{outline:none;border-color:#00b4ff}
-/* Log section */
-#jarvis-log-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:7px}
-.j-log-entry{border-radius:var(--rs);padding:9px 11px;font-size:11px;line-height:1.55;border:1px solid rgba(0,180,255,.12);background:rgba(0,180,255,.04)}
-.j-log-entry .j-log-time{font-size:9px;color:rgba(0,180,255,.4);float:right;margin-left:6px}
-.j-log-entry .j-log-node{font-size:10px;color:#00b4ff;margin-bottom:3px;font-weight:700}
-.j-log-entry .j-log-action{color:#7dd3f7}
-.j-log-entry .j-log-goal{font-size:10px;color:rgba(0,180,255,.45);margin-top:3px;font-style:italic}
-.j-log-entry.j-log-ok{border-left:3px solid var(--green)}
-.j-log-entry.j-log-err{border-left:3px solid var(--red)}
-.j-log-entry.j-log-snap{border-left:3px solid rgba(0,180,255,.5)}
-/* Screenshot preview */
-#jarvis-screenshot-preview{max-width:100%;border-radius:var(--rs);border:1px solid rgba(0,180,255,.25);margin-top:6px;display:none}
-/* Scanning animation */
-@keyframes jarvisScan{0%{opacity:0;transform:scaleX(0)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1)}}
-.j-scanning-bar{height:1px;background:linear-gradient(90deg,transparent,#00b4ff,transparent);animation:jarvisScan 1.4s ease infinite;margin:6px 0}
+/* Heartbeat control */
+.j-hb-row{display:flex;align-items:center;gap:8px;padding:8px 0;flex-wrap:wrap}
+.j-hb-val{font-size:11px;color:#00b4ff;min-width:32px;text-align:right;font-weight:700}
+/* Log entries */
+.j-log{border-radius:var(--rs);padding:8px 10px;font-size:11px;line-height:1.55;border:1px solid rgba(0,180,255,.1);background:rgba(0,180,255,.03);margin-bottom:5px}
+.j-log .j-log-time{font-size:9px;color:rgba(0,180,255,.35);float:right;margin-left:6px}
+.j-log .j-log-node{font-size:10px;color:#00b4ff;margin-bottom:2px;font-weight:700}
+.j-log .j-log-act{color:#7dd3f7}
+.j-log .j-log-goal-ref{font-size:10px;color:rgba(0,180,255,.35);margin-top:2px;font-style:italic}
+.j-log.ok{border-left:3px solid var(--green)}
+.j-log.err{border-left:3px solid var(--red)}
+.j-log.snap{border-left:3px solid rgba(0,180,255,.5)}
+.j-log.plan{border-left:3px solid var(--purple)}
+.j-log.auto{border-left:3px solid rgba(188,140,255,.5)}
+/* Memory / prefs */
+.j-pref{display:flex;align-items:flex-start;gap:6px;padding:5px 8px;border-radius:var(--rs);background:rgba(0,180,255,.04);border:1px solid rgba(0,180,255,.1);font-size:11px;color:var(--text2);margin-bottom:4px}
+/* Screenshot */
+#jarvis-ss-img{max-width:100%;border-radius:var(--rs);border:1px solid rgba(0,180,255,.2);margin-top:6px;display:none}
+/* Scanning bar */
+@keyframes jScan{0%{opacity:0;transform:scaleX(0)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:scaleX(1)}}
+.j-scan-bar{height:1px;background:linear-gradient(90deg,transparent,#00b4ff,transparent);animation:jScan 1.3s ease infinite;margin:5px 0}
 /* Cursor dot */
-#jarvis-cursor{position:fixed;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle,rgba(0,180,255,.9),rgba(0,180,255,0));pointer-events:none;z-index:350;transition:left .4s ease,top .4s ease;display:none;box-shadow:0 0 10px rgba(0,180,255,.6)}
+#jarvis-cursor{position:fixed;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle,rgba(0,180,255,.95),rgba(0,180,255,0));pointer-events:none;z-index:350;transition:left .5s ease,top .5s ease;display:none;box-shadow:0 0 12px rgba(0,180,255,.7)}
 #jarvis-cursor.active{display:block}
 
 /* ── 4. Matrix X-Ray ── */
@@ -1777,437 +1796,773 @@ window.addEventListener('message', function(e) {
   }
 });
 
-/* ═══════════════════════════════════════════════
-   3. J.A.R.V.I.S — AUTONOMOUS GOAL-DRIVEN AGENT
-   - Set goals, JARVIS works towards them autonomously
-   - Captures preview screenshots via html2canvas / postMessage
-   - Dispatches real agent calls (submitPrompt-style) per node
-   - Keeps a persistent action log in session storage
-═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   J.A.R.V.I.S  v2  —  ALWAYS-ON AUTONOMOUS AGENT
+   ▸ Heartbeat-driven, user-configurable rate
+   ▸ Never stops — when user goals done, auto-generates new ones
+   ▸ Plans ahead, remembers preferences, learns from history
+   ▸ Asks for verification only when needed (configurable)
+   ▸ Screenshot-aware context
+   ▸ Persistent memory across sessions
+═══════════════════════════════════════════════════════════ */
 
-var _jarvisOpen    = false;
-var _jarvisRunning = false;
-var _jarvisTimer   = null;
-var _jarvisGoals   = [];          // [{id, text, status:'idle'|'active'|'done'}]
-var _jarvisLog     = [];          // [{time, node, action, goal, status}]
-var _jarvisSnap    = null;        // base64 data URL of latest screenshot
-var _jarvisGoalIdx = 0;
-var _jarvisCycleMs = 18000;       // ms between autonomous cycles (18s default)
+/* ─── State ─── */
+var _jOpen      = false;
+var _jRunning   = false;
+var _jHeartbeat = 30000;      // ms between beats (default 30s)
+var _jTimer     = null;
+var _jBeatCount = 0;
+var _jAutonomy  = 'full';     // 'full' | 'major' | 'always'
+var _jScope     = 'all';      // 'all' | 'css' | 'js' | 'html'
+var _jActiveTab = 'goals';
+var _jSnap      = null;       // latest screenshot dataURL
+var _jVerifyResolve = null;   // pending verification resolver
 
-// ── Panel open/close ──
+/* ─── Persistent memory keys ─── */
+var _JLS = 'jarvis_v2';
+
+var _jMem = {
+  userGoals:  [],   // [{id, text, added, status:'idle'|'active'|'done'}]
+  autoGoals:  [],   // [{id, text, source, status:'idle'|'active'|'done'}]
+  log:        [],   // [{ts, time, node, action, goalRef, status, auto}]
+  prefs:      [],   // [{id, text, added}]  learned or manual prefs
+  memory:     [],   // [{key, value, updated}]  JARVIS working memory
+  doneNodes:  {},   // nodeId -> [{action, ts}]  what was done per node
+  planQueue:  [],   // upcoming planned actions [{nodeId, action, goalRef, priority}]
+  nextBeat:   null,
+};
+
+function _jSave() {
+  try { localStorage.setItem(_JLS, JSON.stringify(_jMem)); } catch(e) {}
+}
+function _jLoad() {
+  try {
+    var raw = localStorage.getItem(_JLS);
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    Object.keys(_jMem).forEach(function(k) { if (d[k] !== undefined) _jMem[k] = d[k]; });
+    // Reset in-progress to idle
+    _jMem.userGoals.forEach(function(g){ if(g.status==='active') g.status='idle'; });
+    _jMem.autoGoals.forEach(function(g){ if(g.status==='active') g.status='idle'; });
+  } catch(e) {}
+}
+
+/* ─── Panel toggle ─── */
 function toggleJarvis() {
-  _jarvisOpen = !_jarvisOpen;
+  _jOpen = !_jOpen;
   var panel = document.getElementById('jarvis-panel');
   var btn   = document.getElementById('sfbtn-jarvis');
-  if (panel) panel.classList.toggle('open', _jarvisOpen);
-  if (btn)   btn.classList.toggle('sf-amber', _jarvisOpen);
-  if (_jarvisOpen) { _jarvisRenderGoals(); _jarvisRenderLog(); }
+  if (panel) panel.classList.toggle('open', _jOpen);
+  if (btn)   btn.classList.toggle('sf-amber', _jOpen);
+  if (_jOpen) { _jRenderAll(); }
 }
 
-// ── Add a goal ──
-function jarvisAddGoal() {
+/* ─── Tab switching ─── */
+function jTab(btn, name) {
+  _jActiveTab = name;
+  document.querySelectorAll('.j-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.j-tabpane').forEach(function(p){ p.classList.remove('active'); });
+  btn.classList.add('active');
+  var pane = document.getElementById('j-pane-' + name);
+  if (pane) pane.classList.add('active');
+  if (name === 'log')     _jRenderLog();
+  if (name === 'memory')  _jRenderMemory();
+  if (name === 'settings') _jRenderSettings();
+}
+
+/* ─── Render all visible ─── */
+function _jRenderAll() {
+  _jRenderGoals();
+  if (_jActiveTab === 'log')    _jRenderLog();
+  if (_jActiveTab === 'memory') _jRenderMemory();
+  _jRenderSettings();
+}
+
+/* ─── Goal UI ─── */
+function jAddUserGoal() {
   var inp = document.getElementById('jarvis-goal-input');
   if (!inp) return;
-  var text = inp.value.trim();
-  if (!text) return;
-  _jarvisGoals.push({ id: 'g' + Date.now(), text: text, status: 'idle' });
+  var text = inp.value.trim(); if (!text) return;
+  _jMem.userGoals.push({ id:'ug'+Date.now(), text:text, added:_jTS(), status:'idle' });
   inp.value = '';
-  _jarvisRenderGoals();
-  _jarvisSaveState();
+  // Extract preference hints from goal text
+  _jExtractPrefs(text);
+  _jSave();
+  _jRenderGoals();
+  jarvisNotif('📌 Goal added. JARVIS will work on it next beat.');
 }
 
-function jarvisRemoveGoal(id) {
-  _jarvisGoals = _jarvisGoals.filter(function(g) { return g.id !== id; });
-  _jarvisRenderGoals();
-  _jarvisSaveState();
+function jRemoveGoal(id, type) {
+  if (type === 'user') _jMem.userGoals = _jMem.userGoals.filter(function(g){ return g.id!==id; });
+  else _jMem.autoGoals = _jMem.autoGoals.filter(function(g){ return g.id!==id; });
+  _jSave(); _jRenderGoals();
 }
 
-function _jarvisRenderGoals() {
-  var el = document.getElementById('jarvis-goals-list');
-  if (!el) return;
-  if (!_jarvisGoals.length) {
-    el.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.3);padding:4px 0">No goals yet. Add one below.</div>';
-    return;
+function _jRenderGoals() {
+  var uEl = document.getElementById('jarvis-user-goals');
+  var aEl = document.getElementById('jarvis-auto-goals');
+  if (!uEl || !aEl) return;
+
+  if (!_jMem.userGoals.length) {
+    uEl.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.25);padding:4px 0 6px">No goals yet. Add one above.</div>';
+  } else {
+    uEl.innerHTML = _jMem.userGoals.map(function(g) {
+      return '<div class="j-goal g-user ' + (g.status==='done'?'g-done':'') + (g.status==='active'?'g-active':'') + '" style="margin-bottom:5px">' +
+        '<div class="j-goal-dot ' + g.status + '"></div>' +
+        '<span style="flex:1;line-height:1.5">' + esc(g.text) + '</span>' +
+        (g.status!=='done'?'<button class="btn xs" style="font-size:9px;padding:2px 5px;min-height:18px;opacity:.4;flex-shrink:0" onclick="jRemoveGoal(\''+g.id+'\',\'user\')">✕</button>':'') +
+        '</div>';
+    }).join('');
   }
-  el.innerHTML = _jarvisGoals.map(function(g) {
-    return '<div class="j-goal-item ' + g.status + '">' +
-      '<div class="j-goal-dot ' + g.status + '"></div>' +
-      '<span style="flex:1">' + esc(g.text) + '</span>' +
-      (g.status !== 'done' ? '<button class="btn xs" style="font-size:9px;padding:2px 5px;min-height:20px;opacity:.5" onclick="jarvisRemoveGoal(\'' + g.id + '\')">✕</button>' : '') +
-      '</div>';
-  }).join('');
+
+  if (!_jMem.autoGoals.length) {
+    aEl.innerHTML = '<div style="font-size:11px;color:rgba(188,140,255,.2);padding:4px 0">JARVIS will generate plans after first beat.</div>';
+  } else {
+    aEl.innerHTML = _jMem.autoGoals.slice(0,8).map(function(g) {
+      return '<div class="j-goal g-auto ' + (g.status==='done'?'g-done':'') + (g.status==='active'?'g-active':'') + '" style="margin-bottom:4px">' +
+        '<div class="j-goal-dot ' + (g.status==='done'?'done':g.status==='active'?'active':'auto') + '"></div>' +
+        '<span style="flex:1;line-height:1.5">' + esc(g.text) + '</span>' +
+        '</div>';
+    }).join('');
+  }
 }
 
-// ── Start / Stop ──
-function jarvisRun() {
-  if (!_jarvisGoals.filter(function(g) { return g.status !== 'done'; }).length) {
-    jarvisNotif('⚠ No active goals. Add at least one goal first.'); return;
-  }
-  if (!effectiveKey()) {
-    jarvisNotif('⚠ No API key configured. Set your key in Vibe settings.'); return;
-  }
-  _jarvisRunning = true;
-  _jarvisSetStatus('working');
-  jarvisNotif('🤖 JARVIS online. Working towards your goals…');
-  _jarvisMoveCursor();
-  _jarvisCycle();
+/* ─── Start / Stop ─── */
+function jStart() {
+  if (!effectiveKey()) { jarvisNotif('⚠ Set an API key in Vibe settings first.'); return; }
+  _jRunning = true;
+  _jSetStatus('thinking');
+  _jSave();
+  jarvisNotif('🤖 JARVIS online — heartbeat every ' + (_jHeartbeat/1000) + 's');
+  _jBeat();
 }
 
-function jarvisStop() {
-  _jarvisRunning = false;
-  clearTimeout(_jarvisTimer);
-  _jarvisSetStatus('idle');
-  _jarvisGoals.forEach(function(g) { if (g.status === 'active') g.status = 'idle'; });
-  _jarvisRenderGoals();
+function jStop() {
+  _jRunning = false;
+  clearTimeout(_jTimer);
+  _jSetStatus('offline');
+  // Reset active goals
+  _jMem.userGoals.forEach(function(g){ if(g.status==='active') g.status='idle'; });
+  _jMem.autoGoals.forEach(function(g){ if(g.status==='active') g.status='idle'; });
+  _jSave(); _jRenderGoals();
   jarvisNotif('🤖 JARVIS standing by.');
 }
 
-function _jarvisSetStatus(st) {
-  var badge = document.getElementById('jarvis-status-badge');
-  if (!badge) return;
-  badge.className = 'j-status ' + st;
-  badge.textContent = st;
+function _jSetStatus(st) {
+  var dot = document.getElementById('jarvis-status-dot');
+  var lbl = document.getElementById('jarvis-status-lbl');
+  if (dot) { dot.className = 'j-status-dot ' + st; }
+  if (lbl) lbl.textContent = st;
+  var sfBtn = document.getElementById('sfbtn-jarvis');
+  if (sfBtn) sfBtn.classList.toggle('sf-amber', st !== 'offline');
 }
 
-// ── Main autonomous cycle ──
-async function _jarvisCycle() {
-  if (!_jarvisRunning) return;
+function _jSetLive(msg) {
+  var el = document.getElementById('j-live-status');
+  if (el) el.textContent = msg;
+}
 
-  var pending = _jarvisGoals.filter(function(g) { return g.status !== 'done'; });
-  if (!pending.length) {
-    _jarvisSetStatus('done');
-    _jarvisRunning = false;
-    jarvisNotif('✅ All goals completed!');
-    return;
-  }
-
-  var nodes = vibeTree ? flattenTree(vibeTree) : [];
-  if (!nodes.length) {
-    _jarvisTimer = setTimeout(_jarvisCycle, _jarvisCycleMs);
-    return;
-  }
-
-  // Pick current goal (round-robin)
-  var goal = pending[_jarvisGoalIdx % pending.length];
-  _jarvisGoalIdx++;
-  goal.status = 'active';
-  _jarvisRenderGoals();
-  _jarvisMoveCursor();
-
-  // Pick a node to work on (ask AI which one)
-  var nodeList = nodes.map(function(n) { return n.id + ' (' + n.type + ')'; }).join(', ');
-  var snapContext = _jarvisSnap
-    ? '\n\nA screenshot of the current UI has been captured. Use it to understand the visual state and make improvements.'
-    : '';
-
-  var planPrompt =
-    'You are JARVIS, an autonomous AI coding agent. Your current goal is: "' + goal.text + '".\n' +
-    'The project has these nodes: ' + nodeList + '.\n' + snapContext +
-    '\n\nRespond with ONLY a JSON object (no markdown, no extra text) like:\n' +
-    '{"nodeId":"the-node-id","action":"a concrete 1-sentence change to make to that node"}\n' +
-    'Pick the single most impactful node+action pair that advances the goal right now.';
+/* ─── Main heartbeat ─── */
+async function _jBeat() {
+  if (!_jRunning) return;
+  _jBeatCount++;
+  _jSetStatus('thinking');
+  _jSetLive('Beat #' + _jBeatCount + ' — planning…');
 
   try {
+    // 1. Take a snapshot if we don't have one (auto-capture)
+    if (!_jSnap && vibeTree) {
+      _jFallbackCapture();
+      await _jSleep(300);
+    }
+
+    // 2. Build full context for JARVIS brain
+    var ctx = _jBuildContext();
+
+    // 3. Ask JARVIS to plan next actions
     var planRaw = await callAnalysisAI(
-      'You are JARVIS, an autonomous goal-driven coding agent. You respond only with valid JSON.',
-      planPrompt
+      _jSystemPrompt(),
+      ctx
     );
 
-    // Parse plan
-    var plan;
-    try {
-      var cleaned = planRaw.replace(/```json|```/g, '').trim();
-      plan = JSON.parse(cleaned);
-    } catch(e) {
-      // Try to extract JSON from response
-      var m = planRaw.match(/\{[^}]+\}/);
-      if (m) plan = JSON.parse(m[0]);
-      else throw new Error('Could not parse plan JSON');
+    // 4. Parse plan
+    var plan = _jParsePlan(planRaw);
+    if (!plan) throw new Error('Could not parse JARVIS plan');
+
+    _jSetStatus('working');
+
+    // 5. Store any new auto-goals
+    if (plan.newGoals && plan.newGoals.length) {
+      plan.newGoals.forEach(function(gt) {
+        var exists = _jMem.autoGoals.some(function(g){ return g.text === gt; });
+        if (!exists) _jMem.autoGoals.push({ id:'ag'+Date.now()+Math.random(), text:gt, source:'jarvis', status:'idle' });
+      });
     }
 
-    if (!plan.nodeId || !plan.action) throw new Error('Invalid plan structure');
-
-    // Validate node exists
-    var targetNode = nodes.find(function(n) { return n.id === plan.nodeId; });
-    if (!targetNode) throw new Error('Node not found: ' + plan.nodeId);
-
-    // Build the full prompt including screenshot context
-    var fullPrompt = plan.action;
-    if (_jarvisSnap) {
-      fullPrompt += '\n\n[JARVIS note: A UI screenshot was captured showing the current visual state. Apply this change with awareness of the current visual design.]';
+    // 6. Store learned prefs
+    if (plan.learnedPrefs && plan.learnedPrefs.length) {
+      plan.learnedPrefs.forEach(function(p) { _jLearnPref(p); });
     }
 
-    // Log intention
-    _jarvisAddLog({
-      node: plan.nodeId, action: plan.action,
-      goal: goal.text, status: 'pending',
-      time: _jarvisTimeStr()
-    });
-    jarvisNotif('🔧 Working on <b>' + esc(plan.nodeId) + '</b>: ' + esc(plan.action.slice(0,60)) + '…');
+    // 7. Update memory
+    if (plan.memoryUpdates) {
+      Object.keys(plan.memoryUpdates).forEach(function(k) {
+        _jSetMemory(k, plan.memoryUpdates[k]);
+      });
+    }
 
-    // Submit as an agent prompt — store on session history and postMessage to Vibe
-    var s = sess();
-    if (s) {
-      var nid = plan.nodeId;
-      if (!s.history[nid]) s.history[nid] = [];
-      var att = {
-        id: 'j' + Date.now(),
-        node: nid,
-        prompt: '[JARVIS] ' + fullPrompt,
-        status: 'pending',
-        time: _jarvisTimeStr(),
-        diff: [],
-        result: 'JARVIS dispatched…',
-        promptPseudo: '→ [JARVIS] ' + plan.action.slice(0,60),
-        aiResultFormatted: null,
-        _jarvisGoalId: goal.id
-      };
-      s.history[nid].push(att);
-      saveSessions();
+    // 8. Execute the chosen action
+    if (plan.action && plan.nodeId) {
+      var needsVerify = _jNeedsVerification(plan);
 
-      // Update active node view if panel is open
-      if (document.getElementById('nd-sel').value === nid) renderWork();
-
-      // Fire to Vibe agent
-      try {
-        window.parent.postMessage({
-          source: 'apui-vibe',
-          type: 'apui-run-agent',
-          prompt: fullPrompt,
-          attemptId: att.id,
-          nodeId: nid,
-          sessionIntent: (s.intent || '') + '\n[JARVIS goal: ' + goal.text + ']'
-        }, '*');
-      } catch(e2) {
-        att.status = 'fail'; att.result = '⚠ postMessage failed: ' + e2.message;
-        att.aiResultFormatted = '<span style="color:var(--red)">' + esc(att.result) + '</span>';
-        _jarvisUpdateLog(nid, att.id, 'fail');
-        if (document.getElementById('nd-sel').value === nid) renderWork();
+      if (needsVerify) {
+        _jSetStatus('waiting');
+        _jSetLive('Waiting for your input…');
+        var approved = await _jAskVerification(
+          plan.action + '\n\nNode: ' + plan.nodeId +
+          (plan.reason ? '\n\nReason: ' + plan.reason : '')
+        );
+        if (!approved) {
+          _jLog({ node: plan.nodeId, action: '(skipped by user) ' + plan.action, goalRef: plan.goalRef||'', status: 'skip', auto: !plan.isUserGoal });
+          _scheduleNextBeat(); return;
+        }
       }
 
-      // Mark goal as done after dispatching (optimistic; real check on agent reply)
-      goal.status = 'done';
-      _jarvisRenderGoals();
-      _jarvisSaveState();
+      // Mark goal active
+      _jMarkGoalActive(plan.goalRef);
+      _jRenderGoals();
+
+      // Dispatch
+      await _jDispatch(plan);
+    } else {
+      // Nothing to do this beat
+      _jLog({ node:'—', action:'Scanned project — no actions needed this cycle', goalRef:'', status:'ok', auto:true });
+      _jSetLive('All clear this cycle.');
     }
+
+    _jSave();
 
   } catch(err) {
-    _jarvisAddLog({ node: '—', action: 'Error: ' + err.message, goal: goal.text, status: 'err', time: _jarvisTimeStr() });
-    jarvisNotif('⚠ JARVIS encountered an error: ' + esc(err.message.slice(0,80)));
-    goal.status = 'idle'; // allow retry
-    _jarvisRenderGoals();
+    _jLog({ node:'—', action:'Error: ' + err.message.slice(0,80), goalRef:'', status:'err', auto:true });
+    _jSetLive('Error: ' + err.message.slice(0,60));
   }
 
-  // Schedule next cycle
-  if (_jarvisRunning) {
-    _jarvisTimer = setTimeout(_jarvisCycle, _jarvisCycleMs);
-  }
+  _jSetStatus(_jRunning ? 'thinking' : 'offline');
+  _scheduleNextBeat();
 }
 
-// ── Screenshot capture ──
-function jarvisCapture() {
-  var btn = document.getElementById('jarvis-snap-btn');
-  var statusEl = document.getElementById('jarvis-snap-status');
-  var scanBar = document.getElementById('jarvis-scan-bar');
-  var preview = document.getElementById('jarvis-screenshot-preview');
+function _scheduleNextBeat() {
+  if (!_jRunning) return;
+  var nextIn = _jHeartbeat;
+  _jSetLive('Next beat in ' + Math.round(nextIn/1000) + 's');
+  clearTimeout(_jTimer);
+  _jTimer = setTimeout(_jBeat, nextIn);
+  // Countdown display
+  var ticksLeft = Math.round(nextIn/1000);
+  var ticker = setInterval(function() {
+    if (!_jRunning) { clearInterval(ticker); return; }
+    ticksLeft--;
+    if (ticksLeft <= 0) { clearInterval(ticker); return; }
+    _jSetLive('Next beat in ' + ticksLeft + 's  ·  beat #' + _jBeatCount);
+  }, 1000);
+}
 
-  if (statusEl) statusEl.textContent = 'Capturing…';
-  if (scanBar) scanBar.style.display = 'block';
-  if (btn) btn.disabled = true;
+/* ─── System prompt ─── */
+function _jSystemPrompt() {
+  return [
+    'You are JARVIS, an always-on autonomous AI coding agent embedded in a vibe-coding environment.',
+    'You have goals set by the user AND generate your own goals to continuously improve the project.',
+    'You NEVER stop improving. When user goals are complete, you autonomously find the next best improvement.',
+    'You remember user preferences and learned patterns. You plan ahead.',
+    'Always respond with ONLY a valid JSON object, no markdown, no extra text.',
+    'JSON schema: {',
+    '  "nodeId": "node-to-edit or null",',
+    '  "action": "concrete single change to make (1 sentence)",',
+    '  "reason": "why this improves the project",',
+    '  "goalRef": "which goal this serves",',
+    '  "isUserGoal": true/false,',
+    '  "isMajorChange": true/false (true = structural/delete/rename, false = styling/copy/minor fix),',
+    '  "newGoals": ["auto-generated goal 1", "auto-generated goal 2"],',
+    '  "learnedPrefs": ["user seems to prefer X", ...],',
+    '  "memoryUpdates": {"key": "value"},',
+    '  "confidence": 0.0-1.0',
+    '}',
+    'If there is truly nothing to do, set nodeId to null and action to empty string.',
+  ].join('\n');
+}
 
-  // Method 1: Ask parent (Vibe) to send screenshot of preview iframe
+/* ─── Context builder ─── */
+function _jBuildContext() {
+  var nodes = vibeTree ? flattenTree(vibeTree) : [];
+  var nodeList = nodes.map(function(n) {
+    var done = (_jMem.doneNodes[n.id] || []).map(function(d){ return d.action; }).slice(-3);
+    return n.id + ' (' + n.type + ')' + (done.length ? ' [done: ' + done.join('; ') + ']' : '');
+  }).join('\n  ');
+
+  var userGoalsList = _jMem.userGoals.filter(function(g){ return g.status !== 'done'; })
+    .map(function(g){ return '- ' + g.text; }).join('\n') || '(none)';
+
+  var autoGoalsList = _jMem.autoGoals.filter(function(g){ return g.status !== 'done'; }).slice(0,5)
+    .map(function(g){ return '- ' + g.text; }).join('\n') || '(none generated yet)';
+
+  var prefsList = _jMem.prefs.slice(0,10).map(function(p){ return '- ' + p.text; }).join('\n') || '(none)';
+
+  var memList = _jMem.memory.slice(0,8).map(function(m){ return m.key + ': ' + m.value; }).join('\n') || '(empty)';
+
+  var recentLog = _jMem.log.slice(0,6).map(function(l){ return l.time + ' [' + l.node + '] ' + l.action; }).join('\n') || '(no history)';
+
+  var scopeNote = _jScope !== 'all' ? '\nNOTE: User has restricted scope to ' + _jScope + ' nodes only. Only pick ' + _jScope + ' nodes.' : '';
+
+  return [
+    '=== PROJECT NODES ===',
+    nodeList || '(no nodes)',
+    '',
+    '=== USER GOALS (must work towards these) ===',
+    userGoalsList,
+    '',
+    '=== JARVIS AUTO-GOALS (self-generated) ===',
+    autoGoalsList,
+    '',
+    '=== USER PREFERENCES (learned) ===',
+    prefsList,
+    '',
+    '=== WORKING MEMORY ===',
+    memList,
+    '',
+    '=== RECENT ACTIONS (do not repeat) ===',
+    recentLog,
+    '',
+    '=== BEAT #' + _jBeatCount + ' ===',
+    scopeNote,
+    _jSnap ? '\n[UI screenshot available — the user\'s current UI state has been captured. Use it to inform visual improvements.]' : '',
+    '\nWhat should JARVIS do this beat? Pick the highest-value action. If all goals are done, generate 2-3 new improvement goals and pick one to act on.',
+  ].join('\n');
+}
+
+/* ─── Plan parser ─── */
+function _jParsePlan(raw) {
   try {
-    window.parent.postMessage({ source: 'apui-vibe', type: 'apui-request-screenshot' }, '*');
-  } catch(e) {}
+    var clean = raw.replace(/```json|```/g,'').trim();
+    return JSON.parse(clean);
+  } catch(e) {
+    var m = raw.match(/\{[\s\S]*\}/);
+    if (m) { try { return JSON.parse(m[0]); } catch(e2) {} }
+    return null;
+  }
+}
 
-  // Method 2: Try to get the preview iframe src directly for html2canvas fallback
-  // We'll give the parent 2s to respond, then fall back
-  var responded = false;
-  var snapTimeout = setTimeout(function() {
-    if (!responded) _jarvisFallbackCapture(btn, statusEl, scanBar, preview);
-  }, 2000);
+/* ─── Needs verification ─── */
+function _jNeedsVerification(plan) {
+  if (_jAutonomy === 'full') return false;
+  if (_jAutonomy === 'always') return true;
+  if (_jAutonomy === 'major') return plan.isMajorChange === true;
+  return false;
+}
 
-  // Store cleanup refs
-  jarvisCapture._cleanup = function(dataUrl) {
-    responded = true;
-    clearTimeout(snapTimeout);
-    if (dataUrl) {
-      _jarvisSnap = dataUrl;
-      if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
-      if (statusEl) statusEl.textContent = 'Snapshot captured ✓';
-      _jarvisAddLog({ node: 'preview', action: 'UI screenshot captured', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
-    } else {
-      if (statusEl) statusEl.textContent = 'Capture failed';
+/* ─── Verification request ─── */
+function _jAskVerification(msg) {
+  return new Promise(function(resolve) {
+    var el  = document.getElementById('jarvis-verify');
+    var mel = document.getElementById('jarvis-verify-msg');
+    var yBtn = document.getElementById('jarvis-verify-yes');
+    var nBtn = document.getElementById('jarvis-verify-no');
+    var lBtn = document.getElementById('jarvis-verify-later');
+    if (!el) { resolve(true); return; }
+
+    mel.textContent = msg;
+    el.classList.add('show');
+    _jVerifyResolve = resolve;
+
+    yBtn.onclick = function() { el.classList.remove('show'); resolve(true); };
+    nBtn.onclick = function() { el.classList.remove('show'); resolve(false); };
+    lBtn.onclick = function() { el.classList.remove('show'); jStop(); resolve(false); };
+  });
+}
+
+/* ─── Dispatch action to Vibe agent ─── */
+async function _jDispatch(plan) {
+  var s = sess(); if (!s) return;
+  var nid = plan.nodeId;
+
+  // Filter by scope
+  if (_jScope !== 'all') {
+    var node = getNodeFromTree(nid);
+    var nodeType = node ? node.type : '';
+    var typeMatch = (_jScope === 'css' && nodeType === 'css') ||
+                    (_jScope === 'js'  && (nodeType === 'javascript' || nodeType === 'js-function' || nodeType === 'declaration')) ||
+                    (_jScope === 'html' && nodeType === 'html');
+    if (!typeMatch) {
+      _jLog({ node: nid, action: '(skipped — out of scope: ' + nodeType + ')', goalRef: plan.goalRef||'', status: 'skip', auto: true });
+      return;
     }
-    if (scanBar) scanBar.style.display = 'none';
-    if (btn) btn.disabled = false;
+  }
+
+  if (!s.history[nid]) s.history[nid] = [];
+
+  var fullPrompt = '[JARVIS] ' + plan.action +
+    (plan.reason ? '\n\nReason: ' + plan.reason : '') +
+    (plan.goalRef ? '\n\nGoal: ' + plan.goalRef : '') +
+    (_jSnap ? '\n\n[JARVIS note: UI screenshot context available — apply change with awareness of current visual design.]' : '');
+
+  var att = {
+    id: 'j' + Date.now(),
+    node: nid,
+    prompt: fullPrompt,
+    status: 'pending',
+    time: _jTimeStr(),
+    diff: [],
+    result: 'JARVIS dispatched…',
+    promptPseudo: '→ [JARVIS] ' + plan.action.slice(0,60),
+    aiResultFormatted: null,
+    _jGoalRef: plan.goalRef,
+    _jAuto: !plan.isUserGoal,
   };
+
+  s.history[nid].push(att);
+  saveSessions();
+
+  // Update node view if selected
+  if (document.getElementById('nd-sel').value === nid) renderWork();
+
+  // Log
+  _jLog({
+    node: nid, action: plan.action, goalRef: plan.goalRef||'',
+    status: 'pending', auto: !plan.isUserGoal
+  });
+
+  // Move cursor
+  _jMoveCursor();
+
+  // Fire to Vibe
+  try {
+    window.parent.postMessage({
+      source: 'apui-vibe',
+      type: 'apui-run-agent',
+      prompt: fullPrompt,
+      attemptId: att.id,
+      nodeId: nid,
+      sessionIntent: (s.intent||'') + '\n[JARVIS: ' + (plan.goalRef||'autonomous improvement') + ']'
+    }, '*');
+    jarvisNotif('🔧 <b>' + esc(nid) + '</b>: ' + esc(plan.action.slice(0,70)) + '…');
+  } catch(err) {
+    att.status = 'fail';
+    att.result = '⚠ postMessage failed';
+    att.aiResultFormatted = '<span style="color:var(--red)">⚠ postMessage failed</span>';
+    if (document.getElementById('nd-sel').value === nid) renderWork();
+  }
 }
 
-function _jarvisFallbackCapture(btn, statusEl, scanBar, preview) {
-  // Fallback: describe the vibeTree as text context instead of a real screenshot
-  if (!vibeTree) {
-    if (statusEl) statusEl.textContent = 'No project loaded';
-    if (scanBar) scanBar.style.display = 'none';
-    if (btn) btn.disabled = false;
-    return;
-  }
-  var nodes = flattenTree(vibeTree);
-  var desc = 'Project snapshot (' + nodes.length + ' nodes): ' + nodes.map(function(n) { return n.id + '[' + n.type + ']'; }).join(', ');
-  // Create a simple SVG "screenshot" placeholder
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#0a0c10"/><text x="10" y="20" fill="#00b4ff" font-family="monospace" font-size="10">UI SNAPSHOT</text>' +
-    nodes.slice(0,12).map(function(n, i) {
-      var y = 36 + i * 12;
-      var colors = {'css':'#58a6ff','javascript':'#3fb950','html':'#d29922'};
-      var col = colors[n.type] || '#7d8590';
-      return '<rect x="8" y="' + (y-9) + '" width="' + Math.min(200, (n.code||'').length/3 + 40) + '" height="10" rx="2" fill="' + col + '" opacity=".25"/><text x="12" y="' + y + '" fill="' + col + '" font-family="monospace" font-size="8">' + n.id + '</text>';
-    }).join('') +
-    '</svg>';
-  var dataUrl = 'data:image/svg+xml;base64,' + btoa(svg);
-  _jarvisSnap = dataUrl;
-  if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
-  if (statusEl) statusEl.textContent = 'Structure snapshot ✓ (visual capture unavailable)';
-  if (scanBar) scanBar.style.display = 'none';
-  if (btn) btn.disabled = false;
-  _jarvisAddLog({ node: 'preview', action: 'Structure snapshot generated (' + nodes.length + ' nodes)', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
-}
-
-// Receive screenshot from parent
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'apui-screenshot-data' && e.data.dataUrl) {
-    _jarvisSnap = e.data.dataUrl;
-    var preview = document.getElementById('jarvis-screenshot-preview');
-    if (preview) { preview.src = e.data.dataUrl; preview.style.display = 'block'; }
-    var statusEl = document.getElementById('jarvis-snap-status');
-    if (statusEl) statusEl.textContent = 'Screenshot captured ✓';
-    if (jarvisCapture._cleanup) jarvisCapture._cleanup(e.data.dataUrl);
-    _jarvisAddLog({ node: 'preview', action: 'Live screenshot captured from preview iframe', goal: '(snapshot)', status: 'snap', time: _jarvisTimeStr() });
-    var scanBar = document.getElementById('jarvis-scan-bar');
-    if (scanBar) scanBar.style.display = 'none';
-    var btn = document.getElementById('jarvis-snap-btn');
-    if (btn) btn.disabled = false;
-  }
-});
-
-// When agent completes, mark JARVIS log entry
-(function patchHandleAgentStatusForJarvis() {
+/* ─── Patch handleAgentStatus to update JARVIS log + mark goals done ─── */
+(function() {
   var _prev = window.handleAgentStatus;
   window.handleAgentStatus = function(d) {
     _prev.call(this, d);
-    if ((d.status === 'done' || d.status === 'error') && d.attemptId) {
-      // Find the attempt
-      var s = sess(); if (!s) return;
-      var att = null;
-      for (var arr of Object.values(s.history)) {
-        att = arr.find(function(a) { return a.id === d.attemptId; });
-        if (att) break;
-      }
-      if (att && att._jarvisGoalId) {
-        // Update the last pending log entry for this node to ok/err
-        var logStatus = d.status === 'done' ? 'ok' : 'err';
-        // Find pending entry and update
-        for (var i = _jarvisLog.length - 1; i >= 0; i--) {
-          if (_jarvisLog[i].node === att.node && _jarvisLog[i].status === 'pending') {
-            _jarvisLog[i].status = logStatus;
-            break;
-          }
-        }
-        _jarvisRenderLog();
-        _jarvisSaveState();
-        if (d.status === 'done') {
-          jarvisNotif('✅ JARVIS completed: <b>' + esc(att.node) + '</b>');
-        }
+    if (!d.attemptId) return;
+    var s = sess(); if (!s) return;
+    var att = null;
+    for (var arr of Object.values(s.history)) {
+      att = arr.find(function(a){ return a.id === d.attemptId; });
+      if (att) break;
+    }
+    if (!att || !att._jGoalRef) return;
+
+    var logStatus = d.status === 'done' ? 'ok' : d.status === 'error' ? 'err' : null;
+    if (!logStatus) return;
+
+    // Update pending log entry
+    for (var i = _jMem.log.length-1; i >= 0; i--) {
+      if (_jMem.log[i].node === att.node && _jMem.log[i].status === 'pending') {
+        _jMem.log[i].status = logStatus; break;
       }
     }
+
+    if (d.status === 'done') {
+      // Track what was done on this node
+      if (!_jMem.doneNodes[att.node]) _jMem.doneNodes[att.node] = [];
+      _jMem.doneNodes[att.node].unshift({ action: att.prompt.replace('[JARVIS] ','').slice(0,80), ts: _jTS() });
+      if (_jMem.doneNodes[att.node].length > 10) _jMem.doneNodes[att.node].pop();
+
+      // Mark goal done if user goal
+      var goalText = att._jGoalRef || '';
+      _jMem.userGoals.forEach(function(g){
+        if (g.status === 'active' && g.text === goalText) g.status = 'done';
+      });
+      _jMem.autoGoals.forEach(function(g){
+        if (g.status === 'active') g.status = 'done';
+      });
+
+      jarvisNotif('✅ JARVIS completed: <b>' + esc(att.node) + '</b>');
+    }
+
+    _jSave();
+    if (_jActiveTab === 'log') _jRenderLog();
+    _jRenderGoals();
   };
 })();
 
-// ── Log helpers ──
-function _jarvisAddLog(entry) {
-  _jarvisLog.unshift(entry);
-  if (_jarvisLog.length > 100) _jarvisLog.pop();
-  _jarvisRenderLog();
-  _jarvisSaveState();
+/* ─── Goal state helpers ─── */
+function _jMarkGoalActive(goalRef) {
+  _jMem.userGoals.forEach(function(g){ if(g.text===goalRef && g.status==='idle') g.status='active'; });
+  _jMem.autoGoals.forEach(function(g){ if(g.text===goalRef && g.status==='idle') g.status='active'; });
 }
 
-function _jarvisRenderLog() {
+/* ─── Screenshot ─── */
+function jarvisCapture() {
+  var scanBar  = document.getElementById('j-scan-bar');
+  var statusEl = document.getElementById('j-snap-status');
+  var snapBtn  = document.getElementById('jarvis-snap-btn'); // may be null if not in view
+  if (scanBar) scanBar.style.display = 'block';
+  if (statusEl) statusEl.textContent = 'Capturing…';
+
+  try { window.parent.postMessage({ source:'apui-vibe', type:'apui-request-screenshot' }, '*'); } catch(e) {}
+
+  setTimeout(function() {
+    if (!_jSnap) _jFallbackCapture();
+    if (scanBar) scanBar.style.display = 'none';
+  }, 2200);
+}
+
+function _jFallbackCapture() {
+  if (!vibeTree) return;
+  var nodes = flattenTree(vibeTree);
+  var svgRows = nodes.slice(0,14).map(function(n, i) {
+    var y = 30 + i*11;
+    var c = n.type==='css'?'#58a6ff':n.type==='javascript'||n.type==='js-function'?'#3fb950':'#d29922';
+    var w = Math.min(220, 50 + (n.code||'').length/4);
+    return '<rect x="8" y="'+(y-8)+'" width="'+w+'" height="9" rx="2" fill="'+c+'" opacity=".18"/>' +
+           '<text x="12" y="'+y+'" fill="'+c+'" font-size="8" font-family="monospace">'+n.id+'</text>';
+  }).join('');
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="#0a0c10"/>' +
+    '<text x="10" y="18" fill="#00b4ff" font-size="9" font-family="monospace" font-weight="bold">JARVIS STRUCTURE MAP · '+nodes.length+' nodes</text>' +
+    svgRows + '</svg>';
+  _jSnap = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  var img = document.getElementById('jarvis-ss-img');
+  if (img) { img.src = _jSnap; img.style.display = 'block'; }
+  var st = document.getElementById('j-snap-status');
+  if (st) st.textContent = 'Structure map captured ✓';
+}
+
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'apui-screenshot-data' && e.data.dataUrl) {
+    _jSnap = e.data.dataUrl;
+    var img = document.getElementById('jarvis-ss-img');
+    if (img) { img.src = _jSnap; img.style.display = 'block'; }
+    var st = document.getElementById('j-snap-status');
+    if (st) st.textContent = 'Screenshot captured ✓';
+    var sb = document.getElementById('j-scan-bar');
+    if (sb) sb.style.display = 'none';
+    _jLog({ node:'preview', action:'Live screenshot received from preview', goalRef:'', status:'snap', auto:true });
+    _jSave();
+  }
+});
+
+/* ─── Preference learning ─── */
+function _jExtractPrefs(text) {
+  var hints = [
+    { test: /dark\s*mode|dark\s*theme/i, pref: 'Prefers dark mode / dark themes' },
+    { test: /mobile|responsive/i,        pref: 'Prioritizes mobile-first / responsive design' },
+    { test: /minimal|clean|simple/i,     pref: 'Prefers minimal, clean UI aesthetics' },
+    { test: /speed|performance|fast/i,   pref: 'Values performance and speed optimization' },
+    { test: /accessible|a11y/i,          pref: 'Cares about accessibility (WCAG)' },
+    { test: /animation|transition/i,     pref: 'Likes smooth animations and transitions' },
+  ];
+  hints.forEach(function(h) { if (h.test.test(text)) _jLearnPref(h.pref); });
+}
+
+function _jLearnPref(text) {
+  if (!text) return;
+  var exists = _jMem.prefs.some(function(p){ return p.text === text; });
+  if (!exists) {
+    _jMem.prefs.push({ id:'p'+Date.now(), text:text, added:_jTS() });
+    _jSave();
+  }
+}
+
+function jAddPref(text) {
+  text = (text||'').trim(); if (!text) return;
+  _jLearnPref(text);
+  var inp = document.getElementById('j-pref-input');
+  if (inp) inp.value = '';
+  _jRenderMemory();
+}
+
+function _jSetMemory(key, value) {
+  var existing = _jMem.memory.find(function(m){ return m.key===key; });
+  if (existing) { existing.value = value; existing.updated = _jTS(); }
+  else _jMem.memory.push({ key:key, value:value, updated:_jTS() });
+  if (_jMem.memory.length > 30) _jMem.memory.splice(0,1);
+}
+
+function jClearMemory() {
+  _jMem.memory = []; _jMem.prefs = []; _jMem.doneNodes = {};
+  _jSave(); _jRenderMemory();
+  jarvisNotif('🗑 JARVIS memory cleared.');
+}
+
+/* ─── Settings ─── */
+function jSetHeartbeat(val) {
+  val = parseInt(val);
+  _jHeartbeat = val * 1000;
+  var lbl = document.getElementById('j-hb-val');
+  if (lbl) lbl.textContent = val + 's';
+  _jSave();
+}
+
+function jSetAutonomy(val) {
+  _jAutonomy = val;
+  var desc = document.getElementById('j-autonomy-desc');
+  var descs = {
+    full:   'JARVIS will act on all improvements without asking.',
+    major:  'JARVIS will ask only for structural or destructive changes.',
+    always: 'JARVIS will ask before every single action.',
+  };
+  if (desc) desc.textContent = descs[val] || '';
+  _jSave();
+}
+
+function jSetScope(val) {
+  _jScope = val;
+  _jSave();
+}
+
+/* ─── Render functions ─── */
+function _jRenderLog() {
   var el = document.getElementById('jarvis-log-list');
   if (!el) return;
-  if (!_jarvisLog.length) {
-    el.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.3);padding:8px 0">No actions yet. Start JARVIS to begin.</div>';
+  if (!_jMem.log.length) {
+    el.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.2);padding:8px 0">No actions yet.</div>';
     return;
   }
-  el.innerHTML = _jarvisLog.slice(0, 30).map(function(l) {
-    var cls = l.status === 'ok' ? 'j-log-ok' : l.status === 'err' ? 'j-log-err' : l.status === 'snap' ? 'j-log-snap' : '';
-    var icon = l.status === 'ok' ? '✓ ' : l.status === 'err' ? '⚠ ' : l.status === 'snap' ? '📷 ' : '⏳ ';
-    return '<div class="j-log-entry ' + cls + '">' +
-      '<span class="j-log-time">' + l.time + '</span>' +
-      '<div class="j-log-node">' + esc(l.node) + '</div>' +
-      '<div class="j-log-action">' + icon + esc(l.action) + '</div>' +
-      (l.goal && l.goal !== '(snapshot)' ? '<div class="j-log-goal">Goal: ' + esc(l.goal.slice(0,60)) + '</div>' : '') +
-      '</div>';
+  el.innerHTML = _jMem.log.slice(0,50).map(function(l) {
+    var icon = l.status==='ok'?'✓ ':l.status==='err'?'⚠ ':l.status==='snap'?'📷 ':l.status==='skip'?'⏭ ':l.status==='plan'?'📋 ':'⏳ ';
+    var cls  = l.status==='ok'?'ok':l.status==='err'?'err':l.status==='snap'?'snap':l.auto?'auto':'plan';
+    return '<div class="j-log '+cls+'">' +
+      '<span class="j-log-time">'+l.time+'</span>' +
+      '<div class="j-log-node">'+esc(l.node)+'</div>' +
+      '<div class="j-log-act">'+icon+esc(l.action)+'</div>' +
+      (l.goalRef?'<div class="j-log-goal-ref">↳ '+esc(l.goalRef.slice(0,50))+'</div>':'') +
+    '</div>';
   }).join('');
 }
 
-// ── Persistence ──
-var _JARVIS_LS_KEY = 'jarvis_state_v1';
-function _jarvisSaveState() {
-  try {
-    localStorage.setItem(_JARVIS_LS_KEY, JSON.stringify({
-      goals: _jarvisGoals, log: _jarvisLog.slice(0, 50)
-    }));
-  } catch(e) {}
+function jClearLog() {
+  _jMem.log = []; _jSave(); _jRenderLog();
 }
-function _jarvisLoadState() {
-  try {
-    var raw = localStorage.getItem(_JARVIS_LS_KEY);
-    if (!raw) return;
-    var data = JSON.parse(raw);
-    if (Array.isArray(data.goals)) { _jarvisGoals = data.goals; _jarvisGoals.forEach(function(g){if(g.status==='active')g.status='idle';}); }
-    if (Array.isArray(data.log))   _jarvisLog   = data.log;
-  } catch(e) {}
-}
-window.addEventListener('load', function() {
-  _jarvisLoadState();
-  if (_jarvisOpen) { _jarvisRenderGoals(); _jarvisRenderLog(); }
-});
 
-// ── Cursor animation ──
-function _jarvisMoveCursor() {
-  var gc = document.getElementById('jarvis-cursor');
-  if (!gc) return;
+function _jRenderMemory() {
+  var pl = document.getElementById('j-prefs-list');
+  var ml = document.getElementById('j-memory-list');
+  if (pl) {
+    if (!_jMem.prefs.length) {
+      pl.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.2)">No preferences learned yet.</div>';
+    } else {
+      pl.innerHTML = _jMem.prefs.map(function(p) {
+        return '<div class="j-pref"><span style="flex:1">'+esc(p.text)+'</span>' +
+          '<button class="btn xs" style="font-size:9px;padding:2px 5px;min-height:18px;opacity:.4" onclick="jRemovePref(\''+p.id+'\')">✕</button></div>';
+      }).join('');
+    }
+  }
+  if (ml) {
+    if (!_jMem.memory.length) {
+      ml.innerHTML = '<div style="font-size:11px;color:rgba(0,180,255,.2)">Memory is empty.</div>';
+    } else {
+      ml.innerHTML = _jMem.memory.slice(0,12).map(function(m) {
+        return '<div class="j-pref" style="flex-direction:column;gap:2px">' +
+          '<span style="font-size:9px;color:rgba(0,180,255,.5);font-weight:700;text-transform:uppercase;letter-spacing:.06em">'+esc(m.key)+'</span>' +
+          '<span style="color:#7dd3f7">'+esc(m.value)+'</span></div>';
+      }).join('');
+    }
+  }
+}
+
+function jRemovePref(id) {
+  _jMem.prefs = _jMem.prefs.filter(function(p){ return p.id!==id; });
+  _jSave(); _jRenderMemory();
+}
+
+function _jRenderSettings() {
+  var hbSlider = document.getElementById('j-hb-slider');
+  var hbVal    = document.getElementById('j-hb-val');
+  var autSel   = document.getElementById('j-autonomy-sel');
+  var scopeSel = document.getElementById('j-scope-sel');
+  var statusEl = document.getElementById('j-settings-status');
+  if (hbSlider) hbSlider.value = _jHeartbeat/1000;
+  if (hbVal)    hbVal.textContent = (_jHeartbeat/1000) + 's';
+  if (autSel)   autSel.value = _jAutonomy;
+  if (scopeSel) scopeSel.value = _jScope;
+  if (statusEl) {
+    statusEl.innerHTML =
+      'Running: <b style="color:' + (_jRunning?'#00b4ff':'var(--red)') + '">' + (_jRunning?'Yes':'No') + '</b><br>' +
+      'Beat count: <b>' + _jBeatCount + '</b><br>' +
+      'User goals: <b>' + _jMem.userGoals.length + '</b> · ' +
+      'Auto goals: <b>' + _jMem.autoGoals.length + '</b><br>' +
+      'Log entries: <b>' + _jMem.log.length + '</b> · ' +
+      'Prefs: <b>' + _jMem.prefs.length + '</b>';
+  }
+}
+
+/* ─── Cursor animation ─── */
+function _jMoveCursor() {
+  var gc = document.getElementById('jarvis-cursor'); if (!gc) return;
   gc.classList.add('active');
   var pts = [
-    [window.innerWidth * 0.35, window.innerHeight * 0.45],
-    [window.innerWidth * 0.55, window.innerHeight * 0.60],
-    [window.innerWidth * 0.42, window.innerHeight * 0.30],
+    [window.innerWidth*.32, window.innerHeight*.42],
+    [window.innerWidth*.58, window.innerHeight*.58],
+    [window.innerWidth*.44, window.innerHeight*.28],
   ];
   var i = 0;
-  function move() {
-    if (i >= pts.length || !_jarvisRunning) { gc.classList.remove('active'); return; }
-    gc.style.left = pts[i][0] + 'px';
-    gc.style.top  = pts[i][1] + 'px';
-    i++;
-    setTimeout(move, 850);
+  function mv() {
+    if (!_jRunning || i>=pts.length) { gc.classList.remove('active'); return; }
+    gc.style.left = pts[i][0]+'px'; gc.style.top = pts[i][1]+'px'; i++;
+    setTimeout(mv, 800);
   }
-  move();
+  mv();
 }
 
-// ── Notification ──
+/* ─── Notification ─── */
 function jarvisNotif(msg) {
-  var el = document.getElementById('jarvis-notif');
-  if (!el) return;
+  var el = document.getElementById('jarvis-notif'); if (!el) return;
   el.innerHTML = msg; el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(function() { el.classList.remove('show'); }, 5000);
+  el._t = setTimeout(function(){ el.classList.remove('show'); }, 5000);
 }
-// Keep showGhostNotif as alias so multiverse/other callers still work
 function showGhostNotif(msg) { jarvisNotif(msg); }
 
-// ── Utils ──
-function _jarvisTimeStr() {
-  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+/* ─── Log helper ─── */
+function _jLog(entry) {
+  entry.time = _jTimeStr();
+  _jMem.log.unshift(entry);
+  if (_jMem.log.length > 200) _jMem.log.pop();
+  if (_jActiveTab === 'log') _jRenderLog();
 }
+
+/* ─── Sleep util ─── */
+function _jSleep(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+/* ─── Time ─── */
+function _jTimeStr() { return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function _jTS()      { return new Date().toISOString(); }
+
+/* ─── Boot: load state, restore settings ─── */
+window.addEventListener('load', function() {
+  _jLoad();
+  // restore settings from memory
+  var hbMem = _jMem.memory.find(function(m){ return m.key==='heartbeat'; });
+  if (hbMem) _jHeartbeat = parseInt(hbMem.value) || 30000;
+  var autMem = _jMem.memory.find(function(m){ return m.key==='autonomy'; });
+  if (autMem) _jAutonomy = autMem.value || 'full';
+  var scpMem = _jMem.memory.find(function(m){ return m.key==='scope'; });
+  if (scpMem) _jScope = scpMem.value || 'all';
+});
+
+/* persist settings on change */
+var _jOrigSetHB = jSetHeartbeat;
+jSetHeartbeat = function(val) { _jOrigSetHB(val); _jSetMemory('heartbeat', String(parseInt(val)*1000)); _jSave(); };
+var _jOrigSetAut = jSetAutonomy;
+jSetAutonomy = function(val) { _jOrigSetAut(val); _jSetMemory('autonomy', val); _jSave(); };
+var _jOrigSetScp = jSetScope;
+jSetScope = function(val) { _jOrigSetScp(val); _jSetMemory('scope', val); _jSave(); };
+
 
 /* ═══════════════════════════════════════════════
    4. MATRIX X-RAY HUD
@@ -2405,45 +2760,121 @@ window.addEventListener('message', function(e) {
 <div id="jarvis-cursor"></div>
 <div id="jarvis-notif"></div>
 
+<!-- Verification request bubble -->
+<div id="jarvis-verify">
+  <div class="jv-title">🤖 JARVIS needs input</div>
+  <div id="jarvis-verify-msg" style="margin-bottom:10px;line-height:1.6;color:var(--text)"></div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap">
+    <button class="btn xs prim" id="jarvis-verify-yes">✓ Proceed</button>
+    <button class="btn xs" id="jarvis-verify-no">✕ Skip</button>
+    <button class="btn xs" id="jarvis-verify-later">⏸ Pause</button>
+  </div>
+</div>
+
+<!-- Main JARVIS Panel -->
 <div id="jarvis-panel">
   <!-- Header -->
   <div class="j-head">
     <span class="j-logo">🤖</span>
     <span class="j-title">J.A.R.V.I.S</span>
-    <span class="j-status idle" id="jarvis-status-badge">idle</span>
-    <button class="btn xs" onclick="toggleJarvis()" style="margin-left:4px">✕</button>
+    <div id="jarvis-status-dot" class="j-status-dot idle"></div>
+    <span id="jarvis-status-lbl" class="j-status-lbl">offline</span>
+    <button class="btn xs" onclick="toggleJarvis()" style="margin-left:6px;padding:3px 7px;min-height:24px">✕</button>
   </div>
 
-  <!-- Screenshot + scan bar -->
-  <div class="j-section" id="jarvis-scan-section">
-    <div class="j-sec-lbl">UI Snapshot</div>
-    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
-      <button class="btn xs prim" id="jarvis-snap-btn" onclick="jarvisCapture()">📷 Capture Preview</button>
-      <span id="jarvis-snap-status" style="font-size:10px;color:rgba(0,180,255,.5)">No snapshot yet</span>
-    </div>
-    <img id="jarvis-screenshot-preview" alt="UI snapshot"/>
-    <div class="j-scanning-bar" id="jarvis-scan-bar" style="display:none"></div>
+  <!-- Tabs -->
+  <div class="j-tabs">
+    <button class="j-tab active" onclick="jTab(this,'goals')">Goals</button>
+    <button class="j-tab" onclick="jTab(this,'log')">Log</button>
+    <button class="j-tab" onclick="jTab(this,'memory')">Memory</button>
+    <button class="j-tab" onclick="jTab(this,'settings')">Settings</button>
   </div>
 
-  <!-- Goals -->
-  <div class="j-section">
-    <div class="j-sec-lbl">Goals</div>
-    <div id="jarvis-goals-list"></div>
-    <div class="j-goal-add">
+  <!-- GOALS TAB -->
+  <div class="j-tabpane active" id="j-pane-goals">
+    <!-- Status / heartbeat live display -->
+    <div id="j-live-status" style="font-size:10px;color:rgba(0,180,255,.5);min-height:16px;flex-shrink:0"></div>
+
+    <!-- User goals -->
+    <div class="j-sec-lbl">Your Goals</div>
+    <div id="jarvis-user-goals"></div>
+    <div style="display:flex;gap:7px;margin-bottom:4px">
       <textarea class="j-goal-input" id="jarvis-goal-input" rows="2"
-        placeholder="Add a goal… e.g. Make the UI fully mobile responsive"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();jarvisAddGoal()}"></textarea>
-      <button class="btn xs prim" onclick="jarvisAddGoal()">+ add</button>
+        placeholder="e.g. Make the whole UI mobile-first, improve accessibility…"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();jAddUserGoal()}"></textarea>
+      <button class="btn xs prim" onclick="jAddUserGoal()" style="align-self:flex-end">+ add</button>
     </div>
-    <div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
-      <button class="btn xs prim" id="jarvis-run-btn" onclick="jarvisRun()" style="border-color:#00b4ff;color:#00b4ff;background:rgba(0,180,255,.08)">▶ Start JARVIS</button>
-      <button class="btn xs" onclick="jarvisStop()">■ Stop</button>
+
+    <!-- JARVIS auto-goals -->
+    <div class="j-sec-lbl" style="margin-top:6px">JARVIS Plans <span style="color:rgba(188,140,255,.5);font-weight:400">(auto-generated)</span></div>
+    <div id="jarvis-auto-goals"></div>
+
+    <!-- Controls -->
+    <div style="display:flex;gap:7px;flex-wrap:wrap;flex-shrink:0;margin-top:4px">
+      <button class="btn xs prim" id="j-start-btn" onclick="jStart()" style="border-color:#00b4ff;color:#00b4ff;background:rgba(0,180,255,.08)">▶ Start</button>
+      <button class="btn xs" onclick="jStop()" id="j-stop-btn">■ Stop</button>
+      <button class="btn xs" onclick="jarvisCapture()" style="font-size:10px">📷 Snapshot</button>
+      <img id="jarvis-ss-img" alt="snapshot"/>
     </div>
+    <div class="j-scan-bar" id="j-scan-bar" style="display:none"></div>
+    <div id="j-snap-status" style="font-size:10px;color:rgba(0,180,255,.4)"></div>
   </div>
 
-  <!-- Live log -->
-  <div class="j-sec-lbl" style="padding:8px 14px 4px;flex-shrink:0">Action Log</div>
-  <div id="jarvis-log-list"></div>
+  <!-- LOG TAB -->
+  <div class="j-tabpane" id="j-pane-log">
+    <div style="display:flex;gap:7px;align-items:center;flex-shrink:0">
+      <span class="j-sec-lbl" style="margin:0;flex:1">Action History</span>
+      <button class="btn xs" onclick="jClearLog()" style="font-size:9px">clear</button>
+    </div>
+    <div id="jarvis-log-list" style="flex:1;overflow-y:auto"></div>
+  </div>
+
+  <!-- MEMORY TAB -->
+  <div class="j-tabpane" id="j-pane-memory">
+    <div class="j-sec-lbl">User Preferences (learned)</div>
+    <div id="j-prefs-list"></div>
+    <div style="display:flex;gap:7px;margin-top:6px">
+      <input type="text" id="j-pref-input" placeholder="Add preference manually…"
+        style="flex:1;padding:6px 9px;font-family:inherit;font-size:11px;border:1px solid rgba(0,180,255,.25);border-radius:var(--rs);background:rgba(0,180,255,.04);color:#7dd3f7"
+        onkeydown="if(event.key==='Enter')jAddPref(this.value)">
+      <button class="btn xs" onclick="jAddPref(document.getElementById('j-pref-input').value)">+ add</button>
+    </div>
+    <div class="j-sec-lbl" style="margin-top:10px">JARVIS Memory (context)</div>
+    <div id="j-memory-list"></div>
+    <button class="btn xs fail" onclick="jClearMemory()" style="margin-top:6px;font-size:9px">🗑 Clear memory</button>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="j-tabpane" id="j-pane-settings">
+    <div class="j-sec-lbl">Heartbeat Rate</div>
+    <div class="j-hb-row">
+      <span style="font-size:11px;color:var(--text2)">Every</span>
+      <input type="range" id="j-hb-slider" min="10" max="300" value="30" oninput="jSetHeartbeat(this.value)" style="flex:1;accent-color:#00b4ff">
+      <span id="j-hb-val" class="j-hb-val">30s</span>
+    </div>
+    <div style="font-size:10px;color:rgba(0,180,255,.35);margin-top:2px">How often JARVIS acts autonomously.</div>
+
+    <div class="j-sec-lbl" style="margin-top:12px">Autonomy Level</div>
+    <select id="j-autonomy-sel" onchange="jSetAutonomy(this.value)"
+      style="font-family:inherit;font-size:11px;padding:6px 8px;border:1px solid rgba(0,180,255,.25);border-radius:var(--rs);background:rgba(0,180,255,.04);color:#7dd3f7;width:100%">
+      <option value="full">Full autonomy — act without asking</option>
+      <option value="major">Ask for major changes only</option>
+      <option value="always">Ask before every action</option>
+    </select>
+    <div style="font-size:10px;color:rgba(0,180,255,.35);margin-top:4px" id="j-autonomy-desc">JARVIS will act on all improvements without asking.</div>
+
+    <div class="j-sec-lbl" style="margin-top:12px">Node Scope</div>
+    <select id="j-scope-sel" onchange="jSetScope(this.value)"
+      style="font-family:inherit;font-size:11px;padding:6px 8px;border:1px solid rgba(0,180,255,.25);border-radius:var(--rs);background:rgba(0,180,255,.04);color:#7dd3f7;width:100%">
+      <option value="all">All nodes</option>
+      <option value="css">CSS nodes only</option>
+      <option value="js">JS nodes only</option>
+      <option value="html">HTML nodes only</option>
+    </select>
+
+    <div class="j-sec-lbl" style="margin-top:12px">Status</div>
+    <div id="j-settings-status" style="font-size:11px;color:rgba(0,180,255,.5);line-height:1.6"></div>
+  </div>
 </div>
 
 <!-- 4. Matrix X-Ray HUD -->
