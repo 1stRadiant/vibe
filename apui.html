@@ -87,7 +87,7 @@
 
     /* ─── Sidebar ─────────────────────────────────────────────── */
     #sidebar {
-        position: fixed; top: 52px; left: 0; bottom: 0; width: 240px;
+        position: fixed; top: var(--nb-h, 52px); left: 0; bottom: 0; width: 240px;
         background: rgba(8, 12, 24, 0.98); border-right: 1px solid rgba(65,105,225,0.25);
         z-index: 9000; transform: translateX(-100%); transition: transform 0.3s ease;
         display: flex; flex-direction: column;
@@ -115,7 +115,7 @@
     .sidebar-action-btn:hover { background: rgba(65,105,225,0.22); }
 
     /* ─── Viewport & World ────────────────────────────────────── */
-    #viewport { position: fixed; top: 52px; left: 0; width: 100vw; height: calc(100vh - 52px); overflow: hidden; cursor: grab; touch-action: none; }
+    #viewport { position: fixed; top: var(--nb-h, 52px); left: 0; width: 100vw; height: calc(100vh - var(--nb-h, 52px)); overflow: hidden; cursor: grab; touch-action: none; }
     #world { position: absolute; top: 0; left: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
     #connector-svg { position: absolute; overflow: visible; pointer-events: none; z-index: 0; }
 
@@ -304,6 +304,47 @@
         opacity: 0; transition: opacity 0.3s; max-width: 320px;
     }
     #toast.show { opacity: 1; }
+
+    /* ─── Pin Button & Pinned Ring ──────────────────────────── */
+    .node-pin-btn {
+        width: 20px; height: 20px; border-radius: 50%;
+        border: none; cursor: pointer; background: transparent;
+        color: rgba(255,255,255,0.25); font-size: 11px; line-height: 20px;
+        padding: 0; flex-shrink: 0; transition: color 0.15s, transform 0.15s;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .node-pin-btn:hover  { color: #e5c07b; transform: scale(1.2); }
+    .node-pin-btn.pinned { color: #e5c07b; }
+    .node.pinned-node {
+        border-color: #e5c07b !important;
+        box-shadow: 0 0 0 2px rgba(229,192,123,0.45), 0 12px 36px rgba(0,0,0,0.6) !important;
+    }
+    .node.pinned-node .node-header { background: rgba(229,192,123,0.10) !important; }
+
+    /* ─── Mobile — navbar wraps to two rows ─────────────────── */
+    @media (max-width: 600px) {
+        .navbar { height: auto; flex-wrap: wrap; padding: 6px 8px; gap: 5px; }
+        .navbar-brand { font-size: 0.9rem; order: 0; }
+        .navbar-brand small { display: none; }
+        .navbar-input-area { order: 2; width: 100%; max-width: 100%; }
+        #user-input { font-size: 15px; padding: 9px 10px; }
+        .btn-main { padding: 0 10px; height: 38px; font-size: 0.78rem; }
+        #apui-screenshot-btn,
+        .btn-main[title="Attach an image as visual context"] { display: none; }
+        .nav-sync-badge { display: none; }
+        .node { width: min(320px, 94vw) !important; height: 270px; }
+        .node.minimized { width: 180px !important; height: 44px !important; }
+        .action-btn { padding: 7px 11px; font-size: 0.78rem; }
+        .win-btn { width: 17px; height: 17px; }
+        .code-editor, .code-highlight { font-size: 12.5px; }
+        #os-menu-container { left: auto !important; right: 1.5rem; bottom: 1.5rem; }
+    }
+    /* Prevent textarea zoom on iOS */
+    @media (max-width: 768px) {
+        textarea, input[type="text"], input[type="password"] {
+            font-size: max(16px, 1em) !important;
+        }
+    }
 </style>
 </head>
 <body>
@@ -332,7 +373,7 @@
 </div>
 
 <!-- Vision image preview strip (shows under navbar when images are attached) -->
-<div id="apui-image-strip" style="display:none;position:fixed;top:52px;left:0;right:0;z-index:9999;background:rgba(10,14,28,0.96);border-bottom:1px solid rgba(65,105,225,0.3);padding:6px 12px;display:none;align-items:center;gap:8px;flex-wrap:wrap;min-height:0;">
+<div id="apui-image-strip" style="display:none;position:fixed;top:var(--nb-h,52px);left:0;right:0;z-index:9999;background:rgba(10,14,28,0.96);border-bottom:1px solid rgba(65,105,225,0.3);padding:6px 12px;display:none;align-items:center;gap:8px;flex-wrap:wrap;min-height:0;">
     <span style="font-family:'Fira Code',monospace;font-size:0.65rem;color:rgba(0,255,204,0.7);flex-shrink:0;">📷 visual context:</span>
     <div id="apui-image-thumbs" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
     <button onclick="apuiClearImages()" style="margin-left:auto;background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef9a9a;border-radius:4px;padding:2px 8px;font-size:0.65rem;cursor:pointer;font-family:'Fira Code',monospace;">✕ clear all</button>
@@ -421,7 +462,12 @@ window.addEventListener('message', e => {
 
     // Parent sends full vibeTree whenever APUI tab is activated
     if (d.type === 'apui-init' && d.vibeTree) {
-        receiveVibeTree(d.vibeTree);
+        receiveVibeTree(d.vibeTree, d.pinnedNodes);
+        return;
+    }
+    // Parent broadcasts current pin set (after pin/unpin from app3.js bridge)
+    if (d.type === 'apui-pinned-nodes' && Array.isArray(d.pinnedNodes)) {
+        applyPinnedNodes(d.pinnedNodes);
         return;
     }
     // Parent pushed an external update to a single node (e.g. agent ran)
@@ -451,15 +497,101 @@ function requestTree() {
     }, 600);
 }
 
-function receiveVibeTree(incoming) {
+function receiveVibeTree(incoming, incomingPins) {
     vibeTree = JSON.parse(JSON.stringify(incoming));
     dirtyNodes.clear();
+    if (Array.isArray(incomingPins)) applyPinnedNodes(incomingPins, false);
     rebuildFromTree();
     renderSidebar();
     setSyncLabel('Synced');
     setSyncDirty(false);
     toast('Vibe Tree loaded ✓');
     updatePreview();
+}
+
+/* Rearrange unpinned nodes into the free canvas area around pinned nodes */
+function redistributeUnpinned() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight - 52;
+    const nodeW = window.innerWidth < 600 ? 320 : 400;
+    const nodeH = 320;
+    const pad   = 28;
+
+    // Collect pinned bounding boxes (in world coords)
+    const pinnedRects = [];
+    AppState.nodes.forEach((el, id) => {
+        if (!AppState.pinnedNodes.has(id)) return;
+        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
+        pinnedRects.push({
+            x: parseFloat(el.style.left) || 0,
+            y: parseFloat(el.style.top)  || 0,
+            w: el.offsetWidth  || nodeW,
+            h: el.offsetHeight || nodeH
+        });
+    });
+
+    // Find an occupied x-range to avoid (rough centroid of pinned nodes)
+    let occupiedRight = 0;
+    if (pinnedRects.length) {
+        occupiedRight = Math.max(...pinnedRects.map(r => r.x + r.w)) + pad * 2;
+    }
+
+    // Determine start position in world coords (to the right of pinned cluster,
+    // or from leftmost free area if canvas is panned)
+    const worldLeft  = (-AppState.pan.x) / AppState.scale;
+    const worldTop   = (-AppState.pan.y) / AppState.scale;
+    let startX = Math.max(occupiedRight, worldLeft + pad);
+    let cx = startX, cy = worldTop + pad;
+
+    AppState.nodes.forEach((el, id) => {
+        if (AppState.pinnedNodes.has(id)) return;
+        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
+
+        el.classList.add('animating-bounds');
+        el.style.left = `${cx}px`;
+        el.style.top  = `${cy}px`;
+        setTimeout(() => el.classList.remove('animating-bounds'), 420);
+
+        cx += nodeW + pad;
+        const colW = (vw / AppState.scale);
+        if (cx + nodeW > startX + colW - pad) { cx = startX; cy += nodeH + pad; }
+    });
+
+    requestAnimationFrame(drawConnections);
+}
+
+/* Apply a pin set from the parent bridge — updates AppState.pinnedNodes and DOM */
+function applyPinnedNodes(ids, broadcast = true) {
+    AppState.pinnedNodes = new Set(ids);
+    AppState.nodes.forEach((el, id) => {
+        const pinned = AppState.pinnedNodes.has(id);
+        el.classList.toggle('pinned-node', pinned);
+        const btn = el.querySelector('.node-pin-btn');
+        if (btn) btn.classList.toggle('pinned', pinned);
+    });
+    if (broadcast) {
+        postToParent('apui-pin-node', { nodeId: null, pinned: null, _batch: [...AppState.pinnedNodes] });
+    }
+}
+
+/* Toggle pin for a single node and sync to parent */
+function togglePin(nodeId) {
+    const el = AppState.nodes.get(nodeId);
+    if (!el) return;
+    const isPinned = AppState.pinnedNodes.has(nodeId);
+    if (isPinned) {
+        AppState.pinnedNodes.delete(nodeId);
+        el.classList.remove('pinned-node');
+        el.querySelector('.node-pin-btn')?.classList.remove('pinned');
+        toast(`[${nodeId}] unpinned`);
+    } else {
+        AppState.pinnedNodes.add(nodeId);
+        el.classList.add('pinned-node');
+        el.querySelector('.node-pin-btn')?.classList.add('pinned');
+        toast(`📌 [${nodeId}] pinned — stays in view while canvas pans`);
+    }
+    postToParent('apui-toggle-pin', { nodeId });
+    redistributeUnpinned();
 }
 
 function applyExternalNodeUpdate(nodeId, newCode) {
@@ -531,6 +663,7 @@ const AppState = {
     pointerStart: { x: 0, y: 0 }, panStart: { x: 0, y: 0 }, nodeStart: { x: 0, y: 0 },
     zIndexCounter: 100,
     resizeObserver: null,
+    pinnedNodes: new Set(),   // nodeIds that are pinned — stay fixed while canvas pans
     settings: {
         apiKey: localStorage.getItem('apui_gemini_key') || '',
         model:  localStorage.getItem('apui_model')  || 'gemini-2.0-flash-exp'
@@ -711,6 +844,7 @@ function createVibeNode(treeNode, x, y) {
             </div>
             <span class="node-type-badge">${type}</span>
             <div class="node-controls">
+                <button class="node-pin-btn${AppState.pinnedNodes.has(id) ? ' pinned' : ''}" onclick="event.stopPropagation();togglePin('${id}')" title="Pin node — stays fixed while canvas pans">📌</button>
                 <button class="win-btn btn-min"   onclick="toggleMin('${id}')"          title="Minimise"></button>
                 <button class="win-btn btn-close"  onclick="removeNodeDOM('${id}', true)" title="Close (keeps tree node)"></button>
             </div>
@@ -722,6 +856,7 @@ function createVibeNode(treeNode, x, y) {
 
     world.appendChild(el);
     AppState.nodes.set(id, el);
+    if (AppState.pinnedNodes.has(id)) el.classList.add('pinned-node');
     AppState.resizeObserver?.observe(el);
     bringToFront(el);
     enforceNodeLimit(id);
@@ -1138,11 +1273,12 @@ function _apuiRefreshStrip() {
     strip.style.display = hasImages ? 'flex' : 'none';
 
     // Shift viewport and sidebar down to accommodate the strip
+    const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
     const extraTop = hasImages ? 42 : 0;
     const vp = document.getElementById('viewport');
     const sb = document.getElementById('sidebar');
-    if (vp) vp.style.top = `${52 + extraTop}px`;
-    if (sb) sb.style.top = `${52 + extraTop}px`;
+    if (vp) vp.style.top = `${nbH + extraTop}px`;
+    if (sb) sb.style.top = `${nbH + extraTop}px`;
 }
 
 /** Handle file input: read files as dataURLs */
@@ -1530,7 +1666,29 @@ function animateTo(tx, ty, ts, dur = 400) {
     }
     requestAnimationFrame(step);
 }
-function updateWorldTransform() { world.style.transform = `translate(${AppState.pan.x}px,${AppState.pan.y}px) scale(${AppState.scale})`; drawConnections(); }
+function updateWorldTransform() {
+    world.style.transform = `translate(${AppState.pan.x}px,${AppState.pan.y}px) scale(${AppState.scale})`;
+    // Keep pinned nodes visually fixed by counter-translating them
+    AppState.nodes.forEach((el, id) => {
+        if (!AppState.pinnedNodes.has(id)) return;
+        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
+        // Convert node's world position to screen and anchor it there
+        const wx = parseFloat(el.style.left) || 0;
+        const wy = parseFloat(el.style.top)  || 0;
+        const screenX = wx * AppState.scale + AppState.pan.x;
+        const screenY = wy * AppState.scale + AppState.pan.y;
+        // Clamp to viewport with padding
+        const pad = 10;
+        const clampedX = Math.max(pad, Math.min(screenX, window.innerWidth  - el.offsetWidth  * AppState.scale - pad));
+        const clampedY = Math.max(52 + pad, Math.min(screenY, window.innerHeight - el.offsetHeight * AppState.scale - pad));
+        // Back-calculate the world position that places the node at (clampedX, clampedY) on screen
+        const newWx = (clampedX - AppState.pan.x) / AppState.scale;
+        const newWy = (clampedY - AppState.pan.y) / AppState.scale;
+        el.style.left = `${newWx}px`;
+        el.style.top  = `${newWy}px`;
+    });
+    drawConnections();
+}
 function startNodeDrag(e, nodeEl) { if (AppState.activePointers.size>1) return; AppState.draggingNode=nodeEl; bringToFront(nodeEl); AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.nodeStart={x:parseFloat(nodeEl.style.left)||0,y:parseFloat(nodeEl.style.top)||0}; nodeEl.classList.add('dragging'); }
 function dragNode(e) { if(!AppState.draggingNode||AppState.activePointers.size>1) return; AppState.draggingNode.style.left=`${AppState.nodeStart.x+(e.clientX-AppState.pointerStart.x)/AppState.scale}px`; AppState.draggingNode.style.top=`${AppState.nodeStart.y+(e.clientY-AppState.pointerStart.y)/AppState.scale}px`; requestAnimationFrame(drawConnections); }
 function startWorldPan(e) { AppState.isPanning=true; viewport.style.cursor='grabbing'; AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.panStart={x:AppState.pan.x,y:AppState.pan.y}; }
@@ -1544,8 +1702,9 @@ function centerOnNode(id, dur = 450) {
     if (!node) return;
     bringToFront(node);
     node.classList.remove('hidden');
+    const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
     const nx=parseFloat(node.style.left)||0, ny=parseFloat(node.style.top)||0;
-    animateTo(window.innerWidth/2-(nx+node.offsetWidth/2)*AppState.scale, (window.innerHeight-52)/2-(ny+node.offsetHeight/2)*AppState.scale, AppState.scale, dur);
+    animateTo(window.innerWidth/2-(nx+node.offsetWidth/2)*AppState.scale, (window.innerHeight-nbH)/2-(ny+node.offsetHeight/2)*AppState.scale, AppState.scale, dur);
 }
 
 function enforceNodeLimit(targetId) {
@@ -1587,15 +1746,17 @@ function toggleNodeFullscreen(node) {
         node.dataset.origW = node.style.width || node.offsetWidth+'px';
         node.dataset.origH = node.style.height || node.offsetHeight+'px';
         node.dataset.origPanX = AppState.pan.x; node.dataset.origPanY = AppState.pan.y; node.dataset.origScale = AppState.scale;
-        node.style.width = window.innerWidth+'px'; node.style.height = (window.innerHeight-52)+'px';
+        const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
+        node.style.width = window.innerWidth+'px'; node.style.height = (window.innerHeight-nbH)+'px';
         animateTo(-parseFloat(node.style.left||0), -parseFloat(node.style.top||0), 1, 400);
         node.classList.add('fullscreen-mode'); AppState.fullscreenNode = node;
     }
 }
 window.addEventListener('resize', () => {
     if (AppState.fullscreenNode) {
+        const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
         AppState.fullscreenNode.style.width  = window.innerWidth+'px';
-        AppState.fullscreenNode.style.height = (window.innerHeight-52)+'px';
+        AppState.fullscreenNode.style.height = (window.innerHeight-nbH)+'px';
     }
 });
 
@@ -1794,6 +1955,14 @@ document.addEventListener('DOMContentLoaded', () => {
     initOsMenuDrag();
     startPhysicsLoop();
 
+    // Keep --nb-h CSS variable in sync with actual navbar height (for mobile two-row layout)
+    function measureNavbar() {
+        const nb = document.querySelector('.navbar');
+        if (nb) document.documentElement.style.setProperty('--nb-h', nb.offsetHeight + 'px');
+    }
+    measureNavbar();
+    new ResizeObserver(measureNavbar).observe(document.querySelector('.navbar'));
+
     AppState.resizeObserver = new ResizeObserver(() => requestAnimationFrame(drawConnections));
     userInput.addEventListener('keypress', e => { if (e.key==='Enter') handleCommand(); });
 
@@ -1813,7 +1982,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logToChat('system', 'APUI connected. Waiting for Vibe Tree from parent system…');
     logToChat('system', 'Tip: Edit any node and hit ⬆ PUSH to sync changes back.');
+    logToChat('system', 'Tip: Tap 📌 on any node header to pin it — it stays visible while you pan.');
 });
 </script>
 </body>
-  </html>
+    </html>
