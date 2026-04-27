@@ -2504,6 +2504,7 @@ async function screenshotAndEdit(context = 'agent') {
 }
 
 
+async function generateCompleteSubtree(parentNode, streamCallback = null) {
     console.log(`Generating subtree for parent: ${parentNode.id}`);
 
     const systemPrompt = `You are an expert UI/UX designer and frontend architect with a focus on creating beautifully structured, self-documenting code.
@@ -8994,4 +8995,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+          }
