@@ -2191,7 +2191,7 @@ function getGeminiModel() {
     return geminiModelSelect ? geminiModelSelect.value : 'gemini-2.5-flash';
 }
 
-async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
+async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null, images = []) {
     if (!geminiApiKey) throw new Error("Gemini API key is not set.");
     
     const components = listComponents();
@@ -2205,8 +2205,23 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     const model = getGeminiModel();
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
+    // Build parts array — text first, then any images
+    const parts = [{ text: userPrompt }];
+    if (Array.isArray(images)) {
+        images.forEach(img => {
+            // img can be { mimeType, data } (base64) or a raw dataURL string
+            if (typeof img === 'string' && img.startsWith('data:')) {
+                const [header, data] = img.split(',');
+                const mimeType = header.split(':')[1].split(';')[0];
+                parts.push({ inlineData: { mimeType, data } });
+            } else if (img && img.data) {
+                parts.push({ inlineData: { mimeType: img.mimeType || 'image/png', data: img.data } });
+            }
+        });
+    }
+
     const requestBody = {
-        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        contents: [{ role: "user", parts }],
         systemInstruction: { parts: [{ text: augmentedSystemPrompt }] },
         generationConfig: forJson ? { responseMimeType: "application/json" } : {}
     };
@@ -2223,7 +2238,7 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
 }
 
 
-async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCallback = null) {
+async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCallback = null, images = []) {
     if (!geminiApiKey) {
         throw new Error("Gemini API key is not set.");
     }
@@ -2234,16 +2249,23 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
         ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${geminiApiKey}`
         : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
-    const requestBody = {
-        contents: [
-            {
-                role: "user",
-                parts: [{ text: userPrompt }]
+    // Build parts — text first, then images
+    const parts = [{ text: userPrompt }];
+    if (Array.isArray(images)) {
+        images.forEach(img => {
+            if (typeof img === 'string' && img.startsWith('data:')) {
+                const [header, data] = img.split(',');
+                const mimeType = header.split(':')[1].split(';')[0];
+                parts.push({ inlineData: { mimeType, data } });
+            } else if (img && img.data) {
+                parts.push({ inlineData: { mimeType: img.mimeType || 'image/png', data: img.data } });
             }
-        ],
-        systemInstruction: {
-            parts: [{ text: systemPrompt }]
-        },
+        });
+    }
+
+    const requestBody = {
+        contents: [{ role: "user", parts }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {}
     };
 
@@ -2338,7 +2360,150 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
     }
 }
 
-async function generateCompleteSubtree(parentNode, streamCallback = null) {
+/* ═══════════════════════════════════════════════════════════════
+   VISION UTILITIES — Screenshot & Image Attachment
+   ═══════════════════════════════════════════════════════════════ */
+
+// Pending images for the next AI call (agent or chat)
+// Each entry is a dataURL string  
+const _pendingImages = { agent: [], chat: [] };
+
+/**
+ * Capture the live preview iframe as a PNG dataURL.
+ * Uses html2canvas if available, otherwise falls back to a blob URL
+ * created from the iframe's srcdoc / src content rendered on a canvas
+ * via a foreign-object SVG trick (works same-origin or srcdoc iframes).
+ */
+async function capturePreviewScreenshot() {
+    const iframe = document.getElementById('website-preview');
+    if (!iframe) throw new Error('Preview iframe not found.');
+
+    // Try html2canvas inside the iframe's document (same-origin / srcdoc)
+    try {
+        const iDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iDoc || !iDoc.body) throw new Error('iframe not ready');
+
+        // Inject html2canvas on demand
+        await new Promise((resolve, reject) => {
+            if (iframe.contentWindow.html2canvas) { resolve(); return; }
+            const s = iDoc.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            iDoc.head.appendChild(s);
+        });
+
+        const canvas = await iframe.contentWindow.html2canvas(iDoc.body, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 0.75,          // half resolution for smaller payload
+            logging: false,
+        });
+        return canvas.toDataURL('image/png');
+    } catch (e) {
+        // Fallback: render the full generated HTML onto an offscreen canvas
+        // via a SVG foreignObject (only works when not cross-origin)
+        console.warn('html2canvas failed, using SVG fallback:', e.message);
+        return await _svgScreenshotFallback(iframe);
+    }
+}
+
+async function _svgScreenshotFallback(iframe) {
+    const iDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iDoc) throw new Error('Cannot access preview document.');
+
+    const W = iframe.offsetWidth  || 800;
+    const H = iframe.offsetHeight || 600;
+
+    const html = iDoc.documentElement.outerHTML;
+    const svgData = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}'>
+        <foreignObject width='100%' height='100%'>
+            <div xmlns='http://www.w3.org/1999/xhtml'>${html}</div>
+        </foreignObject>
+    </svg>`;
+
+    const blob = new Blob([svgData], { type: 'image/svg+xml' });
+    const url  = URL.createObjectURL(blob);
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width  = W;
+            canvas.height = H;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = url;
+    });
+}
+
+/** Add a dataURL image to the pending queue for a given context (agent | chat) */
+function addPendingImage(context, dataURL) {
+    if (!_pendingImages[context]) _pendingImages[context] = [];
+    _pendingImages[context].push(dataURL);
+    _refreshImagePreviews(context);
+}
+
+/** Drain and return the pending images for a context, then clear */
+function consumePendingImages(context) {
+    const imgs = (_pendingImages[context] || []).slice();
+    _pendingImages[context] = [];
+    _refreshImagePreviews(context);
+    return imgs;
+}
+
+/** Re-render the thumbnail strip for a context */
+function _refreshImagePreviews(context) {
+    const container = document.getElementById(`${context}-image-previews`);
+    if (!container) return;
+    container.innerHTML = '';
+    (_pendingImages[context] || []).forEach((dataURL, i) => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'position:relative;display:inline-block;margin:0 4px 4px 0;';
+        const img = document.createElement('img');
+        img.src = dataURL;
+        img.style.cssText = 'width:52px;height:52px;object-fit:cover;border-radius:4px;border:1px solid rgba(65,105,225,0.5);vertical-align:top;';
+        const del = document.createElement('button');
+        del.textContent = '×';
+        del.title = 'Remove image';
+        del.style.cssText = 'position:absolute;top:-5px;right:-5px;background:#c62828;color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;padding:0;';
+        del.onclick = () => { _pendingImages[context].splice(i, 1); _refreshImagePreviews(context); };
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        container.appendChild(wrap);
+    });
+    container.style.display = (_pendingImages[context] || []).length ? 'block' : 'none';
+}
+
+/** Handle a FileList from an <input type=file> and add images to pending */
+function handleImageFileInput(context, files) {
+    Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => addPendingImage(context, e.target.result);
+        reader.readAsDataURL(file);
+    });
+}
+
+/** One-click: screenshot preview → add to agent queue, then run agent */
+async function screenshotAndEdit(context = 'agent') {
+    const btn = document.getElementById(`${context}-screenshot-btn`);
+    if (btn) { btn.disabled = true; btn.textContent = '📷 Capturing…'; }
+    try {
+        const dataURL = await capturePreviewScreenshot();
+        addPendingImage(context, dataURL);
+        console.log(`Screenshot captured for ${context}.`);
+        if (btn) { btn.textContent = '✓ Captured'; setTimeout(() => { btn.disabled = false; btn.innerHTML = '📷 Screenshot'; }, 1400); }
+    } catch (e) {
+        console.error('Screenshot failed:', e);
+        if (btn) { btn.textContent = '✗ Failed'; setTimeout(() => { btn.disabled = false; btn.innerHTML = '📷 Screenshot'; }, 2000); }
+    }
+}
+
+
     console.log(`Generating subtree for parent: ${parentNode.id}`);
 
     const systemPrompt = `You are an expert UI/UX designer and frontend architect with a focus on creating beautifully structured, self-documenting code.
@@ -3539,12 +3704,12 @@ function renderTaskQueue() {
     queueListEl.innerHTML = '';
     taskQueue.forEach((task, index) => {
         const li = document.createElement('li');
-        const textNode = document.createTextNode(task);
-        const span = document.createElement('span');
-        span.appendChild(textNode);
-        
+        // Handle both legacy string tasks and new {prompt, images} objects
+        const taskText  = typeof task === 'string' ? task : task.prompt;
+        const taskImgs  = typeof task === 'object' ? (task.images || []) : [];
+        const imgBadge  = taskImgs.length ? `<span style="font-size:0.7rem;background:rgba(65,105,225,0.25);border:1px solid rgba(65,105,225,0.4);border-radius:3px;padding:1px 5px;margin-left:6px;color:#87CEEB;">📷 ×${taskImgs.length}</span>` : '';
         li.innerHTML = `
-            ${span.outerHTML}
+            <span>${taskText}${imgBadge}</span>
             <button class="remove-task-button" data-index="${index}" title="Remove task" ${isTaskQueueRunning ? 'disabled' : ''}>&times;</button>
         `;
         queueListEl.appendChild(li);
@@ -3674,7 +3839,9 @@ function handleAddTaskToQueue() {
         return;
     }
 
-    taskQueue.push(userPrompt);
+    // Drain any attached images and bundle with the task
+    const images = consumePendingImages('agent');
+    taskQueue.push({ prompt: userPrompt, images });
     agentPromptInput.value = '';
     renderTaskQueue();
     updateTaskQueueUI();
@@ -3708,7 +3875,10 @@ async function processNextTaskInQueue() {
         return;
     }
 
-    const currentTask = taskQueue[0];
+    const currentTaskEntry = taskQueue[0];
+    // Support both legacy string tasks and new {prompt, images} objects
+    const currentTask   = typeof currentTaskEntry === 'string' ? currentTaskEntry : currentTaskEntry.prompt;
+    const currentImages = typeof currentTaskEntry === 'object' ? (currentTaskEntry.images || []) : [];
     
     if (!currentAgentTaskContext || !currentAgentTaskContext.includes(currentTask)) {
         currentAgentTaskContext = currentTask;
@@ -3716,10 +3886,11 @@ async function processNextTaskInQueue() {
 
     const progressText = `Task ${taskQueue.length - taskQueue.length + 1} of ${taskQueue.length}`;
     showGlobalAgentLoader('Agent is processing queue...', progressText);
-    logToAgent(`---<br><strong>Starting Task (${taskQueue.length} remaining):</strong> ${currentTask}`, 'plan');
+    const imageNote = currentImages.length ? ` <em>(+${currentImages.length} image${currentImages.length > 1 ? 's' : ''})</em>` : '';
+    logToAgent(`---<br><strong>Starting Task (${taskQueue.length} remaining):</strong> ${currentTask}${imageNote}`, 'plan');
 
     try {
-        await executeSingleTask(currentAgentTaskContext);
+        await executeSingleTask(currentAgentTaskContext, currentImages);
         
         if (waitingForAgentConfirmation) {
             updateTaskQueueUI(); 
@@ -3781,16 +3952,19 @@ function handleQuickReply(replyText) {
     });
 }
 
-async function executeSingleTask(promptContext) {
+async function executeSingleTask(promptContext, images = []) {
     showAgentSpinner();
     try {
         const systemPrompt = getAgentSystemPrompt();
         const fullTreeString = JSON.stringify(vibeTree, null, 2);
         const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
         
-        const userPrompt = `User Request History:\n"${promptContext}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
+        const imageNote = images.length
+            ? `\n\nThe user has also provided ${images.length} image(s) showing the current visual state of the project. Use these visuals to inform your edits.`
+            : '';
+        const userPrompt = `User Request History:\n"${promptContext}"${imageNote}\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
+        const rawResponse = await callAI(systemPrompt, userPrompt, true, null, images);
         const agentDecision = JSON.parse(rawResponse);
         
         if (agentDecision.question) {
@@ -4120,12 +4294,16 @@ async function handleSendChatMessage() {
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}`;
 
+    // Collect any pending images
+    const images = consumePendingImages('chat');
+
     sendChatButton.disabled = true;
     chatPromptInput.disabled = true;
     sendChatButton.innerHTML = '<div class="loading-spinner"></div>';
     chatPromptInput.value = '';
 
-    logToChat(userPrompt, 'user');
+    const displayPrompt = images.length ? `${userPrompt} [+${images.length} image(s)]` : userPrompt;
+    logToChat(displayPrompt, 'user');
     chatConversationHistory.push({ role: 'user', content: userPrompt });
     
     const aiMessageElement = logToChat('...', 'model');
@@ -4138,7 +4316,7 @@ ${getImageGenerationInstructions()}`;
             chatOutput.scrollTop = chatOutput.scrollHeight;
         };
 
-        const fullResponse = await callAI(systemPrompt, userPrompt, false, streamCallback);
+        const fullResponse = await callAI(systemPrompt, userPrompt, false, streamCallback, images);
         
         aiMessageElement.textContent = fullResponse;
         processChatCodeBlocks(aiMessageElement);
@@ -8816,4 +8994,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                  }
+  }
