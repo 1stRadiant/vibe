@@ -2112,7 +2112,8 @@ function refreshAllUI() {
             frame.contentWindow.postMessage({
                 type: 'apui-init',
                 vibeTree: JSON.parse(JSON.stringify(vibeTree)),
-                projectId: currentProjectId
+                projectId: currentProjectId,
+                pinnedNodes: [..._apuiPinnedNodes]
             }, '*');
         }
     } catch(e) {}
@@ -8321,6 +8322,64 @@ function initMainApp() {
     initializeMermaid();
     initializeShorthandSystem(); 
     SuggestionEngine.init();
+
+    // ── Fix: ensure toolbar dropdowns/menus sit above the preview iframe ──
+    (function injectToolbarZIndexFix() {
+        const style = document.createElement('style');
+        style.id = 'vibe-toolbar-zindex-fix';
+        style.textContent = `
+            /* Ensure any dropdown/popup panel in the toolbar clears the preview iframe */
+            .toolbar-dropdown,
+            .more-options-panel,
+            .more-options-menu,
+            .overflow-menu,
+            [class*="more-menu"],
+            [class*="toolbar-menu"],
+            [id*="more-menu"],
+            [id*="more-options"],
+            [id*="overflow-menu"] {
+                z-index: 10000 !important;
+                position: relative;
+            }
+            /* Bootstrap / generic dropdown menus inside the toolbar */
+            .navbar .dropdown-menu,
+            .toolbar .dropdown-menu,
+            #main-toolbar .dropdown-menu,
+            .app-header .dropdown-menu,
+            .top-bar .dropdown-menu {
+                z-index: 10000 !important;
+            }
+            /* Give the header a stacking context above the preview iframe */
+            .app-header,
+            .main-toolbar,
+            #main-toolbar,
+            .top-toolbar,
+            .vibe-header,
+            header.navbar {
+                position: relative;
+                z-index: 9500;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Dynamic fallback: whenever a child of the toolbar becomes visible ensure
+        // its z-index is high enough to clear the game / preview iframe.
+        const toolbar = document.querySelector(
+            '.app-header, #main-toolbar, .top-toolbar, .vibe-header, header, .navbar'
+        );
+        if (toolbar) {
+            const observer = new MutationObserver(() => {
+                toolbar.querySelectorAll('[class*="menu"],[class*="dropdown"],[class*="popup"],[class*="panel"]').forEach(el => {
+                    const computed = window.getComputedStyle(el);
+                    if (computed.display !== 'none' && computed.visibility !== 'hidden') {
+                        const z = parseInt(computed.zIndex, 10);
+                        if (isNaN(z) || z < 9000) el.style.zIndex = '10000';
+                    }
+                });
+            });
+            observer.observe(toolbar, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+        }
+    })();
     
     bindEventListeners();
     
@@ -8714,6 +8773,19 @@ async function handleZipUpload() {
 // APUI VIBE BRIDGE — exposes vibe tree to the APUI editor panel
 // ══════════════════════════════════════════════════════════════════
 
+// ── Pinned-node state shared between app3.js and the APUI iframe ──
+const _apuiPinnedNodes = new Set();
+
+function _broadcastPinnedNodes() {
+    const frame = document.getElementById('apui-frame');
+    if (frame?.contentWindow) {
+        frame.contentWindow.postMessage({
+            type: 'apui-pinned-nodes',
+            pinnedNodes: [..._apuiPinnedNodes]
+        }, '*');
+    }
+}
+
 window.__vibeBridge = {
     // Read the current tree
     getTree: () => vibeTree,
@@ -8749,6 +8821,37 @@ window.__vibeBridge = {
     // Call the AI (returns promise of string)
     callAI: (system, user, forJson) => callAI(system, user, forJson),
 
+    // ── Pin / Unpin nodes on the APUI canvas ──
+    // Pinned nodes stay visually fixed while the canvas pans; unpinned nodes
+    // are rearranged into the free space that surrounds them.
+    pinnedNodes: _apuiPinnedNodes,
+
+    pinNode(nodeId) {
+        _apuiPinnedNodes.add(nodeId);
+        _broadcastPinnedNodes();
+    },
+
+    unpinNode(nodeId) {
+        _apuiPinnedNodes.delete(nodeId);
+        _broadcastPinnedNodes();
+    },
+
+    togglePinNode(nodeId) {
+        if (_apuiPinnedNodes.has(nodeId)) {
+            this.unpinNode(nodeId);
+        } else {
+            this.pinNode(nodeId);
+        }
+    },
+
+    isPinned(nodeId) {
+        return _apuiPinnedNodes.has(nodeId);
+    },
+
+    getPinnedNodes() {
+        return [..._apuiPinnedNodes];
+    },
+
     // Subscribe to tree changes — callback is fired after every refreshAllUI
     onRefresh: (callback) => {
         const orig = window.__vibeBridge._refreshCallbacks;
@@ -8778,7 +8881,8 @@ function injectBridgeIntoApui() {
             frame.contentWindow.postMessage({
                 type: 'apui-init',
                 vibeTree: JSON.parse(JSON.stringify(vibeTree)),
-                projectId: currentProjectId
+                projectId: currentProjectId,
+                pinnedNodes: [..._apuiPinnedNodes]
             }, '*');
         } catch(e) { /* iframe not ready */ }
     };
@@ -8802,7 +8906,8 @@ function handleApuiMessage(e) {
                 frame.contentWindow.postMessage({
                     type: 'apui-init',
                     vibeTree: JSON.parse(JSON.stringify(vibeTree)),
-                    projectId: currentProjectId
+                    projectId: currentProjectId,
+                    pinnedNodes: [..._apuiPinnedNodes]
                 }, '*');
             }
             break;
@@ -8867,6 +8972,33 @@ function handleApuiMessage(e) {
             break;
         }
 
+        // APUI pinned / unpinned a node
+        case 'apui-pin-node': {
+            const { nodeId: pinId, pinned } = d;
+            if (!pinId) break;
+            if (pinned) {
+                _apuiPinnedNodes.add(pinId);
+            } else {
+                _apuiPinnedNodes.delete(pinId);
+            }
+            // Echo the current pin set back so all APUI instances stay in sync
+            _broadcastPinnedNodes();
+            break;
+        }
+
+        // APUI toggled a single node's pin state
+        case 'apui-toggle-pin': {
+            const { nodeId: toggleId } = d;
+            if (!toggleId) break;
+            if (_apuiPinnedNodes.has(toggleId)) {
+                _apuiPinnedNodes.delete(toggleId);
+            } else {
+                _apuiPinnedNodes.add(toggleId);
+            }
+            _broadcastPinnedNodes();
+            break;
+        }
+
         // APUI requests that Vibe saves to its storage source and sends back updated tree
         case 'apui-request-save': {
             autoSaveProject();
@@ -8876,7 +9008,8 @@ function handleApuiMessage(e) {
                 frame.contentWindow.postMessage({
                     type: 'apui-init',
                     vibeTree: JSON.parse(JSON.stringify(vibeTree)),
-                    projectId: currentProjectId
+                    projectId: currentProjectId,
+                    pinnedNodes: [..._apuiPinnedNodes]
                 }, '*');
             }
             break;
@@ -8995,4 +9128,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-          }
+}
