@@ -2140,6 +2140,14 @@
 
                                 <div id="agent-controls">
                                     <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
+                                    <!-- Vision toolbar -->
+                                    <div id="agent-image-previews" style="display:none;padding:4px 0 2px;"></div>
+                                    <div class="agent-vision-bar" style="display:flex;gap:6px;align-items:center;margin:4px 0 6px;flex-wrap:wrap;">
+                                        <input type="file" id="agent-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('agent',this.files);this.value=''">
+                                        <button id="agent-screenshot-btn" class="action-button small" title="Capture a screenshot of the live preview and attach it" onclick="screenshotAndEdit('agent')" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
+                                        <button class="action-button small" title="Upload an image to attach" onclick="document.getElementById('agent-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach Image</button>
+                                        <span id="agent-vision-label" style="font-size:0.7rem;color:rgba(135,206,235,0.5);font-family:'Fira Code',monospace;">vision-enabled</span>
+                                    </div>
                                     <div class="agent-buttons-container">
                                         <button id="run-agent-single-task-button" class="action-button">Add Task</button>
                                         <button id="start-iterative-session-button" class="action-button">Process Queue</button>
@@ -2168,6 +2176,13 @@
                                     </div>
                                 </div>
                                 <div class="chat-controls">
+                                    <!-- Vision toolbar for chat -->
+                                    <div id="chat-image-previews" style="display:none;padding:4px 0 2px;"></div>
+                                    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+                                        <input type="file" id="chat-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('chat',this.files);this.value=''">
+                                        <button id="chat-screenshot-btn" class="action-button small" title="Capture a screenshot of the live preview" onclick="screenshotAndEdit('chat')" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
+                                        <button class="action-button small" title="Attach an image" onclick="document.getElementById('chat-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach Image</button>
+                                    </div>
                                     <textarea id="chat-prompt-input" placeholder="Ask the AI anything about your project..."></textarea>
                                     <button id="send-chat-button" class="action-button">Send</button>
                                 </div>
