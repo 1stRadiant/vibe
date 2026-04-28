@@ -232,7 +232,7 @@
 
     /* ─── OS Menu ────────────────────────────────────────────── */
     #os-menu-container {
-        position: fixed; bottom: 2rem; left: 2rem; z-index: 20000;
+        position: fixed; bottom: 5rem; left: 2rem; z-index: 21000;
         width: 78px; height: 78px; cursor: grab; touch-action: none;
     }
     #os-menu-container.dragging { cursor: grabbing; }
@@ -320,9 +320,14 @@
     #taskbar {
         position: fixed; bottom: 0; left: 0; right: 0; height: 72px;
         background: rgba(8,12,24,0.97); border-top: 1px solid rgba(65,105,225,0.35);
-        backdrop-filter: blur(14px); z-index: 19000;
+        backdrop-filter: blur(14px); z-index: 22000;
         display: flex; align-items: center; gap: 0;
         box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+        transition: border-top-color 0.3s, box-shadow 0.3s;
+    }
+    #taskbar.jarvis-active {
+        border-top-color: rgba(255,0,255,0.6);
+        box-shadow: 0 -4px 32px rgba(255,0,255,0.25);
     }
     #taskbar-label {
         padding: 0 10px 0 14px; font-family: 'Fira Code', monospace;
@@ -330,6 +335,35 @@
         letter-spacing: 1px; white-space: nowrap; flex-shrink: 0;
         writing-mode: horizontal-tb;
     }
+    #jarvis-status-pill {
+        display: none; align-items: center; gap: 5px; flex-shrink: 0;
+        padding: 0 10px; border-right: 1px solid rgba(255,0,255,0.2);
+        height: 100%;
+    }
+    #jarvis-status-pill.active { display: flex; }
+    .jarvis-dot {
+        width: 6px; height: 6px; border-radius: 50%; background: var(--ai-glow);
+        animation: pulse-sync 0.8s infinite; flex-shrink: 0;
+    }
+    #jarvis-status-text {
+        font-family: 'Fira Code', monospace; font-size: 0.58rem;
+        color: var(--ai-glow); max-width: 140px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #jarvis-heartbeat-counter {
+        font-family: 'Fira Code', monospace; font-size: 0.55rem;
+        color: rgba(255,0,255,0.5); flex-shrink: 0;
+    }
+    .snap-out-hint {
+        position: fixed; top: calc(var(--nb-h, 52px) + 8px); left: 50%;
+        transform: translateX(-50%); z-index: 25000;
+        background: rgba(255,0,255,0.12); border: 1px solid rgba(255,0,255,0.4);
+        border-radius: 20px; padding: 5px 14px;
+        font-family: 'Fira Code', monospace; font-size: 0.62rem;
+        color: var(--ai-glow); pointer-events: none; opacity: 0;
+        transition: opacity 0.3s; white-space: nowrap;
+    }
+    .snap-out-hint.show { opacity: 1; }
     #taskbar-scroll {
         flex: 1; overflow-x: auto; overflow-y: hidden;
         display: flex; align-items: center; gap: 8px;
@@ -525,10 +559,16 @@
 <!-- Taskbar: pinned nodes -->
 <div id="taskbar">
     <div id="taskbar-label">📌 Pinned</div>
+    <div id="jarvis-status-pill">
+        <div class="jarvis-dot"></div>
+        <span id="jarvis-status-text">Working…</span>
+        <span id="jarvis-heartbeat-counter">#0</span>
+    </div>
     <div id="taskbar-scroll">
         <span id="taskbar-empty">No pinned nodes — click 📌 on a node to pin it here</span>
     </div>
 </div>
+<div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · Jarvis keeps working</div>
 
 <!-- Right Sidebar: Session Tracker -->
 <div id="rsidebar">
@@ -571,11 +611,11 @@
             </g>
         </svg>
     </div>
-    <button class="os-menu-btn btn-1" onclick="handleCommand('chat')">💬 Chat</button>
-    <button class="os-menu-btn btn-2" onclick="handleCommand('preview')">👁 Preview</button>
-    <button class="os-menu-btn btn-3" onclick="handleCommand('settings')">⚙ Settings</button>
+    <button class="os-menu-btn btn-1" onclick="jarvisToggle()">🤖 Jarvis</button>
+    <button class="os-menu-btn btn-2" onclick="jarvisSetGoal()">🎯 Goal</button>
+    <button class="os-menu-btn btn-3" onclick="openJarvisSettings()">⚡ Interval</button>
     <button class="os-menu-btn btn-4" onclick="pushAllToVibeTree()">⬆ Push</button>
-    <button class="os-menu-btn btn-5" onclick="handleCommand('clean')">🧹 Clean</button>
+    <button class="os-menu-btn btn-5" onclick="handleCommand('preview')">👁 Preview</button>
 </div>
 
 <div id="toast"></div>
@@ -1471,11 +1511,11 @@ async function simulateThinking(triggerId) {
         if (!AppState.nodes.has(id)) continue;
         centerOnNode(id, 280);
         AppState.nodes.get(id).classList.add('ai-scanning');
-        svgLayer.querySelectorAll(`[data-from="${id}"],[data-to="${id}"]`).forEach(l => l.classList.add('ai-laser'));
+        drawAiLaser('settings', triggerId, true);
         logToChat('system', `Scanning [${id}]…`);
         await delay(320);
         AppState.nodes.get(id).classList.remove('ai-scanning');
-        svgLayer.querySelectorAll(`[data-from="${id}"],[data-to="${id}"]`).forEach(l => l.classList.remove('ai-laser'));
+        drawAiLaser('settings', triggerId, false);
     }
 }
 
@@ -1623,8 +1663,246 @@ Return the JSON object now.`;
 }
 
 /* ════════════════════════════════════════════════════════════════
-   COMMAND HANDLER
+   JARVIS — Continuous Goal-Driven Agent
+   ════════════════════════════════════════════════════════════════
+   Jarvis runs on a heartbeat interval. Each beat it:
+     1. Reviews its goal + memory of past actions
+     2. Plans the next incremental edit
+     3. Applies changes (nodes float to front, user can still pan)
+     4. Logs to memory and chat
+     5. Sleeps until next heartbeat
    ════════════════════════════════════════════════════════════════ */
+const Jarvis = {
+    running:        false,
+    goal:           '',
+    heartbeatMs:    8000,   // default 8 seconds
+    beat:           0,
+    memory:         [],     // [ { beat, plan, nodeIds, summary } ]
+    _timeoutHandle: null,
+    _userPanning:   false,  // true when user grabbed canvas mid-run
+    _snapHintTimer: null,
+
+    start(goal) {
+        if (this.running) { this.stop(); }
+        this.goal    = goal;
+        this.beat    = 0;
+        this.memory  = [];
+        this.running = true;
+        document.getElementById('taskbar')?.classList.add('jarvis-active');
+        logToChat('system', `🤖 Jarvis started · Goal: "${goal}"`);
+        logToChat('system', `⚡ Heartbeat every ${this.heartbeatMs / 1000}s · tap 🤖 to stop`);
+        trackerLog('ai', null, `Jarvis started · "${goal.slice(0,60)}"`);
+        this._tick();
+    },
+
+    stop() {
+        this.running = false;
+        clearTimeout(this._timeoutHandle);
+        document.getElementById('taskbar')?.classList.remove('jarvis-active');
+        document.getElementById('jarvis-status-pill')?.classList.remove('active');
+        logToChat('system', `🤖 Jarvis stopped after ${this.beat} beat(s)`);
+        trackerLog('ai', null, `Jarvis stopped · ${this.beat} beat(s) completed`);
+    },
+
+    setStatus(text) {
+        const pill = document.getElementById('jarvis-status-pill');
+        const txt  = document.getElementById('jarvis-status-text');
+        const ctr  = document.getElementById('jarvis-heartbeat-counter');
+        if (pill) pill.classList.add('active');
+        if (txt)  txt.textContent  = text;
+        if (ctr)  ctr.textContent  = `#${this.beat}`;
+    },
+
+    showSnapHint() {
+        const hint = document.getElementById('snap-out-hint');
+        if (!hint) return;
+        hint.classList.add('show');
+        clearTimeout(this._snapHintTimer);
+        this._snapHintTimer = setTimeout(() => hint.classList.remove('show'), 2500);
+    },
+
+    async _tick() {
+        if (!this.running) return;
+        this.beat++;
+        this.setStatus(`Beat ${this.beat} · thinking…`);
+
+        try {
+            await this._runBeat();
+        } catch(e) {
+            logToChat('system', `⚠ Jarvis beat ${this.beat} error: ${e.message}`);
+            console.error('Jarvis error:', e);
+        }
+
+        if (this.running) {
+            this.setStatus(`Beat ${this.beat} done · next in ${this.heartbeatMs/1000}s`);
+            this._timeoutHandle = setTimeout(() => this._tick(), this.heartbeatMs);
+        }
+    },
+
+    async _runBeat() {
+        if (!AppState.settings.apiKey) {
+            logToChat('system', '⚠ Jarvis needs an API key — open Settings'); this.stop(); return;
+        }
+
+        // Build memory summary for context (last 5 beats)
+        const recentMemory = this.memory.slice(-5).map(m =>
+            `Beat ${m.beat}: ${m.plan} → changed [${m.nodeIds.join(', ')}]`
+        ).join('\n') || 'None yet — this is the first beat.';
+
+        const context = getVibeContext();
+
+        const sys = `You are Jarvis, an autonomous web-development agent making INCREMENTAL edits toward a long-term goal.
+You run on a heartbeat — each beat you make ONE focused improvement. Do not try to do everything at once.
+
+GOAL: "${this.goal}"
+
+YOUR MEMORY (recent beats):
+${recentMemory}
+
+Return ONLY valid JSON — no other text:
+{
+  "plan": "one-line description of what you will do THIS beat",
+  "done": false,
+  "actions": [
+    { "actionType": "update", "nodeId": "EXISTING_ID", "newCode": "complete updated code" },
+    { "actionType": "create", "parentId": "PARENT_ID", "newNode": { "id": "id", "type": "html|css|javascript|js-function|declaration|head", "description": "desc", "code": "complete code" } }
+  ]
+}
+
+Set "done": true if the goal is fully achieved and no more edits are needed.
+RULES:
+1. FULL code for every node — never truncate or use ellipsis.
+2. Prefer updating existing nodes over creating new ones.
+3. HTML: body-level markup only. CSS: standalone. JS: standalone.
+4. Make progress each beat — never repeat the exact same change.`;
+
+        const user = `VIBE TREE:
+${JSON.stringify(context, null, 2)}
+
+TREE ROOT ID: ${vibeTree.id}
+BEAT: ${this.beat}
+
+Return the JSON object now.`;
+
+        this.setStatus(`Beat ${this.beat} · drafting…`);
+        logToChat('system', `🤖 Beat ${this.beat} · ${this.goal.slice(0, 50)}…`);
+
+        const raw = await callGemini(sys, user, true, []);
+        let plan;
+        try { plan = JSON.parse(raw); } catch { throw new Error('Jarvis returned invalid JSON'); }
+
+        logToChat('ai', `[B${this.beat}] ${plan.plan}`);
+        this.setStatus(`Beat ${this.beat} · applying ${plan.actions?.length || 0} edit(s)…`);
+
+        const changedIds = [];
+        const pushUpdates = [];
+
+        for (const action of (plan.actions || [])) {
+            if (!this.running) break; // user stopped mid-beat
+
+            if (action.actionType === 'update') {
+                const domNode  = AppState.nodes.get(action.nodeId);
+                const treeNode = findNodeInTree(action.nodeId);
+                if (!treeNode) continue;
+
+                // Float node to front visually
+                if (domNode) {
+                    bringToFront(domNode);
+                    domNode.classList.add('ai-updating');
+                    // Show snap hint if user hasn't panned yet this beat
+                    if (!this._userPanning) this.showSnapHint();
+                }
+
+                // If user is panning, skip the centerOnNode camera move
+                if (!this._userPanning) centerOnNode(action.nodeId, 350);
+
+                await delay(400);
+
+                treeNode.code = action.newCode;
+                const editor = document.getElementById(`ed-${action.nodeId}`);
+                if (editor) { editor.value = action.newCode; syncHighlight(action.nodeId); }
+                dirtyNodes.delete(action.nodeId);
+                updateDirtyDot(action.nodeId);
+                pushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
+                changedIds.push(action.nodeId);
+                trackerLog('ai', action.nodeId, `Jarvis B${this.beat} · ${plan.plan.slice(0,50)}`);
+
+                await delay(300);
+                if (domNode) domNode.classList.remove('ai-updating');
+
+            } else if (action.actionType === 'create') {
+                const newNode = action.newNode;
+                if (!newNode?.id || !newNode?.type) continue;
+                if (findNodeInTree(newNode.id)) newNode.id += '-' + Date.now().toString(36);
+
+                addChildToTree(action.parentId || vibeTree.id, newNode);
+                const cx = (-AppState.pan.x + window.innerWidth / 2) / AppState.scale - 180;
+                const cy = (-AppState.pan.y + (window.innerHeight - 120) / 2) / AppState.scale - 130;
+                const newEl = createVibeNode(newNode, cx + Math.random() * 100, cy);
+                if (newEl) {
+                    bringToFront(newEl);
+                    newEl.classList.add('ai-updating');
+                }
+                buildConnections(); drawConnections();
+                if (!this._userPanning) centerOnNode(newNode.id, 350);
+                changedIds.push(newNode.id);
+                trackerLog('create', newNode.id, `Jarvis B${this.beat} created ${newNode.type}`);
+                await delay(500);
+                if (newEl) newEl.classList.remove('ai-updating');
+                pushUpdates.push({ nodeId: newNode.id, newCode: newNode.code, isNew: true, newNode });
+            }
+        }
+
+        // Store beat in memory
+        this.memory.push({ beat: this.beat, plan: plan.plan, nodeIds: changedIds, summary: plan.plan });
+
+        // Push to parent
+        if (pushUpdates.length) {
+            postToParent('apui-bulk-update', { updates: pushUpdates });
+            trackerLog('push', null, `Jarvis B${this.beat} pushed ${pushUpdates.length} update(s)`);
+        }
+
+        renderSidebar();
+        updatePreview();
+        this._userPanning = false; // reset snap state for next beat
+
+        if (plan.done) {
+            logToChat('ai', `🏁 Jarvis: goal complete after ${this.beat} beat(s)!`);
+            trackerLog('ai', null, `Jarvis goal complete · ${this.beat} beats`);
+            this.stop();
+        }
+    }
+};
+
+/* UI helpers for Jarvis */
+function jarvisToggle() {
+    if (Jarvis.running) {
+        Jarvis.stop();
+    } else {
+        const goal = Jarvis.goal || prompt('🎯 What is Jarvis\'s goal?\n\nDescribe the end-state you want (e.g. "Build a polished landing page with hero, features and footer"):');
+        if (!goal?.trim()) return;
+        Jarvis.goal = goal.trim();
+        Jarvis.start(Jarvis.goal);
+    }
+    document.getElementById('os-menu-container')?.classList.remove('open');
+}
+
+function jarvisSetGoal() {
+    const g = prompt('🎯 Set Jarvis goal:', Jarvis.goal || '');
+    if (g?.trim()) { Jarvis.goal = g.trim(); toast(`Goal set: "${Jarvis.goal.slice(0,40)}"`); }
+    document.getElementById('os-menu-container')?.classList.remove('open');
+}
+
+function openJarvisSettings() {
+    const cur = Jarvis.heartbeatMs / 1000;
+    const v = prompt(`⚡ Jarvis heartbeat interval (seconds)\n\nCurrent: ${cur}s\nMin: 5s · Recommended: 8–30s`, String(cur));
+    if (!v) return;
+    const n = parseFloat(v);
+    if (isNaN(n) || n < 5) { toast('Minimum interval is 5 seconds'); return; }
+    Jarvis.heartbeatMs = n * 1000;
+    toast(`⚡ Jarvis heartbeat set to ${n}s`);
+    document.getElementById('os-menu-container')?.classList.remove('open');
+}
 async function handleCommand(specificCmd = null) {
     const val = specificCmd || userInput.value.trim();
     if (!val) return;
@@ -1646,6 +1924,10 @@ async function handleCommand(specificCmd = null) {
         drawConnections(); logToConsole('Canvas cleared.', 'success');
     } else if (cmd === 'push') {
         pushAllToVibeTree();
+    } else if (cmd === 'jarvis' || cmd === 'start jarvis') {
+        jarvisToggle();
+    } else if (cmd === 'stop jarvis' || cmd === 'stop') {
+        Jarvis.stop();
     } else if (cmd === '/snap' || cmd === 'screenshot') {
         // Shortcut: capture preview then prompt for what to fix
         await apuiScreenshot();
@@ -1665,8 +1947,11 @@ async function handleCommand(specificCmd = null) {
 /* ════════════════════════════════════════════════════════════════
    SVG CONNECTIONS
    ════════════════════════════════════════════════════════════════ */
+let showConnections = false; // off by default — lines clutter mobile canvas
+
 function drawConnections() {
     svgLayer.innerHTML = '';
+    if (!showConnections) return; // lines hidden unless toggled on
     AppState.connections.forEach(conn => {
         const n1 = AppState.nodes.get(conn.from);
         const n2 = AppState.nodes.get(conn.to);
@@ -1688,6 +1973,27 @@ function drawConnections() {
         line.setAttribute('data-to',   conn.to);
         svgLayer.appendChild(line);
     });
+}
+
+/* Draw just the AI laser lines between two nodes regardless of showConnections */
+function drawAiLaser(fromId, toId, add = true) {
+    const n1 = AppState.nodes.get(fromId);
+    const n2 = AppState.nodes.get(toId);
+    if (!n1 || !n2) return;
+    if (add) {
+        const x1 = parseFloat(n1.style.left) + n1.offsetWidth  / 2;
+        const y1 = parseFloat(n1.style.top)  + n1.offsetHeight / 2;
+        const x2 = parseFloat(n2.style.left) + n2.offsetWidth  / 2;
+        const y2 = parseFloat(n2.style.top)  + n2.offsetHeight / 2;
+        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('data-from', fromId); line.setAttribute('data-to', toId);
+        line.classList.add('ai-laser');
+        svgLayer.appendChild(line);
+    } else {
+        svgLayer.querySelectorAll(`[data-from="${fromId}"][data-to="${toId}"]`).forEach(l => l.remove());
+    }
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -1821,7 +2127,7 @@ function updateWorldTransform() {
 }
 function startNodeDrag(e, nodeEl) { if (AppState.activePointers.size>1) return; AppState.draggingNode=nodeEl; bringToFront(nodeEl); AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.nodeStart={x:parseFloat(nodeEl.style.left)||0,y:parseFloat(nodeEl.style.top)||0}; nodeEl.classList.add('dragging'); }
 function dragNode(e) { if(!AppState.draggingNode||AppState.activePointers.size>1) return; AppState.draggingNode.style.left=`${AppState.nodeStart.x+(e.clientX-AppState.pointerStart.x)/AppState.scale}px`; AppState.draggingNode.style.top=`${AppState.nodeStart.y+(e.clientY-AppState.pointerStart.y)/AppState.scale}px`; requestAnimationFrame(drawConnections); }
-function startWorldPan(e) { AppState.isPanning=true; viewport.style.cursor='grabbing'; AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.panStart={x:AppState.pan.x,y:AppState.pan.y}; }
+function startWorldPan(e) { AppState.isPanning=true; viewport.style.cursor='grabbing'; AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.panStart={x:AppState.pan.x,y:AppState.pan.y}; if(Jarvis.running){ Jarvis._userPanning=true; Jarvis.showSnapHint(); } }
 function panWorld(e) { if(!AppState.isPanning||AppState.activePointers.size>1) return; AppState.pan.x=AppState.panStart.x+(e.clientX-AppState.pointerStart.x); AppState.pan.y=AppState.panStart.y+(e.clientY-AppState.pointerStart.y); if(animationFrameId)cancelAnimationFrame(animationFrameId); updateWorldTransform(); }
 function stopInteraction() { if(AppState.draggingNode){AppState.draggingNode.classList.remove('dragging');AppState.draggingNode=null;} if(AppState.isPanning){AppState.isPanning=false;viewport.style.cursor='grab';} }
 function bringToFront(node) { AppState.zIndexCounter++; node.style.zIndex=AppState.zIndexCounter; }
@@ -2236,7 +2542,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logToChat('system', 'APUI connected. Waiting for Vibe Tree from parent system…');
     logToChat('system', 'Tip: Edit any node and hit ⬆ PUSH to sync changes back.');
-    logToChat('system', 'Tip: Tap 📌 on any node header to pin it to the taskbar.');
+    logToChat('system', 'Tip: Tap 📌 on a node to pin it to the taskbar.');
+    logToChat('system', 'Tip: Open the ◎ menu → 🤖 Jarvis to set a goal and run continuously.');
 
     trackerInit();
     renderTaskbar();
