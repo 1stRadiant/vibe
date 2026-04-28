@@ -87,7 +87,7 @@
 
     /* ─── Sidebar ─────────────────────────────────────────────── */
     #sidebar {
-        position: fixed; top: var(--nb-h, 52px); left: 0; bottom: 0; width: 240px;
+        position: fixed; top: var(--nb-h, 52px); left: 0; bottom: 72px; width: 240px;
         background: rgba(8, 12, 24, 0.98); border-right: 1px solid rgba(65,105,225,0.25);
         z-index: 9000; transform: translateX(-100%); transition: transform 0.3s ease;
         display: flex; flex-direction: column;
@@ -115,7 +115,7 @@
     .sidebar-action-btn:hover { background: rgba(65,105,225,0.22); }
 
     /* ─── Viewport & World ────────────────────────────────────── */
-    #viewport { position: fixed; top: var(--nb-h, 52px); left: 0; width: 100vw; height: calc(100vh - var(--nb-h, 52px)); overflow: hidden; cursor: grab; touch-action: none; }
+    #viewport { position: fixed; top: var(--nb-h, 52px); left: 0; width: 100vw; height: calc(100vh - var(--nb-h, 52px) - 72px); overflow: hidden; cursor: grab; touch-action: none; }
     #world { position: absolute; top: 0; left: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
     #connector-svg { position: absolute; overflow: visible; pointer-events: none; z-index: 0; }
 
@@ -305,21 +305,132 @@
     }
     #toast.show { opacity: 1; }
 
-    /* ─── Pin Button & Pinned Ring ──────────────────────────── */
+    /* ─── Pin Button ────────────────────────────────────────── */
     .node-pin-btn {
         width: 20px; height: 20px; border-radius: 50%;
         border: none; cursor: pointer; background: transparent;
-        color: rgba(255,255,255,0.25); font-size: 11px; line-height: 20px;
+        color: rgba(255,255,255,0.25); font-size: 11px;
         padding: 0; flex-shrink: 0; transition: color 0.15s, transform 0.15s;
         display: flex; align-items: center; justify-content: center;
     }
     .node-pin-btn:hover  { color: #e5c07b; transform: scale(1.2); }
     .node-pin-btn.pinned { color: #e5c07b; }
-    .node.pinned-node {
-        border-color: #e5c07b !important;
-        box-shadow: 0 0 0 2px rgba(229,192,123,0.45), 0 12px 36px rgba(0,0,0,0.6) !important;
+
+    /* ─── Taskbar ────────────────────────────────────────────── */
+    #taskbar {
+        position: fixed; bottom: 0; left: 0; right: 0; height: 72px;
+        background: rgba(8,12,24,0.97); border-top: 1px solid rgba(65,105,225,0.35);
+        backdrop-filter: blur(14px); z-index: 19000;
+        display: flex; align-items: center; gap: 0;
+        box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
     }
-    .node.pinned-node .node-header { background: rgba(229,192,123,0.10) !important; }
+    #taskbar-label {
+        padding: 0 10px 0 14px; font-family: 'Fira Code', monospace;
+        font-size: 0.6rem; color: rgba(65,105,225,0.6); text-transform: uppercase;
+        letter-spacing: 1px; white-space: nowrap; flex-shrink: 0;
+        writing-mode: horizontal-tb;
+    }
+    #taskbar-scroll {
+        flex: 1; overflow-x: auto; overflow-y: hidden;
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 10px; scrollbar-width: thin;
+        scrollbar-color: rgba(65,105,225,0.4) transparent;
+    }
+    #taskbar-scroll::-webkit-scrollbar { height: 3px; }
+    #taskbar-scroll::-webkit-scrollbar-thumb { background: rgba(65,105,225,0.4); border-radius: 2px; }
+    #taskbar-empty {
+        font-family: 'Fira Code', monospace; font-size: 0.62rem;
+        color: rgba(255,255,255,0.15); white-space: nowrap; pointer-events: none;
+    }
+    .taskbar-chip {
+        display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+        width: 160px; height: 52px; border-radius: 6px; padding: 0 8px;
+        background: rgba(16,24,48,0.9); border: 1px solid rgba(65,105,225,0.35);
+        cursor: pointer; transition: border-color 0.15s, background 0.15s;
+        position: relative; overflow: hidden;
+    }
+    .taskbar-chip:hover { border-color: var(--secondary); background: rgba(65,105,225,0.15); }
+    .taskbar-chip .tc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .taskbar-chip .tc-info { flex: 1; min-width: 0; }
+    .taskbar-chip .tc-title { font-size: 0.72rem; font-weight: 700; color: var(--secondary);
+        text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .taskbar-chip .tc-id { font-family: 'Fira Code', monospace; font-size: 0.55rem;
+        color: rgba(255,255,255,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .taskbar-chip .tc-unpin { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px;
+        border-radius: 50%; background: rgba(239,83,80,0.15); border: none; color: rgba(239,83,80,0.6);
+        font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.15s; }
+    .taskbar-chip:hover .tc-unpin { opacity: 1; }
+    .taskbar-chip .tc-unpin:hover { background: rgba(239,83,80,0.5); color: white; }
+
+    /* ─── Right Sidebar (Session Tracker) ───────────────────── */
+    #rsidebar {
+        position: fixed; top: var(--nb-h, 52px); right: 0;
+        bottom: 72px; /* above taskbar */
+        width: 280px; background: rgba(8,12,24,0.98);
+        border-left: 1px solid rgba(65,105,225,0.25);
+        z-index: 9000; transform: translateX(100%);
+        transition: transform 0.3s ease; display: flex; flex-direction: column;
+    }
+    #rsidebar.open { transform: translateX(0); }
+    .rsidebar-header {
+        padding: 12px 14px; border-bottom: 1px solid rgba(65,105,225,0.2);
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .rsidebar-title { font-weight: 700; color: var(--secondary); text-transform: uppercase;
+        font-size: 0.75rem; letter-spacing: 1.5px; }
+    .rsidebar-actions { display: flex; gap: 6px; }
+    .rsidebar-btn { background: transparent; border: 1px solid rgba(65,105,225,0.3);
+        border-radius: 3px; color: rgba(255,255,255,0.5); font-size: 0.65rem;
+        padding: 2px 7px; cursor: pointer; font-family: 'Rajdhani', sans-serif;
+        transition: 0.15s; }
+    .rsidebar-btn:hover { border-color: var(--primary); color: var(--secondary); }
+    .rsidebar-btn.danger:hover { border-color: #ff4444; color: #ff8888; }
+    .rsidebar-session-bar {
+        padding: 8px 12px; border-bottom: 1px solid rgba(65,105,225,0.12);
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .session-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ai-edit);
+        animation: pulse-sync 2s infinite; flex-shrink: 0; }
+    .session-dot.idle { background: #444; animation: none; }
+    .session-info { flex: 1; min-width: 0; }
+    .session-name { font-size: 0.72rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .session-meta { font-family: 'Fira Code', monospace; font-size: 0.58rem; color: #555; }
+    #tracker-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .tracker-entry {
+        padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        cursor: pointer; transition: background 0.12s;
+    }
+    .tracker-entry:hover { background: rgba(65,105,225,0.08); }
+    .tracker-entry .te-header { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .tracker-entry .te-icon { font-size: 0.8rem; flex-shrink: 0; }
+    .tracker-entry .te-node { font-family: 'Fira Code', monospace; font-size: 0.65rem;
+        color: var(--secondary); font-weight: 700; }
+    .tracker-entry .te-action { font-size: 0.65rem; color: #666; margin-left: auto;
+        text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+    .tracker-entry .te-time { font-family: 'Fira Code', monospace; font-size: 0.58rem; color: #444; }
+    .tracker-entry .te-desc { font-size: 0.7rem; color: rgba(255,255,255,0.45); margin-top: 2px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tracker-entry.type-create .te-node { color: var(--ai-edit); }
+    .tracker-entry.type-delete .te-node { color: #ff6b6b; }
+    .tracker-entry.type-ai     .te-node { color: var(--ai-glow); }
+    .tracker-entry.type-push   .te-node { color: #ffb74d; }
+    #tracker-empty { padding: 24px 16px; text-align: center; font-family: 'Fira Code', monospace;
+        font-size: 0.65rem; color: #333; line-height: 1.8; }
+    .tracker-stats {
+        padding: 10px 12px; border-top: 1px solid rgba(65,105,225,0.15);
+        display: flex; gap: 12px; flex-shrink: 0;
+    }
+    .tstat { text-align: center; flex: 1; }
+    .tstat-num { font-family: 'Fira Code', monospace; font-size: 1rem; font-weight: 700;
+        color: var(--secondary); display: block; }
+    .tstat-lbl { font-size: 0.58rem; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Fullscreen: truly full viewport */
+    .node.fullscreen-mode {
+        resize: none !important; z-index: 9999 !important;
+        border-radius: 0 !important;
+    }
 
     /* ─── Mobile — navbar wraps to two rows ─────────────────── */
     @media (max-width: 600px) {
@@ -337,7 +448,10 @@
         .action-btn { padding: 7px 11px; font-size: 0.78rem; }
         .win-btn { width: 17px; height: 17px; }
         .code-editor, .code-highlight { font-size: 12.5px; }
-        #os-menu-container { left: auto !important; right: 1.5rem; bottom: 1.5rem; }
+        #os-menu-container { left: auto !important; right: 1.5rem; bottom: 5rem; }
+        #rsidebar { width: 100%; border-left: none; border-top: 1px solid rgba(65,105,225,0.25); bottom: 72px; }
+        #taskbar { height: 64px; }
+        .taskbar-chip { width: 140px; height: 44px; }
     }
     /* Prevent textarea zoom on iOS */
     @media (max-width: 768px) {
@@ -370,6 +484,7 @@
     </div>
     <button class="btn-main" style="background: var(--ai-edit); color:#000; margin-left:8px;" onclick="pushAllToVibeTree()" title="Push all edits to Vibe System">⬆ PUSH</button>
     <button class="btn-main success" style="margin-left:6px;" onclick="downloadProject()">⬇ EXPORT</button>
+    <button class="btn-icon" title="Toggle Session Tracker" onclick="toggleRSidebar()" style="margin-left:6px; font-size:1.1rem;" id="tracker-toggle-btn">📋</button>
 </div>
 
 <!-- Vision image preview strip (shows under navbar when images are attached) -->
@@ -404,6 +519,41 @@
 <div id="viewport">
     <div id="world">
         <svg id="connector-svg"></svg>
+    </div>
+</div>
+
+<!-- Taskbar: pinned nodes -->
+<div id="taskbar">
+    <div id="taskbar-label">📌 Pinned</div>
+    <div id="taskbar-scroll">
+        <span id="taskbar-empty">No pinned nodes — click 📌 on a node to pin it here</span>
+    </div>
+</div>
+
+<!-- Right Sidebar: Session Tracker -->
+<div id="rsidebar">
+    <div class="rsidebar-header">
+        <span class="rsidebar-title">📋 Session Tracker</span>
+        <div class="rsidebar-actions">
+            <button class="rsidebar-btn" onclick="trackerNewSession()" title="Start new session">＋ Session</button>
+            <button class="rsidebar-btn danger" onclick="trackerClear()" title="Clear log">Clear</button>
+        </div>
+    </div>
+    <div class="rsidebar-session-bar">
+        <div class="session-dot" id="session-dot"></div>
+        <div class="session-info">
+            <div class="session-name" id="session-name">Session 1</div>
+            <div class="session-meta" id="session-meta">0 changes · started just now</div>
+        </div>
+    </div>
+    <div id="tracker-list">
+        <div id="tracker-empty">No changes yet.<br>Edit a node, push, or use AI<br>to start tracking.</div>
+    </div>
+    <div class="tracker-stats">
+        <div class="tstat"><span class="tstat-num" id="tstat-edits">0</span><span class="tstat-lbl">Edits</span></div>
+        <div class="tstat"><span class="tstat-num" id="tstat-creates">0</span><span class="tstat-lbl">Creates</span></div>
+        <div class="tstat"><span class="tstat-num" id="tstat-ai">0</span><span class="tstat-lbl">AI runs</span></div>
+        <div class="tstat"><span class="tstat-num" id="tstat-pushes">0</span><span class="tstat-lbl">Pushes</span></div>
     </div>
 </div>
 
@@ -503,95 +653,84 @@ function receiveVibeTree(incoming, incomingPins) {
     if (Array.isArray(incomingPins)) applyPinnedNodes(incomingPins, false);
     rebuildFromTree();
     renderSidebar();
+    renderTaskbar();
     setSyncLabel('Synced');
     setSyncDirty(false);
     toast('Vibe Tree loaded ✓');
     updatePreview();
 }
 
-/* Rearrange unpinned nodes into the free canvas area around pinned nodes */
-function redistributeUnpinned() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight - 52;
-    const nodeW = window.innerWidth < 600 ? 320 : 400;
-    const nodeH = 320;
-    const pad   = 28;
+/* ════════════════════════════════════════════════════════════════
+   TASKBAR — pinned nodes live here as chips
+   ════════════════════════════════════════════════════════════════ */
+function renderTaskbar() {
+    const scroll = document.getElementById('taskbar-scroll');
+    const empty  = document.getElementById('taskbar-empty');
+    if (!scroll) return;
+    // Remove existing chips (keep the empty label)
+    scroll.querySelectorAll('.taskbar-chip').forEach(c => c.remove());
 
-    // Collect pinned bounding boxes (in world coords)
-    const pinnedRects = [];
-    AppState.nodes.forEach((el, id) => {
-        if (!AppState.pinnedNodes.has(id)) return;
-        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
-        pinnedRects.push({
-            x: parseFloat(el.style.left) || 0,
-            y: parseFloat(el.style.top)  || 0,
-            w: el.offsetWidth  || nodeW,
-            h: el.offsetHeight || nodeH
+    const pinned = [...AppState.pinnedNodes];
+    if (empty) empty.style.display = pinned.length ? 'none' : 'block';
+
+    pinned.forEach(id => {
+        const node = findNodeInTree(id);
+        const color = node ? typeColor(node.type) : '#78909c';
+        const label = node ? (node.description || id) : id;
+        const type  = node ? node.type : '?';
+
+        const chip = document.createElement('div');
+        chip.className = 'taskbar-chip';
+        chip.dataset.id = id;
+        chip.innerHTML = `
+            <span class="tc-dot" style="background:${color}"></span>
+            <div class="tc-info">
+                <div class="tc-title">${truncate(label, 14)}</div>
+                <div class="tc-id">${id} · ${type}</div>
+            </div>
+            <button class="tc-unpin" onclick="event.stopPropagation(); togglePin('${id}')" title="Unpin">✕</button>
+        `;
+        chip.addEventListener('click', () => {
+            if (AppState.nodes.has(id)) {
+                centerOnNode(id, 400);
+            } else {
+                spawnNodeFromTree(id);
+            }
         });
+        scroll.appendChild(chip);
     });
-
-    // Find an occupied x-range to avoid (rough centroid of pinned nodes)
-    let occupiedRight = 0;
-    if (pinnedRects.length) {
-        occupiedRight = Math.max(...pinnedRects.map(r => r.x + r.w)) + pad * 2;
-    }
-
-    // Determine start position in world coords (to the right of pinned cluster,
-    // or from leftmost free area if canvas is panned)
-    const worldLeft  = (-AppState.pan.x) / AppState.scale;
-    const worldTop   = (-AppState.pan.y) / AppState.scale;
-    let startX = Math.max(occupiedRight, worldLeft + pad);
-    let cx = startX, cy = worldTop + pad;
-
-    AppState.nodes.forEach((el, id) => {
-        if (AppState.pinnedNodes.has(id)) return;
-        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
-
-        el.classList.add('animating-bounds');
-        el.style.left = `${cx}px`;
-        el.style.top  = `${cy}px`;
-        setTimeout(() => el.classList.remove('animating-bounds'), 420);
-
-        cx += nodeW + pad;
-        const colW = (vw / AppState.scale);
-        if (cx + nodeW > startX + colW - pad) { cx = startX; cy += nodeH + pad; }
-    });
-
-    requestAnimationFrame(drawConnections);
 }
 
-/* Apply a pin set from the parent bridge — updates AppState.pinnedNodes and DOM */
+/* Apply a pin set from the parent bridge */
 function applyPinnedNodes(ids, broadcast = true) {
     AppState.pinnedNodes = new Set(ids);
+    // Sync pin buttons on open nodes
     AppState.nodes.forEach((el, id) => {
-        const pinned = AppState.pinnedNodes.has(id);
-        el.classList.toggle('pinned-node', pinned);
         const btn = el.querySelector('.node-pin-btn');
-        if (btn) btn.classList.toggle('pinned', pinned);
+        if (btn) btn.classList.toggle('pinned', AppState.pinnedNodes.has(id));
     });
+    renderTaskbar();
     if (broadcast) {
         postToParent('apui-pin-node', { nodeId: null, pinned: null, _batch: [...AppState.pinnedNodes] });
     }
 }
 
-/* Toggle pin for a single node and sync to parent */
+/* Toggle pin for a single node */
 function togglePin(nodeId) {
-    const el = AppState.nodes.get(nodeId);
-    if (!el) return;
-    const isPinned = AppState.pinnedNodes.has(nodeId);
-    if (isPinned) {
+    if (AppState.pinnedNodes.has(nodeId)) {
         AppState.pinnedNodes.delete(nodeId);
-        el.classList.remove('pinned-node');
-        el.querySelector('.node-pin-btn')?.classList.remove('pinned');
         toast(`[${nodeId}] unpinned`);
+        trackerLog('pin', nodeId, 'Unpinned from taskbar');
     } else {
         AppState.pinnedNodes.add(nodeId);
-        el.classList.add('pinned-node');
-        el.querySelector('.node-pin-btn')?.classList.add('pinned');
-        toast(`📌 [${nodeId}] pinned — stays in view while canvas pans`);
+        toast(`📌 [${nodeId}] pinned to taskbar`);
+        trackerLog('pin', nodeId, 'Pinned to taskbar');
     }
+    // Sync pin button on the open node card
+    const el = AppState.nodes.get(nodeId);
+    if (el) el.querySelector('.node-pin-btn')?.classList.toggle('pinned', AppState.pinnedNodes.has(nodeId));
+    renderTaskbar();
     postToParent('apui-toggle-pin', { nodeId });
-    redistributeUnpinned();
 }
 
 function applyExternalNodeUpdate(nodeId, newCode) {
@@ -918,6 +1057,7 @@ function saveNodeToTree(nodeId) {
     // Push to parent
     postToParent('apui-node-update', { nodeId, newCode: node.code });
     toast(`[${nodeId}] saved to Vibe Tree ✓`);
+    trackerLog('edit', nodeId, `Saved · ${(node.code||'').split('\n').length} lines`);
 
     // Animate button
     const btn = document.getElementById(`savebtn-${nodeId}`);
@@ -939,6 +1079,7 @@ function pushAllToVibeTree() {
         if (node) updates.push({ nodeId: id, newCode: node.code });
     });
     postToParent('apui-bulk-update', { updates });
+    trackerLog('push', null, `Pushed ${updates.length} node(s) to Vibe System`);
 
     dirtyNodes.clear();
     AppState.nodes.forEach((_, id) => updateDirtyDot(id));
@@ -1046,6 +1187,7 @@ function addVibeNodeOfType(type) {
 
     // Tell parent a node was created
     postToParent('apui-create-node', { parentId, newNode });
+    trackerLog('create', id, `Created ${type} node`);
     toast(`Created ${type} node: ${id}`);
     document.getElementById('add-node-menu').classList.remove('open');
 }
@@ -1071,7 +1213,10 @@ function deleteVibeNode(nodeId) {
     removeFromTree(nodeId);
     removeNodeDOM(nodeId, false);
     dirtyNodes.delete(nodeId);
+    AppState.pinnedNodes.delete(nodeId);
+    renderTaskbar();
     postToParent('apui-delete-node', { nodeId });
+    trackerLog('delete', nodeId, 'Deleted from Vibe Tree');
     renderSidebar();
     toast(`[${nodeId}] deleted`);
 }
@@ -1277,7 +1422,7 @@ function _apuiRefreshStrip() {
     const extraTop = hasImages ? 42 : 0;
     const vp = document.getElementById('viewport');
     const sb = document.getElementById('sidebar');
-    if (vp) vp.style.top = `${nbH + extraTop}px`;
+    if (vp) { vp.style.top = `${nbH + extraTop}px`; vp.style.height = `calc(100vh - ${nbH + extraTop}px - 72px)`; }
     if (sb) sb.style.top = `${nbH + extraTop}px`;
 }
 
@@ -1353,6 +1498,7 @@ async function askAI(nodeId) {
             images
         );
         logToChat('ai', reply);
+        trackerLog('ai', nodeId, `Asked: ${req.slice(0, 60)}`);
     } catch(e) { logToChat('system', '⚠ ' + e.message); }
 }
 
@@ -1431,6 +1577,7 @@ Return the JSON object now.`;
                 dirtyNodes.delete(action.nodeId);
                 updateDirtyDot(action.nodeId);
                 pushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
+                trackerLog('ai', action.nodeId, `AI updated · ${(action.newCode||'').split('\n').length} lines`);
 
                 logToChat('system', `Updated [${action.nodeId}]`);
                 await delay(400);
@@ -1450,6 +1597,7 @@ Return the JSON object now.`;
 
                 centerOnNode(newNode.id, 400);
                 if (newEl) newEl.classList.add('ai-updating');
+                trackerLog('create', newNode.id, `AI created ${newNode.type} node`);
                 logToChat('system', `Created [${newNode.id}]`);
                 await delay(600);
                 if (newEl) newEl.classList.remove('ai-updating');
@@ -1460,6 +1608,7 @@ Return the JSON object now.`;
 
         // Push all changes to the parent Vibe System in one shot
         postToParent('apui-bulk-update', { updates: pushUpdates });
+        if (pushUpdates.length) trackerLog('push', null, `AI pushed ${pushUpdates.length} update(s) to Vibe System`);
 
         renderSidebar();
         logToChat('ai', 'Done! Preview updated.');
@@ -1668,25 +1817,6 @@ function animateTo(tx, ty, ts, dur = 400) {
 }
 function updateWorldTransform() {
     world.style.transform = `translate(${AppState.pan.x}px,${AppState.pan.y}px) scale(${AppState.scale})`;
-    // Keep pinned nodes visually fixed by counter-translating them
-    AppState.nodes.forEach((el, id) => {
-        if (!AppState.pinnedNodes.has(id)) return;
-        if (el.classList.contains('out-of-view') || el.classList.contains('hidden')) return;
-        // Convert node's world position to screen and anchor it there
-        const wx = parseFloat(el.style.left) || 0;
-        const wy = parseFloat(el.style.top)  || 0;
-        const screenX = wx * AppState.scale + AppState.pan.x;
-        const screenY = wy * AppState.scale + AppState.pan.y;
-        // Clamp to viewport with padding
-        const pad = 10;
-        const clampedX = Math.max(pad, Math.min(screenX, window.innerWidth  - el.offsetWidth  * AppState.scale - pad));
-        const clampedY = Math.max(52 + pad, Math.min(screenY, window.innerHeight - el.offsetHeight * AppState.scale - pad));
-        // Back-calculate the world position that places the node at (clampedX, clampedY) on screen
-        const newWx = (clampedX - AppState.pan.x) / AppState.scale;
-        const newWy = (clampedY - AppState.pan.y) / AppState.scale;
-        el.style.left = `${newWx}px`;
-        el.style.top  = `${newWy}px`;
-    });
     drawConnections();
 }
 function startNodeDrag(e, nodeEl) { if (AppState.activePointers.size>1) return; AppState.draggingNode=nodeEl; bringToFront(nodeEl); AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.nodeStart={x:parseFloat(nodeEl.style.left)||0,y:parseFloat(nodeEl.style.top)||0}; nodeEl.classList.add('dragging'); }
@@ -1747,7 +1877,10 @@ function toggleNodeFullscreen(node) {
         node.dataset.origH = node.style.height || node.offsetHeight+'px';
         node.dataset.origPanX = AppState.pan.x; node.dataset.origPanY = AppState.pan.y; node.dataset.origScale = AppState.scale;
         const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
-        node.style.width = window.innerWidth+'px'; node.style.height = (window.innerHeight-nbH)+'px';
+        // Full width AND full height (only minus navbar — covers the taskbar too for immersive editing)
+        node.style.width  = window.innerWidth + 'px';
+        node.style.height = (window.innerHeight - nbH) + 'px';
+        // Pan so node's top-left aligns with viewport top-left
         animateTo(-parseFloat(node.style.left||0), -parseFloat(node.style.top||0), 1, 400);
         node.classList.add('fullscreen-mode'); AppState.fullscreenNode = node;
     }
@@ -1755,8 +1888,8 @@ function toggleNodeFullscreen(node) {
 window.addEventListener('resize', () => {
     if (AppState.fullscreenNode) {
         const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
-        AppState.fullscreenNode.style.width  = window.innerWidth+'px';
-        AppState.fullscreenNode.style.height = (window.innerHeight-nbH)+'px';
+        AppState.fullscreenNode.style.width  = window.innerWidth + 'px';
+        AppState.fullscreenNode.style.height = (window.innerHeight - nbH) + 'px';
     }
 });
 
@@ -1833,7 +1966,128 @@ function initParticles() {
 /* ════════════════════════════════════════════════════════════════
    MISC UI HELPERS
    ════════════════════════════════════════════════════════════════ */
-function toggleSidebar() { sidebar.classList.toggle('open'); }
+/* ════════════════════════════════════════════════════════════════
+   SESSION TRACKER — right sidebar change log
+   ════════════════════════════════════════════════════════════════ */
+const TrackerState = {
+    sessions: [],
+    current: null,
+    stats: { edits: 0, creates: 0, ai: 0, pushes: 0 }
+};
+
+const ACTION_ICONS = { edit:'✏️', create:'✨', delete:'🗑', ai:'🤖', push:'⬆', pin:'📌', error:'⚠️' };
+
+function trackerInit() {
+    trackerNewSession();
+}
+
+function trackerNewSession() {
+    const num = TrackerState.sessions.length + 1;
+    const session = {
+        id: num,
+        name: `Session ${num}`,
+        startTime: Date.now(),
+        entries: []
+    };
+    TrackerState.sessions.push(session);
+    TrackerState.current = session;
+    TrackerState.stats = { edits: 0, creates: 0, ai: 0, pushes: 0 };
+    renderTrackerHeader();
+    renderTrackerList();
+    updateTrackerStats();
+    toast(`📋 Session ${num} started`);
+}
+
+function trackerLog(type, nodeId, desc) {
+    if (!TrackerState.current) return;
+    const entry = { type, nodeId, desc, time: Date.now() };
+    TrackerState.current.entries.unshift(entry); // newest first
+    // Update stats
+    if (type === 'edit')   TrackerState.stats.edits++;
+    if (type === 'create') TrackerState.stats.creates++;
+    if (type === 'ai')     TrackerState.stats.ai++;
+    if (type === 'push')   TrackerState.stats.pushes++;
+    renderTrackerList();
+    renderTrackerHeader();
+    updateTrackerStats();
+}
+
+function trackerClear() {
+    if (!TrackerState.current) return;
+    TrackerState.current.entries = [];
+    TrackerState.stats = { edits: 0, creates: 0, ai: 0, pushes: 0 };
+    renderTrackerList();
+    updateTrackerStats();
+    toast('Session log cleared');
+}
+
+function renderTrackerHeader() {
+    const s = TrackerState.current;
+    if (!s) return;
+    const nameEl = document.getElementById('session-name');
+    const metaEl = document.getElementById('session-meta');
+    const dotEl  = document.getElementById('session-dot');
+    if (nameEl) nameEl.textContent = s.name;
+    if (metaEl) {
+        const mins = Math.floor((Date.now() - s.startTime) / 60000);
+        const dur  = mins < 1 ? 'just now' : `${mins}m ago`;
+        metaEl.textContent = `${s.entries.length} change${s.entries.length !== 1 ? 's' : ''} · started ${dur}`;
+    }
+    if (dotEl) dotEl.classList.toggle('idle', s.entries.length === 0);
+}
+
+function renderTrackerList() {
+    const list  = document.getElementById('tracker-list');
+    const empty = document.getElementById('tracker-empty');
+    if (!list) return;
+    const entries = TrackerState.current?.entries || [];
+    list.querySelectorAll('.tracker-entry').forEach(e => e.remove());
+    if (empty) empty.style.display = entries.length ? 'none' : 'block';
+    entries.forEach(entry => {
+        const el = document.createElement('div');
+        el.className = `tracker-entry type-${entry.type}`;
+        const timeStr = new Date(entry.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        el.innerHTML = `
+            <div class="te-header">
+                <span class="te-icon">${ACTION_ICONS[entry.type] || '•'}</span>
+                <span class="te-node">${entry.nodeId || '—'}</span>
+                <span class="te-action">${entry.type}</span>
+            </div>
+            <div class="te-time">${timeStr}</div>
+            ${entry.desc ? `<div class="te-desc">${escapeHTML(entry.desc)}</div>` : ''}
+        `;
+        // Click to jump to node
+        if (entry.nodeId) {
+            el.addEventListener('click', () => {
+                if (AppState.nodes.has(entry.nodeId)) centerOnNode(entry.nodeId, 400);
+                else spawnNodeFromTree(entry.nodeId);
+            });
+        }
+        list.appendChild(el);
+    });
+}
+
+function updateTrackerStats() {
+    const s = TrackerState.stats;
+    const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    set('tstat-edits',   s.edits);
+    set('tstat-creates', s.creates);
+    set('tstat-ai',      s.ai);
+    set('tstat-pushes',  s.pushes);
+}
+
+function toggleRSidebar() {
+    const rs  = document.getElementById('rsidebar');
+    const btn = document.getElementById('tracker-toggle-btn');
+    if (!rs) return;
+    const isOpen = rs.classList.toggle('open');
+    if (btn) btn.style.color = isOpen ? 'var(--ai-edit)' : '';
+}
+function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    if (sb) sb.classList.toggle('open');
+}
+
 function toggleMin(id) { AppState.nodes.get(id)?.classList.toggle('minimized'); drawConnections(); }
 function escapeHTML(s) { if(!s)return''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function truncate(s, n) { return s.length>n ? s.slice(0,n-1)+'…' : s; }
@@ -1982,7 +2236,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logToChat('system', 'APUI connected. Waiting for Vibe Tree from parent system…');
     logToChat('system', 'Tip: Edit any node and hit ⬆ PUSH to sync changes back.');
-    logToChat('system', 'Tip: Tap 📌 on any node header to pin it — it stays visible while you pan.');
+    logToChat('system', 'Tip: Tap 📌 on any node header to pin it to the taskbar.');
+
+    trackerInit();
+    renderTaskbar();
 });
 </script>
 </body>
