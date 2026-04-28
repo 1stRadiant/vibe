@@ -136,8 +136,10 @@
     .node.has-error { border-color: var(--c-error) !important; box-shadow: 0 0 30px rgba(239,83,80,0.45) !important; }
     .node.hidden { display: none !important; }
     .node.out-of-view { display: none !important; }
-    .node.minimized { height: 44px !important; width: 210px !important; resize: none; }
+    .node.minimized { height: 48px !important; width: auto !important; min-width: 200px; max-width: 320px; resize: none; }
     .node.minimized .node-content, .node.minimized .node-footer, .node.minimized .node-error-bar { display: none; }
+    /* Ensure minimized title never truncates */
+    .node.minimized .node-title { overflow: visible; text-overflow: unset; white-space: nowrap; }
     .node.fullscreen-mode { resize: none !important; z-index: 9999 !important; }
     .node.animating-bounds { transition: width 0.4s cubic-bezier(0.2,0.8,0.2,1), height 0.4s cubic-bezier(0.2,0.8,0.2,1) !important; }
 
@@ -251,33 +253,41 @@
     @keyframes os-pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
 
     .os-menu-btn {
-        position: absolute; top: 50%; left: 50%;
-        transform: translate(-50%,-50%) scale(0.5);
+        position: absolute;
+        /* Stack upward: each button is 40px tall + 6px gap, starting directly above the logo */
+        left: 50%; transform: translateX(-50%) translateY(0) scaleY(0.7);
         opacity: 0; pointer-events: none;
-        transition: all 0.38s cubic-bezier(0.175,0.885,0.32,1.275);
+        transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.175,0.885,0.32,1.275);
         background: rgba(16,24,48,0.97); color: var(--secondary);
         border: 1px solid var(--primary); border-radius: 8px;
-        padding: 8px 14px; display: flex; align-items: center; gap: 6px;
+        padding: 9px 16px; display: flex; align-items: center; gap: 8px;
         font-family: 'Rajdhani', sans-serif; font-weight: 700; text-transform: uppercase;
         box-shadow: 0 0 12px rgba(65,105,225,0.4); white-space: nowrap; cursor: pointer;
-        backdrop-filter: blur(6px); font-size: 0.78rem; z-index: 1;
+        backdrop-filter: blur(8px); font-size: 0.82rem; z-index: 1;
+        width: max-content; min-width: 148px;
     }
     .os-menu-btn:hover { background: var(--primary); color: white; box-shadow: 0 0 20px var(--secondary); }
-    #os-menu-container.open .os-menu-btn { opacity: 1; pointer-events: auto; }
-    #os-menu-container.open .btn-1 { transform: translate(72px, -8px) scale(1); }
-    #os-menu-container.open .btn-2 { transform: translate(62px, -58px) scale(1); }
-    #os-menu-container.open .btn-3 { transform: translate(28px, -96px) scale(1); }
-    #os-menu-container.open .btn-4 { transform: translate(-20px, -112px) scale(1); }
-    #os-menu-container.open .btn-5 { transform: translate(-68px, -96px) scale(1); }
-    #os-menu-container.open .btn-6 { transform: translate(-90px, -52px) scale(1); }
-    @media (max-width: 768px) {
-        #os-menu-container.open .btn-1 { transform: translate(60px, -6px) scale(0.9); }
-        #os-menu-container.open .btn-2 { transform: translate(52px, -48px) scale(0.9); }
-        #os-menu-container.open .btn-3 { transform: translate(22px, -80px) scale(0.9); }
-        #os-menu-container.open .btn-4 { transform: translate(-16px, -92px) scale(0.9); }
-        #os-menu-container.open .btn-5 { transform: translate(-56px, -78px) scale(0.9); }
-        #os-menu-container.open .btn-6 { transform: translate(-74px, -42px) scale(0.9); }
+
+    /* When open: slide each button upward in a clean vertical stack */
+    #os-menu-container.open .os-menu-btn {
+        opacity: 1; pointer-events: auto;
+        transform: translateX(-50%) scaleY(1);
     }
+    /* btn-1 sits closest to the orb, btn-6 furthest up */
+    #os-menu-container.open .btn-1 { bottom: calc(78px + 6px); }
+    #os-menu-container.open .btn-2 { bottom: calc(78px + 46px + 12px); }
+    #os-menu-container.open .btn-3 { bottom: calc(78px + 92px + 18px); }
+    #os-menu-container.open .btn-4 { bottom: calc(78px + 138px + 24px); }
+    #os-menu-container.open .btn-5 { bottom: calc(78px + 184px + 30px); }
+    #os-menu-container.open .btn-6 { bottom: calc(78px + 230px + 36px); }
+
+    /* Stagger the reveal for a cascade effect */
+    #os-menu-container.open .btn-1 { transition-delay: 0ms;   }
+    #os-menu-container.open .btn-2 { transition-delay: 35ms;  }
+    #os-menu-container.open .btn-3 { transition-delay: 70ms;  }
+    #os-menu-container.open .btn-4 { transition-delay: 105ms; }
+    #os-menu-container.open .btn-5 { transition-delay: 140ms; }
+    #os-menu-container.open .btn-6 { transition-delay: 175ms; }
 
     /* ─── Add Node Palette ──────────────────────────────────── */
     #add-node-menu {
@@ -471,7 +481,8 @@
     /* ─── Overview mode (all nodes minimised) ─────────────────── */
     body.overview-mode #viewport { background: rgba(0,0,0,0.15); }
     body.overview-mode .node:not(.hidden):not(.out-of-view) {
-        width: 180px !important; height: 44px !important;
+        width: auto !important; min-width: 200px; max-width: 320px;
+        height: 48px !important;
         resize: none !important; cursor: pointer !important;
     }
     body.overview-mode .node .node-content,
@@ -518,14 +529,20 @@
         .btn-main[title="Attach an image as visual context"] { display: none; }
         .nav-sync-badge { display: none; }
         .node { width: min(320px, 94vw) !important; height: 270px; }
-        .node.minimized { width: 180px !important; height: 44px !important; }
+        /* minimized nodes already use auto-width; ensure they fit on mobile */
+        .node.minimized { max-width: 88vw !important; }
         .action-btn { padding: 7px 11px; font-size: 0.78rem; }
         .win-btn { width: 17px; height: 17px; }
         .code-editor, .code-highlight { font-size: 12.5px; }
-        #os-menu-container { left: auto !important; right: 1.5rem; bottom: 5rem; }
-        #rsidebar { width: 100%; border-left: none; border-top: 1px solid rgba(65,105,225,0.25); bottom: 72px; }
-        #taskbar { height: 64px; }
-        .taskbar-chip { width: 140px; height: 44px; }
+        /* Taskbar: tall on mobile so chips are easy to tap */
+        #taskbar { height: 110px; }
+        #taskbar-label { font-size: 0.55rem; padding: 0 6px 0 10px; }
+        .taskbar-chip { height: 68px; width: 150px; }
+        #viewport { height: calc(100vh - var(--nb-h, 94px) - 110px) !important; }
+        #sidebar   { bottom: 110px; }
+        #rsidebar  { width: 100%; border-left: none; border-top: 1px solid rgba(65,105,225,0.25); bottom: 110px; }
+        /* OS menu: sit above taller taskbar */
+        #os-menu-container { left: auto !important; right: 1.2rem !important; bottom: 120px !important; }
     }
     /* Prevent textarea zoom on iOS */
     @media (max-width: 768px) {
@@ -1501,10 +1518,11 @@ function _apuiRefreshStrip() {
 
     // Shift viewport and sidebar down to accommodate the strip
     const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
+    const tbH = window.innerWidth <= 600 ? 110 : 72;
     const extraTop = hasImages ? 42 : 0;
     const vp = document.getElementById('viewport');
     const sb = document.getElementById('sidebar');
-    if (vp) { vp.style.top = `${nbH + extraTop}px`; vp.style.height = `calc(100vh - ${nbH + extraTop}px - 72px)`; }
+    if (vp) { vp.style.top = `${nbH + extraTop}px`; vp.style.height = `calc(100vh - ${nbH + extraTop}px - ${tbH}px)`; }
     if (sb) sb.style.top = `${nbH + extraTop}px`;
 }
 
