@@ -264,17 +264,19 @@
     }
     .os-menu-btn:hover { background: var(--primary); color: white; box-shadow: 0 0 20px var(--secondary); }
     #os-menu-container.open .os-menu-btn { opacity: 1; pointer-events: auto; }
-    #os-menu-container.open .btn-1 { transform: translate(65px, -10px) scale(1); }
-    #os-menu-container.open .btn-2 { transform: translate(55px, -60px) scale(1); }
-    #os-menu-container.open .btn-3 { transform: translate(15px, -90px) scale(1); }
-    #os-menu-container.open .btn-4 { transform: translate(-35px, -100px) scale(1); }
-    #os-menu-container.open .btn-5 { transform: translate(-80px, -80px) scale(1); }
+    #os-menu-container.open .btn-1 { transform: translate(72px, -8px) scale(1); }
+    #os-menu-container.open .btn-2 { transform: translate(62px, -58px) scale(1); }
+    #os-menu-container.open .btn-3 { transform: translate(28px, -96px) scale(1); }
+    #os-menu-container.open .btn-4 { transform: translate(-20px, -112px) scale(1); }
+    #os-menu-container.open .btn-5 { transform: translate(-68px, -96px) scale(1); }
+    #os-menu-container.open .btn-6 { transform: translate(-90px, -52px) scale(1); }
     @media (max-width: 768px) {
-        #os-menu-container.open .btn-1 { transform: translate(50px, -10px) scale(0.9); }
-        #os-menu-container.open .btn-2 { transform: translate(45px, -50px) scale(0.9); }
-        #os-menu-container.open .btn-3 { transform: translate(10px, -75px) scale(0.9); }
-        #os-menu-container.open .btn-4 { transform: translate(-30px, -80px) scale(0.9); }
-        #os-menu-container.open .btn-5 { transform: translate(-70px, -60px) scale(0.9); }
+        #os-menu-container.open .btn-1 { transform: translate(60px, -6px) scale(0.9); }
+        #os-menu-container.open .btn-2 { transform: translate(52px, -48px) scale(0.9); }
+        #os-menu-container.open .btn-3 { transform: translate(22px, -80px) scale(0.9); }
+        #os-menu-container.open .btn-4 { transform: translate(-16px, -92px) scale(0.9); }
+        #os-menu-container.open .btn-5 { transform: translate(-56px, -78px) scale(0.9); }
+        #os-menu-container.open .btn-6 { transform: translate(-74px, -42px) scale(0.9); }
     }
 
     /* ─── Add Node Palette ──────────────────────────────────── */
@@ -466,6 +468,44 @@
         border-radius: 0 !important;
     }
 
+    /* ─── Overview mode (all nodes minimised) ─────────────────── */
+    body.overview-mode #viewport { background: rgba(0,0,0,0.15); }
+    body.overview-mode .node:not(.hidden):not(.out-of-view) {
+        width: 180px !important; height: 44px !important;
+        resize: none !important; cursor: pointer !important;
+    }
+    body.overview-mode .node .node-content,
+    body.overview-mode .node .node-footer,
+    body.overview-mode .node .node-error-bar { display: none !important; }
+    #overview-banner {
+        position: fixed; top: calc(var(--nb-h, 52px) + 8px); left: 50%;
+        transform: translateX(-50%); z-index: 25000;
+        background: rgba(65,105,225,0.15); border: 1px solid rgba(65,105,225,0.5);
+        border-radius: 20px; padding: 6px 18px;
+        font-family: 'Fira Code', monospace; font-size: 0.65rem;
+        color: var(--secondary); pointer-events: none; opacity: 0;
+        transition: opacity 0.3s; white-space: nowrap;
+    }
+    #overview-banner.show { opacity: 1; }
+
+    /* ─── Children-expand overlay ────────────────────────────── */
+    .children-overlay {
+        position: absolute; background: rgba(10,14,28,0.96);
+        border: 1px solid rgba(65,105,225,0.4); border-radius: 8px;
+        padding: 8px; z-index: 50000; min-width: 160px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+        animation: popIn 0.2s ease-out;
+    }
+    .child-chip {
+        display: flex; align-items: center; gap: 8px;
+        padding: 7px 10px; border-radius: 4px; cursor: pointer;
+        font-size: 0.8rem; transition: background 0.12s;
+    }
+    .child-chip:hover { background: rgba(65,105,225,0.2); }
+    .child-chip .ch-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .child-chip .ch-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .child-chip .ch-type { font-size: 0.6rem; color: #555; flex-shrink: 0; }
+
     /* ─── Mobile — navbar wraps to two rows ─────────────────── */
     @media (max-width: 600px) {
         .navbar { height: auto; flex-wrap: wrap; padding: 6px 8px; gap: 5px; }
@@ -569,6 +609,7 @@
     </div>
 </div>
 <div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · Jarvis keeps working</div>
+<div id="overview-banner">Tap any node to open it · Pinch in to exit overview</div>
 
 <!-- Right Sidebar: Session Tracker -->
 <div id="rsidebar">
@@ -612,10 +653,11 @@
         </svg>
     </div>
     <button class="os-menu-btn btn-1" onclick="jarvisToggle()">🤖 Jarvis</button>
-    <button class="os-menu-btn btn-2" onclick="jarvisSetGoal()">🎯 Goal</button>
-    <button class="os-menu-btn btn-3" onclick="openJarvisSettings()">⚡ Interval</button>
-    <button class="os-menu-btn btn-4" onclick="pushAllToVibeTree()">⬆ Push</button>
-    <button class="os-menu-btn btn-5" onclick="handleCommand('preview')">👁 Preview</button>
+    <button class="os-menu-btn btn-2" onclick="jarvisReturnFocus()">🔭 Focus</button>
+    <button class="os-menu-btn btn-3" onclick="jarvisSetGoal()">🎯 Goal</button>
+    <button class="os-menu-btn btn-4" onclick="openJarvisSettings()">⚡ Interval</button>
+    <button class="os-menu-btn btn-5" onclick="handleCommand('settings')">⚙ Settings</button>
+    <button class="os-menu-btn btn-6" onclick="pushAllToVibeTree()">⬆ Push</button>
 </div>
 
 <div id="toast"></div>
@@ -1903,6 +1945,148 @@ function openJarvisSettings() {
     toast(`⚡ Jarvis heartbeat set to ${n}s`);
     document.getElementById('os-menu-container')?.classList.remove('open');
 }
+function jarvisReturnFocus() {
+    // Re-centre the camera on the most recently changed node, or chat node
+    const lastBeat = Jarvis.memory[Jarvis.memory.length - 1];
+    const targetId = lastBeat?.nodeIds?.[0] || 'chat';
+    if (AppState.nodes.has(targetId)) {
+        centerOnNode(targetId, 450);
+        toast(`🔭 Returned to [${targetId}]`);
+    } else {
+        // Spawn chat and fly to it
+        handleCommand('chat');
+        toast('🔭 Returned to AI Activity');
+    }
+    document.getElementById('os-menu-container')?.classList.remove('open');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   OVERVIEW MODE — pinch-out on preview shows all nodes minimised
+   ════════════════════════════════════════════════════════════════ */
+let overviewMode = false;
+
+function enterOverviewMode() {
+    if (overviewMode) return;
+    overviewMode = true;
+
+    // Exit fullscreen if active
+    if (AppState.fullscreenNode) toggleNodeFullscreen(AppState.fullscreenNode);
+
+    // Make ALL tree nodes visible (remove out-of-view / hidden)
+    flattenTree().forEach(({ node }) => {
+        if (!AppState.nodes.has(node.id)) spawnNodeFromTree(node.id);
+        const el = AppState.nodes.get(node.id);
+        if (el) { el.classList.remove('hidden', 'out-of-view'); }
+    });
+    // Also un-hide system nodes
+    ['preview','chat','console','settings'].forEach(id => {
+        const el = AppState.nodes.get(id);
+        if (el) el.classList.remove('hidden', 'out-of-view');
+    });
+
+    // Minimise every node
+    AppState.nodes.forEach(el => {
+        el.classList.add('minimized');
+        el.classList.remove('fullscreen-mode');
+    });
+
+    document.body.classList.add('overview-mode');
+
+    // Lay nodes out in a grid so they are all visible
+    const cols   = Math.ceil(Math.sqrt(AppState.nodes.size));
+    const chipW  = 190, chipH = 54, pad = 18;
+    let col = 0, row = 0;
+    AppState.nodes.forEach((el) => {
+        el.classList.add('animating-bounds');
+        el.style.left = `${col * (chipW + pad) + pad}px`;
+        el.style.top  = `${row * (chipH + pad) + pad}px`;
+        setTimeout(() => el.classList.remove('animating-bounds'), 450);
+        col++;
+        if (col >= cols) { col = 0; row++; }
+    });
+
+    // Zoom to fit
+    const totalW = cols * (chipW + pad) + pad;
+    const totalH = (Math.ceil(AppState.nodes.size / cols)) * (chipH + pad) + pad;
+    const nbH = document.querySelector('.navbar')?.offsetHeight || 52;
+    const vpW = window.innerWidth, vpH = window.innerHeight - nbH - 72;
+    const fitScale = Math.min(vpW / totalW, vpH / totalH, 1) * 0.92;
+    animateTo(pad, pad, fitScale, 450);
+
+    const banner = document.getElementById('overview-banner');
+    if (banner) { banner.classList.add('show'); }
+
+    drawConnections();
+    toast('Overview · tap any node to open');
+}
+
+function exitOverviewMode(targetId = null) {
+    if (!overviewMode) return;
+    overviewMode = false;
+    document.body.classList.remove('overview-mode');
+
+    const banner = document.getElementById('overview-banner');
+    if (banner) banner.classList.remove('show');
+
+    // Restore all nodes to normal size
+    AppState.nodes.forEach(el => el.classList.remove('minimized'));
+
+    if (targetId) {
+        enforceNodeLimit(targetId);
+        centerOnNode(targetId, 450);
+    } else {
+        // zoom back to default
+        animateTo(AppState.pan.x, AppState.pan.y, 1, 400);
+    }
+    drawConnections();
+}
+
+/* Show children of a node in a floating overlay */
+function showChildrenOverlay(nodeId, anchorEl) {
+    // Remove any existing overlay
+    document.querySelectorAll('.children-overlay').forEach(o => o.remove());
+
+    const treeNode = findNodeInTree(nodeId);
+    const children = treeNode?.children || [];
+    if (!children.length) { toast(`[${nodeId}] has no children`); return; }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'children-overlay';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-family:\'Fira Code\',monospace;font-size:0.6rem;color:#555;padding:0 4px 6px;border-bottom:1px solid #1a2a4a;margin-bottom:4px;';
+    title.textContent = `Children of [${nodeId}]`;
+    overlay.appendChild(title);
+
+    children.forEach(child => {
+        const chip = document.createElement('div');
+        chip.className = 'child-chip';
+        chip.innerHTML = `
+            <span class="ch-dot" style="background:${typeColor(child.type)}"></span>
+            <span class="ch-label">${child.description || child.id}</span>
+            <span class="ch-type">${child.type}</span>
+        `;
+        chip.onclick = () => {
+            overlay.remove();
+            if (overviewMode) exitOverviewMode(child.id);
+            else { spawnNodeFromTree(child.id); centerOnNode(child.id, 380); }
+        };
+        overlay.appendChild(chip);
+    });
+
+    // Position near the node
+    const rect = anchorEl.getBoundingClientRect();
+    overlay.style.position = 'fixed';
+    overlay.style.left = `${Math.min(rect.right + 8, window.innerWidth - 200)}px`;
+    overlay.style.top  = `${Math.max(rect.top, 60)}px`;
+    document.body.appendChild(overlay);
+
+    // Auto-dismiss on outside click
+    const dismiss = e => { if (!overlay.contains(e.target)) { overlay.remove(); document.removeEventListener('pointerdown', dismiss); } };
+    setTimeout(() => document.addEventListener('pointerdown', dismiss), 100);
+    toast(`[${nodeId}] has ${children.length} child(ren)`);
+}
+
 async function handleCommand(specificCmd = null) {
     const val = specificCmd || userInput.value.trim();
     if (!val) return;
@@ -2038,6 +2222,10 @@ function startPhysicsLoop() {
    ════════════════════════════════════════════════════════════════ */
 function initPointerSystem() {
     let downPos = { x: 0, y: 0 };
+    // Track which node (if any) both fingers are over when the pinch starts
+    let pinchTargetNode = null;
+    let pinchStartDist  = null;
+    const PINCH_THRESHOLD = 60; // px delta to trigger gesture
 
     viewport.addEventListener('pointerdown', e => {
         downPos = { x: e.clientX, y: e.clientY };
@@ -2047,9 +2235,24 @@ function initPointerSystem() {
             if (AppState.fullscreenNode) toggleNodeFullscreen(AppState.fullscreenNode);
             const pts = Array.from(AppState.activePointers.values());
             AppState.initialPinchDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+            pinchStartDist            = AppState.initialPinchDist;
             AppState.initialScale = AppState.scale;
             AppState.initialPan  = { x: AppState.pan.x, y: AppState.pan.y };
             AppState.pinchCenter = { x: (pts[0].x+pts[1].x)/2, y: (pts[0].y+pts[1].y)/2 };
+
+            // Detect which node (if any) both fingers are touching
+            const midX = AppState.pinchCenter.x, midY = AppState.pinchCenter.y;
+            // Convert screen mid-point to world coords
+            const wx = (midX - AppState.pan.x) / AppState.scale;
+            const wy = (midY - AppState.pan.y) / AppState.scale;
+            pinchTargetNode = null;
+            AppState.nodes.forEach((el, id) => {
+                if (el.classList.contains('hidden') || el.classList.contains('out-of-view')) return;
+                const nx = parseFloat(el.style.left)||0, ny = parseFloat(el.style.top)||0;
+                if (wx >= nx && wx <= nx + el.offsetWidth && wy >= ny && wy <= ny + el.offsetHeight) {
+                    pinchTargetNode = id;
+                }
+            });
             return;
         }
         if (e.target.closest('input,textarea,button,select,.code-editor,.settings-panel,.console-output,.chat-output')) return;
@@ -2079,6 +2282,57 @@ function initPointerSystem() {
     });
 
     const onUp = e => {
+        const pts = Array.from(AppState.activePointers.values());
+
+        // ── Pinch-gesture detection on pointer-up ───────────────
+        if (AppState.activePointers.size === 2 && pinchStartDist !== null) {
+            const currentPts = Array.from(AppState.activePointers.values());
+            const endDist = Math.hypot(currentPts[0].x-currentPts[1].x, currentPts[0].y-currentPts[1].y);
+            const delta   = endDist - pinchStartDist;
+
+            if (Math.abs(delta) > PINCH_THRESHOLD) {
+                const isExpand  = delta > 0;  // fingers spread apart
+                const isCollapse = delta < 0; // fingers pinched together
+
+                if (isExpand) {
+                    if (pinchTargetNode === 'preview' || overviewMode === false && !pinchTargetNode) {
+                        // Pinch-out on preview OR empty canvas → enter overview
+                        enterOverviewMode();
+                    } else if (pinchTargetNode) {
+                        // Pinch-out on a non-preview node → show its children
+                        const el = AppState.nodes.get(pinchTargetNode);
+                        if (el) showChildrenOverlay(pinchTargetNode, el);
+                    }
+                } else if (isCollapse) {
+                    if (overviewMode) {
+                        // Pinch-in while in overview → exit overview
+                        exitOverviewMode();
+                    } else if (pinchTargetNode) {
+                        // Pinch-in on a node → minimise it
+                        const el = AppState.nodes.get(pinchTargetNode);
+                        if (el) {
+                            el.classList.add('minimized');
+                            drawConnections();
+                            toast(`[${pinchTargetNode}] minimised · tap header to restore`);
+                        }
+                    }
+                }
+                // Consumed as gesture — don't fall through to tap
+                AppState.activePointers.delete(e.pointerId);
+                if (AppState.activePointers.size < 2) { AppState.initialPinchDist = null; pinchTargetNode = null; }
+                stopInteraction();
+                return;
+            }
+        }
+        // ── In overview: single tap on a node chip opens it ─────
+        if (overviewMode) {
+            const body = e.target.closest('.node');
+            if (body) {
+                const id = body.dataset.id;
+                if (id) { exitOverviewMode(id); AppState.activePointers.delete(e.pointerId); stopInteraction(); return; }
+            }
+        }
+
         if (AppState.draggingNode && AppState.activePointers.size <= 1) {
             if (Math.hypot(e.clientX-downPos.x, e.clientY-downPos.y) < 5) toggleNodeFullscreen(AppState.draggingNode);
         }
@@ -2088,7 +2342,7 @@ function initPointerSystem() {
             AppState.pointerStart = { x: r.x, y: r.y };
             AppState.panStart     = { x: AppState.pan.x, y: AppState.pan.y };
         }
-        if (AppState.activePointers.size < 2) AppState.initialPinchDist = null;
+        if (AppState.activePointers.size < 2) { AppState.initialPinchDist = null; pinchTargetNode = null; }
         stopInteraction();
     };
     window.addEventListener('pointerup',     onUp);
@@ -2394,7 +2648,12 @@ function toggleSidebar() {
     if (sb) sb.classList.toggle('open');
 }
 
-function toggleMin(id) { AppState.nodes.get(id)?.classList.toggle('minimized'); drawConnections(); }
+function toggleMin(id) {
+    const el = AppState.nodes.get(id);
+    if (!el) return;
+    el.classList.toggle('minimized');
+    drawConnections();
+}
 function escapeHTML(s) { if(!s)return''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function truncate(s, n) { return s.length>n ? s.slice(0,n-1)+'…' : s; }
 
