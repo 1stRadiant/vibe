@@ -317,7 +317,27 @@
     }
     #toast.show { opacity: 1; }
 
-    /* ─── Pin Button ────────────────────────────────────────── */
+    /* ─── Node Explanation Pane (Jarvis stream) ──────────────── */
+    .node-explain {
+        position: absolute; left: 0; right: 0;
+        top: 100%; margin-top: 6px;
+        background: rgba(6,10,22,0.97);
+        border: 1px solid rgba(255,0,255,0.25);
+        border-radius: 0 0 8px 8px;
+        padding: 8px 11px; min-height: 0; max-height: 120px;
+        overflow-y: auto; font-family: 'Fira Code', monospace;
+        font-size: 0.67rem; color: rgba(255,0,255,0.8); line-height: 1.55;
+        display: none; z-index: 1; pointer-events: auto;
+        scrollbar-width: thin; scrollbar-color: rgba(255,0,255,0.3) transparent;
+        white-space: pre-wrap; word-break: break-word;
+    }
+    .node-explain.active { display: block; }
+    .node-explain .explain-cursor {
+        display: inline-block; width: 6px; height: 0.85em;
+        background: rgba(255,0,255,0.7); vertical-align: middle;
+        animation: blink 0.7s step-end infinite; margin-left: 1px;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
     .node-pin-btn {
         width: 20px; height: 20px; border-radius: 50%;
         border: none; cursor: pointer; background: transparent;
@@ -1214,6 +1234,7 @@ function createVibeNode(treeNode, x, y) {
         ${errHtml}
         <div class="node-content">${contentHtml}</div>
         ${footerHtml}
+        <div class="node-explain" id="explain-${id}"></div>
     `;
 
     world.appendChild(el);
@@ -1846,24 +1867,53 @@ Return the JSON object now.`;
     } catch(e) { logToChat('system', '⚠ ' + e.message); console.error(e); }
 }
 
-/* ════════════════════════════════════════════════════════════════
-   JARVIS — Continuous Goal-Driven Agent
-   ════════════════════════════════════════════════════════════════
+/* Stream a narration string word-by-word into a node's explain pane.
+   Returns a promise that resolves when the full string is rendered. */
+async function streamToExplainPane(nodeId, text, msPerWord = 38) {
+    // Spawn the node if not open so the pane exists
+    if (!AppState.nodes.has(nodeId)) spawnNodeFromTree(nodeId);
+    const pane = document.getElementById(`explain-${nodeId}`);
+    if (!pane) return;
+
+    pane.classList.add('active');
+    pane.textContent = '';
+
+    const cursor = document.createElement('span');
+    cursor.className = 'explain-cursor';
+    pane.appendChild(cursor);
+
+    const words = text.split(' ');
+    for (const word of words) {
+        if (!Jarvis.running && !Jarvis._inBeat) break; // stopped mid-stream
+        const t = document.createTextNode(word + ' ');
+        pane.insertBefore(t, cursor);
+        pane.scrollTop = pane.scrollHeight;
+        await delay(msPerWord);
+    }
+    cursor.remove();
+}
+
+function clearExplainPane(nodeId) {
+    const pane = document.getElementById(`explain-${nodeId}`);
+    if (pane) { pane.textContent = ''; pane.classList.remove('active'); }
+}
+/* ==============================================================
    Jarvis runs on a heartbeat interval. Each beat it:
      1. Reviews its goal + memory of past actions
      2. Plans the next incremental edit
      3. Applies changes (nodes float to front, user can still pan)
      4. Logs to memory and chat
      5. Sleeps until next heartbeat
-   ════════════════════════════════════════════════════════════════ */
+   ============================================================== */
 const Jarvis = {
     running:        false,
     goal:           '',
-    heartbeatMs:    8000,   // default 8 seconds
+    heartbeatMs:    8000,
     beat:           0,
-    memory:         [],     // [ { beat, plan, nodeIds, summary } ]
+    memory:         [],
     _timeoutHandle: null,
-    _userPanning:   false,  // true when user grabbed canvas mid-run
+    _userPanning:   false,
+    _inBeat:        false,   // true only while _runBeat is executing
     _snapHintTimer: null,
 
     start(goal) {
@@ -1911,10 +1961,13 @@ const Jarvis = {
         this.setStatus(`Beat ${this.beat} · thinking…`);
 
         try {
+            this._inBeat = true;
             await this._runBeat();
         } catch(e) {
             logToChat('system', `⚠ Jarvis beat ${this.beat} error: ${e.message}`);
             console.error('Jarvis error:', e);
+        } finally {
+            this._inBeat = false;
         }
 
         if (this.running) {
@@ -1948,8 +2001,18 @@ Return ONLY valid JSON — no other text:
   "plan": "one-line description of what you will do THIS beat",
   "done": false,
   "actions": [
-    { "actionType": "update", "nodeId": "EXISTING_ID", "newCode": "complete updated code" },
-    { "actionType": "create", "parentId": "PARENT_ID", "newNode": { "id": "id", "type": "html|css|javascript|js-function|declaration|head", "description": "desc", "code": "complete code" } }
+    {
+      "actionType": "update",
+      "nodeId": "EXISTING_ID",
+      "newCode": "complete updated code",
+      "narration": "2-3 sentences explaining what you changed in this node and why, in plain English"
+    },
+    {
+      "actionType": "create",
+      "parentId": "PARENT_ID",
+      "newNode": { "id": "id", "type": "html|css|javascript|js-function|declaration|head", "description": "desc", "code": "complete code" },
+      "narration": "2-3 sentences explaining what this new node does and why you created it"
+    }
   ]
 }
 
@@ -1958,7 +2021,8 @@ RULES:
 1. FULL code for every node — never truncate or use ellipsis.
 2. Prefer updating existing nodes over creating new ones.
 3. HTML: body-level markup only. CSS: standalone. JS: standalone.
-4. Make progress each beat — never repeat the exact same change.`;
+4. Make progress each beat — never repeat the exact same change.
+5. narration field: plain English, conversational, 2-3 sentences max.`;
 
         const user = `VIBE TREE:
 ${JSON.stringify(context, null, 2)}
@@ -1982,25 +2046,26 @@ Return the JSON object now.`;
         const pushUpdates = [];
 
         for (const action of (plan.actions || [])) {
-            if (!this.running) break; // user stopped mid-beat
+            if (!this.running) break;
 
             if (action.actionType === 'update') {
                 const domNode  = AppState.nodes.get(action.nodeId);
                 const treeNode = findNodeInTree(action.nodeId);
                 if (!treeNode) continue;
 
-                // Float node to front visually
                 if (domNode) {
                     bringToFront(domNode);
                     domNode.classList.add('ai-updating');
-                    // Show snap hint if user hasn't panned yet this beat
                     if (!this._userPanning) this.showSnapHint();
                 }
-
-                // If user is panning, skip the centerOnNode camera move
                 if (!this._userPanning) centerOnNode(action.nodeId, 350);
 
-                await delay(400);
+                // Stream the narration — fully completed before applying code
+                if (action.narration) {
+                    await streamToExplainPane(action.nodeId, action.narration, 32);
+                } else {
+                    await delay(400);
+                }
 
                 treeNode.code = action.newCode;
                 const editor = document.getElementById(`ed-${action.nodeId}`);
@@ -2009,7 +2074,6 @@ Return the JSON object now.`;
                 updateDirtyDot(action.nodeId);
                 pushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
                 changedIds.push(action.nodeId);
-                trackerLog('ai', action.nodeId, `Jarvis B${this.beat} · ${plan.plan.slice(0,50)}`);
 
                 await delay(300);
                 if (domNode) domNode.classList.remove('ai-updating');
@@ -2023,15 +2087,18 @@ Return the JSON object now.`;
                 const cx = (-AppState.pan.x + window.innerWidth / 2) / AppState.scale - 180;
                 const cy = (-AppState.pan.y + (window.innerHeight - 120) / 2) / AppState.scale - 130;
                 const newEl = createVibeNode(newNode, cx + Math.random() * 100, cy);
-                if (newEl) {
-                    bringToFront(newEl);
-                    newEl.classList.add('ai-updating');
-                }
+                if (newEl) { bringToFront(newEl); newEl.classList.add('ai-updating'); }
                 buildConnections(); drawConnections();
                 if (!this._userPanning) centerOnNode(newNode.id, 350);
                 changedIds.push(newNode.id);
-                trackerLog('create', newNode.id, `Jarvis B${this.beat} created ${newNode.type}`);
-                await delay(500);
+
+                // Stream narration for the new node
+                if (action.narration) {
+                    await streamToExplainPane(newNode.id, action.narration, 32);
+                } else {
+                    await delay(500);
+                }
+
                 if (newEl) newEl.classList.remove('ai-updating');
                 pushUpdates.push({ nodeId: newNode.id, newCode: newNode.code, isNew: true, newNode });
             }
@@ -2364,10 +2431,12 @@ function startPhysicsLoop() {
    ════════════════════════════════════════════════════════════════ */
 function initPointerSystem() {
     let downPos = { x: 0, y: 0 };
-    // Track which node (if any) both fingers are over when the pinch starts
-    let pinchTargetNode = null;
-    let pinchStartDist  = null;
-    const PINCH_THRESHOLD = 60; // px delta to trigger gesture
+    let pinchTargetNode  = null;
+    let pinchStartDist   = null;
+    let pinchMaxDelta    = 0;   // max absolute delta seen during this pinch
+    let pinchMovedWhileZooming = false; // true if fingers moved a lot mid-pinch (= zoom intent)
+    const GESTURE_THRESHOLD = 120;  // px — much higher than zoom micro-movements
+    const ZOOM_CANCEL_DIST  = 40;   // if fingers moved this much in both axes it's a zoom, not a gesture
 
     viewport.addEventListener('pointerdown', e => {
         downPos = { x: e.clientX, y: e.clientY };
@@ -2376,15 +2445,17 @@ function initPointerSystem() {
         if (AppState.activePointers.size === 2) {
             if (AppState.fullscreenNode) toggleNodeFullscreen(AppState.fullscreenNode);
             const pts = Array.from(AppState.activePointers.values());
-            AppState.initialPinchDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-            pinchStartDist            = AppState.initialPinchDist;
+            const d = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+            AppState.initialPinchDist = d;
+            pinchStartDist = d;
+            pinchMaxDelta  = 0;
+            pinchMovedWhileZooming = false;
             AppState.initialScale = AppState.scale;
             AppState.initialPan  = { x: AppState.pan.x, y: AppState.pan.y };
             AppState.pinchCenter = { x: (pts[0].x+pts[1].x)/2, y: (pts[0].y+pts[1].y)/2 };
 
-            // Detect which node (if any) both fingers are touching
+            // Detect which node (if any) the pinch midpoint is over
             const midX = AppState.pinchCenter.x, midY = AppState.pinchCenter.y;
-            // Convert screen mid-point to world coords
             const wx = (midX - AppState.pan.x) / AppState.scale;
             const wy = (midY - AppState.pan.y) / AppState.scale;
             pinchTargetNode = null;
@@ -2397,7 +2468,7 @@ function initPointerSystem() {
             });
             return;
         }
-        if (e.target.closest('input,textarea,button,select,.code-editor,.settings-panel,.console-output,.chat-output')) return;
+        if (e.target.closest('input,textarea,button,select,.code-editor,.settings-panel,.console-output,.chat-output,.node-explain')) return;
         e.preventDefault();
 
         const header = e.target.closest('.node-header');
@@ -2413,6 +2484,10 @@ function initPointerSystem() {
             e.preventDefault();
             const pts = Array.from(AppState.activePointers.values());
             const d   = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+            const delta = Math.abs(d - pinchStartDist);
+            if (delta > pinchMaxDelta) pinchMaxDelta = delta;
+            // If fingers travel a significant distance mid-pinch in both axes, treat as zoom
+            if (delta > ZOOM_CANCEL_DIST && delta < GESTURE_THRESHOLD) pinchMovedWhileZooming = true;
             const ns  = Math.max(0.1, Math.min(AppState.initialScale*(d/AppState.initialPinchDist), 3.0));
             AppState.scale = ns;
             AppState.pan.x = AppState.pinchCenter.x-(AppState.pinchCenter.x-AppState.initialPan.x)*(ns/AppState.initialScale);
@@ -2424,33 +2499,32 @@ function initPointerSystem() {
     });
 
     const onUp = e => {
-        const pts = Array.from(AppState.activePointers.values());
-
         // ── Pinch-gesture detection on pointer-up ───────────────
         if (AppState.activePointers.size === 2 && pinchStartDist !== null) {
             const currentPts = Array.from(AppState.activePointers.values());
             const endDist = Math.hypot(currentPts[0].x-currentPts[1].x, currentPts[0].y-currentPts[1].y);
             const delta   = endDist - pinchStartDist;
 
-            if (Math.abs(delta) > PINCH_THRESHOLD) {
-                const isExpand  = delta > 0;  // fingers spread apart
-                const isCollapse = delta < 0; // fingers pinched together
+            // Only fire gesture if:
+            // 1. Net delta is large (clear intent, not just a zoom micro-movement)
+            // 2. The pinch was NOT a gradual zoom (pinchMovedWhileZooming = false means it snapped quickly)
+            const isCleanGesture = Math.abs(delta) > GESTURE_THRESHOLD && !pinchMovedWhileZooming;
+
+            if (isCleanGesture) {
+                const isExpand   = delta > 0;
+                const isCollapse = delta < 0;
 
                 if (isExpand) {
-                    if (pinchTargetNode === 'preview' || overviewMode === false && !pinchTargetNode) {
-                        // Pinch-out on preview OR empty canvas → enter overview
+                    if (pinchTargetNode === 'preview' || (!overviewMode && !pinchTargetNode)) {
                         enterOverviewMode();
                     } else if (pinchTargetNode) {
-                        // Pinch-out on a non-preview node → show its children
                         const el = AppState.nodes.get(pinchTargetNode);
                         if (el) showChildrenOverlay(pinchTargetNode, el);
                     }
                 } else if (isCollapse) {
                     if (overviewMode) {
-                        // Pinch-in while in overview → exit overview
                         exitOverviewMode();
                     } else if (pinchTargetNode) {
-                        // Pinch-in on a node → minimise it
                         const el = AppState.nodes.get(pinchTargetNode);
                         if (el) {
                             el.classList.add('minimized');
@@ -2459,15 +2533,14 @@ function initPointerSystem() {
                         }
                     }
                 }
-                // Consumed as gesture — don't fall through to tap
                 AppState.activePointers.delete(e.pointerId);
-                if (AppState.activePointers.size < 2) { AppState.initialPinchDist = null; pinchTargetNode = null; }
+                if (AppState.activePointers.size < 2) { AppState.initialPinchDist = null; pinchTargetNode = null; pinchStartDist = null; pinchMaxDelta = 0; pinchMovedWhileZooming = false; }
                 stopInteraction();
                 return;
             }
         }
+
         // ── In overview: single tap on a node chip opens it ─────
-        // We detect this by checking if pointer barely moved (tap vs drag)
         if (overviewMode) {
             const didMove = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) < 12;
             if (didMove) {
@@ -2493,7 +2566,10 @@ function initPointerSystem() {
             AppState.pointerStart = { x: r.x, y: r.y };
             AppState.panStart     = { x: AppState.pan.x, y: AppState.pan.y };
         }
-        if (AppState.activePointers.size < 2) { AppState.initialPinchDist = null; pinchTargetNode = null; }
+        if (AppState.activePointers.size < 2) {
+            AppState.initialPinchDist = null; pinchTargetNode = null;
+            pinchStartDist = null; pinchMaxDelta = 0; pinchMovedWhileZooming = false;
+        }
         stopInteraction();
     };
     window.addEventListener('pointerup',     onUp);
@@ -2532,7 +2608,17 @@ function updateWorldTransform() {
 }
 function startNodeDrag(e, nodeEl) { if (AppState.activePointers.size>1) return; AppState.draggingNode=nodeEl; bringToFront(nodeEl); AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.nodeStart={x:parseFloat(nodeEl.style.left)||0,y:parseFloat(nodeEl.style.top)||0}; nodeEl.classList.add('dragging'); }
 function dragNode(e) { if(!AppState.draggingNode||AppState.activePointers.size>1) return; AppState.draggingNode.style.left=`${AppState.nodeStart.x+(e.clientX-AppState.pointerStart.x)/AppState.scale}px`; AppState.draggingNode.style.top=`${AppState.nodeStart.y+(e.clientY-AppState.pointerStart.y)/AppState.scale}px`; requestAnimationFrame(drawConnections); }
-function startWorldPan(e) { AppState.isPanning=true; viewport.style.cursor='grabbing'; AppState.pointerStart={x:e.clientX,y:e.clientY}; AppState.panStart={x:AppState.pan.x,y:AppState.pan.y}; if(Jarvis.running){ Jarvis._userPanning=true; Jarvis.showSnapHint(); } }
+function startWorldPan(e) {
+    AppState.isPanning = true;
+    viewport.style.cursor = 'grabbing';
+    AppState.pointerStart = { x: e.clientX, y: e.clientY };
+    AppState.panStart     = { x: AppState.pan.x, y: AppState.pan.y };
+    // Only suppress Jarvis camera if it's mid-beat (actively animating nodes)
+    if (Jarvis.running && Jarvis._inBeat) {
+        Jarvis._userPanning = true;
+        Jarvis.showSnapHint();
+    }
+}
 function panWorld(e) { if(!AppState.isPanning||AppState.activePointers.size>1) return; AppState.pan.x=AppState.panStart.x+(e.clientX-AppState.pointerStart.x); AppState.pan.y=AppState.panStart.y+(e.clientY-AppState.pointerStart.y); if(animationFrameId)cancelAnimationFrame(animationFrameId); updateWorldTransform(); }
 function stopInteraction() { if(AppState.draggingNode){AppState.draggingNode.classList.remove('dragging');AppState.draggingNode=null;} if(AppState.isPanning){AppState.isPanning=false;viewport.style.cursor='grab';} }
 function bringToFront(node) { AppState.zIndexCounter++; node.style.zIndex=AppState.zIndexCounter; }
