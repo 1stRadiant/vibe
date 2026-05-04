@@ -2375,47 +2375,67 @@ const _pendingImages = { agent: [], chat: [] };
  * created from the iframe's srcdoc / src content rendered on a canvas
  * via a foreign-object SVG trick (works same-origin or srcdoc iframes).
  */
+/**
+ * Capture the live preview iframe as a PNG dataURL.
+ *
+ * Strategy order:
+ *  1. Load html2canvas in the PARENT window, run it against iframe.contentDocument.body
+ *     (same-origin doc.write iframe — most reliable)
+ *  2. SVG foreignObject trick — serialise the iframe HTML into a blob, draw on canvas
+ *  3. Blank placeholder canvas so the button never hard-fails
+ */
 async function capturePreviewScreenshot() {
     const iframe = document.getElementById('website-preview');
     if (!iframe) throw new Error('Preview iframe not found.');
 
-    // Strategy 1: inject html2canvas into the iframe and capture
+    // ── Strategy 1: html2canvas loaded in the PARENT, aimed at iframe body ──
     try {
-        const iDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iDoc || !iDoc.body) throw new Error('iframe not accessible');
+        const iWin = iframe.contentWindow;
+        const iDoc = iframe.contentDocument || iWin?.document;
+        if (!iDoc || !iDoc.body) throw new Error('iframe document not accessible');
 
-        // Inject html2canvas on demand — wrap onerror so we reject with a real Error
-        await new Promise((resolve, reject) => {
-            if (iframe.contentWindow.html2canvas) { resolve(); return; }
-            const s = iDoc.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-            s.onload = resolve;
-            s.onerror = (ev) => reject(new Error('html2canvas script failed to load: ' + (ev && ev.type)));
-            iDoc.head.appendChild(s);
-        });
+        // Load html2canvas into the parent window (not the iframe)
+        await _ensureHtml2Canvas();
 
-        const canvas = await iframe.contentWindow.html2canvas(iDoc.body, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 0.75,
-            logging: false,
+        const canvas = await window.html2canvas(iDoc.body, {
+            useCORS:         true,
+            allowTaint:      true,
+            scale:           Math.min(window.devicePixelRatio || 1, 2) * 0.6,
+            logging:         false,
             backgroundColor: '#ffffff',
+            windowWidth:     iDoc.documentElement.scrollWidth,
+            windowHeight:    iDoc.documentElement.scrollHeight,
+            scrollX:         0,
+            scrollY:         0,
+            x:               0,
+            y:               0,
         });
         return canvas.toDataURL('image/png');
     } catch (e) {
-        console.warn('html2canvas strategy failed, trying SVG foreignObject fallback:', e.message || e);
+        console.warn('[Screenshot] html2canvas in parent failed:', e.message || e);
     }
 
-    // Strategy 2: SVG foreignObject trick (works for srcdoc / same-origin iframes)
+    // ── Strategy 2: SVG foreignObject ──
     try {
         return await _svgScreenshotFallback(iframe);
     } catch (e) {
-        console.warn('SVG fallback failed, trying blank canvas placeholder:', e.message || e);
+        console.warn('[Screenshot] SVG fallback failed:', e.message || e);
     }
 
-    // Strategy 3: last-resort — return a solid-colour placeholder canvas
-    //   so the user at least gets something attached rather than an error
+    // ── Strategy 3: Placeholder so the user gets something ──
     return _blankCanvasFallback(iframe);
+}
+
+/** Ensure html2canvas is available in the parent window */
+function _ensureHtml2Canvas() {
+    if (window.html2canvas) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload  = resolve;
+        s.onerror = () => reject(new Error('Failed to load html2canvas in parent'));
+        document.head.appendChild(s);
+    });
 }
 
 async function _svgScreenshotFallback(iframe) {
@@ -2452,7 +2472,7 @@ async function _svgScreenshotFallback(iframe) {
         };
         img.onerror = (ev) => {
             URL.revokeObjectURL(url);
-            reject(new Error('SVG image load failed (likely cross-origin content). Event: ' + (ev && ev.type)));
+            reject(new Error('SVG image load failed. Event: ' + (ev && ev.type)));
         };
         img.src = url;
     });
@@ -9169,4 +9189,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+}
