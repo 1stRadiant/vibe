@@ -2379,34 +2379,43 @@ async function capturePreviewScreenshot() {
     const iframe = document.getElementById('website-preview');
     if (!iframe) throw new Error('Preview iframe not found.');
 
-    // Try html2canvas inside the iframe's document (same-origin / srcdoc)
+    // Strategy 1: inject html2canvas into the iframe and capture
     try {
         const iDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iDoc || !iDoc.body) throw new Error('iframe not ready');
+        if (!iDoc || !iDoc.body) throw new Error('iframe not accessible');
 
-        // Inject html2canvas on demand
+        // Inject html2canvas on demand — wrap onerror so we reject with a real Error
         await new Promise((resolve, reject) => {
             if (iframe.contentWindow.html2canvas) { resolve(); return; }
             const s = iDoc.createElement('script');
             s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
             s.onload = resolve;
-            s.onerror = reject;
+            s.onerror = (ev) => reject(new Error('html2canvas script failed to load: ' + (ev && ev.type)));
             iDoc.head.appendChild(s);
         });
 
         const canvas = await iframe.contentWindow.html2canvas(iDoc.body, {
             useCORS: true,
             allowTaint: true,
-            scale: 0.75,          // half resolution for smaller payload
+            scale: 0.75,
             logging: false,
+            backgroundColor: '#ffffff',
         });
         return canvas.toDataURL('image/png');
     } catch (e) {
-        // Fallback: render the full generated HTML onto an offscreen canvas
-        // via a SVG foreignObject (only works when not cross-origin)
-        console.warn('html2canvas failed, using SVG fallback:', e.message);
-        return await _svgScreenshotFallback(iframe);
+        console.warn('html2canvas strategy failed, trying SVG foreignObject fallback:', e.message || e);
     }
+
+    // Strategy 2: SVG foreignObject trick (works for srcdoc / same-origin iframes)
+    try {
+        return await _svgScreenshotFallback(iframe);
+    } catch (e) {
+        console.warn('SVG fallback failed, trying blank canvas placeholder:', e.message || e);
+    }
+
+    // Strategy 3: last-resort — return a solid-colour placeholder canvas
+    //   so the user at least gets something attached rather than an error
+    return _blankCanvasFallback(iframe);
 }
 
 async function _svgScreenshotFallback(iframe) {
@@ -2429,16 +2438,43 @@ async function _svgScreenshotFallback(iframe) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width  = W;
-            canvas.height = H;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-            resolve(canvas.toDataURL('image/png'));
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width  = W;
+                canvas.height = H;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                resolve(canvas.toDataURL('image/png'));
+            } catch(drawErr) {
+                URL.revokeObjectURL(url);
+                reject(new Error('Canvas draw failed: ' + drawErr.message));
+            }
         };
-        img.onerror = reject;
+        img.onerror = (ev) => {
+            URL.revokeObjectURL(url);
+            reject(new Error('SVG image load failed (likely cross-origin content). Event: ' + (ev && ev.type)));
+        };
         img.src = url;
     });
+}
+
+function _blankCanvasFallback(iframe) {
+    const W = (iframe && iframe.offsetWidth)  || 800;
+    const H = (iframe && iframe.offsetHeight) || 600;
+    const canvas = document.createElement('canvas');
+    canvas.width  = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(135,206,235,0.6)';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('[ Preview Screenshot ]', W / 2, H / 2 - 10);
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = 'rgba(135,206,235,0.35)';
+    ctx.fillText('Attach your own image below if needed', W / 2, H / 2 + 18);
+    return canvas.toDataURL('image/png');
 }
 
 /** Add a dataURL image to the pending queue for a given context (agent | chat) */
@@ -9133,4 +9169,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                                                                                                                                                                                                                                                           }
+  }
