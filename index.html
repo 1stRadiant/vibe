@@ -3079,11 +3079,12 @@ document.addEventListener('DOMContentLoaded', function() {
 /* ── Project Search (Home tab) ── */
 function filterProjectList(query) {
   var q = (query || '').trim().toLowerCase();
-  var items = document.querySelectorAll('#project-list .project-item');
+  // Items are rendered with class 'project-list-item' by app3.js
+  var items = document.querySelectorAll('#project-list .project-list-item');
   var visible = 0;
   items.forEach(function(item) {
-    var text = item.textContent.toLowerCase();
-    var match = !q || text.includes(q);
+    var text = (item.querySelector('.project-id-text') || item).textContent.toLowerCase();
+    var match = !q || _fuzzyMatch(q, text);
     item.style.display = match ? '' : 'none';
     if (match) visible++;
   });
@@ -3093,7 +3094,16 @@ function filterProjectList(query) {
   if (emptyMsg && q) emptyMsg.style.display = 'none';
 }
 
-// Re-run filter after project list re-renders (patch: observe DOM changes)
+/** Simple fuzzy match: every char in needle must appear in order in haystack */
+function _fuzzyMatch(needle, haystack) {
+  var ni = 0;
+  for (var hi = 0; hi < haystack.length && ni < needle.length; hi++) {
+    if (haystack[hi] === needle[ni]) ni++;
+  }
+  return ni === needle.length;
+}
+
+// Re-run filter after project list re-renders (observe DOM mutations)
 (function() {
   var list = document.getElementById('project-list');
   if (!list) return;
@@ -3306,4 +3316,4 @@ document.addEventListener('dragover', function(e) {
 </script>
 
 </body>
-                                    </html>
+    </html>
