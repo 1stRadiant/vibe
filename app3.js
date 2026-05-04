@@ -8414,6 +8414,11 @@ window.vibeAPI = {
     handleQuickReply: handleQuickReply
 };
 
+// Expose vision/image functions globally so inline onclick handlers work
+window.screenshotAndEdit = screenshotAndEdit;
+window.handleImageFileInput = handleImageFileInput;
+window.addPendingImage = addPendingImage;
+
 console.log("Vibe Automation API exposed as window.vibeAPI");
 
 
@@ -9128,4 +9133,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+                                                                                                                                                                                                                                                           }
