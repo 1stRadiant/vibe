@@ -3548,22 +3548,48 @@ var _annSnapshot = null;   // ImageData snapshot before current stroke
 })();
 
 function annotateOpenForContext(ctx) {
-  // If there's a pending image, use it; otherwise take a screenshot first
   _annContext = ctx || 'agent';
-  var pend = window._pendingImages && window._pendingImages[_annContext];
-  if (pend && pend.length > 0) {
+
+  // Check for existing pending image first (use the last one)
+  var pend = (window._pendingImages && window._pendingImages[_annContext]) || [];
+  if (pend.length > 0) {
     _annotateOpen(pend[pend.length - 1], false);
+    return;
+  }
+
+  // No pending image — auto-take a screenshot of the preview
+  var captureFn = window.capturePreviewScreenshot || (typeof capturePreviewScreenshot === 'function' ? capturePreviewScreenshot : null);
+  if (captureFn) {
+    _jarvisAppendLog && _jarvisAppendLog('Taking screenshot for annotate…');
+    var btn = document.querySelector('[onclick*="annotateOpenForContext"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+    captureFn().then(function(dataURL) {
+      if (btn) { btn.disabled = false; btn.textContent = '✏️ Annotate'; }
+      _annotateOpen(dataURL, true);
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = '✏️ Annotate'; }
+      // Open annotate with a blank canvas so user can still draw
+      var blankCanvas = document.createElement('canvas');
+      blankCanvas.width = 900; blankCanvas.height = 600;
+      var bc = blankCanvas.getContext('2d');
+      bc.fillStyle = '#1a1a2e';
+      bc.fillRect(0, 0, 900, 600);
+      bc.fillStyle = 'rgba(135,206,235,0.4)';
+      bc.font = '18px sans-serif';
+      bc.textAlign = 'center';
+      bc.fillText('No preview available — draw your annotation here', 450, 300);
+      _annotateOpen(blankCanvas.toDataURL('image/png'), true);
+    });
   } else {
-    // Take screenshot then open
-    if (typeof capturePreviewScreenshot === 'function') {
-      capturePreviewScreenshot().then(function(dataURL) {
-        _annotateOpen(dataURL, true);
-      }).catch(function() {
-        alert('No image attached yet. Please take a screenshot or attach an image first.');
-      });
-    } else {
-      alert('No image attached yet. Please attach an image first.');
-    }
+    // app3.js not fully loaded yet — open blank canvas
+    var blankCanvas = document.createElement('canvas');
+    blankCanvas.width = 900; blankCanvas.height = 600;
+    var bc = blankCanvas.getContext('2d');
+    bc.fillStyle = '#1a1a2e'; bc.fillRect(0, 0, 900, 600);
+    bc.fillStyle = 'rgba(135,206,235,0.4)';
+    bc.font = '16px sans-serif'; bc.textAlign = 'center';
+    bc.fillText('Attach an image first, then click Annotate to draw on it', 450, 300);
+    _annotateOpen(blankCanvas.toDataURL('image/png'), true);
   }
 }
 
@@ -3857,81 +3883,6 @@ function _jarvisAppendLogRaw(html) {
   log.scrollTop = log.scrollHeight;
 }
 
-// The set of actions Jarvis can perform
-var JARVIS_ACTIONS = {
-  switchTab: function(args) {
-    var tab = args.tab;
-    if (typeof switchToTab === 'function') switchToTab(tab);
-    else if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(tab);
-    return 'Switched to tab: ' + tab;
-  },
-  switchAgentTab: function(args) {
-    var btn = document.querySelector('.agt-itab[onclick*="' + args.tab + '"]');
-    agtSwitchTab(args.tab, btn);
-    return 'Switched agent inner tab to: ' + args.tab;
-  },
-  setAgentPrompt: function(args) {
-    var el = document.getElementById('agent-prompt-input');
-    if (el) el.value = args.text || '';
-    return 'Set agent prompt: ' + (args.text || '').slice(0, 60);
-  },
-  clickAddTask: function() {
-    var btn = document.getElementById('run-agent-single-task-button');
-    if (btn) btn.click();
-    return 'Clicked Add Task';
-  },
-  clickProcessQueue: function() {
-    var btn = document.getElementById('start-iterative-session-button');
-    if (btn) btn.click();
-    return 'Clicked Process Queue';
-  },
-  clickStopQueue: function() {
-    var btn = document.getElementById('end-session-button');
-    if (btn && btn.style.display !== 'none') btn.click();
-    return 'Clicked Stop Queue';
-  },
-  setSessionIntent: function(args) {
-    ancEditIntent();
-    var inp = document.getElementById('anc-intent-input');
-    if (inp) inp.value = args.intent || '';
-    ancSaveIntent();
-    return 'Set session intent: ' + (args.intent || '').slice(0, 80);
-  },
-  takeScreenshot: function() {
-    if (typeof screenshotAndEdit === 'function') screenshotAndEdit('agent');
-    else if (window.screenshotAndEdit) window.screenshotAndEdit('agent');
-    return 'Triggered screenshot';
-  },
-  newTrackerThread: function(args) {
-    _ttLoad();
-    var id = 'tt_' + Date.now();
-    _ttDB[id] = { id: id, name: args.name || 'Jarvis Thread', edits: [], created: Date.now() };
-    _ttSave();
-    ttRenderThreadList();
-    ttOpenThread(id);
-    return 'Created tracker thread: ' + args.name;
-  },
-  logTrackerEdit: function(args) {
-    ttAddEdit(args.status || 'pending');
-    return 'Logged edit: ' + (args.text || '');
-  },
-  wait: function(args) {
-    return new Promise(function(res) {
-      setTimeout(function() { res('Waited ' + (args.ms || 500) + 'ms'); }, args.ms || 500);
-    });
-  },
-  readPageState: function() {
-    var activeTab = (document.querySelector('.tab-button.active') || {}).textContent || 'unknown';
-    var agentLog  = (document.getElementById('agent-output') || {}).innerText || '';
-    var intent    = (document.getElementById('anc-intent-text') || {}).textContent || '';
-    return JSON.stringify({
-      activeTab: activeTab.trim(),
-      agentLogSnippet: agentLog.slice(-400),
-      sessionIntent: intent.trim(),
-    });
-  },
-};
-
 async function jarvisRun() {
   jarvisLoadSettings();
   var apiKey   = (document.getElementById('jarvis-api-key')  || {}).value || '';
@@ -3948,104 +3899,210 @@ async function jarvisRun() {
 
   _jarvisAppendLog('🤖 Goal: ' + goal, '#c678dd');
 
-  var systemPrompt = `You are Jarvis, an AI autopilot that controls a web IDE called Vibe Editor.
-You execute a goal step-by-step by emitting JSON action objects. Each response must be exactly ONE JSON object.
+  // ── Ultra-simple prompt for tiny models ──
+  // Output format: exactly two lines — THINK: ... and DO: ACTION arg
+  // No JSON, no markdown, no nesting.
+  var actionMenu = [
+    'switchTab <tab>         — tabs: start agent preview code context chat',
+    'agentTab <tab>          — tabs: run session tracker jarvis',
+    'setPrompt <text>        — type text into agent prompt box',
+    'addTask                 — click Add Task button',
+    'processQueue            — click Process Queue button',
+    'stopQueue               — click Stop Queue button',
+    'setIntent <text>        — set session intent/goal text',
+    'screenshot              — capture preview screenshot',
+    'newThread <name>        — create tracker thread with name',
+    'logEdit <text>          — log a pending edit in current thread',
+    'logWorked <text>        — log an edit that worked',
+    'logFailed <text>        — log an edit that failed',
+    'readState               — read current UI state',
+    'wait                    — pause briefly',
+    'done <summary>          — finish and summarise what was done',
+  ].join('\n');
 
-Available actions:
-- {"action":"switchTab","tab":"start"|"agent"|"preview"|"code"|"context"|"chat"} — switch main tab
-- {"action":"switchAgentTab","tab":"run"|"session"|"tracker"|"jarvis"} — switch agent inner tab
-- {"action":"setAgentPrompt","text":"..."} — type into the agent prompt box
-- {"action":"clickAddTask"} — click Add Task button
-- {"action":"clickProcessQueue"} — click Process Queue button
-- {"action":"clickStopQueue"} — click Stop Queue button
-- {"action":"setSessionIntent","intent":"..."} — set the session goal/intent
-- {"action":"takeScreenshot"} — capture the preview screenshot
-- {"action":"newTrackerThread","name":"..."} — create a new tracker thread
-- {"action":"logTrackerEdit","text":"...","status":"pending"|"worked"|"failed"} — log an edit
-- {"action":"readPageState"} — read current UI state (returns JSON)
-- {"action":"wait","ms":500} — pause briefly
-- {"action":"done","summary":"..."} — signal completion with a summary
+  var systemPrompt = [
+    'You are Jarvis, an AI that controls a web IDE by issuing one action per turn.',
+    'RULES:',
+    '1. Reply with EXACTLY two lines. No more, no less.',
+    '2. Line 1: THINK: <one sentence of reasoning>',
+    '3. Line 2: DO: <action> <optional arg>',
+    '4. Never use JSON, markdown, or bullet points.',
+    '5. The arg for DO is everything after the action name on that line.',
+    '',
+    'ACTIONS:',
+    actionMenu,
+    '',
+    'EXAMPLES:',
+    'THINK: I need to switch to the agent tab first.',
+    'DO: switchTab agent',
+    '',
+    'THINK: Now I will type the task into the prompt box.',
+    'DO: setPrompt Fix the navigation bar layout',
+    '',
+    'THINK: Task is queued, I am done.',
+    'DO: done Switched to agent tab and queued fix-nav task',
+  ].join('\n');
 
-Rules:
-- Output ONLY the raw JSON object, no markdown, no explanation.
-- After readPageState you will receive the state in the next user message prefixed with STATE:.
-- Be efficient. Complete the goal in as few steps as possible.
-- Always end with {"action":"done","summary":"..."}.
-`;
-
-  var messages = [{ role: 'user', parts: [{ text: 'Goal: ' + goal }] }];
+  var messages = [
+    { role: 'user', parts: [{ text: 'Goal: ' + goal }] }
+  ];
   var steps = 0;
 
   while (steps < maxSteps && !_jarvisStopped) {
     steps++;
-    _jarvisAppendLog('⏳ Step ' + steps + '…', '#5c6370');
 
     var body = JSON.stringify({
       contents: messages,
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 80,  // force brevity
+        topP: 0.8,
+      },
     });
 
-    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
+    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/'
+      + encodeURIComponent(model) + ':generateContent?key=' + apiKey;
 
     var resp, data, rawText;
     try {
       resp = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
       data = await resp.json();
-      rawText = ((data.candidates || [])[0] || {}).content?.parts?.[0]?.text || '';
-      if (!rawText) throw new Error(JSON.stringify(data));
+      rawText = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
+      if (!rawText && data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     } catch(e) {
-      _jarvisAppendLog('❌ API error: ' + (e.message || e), '#e06c75');
+      _jarvisAppendLog('❌ API error: ' + (e.message || String(e)), '#e06c75');
       break;
     }
 
-    // Parse the action
-    var actionObj;
-    try {
-      var clean = rawText.trim().replace(/^```json\s*/i,'').replace(/```$/,'').trim();
-      actionObj = JSON.parse(clean);
-    } catch(e) {
-      _jarvisAppendLog('⚠ Could not parse action: ' + rawText.slice(0, 120), '#e5c07b');
+    // Parse THINK + DO lines — be lenient about format
+    var thinkLine = '', doLine = '';
+    var lines = rawText.trim().split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    lines.forEach(function(l) {
+      if (!thinkLine && /^think[:\s]/i.test(l)) thinkLine = l.replace(/^think[:\s]*/i, '').trim();
+      if (!doLine   && /^do[:\s]/i.test(l))    doLine    = l.replace(/^do[:\s]*/i,    '').trim();
+    });
+    // Fallback: if model ignored format, treat entire output as a DO line
+    if (!doLine && lines.length > 0) doLine = lines[lines.length - 1];
+
+    if (thinkLine) _jarvisAppendLog('💭 ' + thinkLine, '#5c6370');
+
+    if (!doLine) {
+      _jarvisAppendLog('⚠ No DO line found in response, stopping.', '#e5c07b');
       break;
     }
 
-    if (actionObj.action === 'done') {
-      _jarvisAppendLog('✅ Done: ' + (actionObj.summary || ''), '#98c379');
+    // Split action from arg
+    var parts  = doLine.split(/\s+/);
+    var action = (parts[0] || '').toLowerCase();
+    var arg    = parts.slice(1).join(' ').trim();
+
+    if (action === 'done') {
+      _jarvisAppendLog('✅ Done: ' + (arg || 'Task complete'), '#98c379');
       break;
     }
 
-    // Execute action
-    var fn = JARVIS_ACTIONS[actionObj.action];
-    var result = '';
-    if (fn) {
-      try {
-        var r = fn(actionObj);
-        result = (r instanceof Promise) ? await r : r;
-        _jarvisAppendLogRaw('<span style="color:#61afef">▶ ' + _esc(actionObj.action) + '</span> <span style="color:#5c6370">→ ' + _esc(String(result).slice(0, 120)) + '</span>');
-      } catch(e) {
-        result = 'Error: ' + e.message;
-        _jarvisAppendLog('⚠ ' + result, '#e06c75');
-      }
-    } else {
-      result = 'Unknown action: ' + actionObj.action;
-      _jarvisAppendLog('⚠ ' + result, '#e5c07b');
-    }
+    // Execute
+    var result = _jarvisExecAction(action, arg);
+    if (result instanceof Promise) result = await result;
 
-    // Feed result back as next turn
+    _jarvisAppendLogRaw(
+      '<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
+      + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0, 60)) + '</span>' : '')
+      + ' <span style="color:#5c6370">→ ' + _esc(String(result || 'ok').slice(0, 100)) + '</span>'
+    );
+
+    // Feed result back
     messages.push({ role: 'model', parts: [{ text: rawText }] });
-    messages.push({ role: 'user',  parts: [{ text: (actionObj.action === 'readPageState' ? 'STATE: ' : 'RESULT: ') + result }] });
+    var feedback = action === 'readState'
+      ? 'STATE: ' + result
+      : 'OK: ' + String(result || 'done').slice(0, 120);
+    messages.push({ role: 'user', parts: [{ text: feedback }] });
 
-    // Small pause between steps
-    await new Promise(function(r) { setTimeout(r, 300); });
+    // Keep conversation short for small models — drop early turns
+    if (messages.length > 14) messages.splice(1, 2);
+
+    await new Promise(function(r) { setTimeout(r, 250); });
   }
 
   if (steps >= maxSteps && !_jarvisStopped) {
-    _jarvisAppendLog('⏹ Max steps reached (' + maxSteps + ').', '#e5c07b');
+    _jarvisAppendLog('⏹ Max steps (' + maxSteps + ') reached.', '#e5c07b');
   }
 
   document.getElementById('jarvis-run-btn').style.display = '';
   document.getElementById('jarvis-stop-btn').style.display = 'none';
   _jarvisStopped = false;
+}
+
+function _jarvisExecAction(action, arg) {
+  switch (action) {
+    case 'switchtab':
+    case 'switchtab': {
+      var tab = arg.trim().split(/\s+/)[0];
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(tab);
+      else if (typeof switchToTab === 'function') switchToTab(tab);
+      return 'switched to ' + tab;
+    }
+    case 'agenttab': {
+      var t = arg.trim().split(/\s+/)[0];
+      var btn = document.querySelector('.agt-itab[onclick*="' + t + '"]');
+      agtSwitchTab(t, btn);
+      return 'agent tab: ' + t;
+    }
+    case 'setprompt': {
+      var el = document.getElementById('agent-prompt-input');
+      if (el) { el.value = arg; el.dispatchEvent(new Event('input')); }
+      return 'prompt set';
+    }
+    case 'addtask': {
+      var b = document.getElementById('run-agent-single-task-button');
+      if (b) b.click();
+      return 'add task clicked';
+    }
+    case 'processqueue': {
+      var b = document.getElementById('start-iterative-session-button');
+      if (b) b.click();
+      return 'process queue clicked';
+    }
+    case 'stopqueue': {
+      var b = document.getElementById('end-session-button');
+      if (b && b.style.display !== 'none') b.click();
+      return 'stop clicked';
+    }
+    case 'setintent': {
+      var inp = document.getElementById('anc-intent-input');
+      var txt = document.getElementById('anc-intent-text');
+      if (inp) inp.value = arg;
+      if (txt) { txt.textContent = arg; txt.setAttribute('data-intent', arg); }
+      try { sessionStorage.setItem('apui_session_intent', arg); } catch(e){}
+      return 'intent set';
+    }
+    case 'screenshot': {
+      var fn = window.screenshotAndEdit || screenshotAndEdit;
+      if (fn) fn('agent');
+      return 'screenshot triggered';
+    }
+    case 'newthread': {
+      _ttLoad();
+      var id = 'tt_' + Date.now();
+      _ttDB[id] = { id: id, name: arg || 'Jarvis', edits: [], created: Date.now() };
+      _ttSave(); ttRenderThreadList(); ttOpenThread(id);
+      return 'thread created: ' + arg;
+    }
+    case 'logedit':   { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('pending'); return 'logged'; }
+    case 'logworked': { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('worked');  return 'logged worked'; }
+    case 'logfailed': { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('failed');  return 'logged failed'; }
+    case 'readstate': {
+      var activeTab = ((document.querySelector('.tab-button.active') || {}).textContent || '').trim();
+      var agentLog  = ((document.getElementById('agent-output') || {}).innerText || '').slice(-300);
+      var intent    = ((document.getElementById('anc-intent-text') || {}).textContent || '').trim();
+      return 'tab=' + activeTab + ' intent=' + intent.slice(0,60) + ' log=' + agentLog.slice(0,120);
+    }
+    case 'wait':
+      return new Promise(function(r) { setTimeout(function() { r('waited'); }, 600); });
+    default:
+      return 'unknown action: ' + action;
+  }
 }
 
 // Load settings on boot
