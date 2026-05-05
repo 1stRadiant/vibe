@@ -2143,6 +2143,9 @@
                                     <button class="agt-itab" onclick="agtSwitchTab('tracker',this)" title="Task &amp; edit tracker">
                                         <i class="bi bi-kanban"></i> Tracker
                                     </button>
+                                    <button class="agt-itab" onclick="agtSwitchTab('jarvis',this)" title="Jarvis Autopilot" style="color:#c678dd;margin-left:auto;">
+                                        <i class="bi bi-robot"></i> Jarvis
+                                    </button>
                                 </div>
 
                                 <!-- ══ RUN pane ══ -->
@@ -2154,6 +2157,7 @@
                                             <input type="file" id="agent-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('agent',this.files);this.value=''">
                                             <button id="agent-screenshot-btn" class="action-button small" onclick="screenshotAndEdit('agent')" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
                                             <button class="action-button small" onclick="document.getElementById('agent-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach</button>
+                                            <button class="action-button small" onclick="annotateOpenForContext('agent')" style="border-color:#e5c07b;color:#e5c07b;">✏️ Annotate</button>
                                             <span id="agent-vision-label" style="font-size:0.7rem;color:rgba(135,206,235,0.4);font-family:'Fira Code',monospace;">vision-enabled</span>
                                         </div>
                                         <div class="agent-buttons-container">
@@ -2273,6 +2277,60 @@
                                         </div>
                                     </div>
                                     <div id="tt-empty" style="text-align:center;color:var(--apui-text-dim);font-size:0.82rem;padding:16px 0;">No threads yet — create one to start tracking edits.</div>
+                                </div>
+
+                                <!-- ══ JARVIS AUTOPILOT pane ══ -->
+                                <div id="agt-pane-jarvis" class="agt-pane" style="flex-direction:column;gap:0;">
+                                    <!-- Header -->
+                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-shrink:0;">
+                                        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#c678dd,#61afef);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🤖</div>
+                                        <div>
+                                            <div style="font-size:14px;font-weight:700;color:#c678dd;letter-spacing:.04em;">JARVIS AUTOPILOT</div>
+                                            <div style="font-size:11px;color:var(--apui-text-dim);">AI that controls the full vibe system</div>
+                                        </div>
+                                        <div style="margin-left:auto;display:flex;gap:6px;">
+                                            <button class="action-button small" id="jarvis-settings-btn" onclick="jarvisToggleSettings()" style="border-color:#5c6370;color:#5c6370;"><i class="bi bi-gear"></i></button>
+                                            <button class="action-button small" id="jarvis-clear-btn" onclick="jarvisClearLog()" style="border-color:#5c6370;color:#5c6370;"><i class="bi bi-trash"></i></button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Settings panel -->
+                                    <div id="jarvis-settings" style="display:none;background:#1e2227;border:1px solid #3e4451;border-radius:6px;padding:12px;margin-bottom:12px;flex-shrink:0;">
+                                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:10px;">Configuration</div>
+                                        <div style="display:flex;flex-direction:column;gap:8px;">
+                                            <div>
+                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Gemini API Key</label>
+                                                <input type="password" id="jarvis-api-key" placeholder="AIza…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div>
+                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Model name</label>
+                                                <input type="text" id="jarvis-model" placeholder="gemini-2.0-flash" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div>
+                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Max steps per run</label>
+                                                <input type="number" id="jarvis-max-steps" min="1" max="30" value="8" style="width:80px;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div id="jarvis-settings-status" style="font-size:11px;color:#98c379;display:none;">✓ Settings saved</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Activity log -->
+                                    <div id="jarvis-log" style="flex:1;min-height:120px;overflow-y:auto;background:rgba(5,8,18,0.7);border:1px solid var(--apui-border);border-radius:6px;padding:10px 12px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.7;margin-bottom:10px;">
+                                        <div style="color:#5c6370;text-align:center;padding:20px 0;">Jarvis is ready. Give it a goal and it will autonomously control the system.</div>
+                                    </div>
+
+                                    <!-- Input -->
+                                    <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
+                                        <textarea id="jarvis-input" rows="2" placeholder="e.g. Switch to the Preview tab, take a screenshot, then open the Agent tab and queue a task to fix the layout…" style="width:100%;font-size:13px;resize:vertical;"></textarea>
+                                        <div style="display:flex;gap:6px;align-items:center;">
+                                            <button class="action-button" id="jarvis-run-btn" onclick="jarvisRun()" style="flex:1;border-color:#c678dd;color:#c678dd;background:rgba(198,120,221,0.08);">
+                                                <i class="bi bi-robot"></i> Run Jarvis
+                                            </button>
+                                            <button class="action-button small" id="jarvis-stop-btn" onclick="jarvisStop()" style="display:none;border-color:#e06c75;color:#e06c75;">
+                                                <i class="bi bi-stop-circle"></i> Stop
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                             </div>
@@ -3450,14 +3508,599 @@ function ttRenderEditList() {
 
 /* ── Global drag-over on the full page — highlight drop zone ── */
 document.addEventListener('dragover', function(e) {
-  // Only activate when hovering over the code tab and it's active
   var codeTab = document.getElementById('code');
   if (codeTab && codeTab.classList.contains('active')) {
     e.preventDefault();
     _showCodeDropZone(true);
   }
 });
+
+/* ══════════════════════════════════════════════════════════
+   ANNOTATE MODE
+   ══════════════════════════════════════════════════════════ */
+var _annCtx = null;
+var _annTool = 'pen';
+var _annColor = '#ef5350';
+var _annStroke = 4;
+var _annDrawing = false;
+var _annStart = {};
+var _annHistory = [];
+var _annContext = 'agent'; // which pending-image context to push to
+var _annSnapshot = null;   // ImageData snapshot before current stroke
+
+(function addAnnotateCSS() {
+  var s = document.createElement('style');
+  s.textContent = `
+    .ann-tool {
+      background:transparent;border:1px solid #3e4451;color:#abb2bf;
+      border-radius:4px;padding:3px 8px;cursor:pointer;font-size:13px;
+      transition:border-color .15s,color .15s;
+    }
+    .ann-tool:hover { border-color:#61afef;color:#61afef; }
+    .ann-tool-active { border-color:#c678dd!important;color:#c678dd!important;background:rgba(198,120,221,.12)!important; }
+    .ann-swatch {
+      width:18px;height:18px;border-radius:50%;border:2px solid transparent;
+      cursor:pointer;transition:border-color .12s;flex-shrink:0;
+    }
+    .ann-swatch-active { border-color:#fff!important;box-shadow:0 0 0 1px #888; }
+  `;
+  document.head.appendChild(s);
+})();
+
+function annotateOpenForContext(ctx) {
+  // If there's a pending image, use it; otherwise take a screenshot first
+  _annContext = ctx || 'agent';
+  var pend = window._pendingImages && window._pendingImages[_annContext];
+  if (pend && pend.length > 0) {
+    _annotateOpen(pend[pend.length - 1], false);
+  } else {
+    // Take screenshot then open
+    if (typeof capturePreviewScreenshot === 'function') {
+      capturePreviewScreenshot().then(function(dataURL) {
+        _annotateOpen(dataURL, true);
+      }).catch(function() {
+        alert('No image attached yet. Please take a screenshot or attach an image first.');
+      });
+    } else {
+      alert('No image attached yet. Please attach an image first.');
+    }
+  }
+}
+
+function _annotateOpen(dataURL, isNew) {
+  var modal = document.getElementById('annotate-modal');
+  var img   = document.getElementById('ann-base-img');
+  var canvas = document.getElementById('ann-canvas');
+  if (!modal || !img || !canvas) return;
+
+  _annHistory = [];
+  _annIsNew = isNew;
+  _annSourceDataURL = dataURL;
+
+  img.onload = function() {
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvas.style.width  = img.offsetWidth  + 'px';
+    canvas.style.height = img.offsetHeight + 'px';
+    _annCtx = canvas.getContext('2d');
+    _annCtx.clearRect(0, 0, canvas.width, canvas.height);
+    _annHistory = [];
+    _annBindEvents(canvas);
+  };
+  img.src = dataURL;
+
+  modal.style.display = 'flex';
+}
+
+var _annIsNew = false;
+var _annSourceDataURL = '';
+
+function annotateClose() {
+  var modal = document.getElementById('annotate-modal');
+  if (modal) modal.style.display = 'none';
+  _annUnbindEvents();
+}
+
+function annSetTool(t) {
+  _annTool = t;
+  document.querySelectorAll('.ann-tool').forEach(function(b) { b.classList.remove('ann-tool-active'); });
+  var btn = document.getElementById('ann-tool-' + t);
+  if (btn) btn.classList.add('ann-tool-active');
+}
+
+function annSetColor(el) {
+  _annColor = el.getAttribute('data-color');
+  document.querySelectorAll('.ann-swatch').forEach(function(b) { b.classList.remove('ann-swatch-active'); });
+  el.classList.add('ann-swatch-active');
+}
+
+function annSetStroke(v) { _annStroke = parseInt(v, 10); }
+
+function annUndo() {
+  if (!_annCtx || _annHistory.length === 0) return;
+  var prev = _annHistory.pop();
+  _annCtx.putImageData(prev, 0, 0);
+}
+
+function annClear() {
+  if (!_annCtx) return;
+  _annSaveHistory();
+  var c = document.getElementById('ann-canvas');
+  _annCtx.clearRect(0, 0, c.width, c.height);
+}
+
+function _annSaveHistory() {
+  if (!_annCtx) return;
+  var c = document.getElementById('ann-canvas');
+  _annHistory.push(_annCtx.getImageData(0, 0, c.width, c.height));
+  if (_annHistory.length > 40) _annHistory.shift();
+}
+
+function annSubmit() {
+  var baseImg = document.getElementById('ann-base-img');
+  var annCanvas = document.getElementById('ann-canvas');
+  if (!baseImg || !annCanvas) return;
+
+  // Composite base image + annotations onto a single canvas
+  var out = document.createElement('canvas');
+  out.width  = baseImg.naturalWidth;
+  out.height = baseImg.naturalHeight;
+  var ctx = out.getContext('2d');
+  ctx.drawImage(baseImg, 0, 0);
+  ctx.drawImage(annCanvas, 0, 0);
+  var dataURL = out.toDataURL('image/png');
+
+  // If this was a new screenshot, remove the last pending image (replace with annotated)
+  if (_annIsNew && window._pendingImages && window._pendingImages[_annContext]) {
+    window._pendingImages[_annContext].pop();
+  } else if (!_annIsNew && window._pendingImages && window._pendingImages[_annContext] && window._pendingImages[_annContext].length > 0) {
+    // Replace last image with annotated version
+    window._pendingImages[_annContext].pop();
+  }
+
+  if (typeof addPendingImage === 'function') {
+    addPendingImage(_annContext, dataURL);
+  } else if (window.addPendingImage) {
+    window.addPendingImage(_annContext, dataURL);
+  }
+  annotateClose();
+}
+
+var _annBound = {};
+function _annBindEvents(canvas) {
+  _annUnbindEvents();
+  function pos(e) {
+    var r = canvas.getBoundingClientRect();
+    var scaleX = canvas.width  / r.width;
+    var scaleY = canvas.height / r.height;
+    var src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
+  }
+  function down(e) {
+    e.preventDefault();
+    _annDrawing = true;
+    _annSaveHistory();
+    var p = pos(e);
+    _annStart = p;
+    if (_annTool === 'pen' || _annTool === 'erase') {
+      _annCtx.beginPath();
+      _annCtx.moveTo(p.x, p.y);
+    }
+    if (_annTool === 'text') {
+      var txt = prompt('Enter text:');
+      if (txt) {
+        _annCtx.font = 'bold ' + (_annStroke * 6 + 12) + 'px sans-serif';
+        _annCtx.fillStyle = _annColor;
+        _annCtx.fillText(txt, p.x, p.y);
+      }
+      _annDrawing = false;
+    }
+  }
+  function move(e) {
+    if (!_annDrawing) return;
+    e.preventDefault();
+    var p = pos(e);
+    var c = document.getElementById('ann-canvas');
+    if (_annTool === 'pen') {
+      _annCtx.globalCompositeOperation = 'source-over';
+      _annCtx.strokeStyle = _annColor;
+      _annCtx.lineWidth   = _annStroke;
+      _annCtx.lineCap     = 'round';
+      _annCtx.lineJoin    = 'round';
+      _annCtx.lineTo(p.x, p.y);
+      _annCtx.stroke();
+    } else if (_annTool === 'erase') {
+      _annCtx.globalCompositeOperation = 'destination-out';
+      _annCtx.strokeStyle = 'rgba(0,0,0,1)';
+      _annCtx.lineWidth   = _annStroke * 3;
+      _annCtx.lineCap     = 'round';
+      _annCtx.lineTo(p.x, p.y);
+      _annCtx.stroke();
+      _annCtx.globalCompositeOperation = 'source-over';
+    } else if (_annTool === 'rect' || _annTool === 'arrow') {
+      // Restore snapshot then redraw shape live
+      if (_annHistory.length > 0) {
+        _annCtx.putImageData(_annHistory[_annHistory.length - 1], 0, 0);
+      } else {
+        _annCtx.clearRect(0, 0, c.width, c.height);
+      }
+      _annCtx.strokeStyle = _annColor;
+      _annCtx.lineWidth   = _annStroke;
+      _annCtx.globalCompositeOperation = 'source-over';
+      if (_annTool === 'rect') {
+        _annCtx.strokeRect(_annStart.x, _annStart.y, p.x - _annStart.x, p.y - _annStart.y);
+      } else {
+        // Arrow
+        _annDrawArrow(_annStart.x, _annStart.y, p.x, p.y);
+      }
+    }
+  }
+  function up(e) {
+    if (!_annDrawing) return;
+    _annDrawing = false;
+    _annCtx.beginPath();
+  }
+  _annBound = { down: down, move: move, up: up };
+  canvas.addEventListener('mousedown',  down, { passive: false });
+  canvas.addEventListener('mousemove',  move, { passive: false });
+  canvas.addEventListener('mouseup',    up);
+  canvas.addEventListener('mouseleave', up);
+  canvas.addEventListener('touchstart', down, { passive: false });
+  canvas.addEventListener('touchmove',  move, { passive: false });
+  canvas.addEventListener('touchend',   up);
+}
+
+function _annUnbindEvents() {
+  var c = document.getElementById('ann-canvas');
+  if (!c || !_annBound.down) return;
+  c.removeEventListener('mousedown',  _annBound.down);
+  c.removeEventListener('mousemove',  _annBound.move);
+  c.removeEventListener('mouseup',    _annBound.up);
+  c.removeEventListener('mouseleave', _annBound.up);
+  c.removeEventListener('touchstart', _annBound.down);
+  c.removeEventListener('touchmove',  _annBound.move);
+  c.removeEventListener('touchend',   _annBound.up);
+}
+
+function _annDrawArrow(x1, y1, x2, y2) {
+  var headLen = Math.max(12, _annStroke * 4);
+  var angle   = Math.atan2(y2 - y1, x2 - x1);
+  _annCtx.beginPath();
+  _annCtx.moveTo(x1, y1);
+  _annCtx.lineTo(x2, y2);
+  _annCtx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
+  _annCtx.moveTo(x2, y2);
+  _annCtx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
+  _annCtx.stroke();
+}
+
+// Also expose annotate for screenshot+annotate shortcut
+function annotateFromScreenshot(ctx) {
+  _annContext = ctx || 'agent';
+  if (typeof capturePreviewScreenshot === 'function') {
+    capturePreviewScreenshot().then(function(dataURL) {
+      _annotateOpen(dataURL, true);
+    }).catch(function(e) { console.warn('Screenshot for annotate failed:', e); });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   JARVIS AUTOPILOT
+   ══════════════════════════════════════════════════════════ */
+var _jarvisStopped = false;
+var _jarvisLog = [];
+
+function jarvisToggleSettings() {
+  var s = document.getElementById('jarvis-settings');
+  if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
+  // Load saved settings
+  jarvisLoadSettings();
+}
+
+function jarvisLoadSettings() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('jarvis_settings') || '{}');
+    var keyEl   = document.getElementById('jarvis-api-key');
+    var modelEl = document.getElementById('jarvis-model');
+    var stepsEl = document.getElementById('jarvis-max-steps');
+    if (keyEl   && saved.apiKey)    keyEl.value   = saved.apiKey;
+    if (modelEl && saved.model)     modelEl.value = saved.model;
+    if (stepsEl && saved.maxSteps)  stepsEl.value = saved.maxSteps;
+  } catch(e) {}
+}
+
+function jarvisSaveSettings() {
+  try {
+    var saved = {
+      apiKey:   (document.getElementById('jarvis-api-key')   || {}).value || '',
+      model:    (document.getElementById('jarvis-model')      || {}).value || 'gemini-2.0-flash',
+      maxSteps: (document.getElementById('jarvis-max-steps')  || {}).value || '8',
+    };
+    localStorage.setItem('jarvis_settings', JSON.stringify(saved));
+    var st = document.getElementById('jarvis-settings-status');
+    if (st) { st.style.display = 'block'; clearTimeout(st._t); st._t = setTimeout(function(){ st.style.display='none'; }, 1500); }
+  } catch(e) {}
+}
+
+function jarvisClearLog() {
+  _jarvisLog = [];
+  var log = document.getElementById('jarvis-log');
+  if (log) log.innerHTML = '<div style="color:#5c6370;text-align:center;padding:20px 0;">Log cleared. Give Jarvis a goal.</div>';
+}
+
+function jarvisStop() {
+  _jarvisStopped = true;
+  _jarvisAppendLog('⛔ Stopped by user.', '#e06c75');
+  document.getElementById('jarvis-run-btn').style.display = '';
+  document.getElementById('jarvis-stop-btn').style.display = 'none';
+}
+
+function _jarvisAppendLog(msg, color) {
+  var log = document.getElementById('jarvis-log');
+  if (!log) return;
+  var line = document.createElement('div');
+  line.style.cssText = 'padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:' + (color || '#abb2bf');
+  var ts = new Date().toLocaleTimeString();
+  line.innerHTML = '<span style="color:#5c6370;font-size:10px;">[' + ts + ']</span> ' + _esc(msg);
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+function _jarvisAppendLogRaw(html) {
+  var log = document.getElementById('jarvis-log');
+  if (!log) return;
+  var line = document.createElement('div');
+  line.style.cssText = 'padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
+  var ts = new Date().toLocaleTimeString();
+  line.innerHTML = '<span style="color:#5c6370;font-size:10px;">[' + ts + ']</span> ' + html;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+// The set of actions Jarvis can perform
+var JARVIS_ACTIONS = {
+  switchTab: function(args) {
+    var tab = args.tab;
+    if (typeof switchToTab === 'function') switchToTab(tab);
+    else if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(tab);
+    return 'Switched to tab: ' + tab;
+  },
+  switchAgentTab: function(args) {
+    var btn = document.querySelector('.agt-itab[onclick*="' + args.tab + '"]');
+    agtSwitchTab(args.tab, btn);
+    return 'Switched agent inner tab to: ' + args.tab;
+  },
+  setAgentPrompt: function(args) {
+    var el = document.getElementById('agent-prompt-input');
+    if (el) el.value = args.text || '';
+    return 'Set agent prompt: ' + (args.text || '').slice(0, 60);
+  },
+  clickAddTask: function() {
+    var btn = document.getElementById('run-agent-single-task-button');
+    if (btn) btn.click();
+    return 'Clicked Add Task';
+  },
+  clickProcessQueue: function() {
+    var btn = document.getElementById('start-iterative-session-button');
+    if (btn) btn.click();
+    return 'Clicked Process Queue';
+  },
+  clickStopQueue: function() {
+    var btn = document.getElementById('end-session-button');
+    if (btn && btn.style.display !== 'none') btn.click();
+    return 'Clicked Stop Queue';
+  },
+  setSessionIntent: function(args) {
+    ancEditIntent();
+    var inp = document.getElementById('anc-intent-input');
+    if (inp) inp.value = args.intent || '';
+    ancSaveIntent();
+    return 'Set session intent: ' + (args.intent || '').slice(0, 80);
+  },
+  takeScreenshot: function() {
+    if (typeof screenshotAndEdit === 'function') screenshotAndEdit('agent');
+    else if (window.screenshotAndEdit) window.screenshotAndEdit('agent');
+    return 'Triggered screenshot';
+  },
+  newTrackerThread: function(args) {
+    _ttLoad();
+    var id = 'tt_' + Date.now();
+    _ttDB[id] = { id: id, name: args.name || 'Jarvis Thread', edits: [], created: Date.now() };
+    _ttSave();
+    ttRenderThreadList();
+    ttOpenThread(id);
+    return 'Created tracker thread: ' + args.name;
+  },
+  logTrackerEdit: function(args) {
+    ttAddEdit(args.status || 'pending');
+    return 'Logged edit: ' + (args.text || '');
+  },
+  wait: function(args) {
+    return new Promise(function(res) {
+      setTimeout(function() { res('Waited ' + (args.ms || 500) + 'ms'); }, args.ms || 500);
+    });
+  },
+  readPageState: function() {
+    var activeTab = (document.querySelector('.tab-button.active') || {}).textContent || 'unknown';
+    var agentLog  = (document.getElementById('agent-output') || {}).innerText || '';
+    var intent    = (document.getElementById('anc-intent-text') || {}).textContent || '';
+    return JSON.stringify({
+      activeTab: activeTab.trim(),
+      agentLogSnippet: agentLog.slice(-400),
+      sessionIntent: intent.trim(),
+    });
+  },
+};
+
+async function jarvisRun() {
+  jarvisLoadSettings();
+  var apiKey   = (document.getElementById('jarvis-api-key')  || {}).value || '';
+  var model    = (document.getElementById('jarvis-model')    || {}).value || 'gemini-2.0-flash';
+  var maxSteps = parseInt((document.getElementById('jarvis-max-steps') || {}).value || '8', 10);
+  var goal     = (document.getElementById('jarvis-input')    || {}).value || '';
+
+  if (!apiKey) { alert('Please set your Gemini API key in Jarvis settings ⚙'); jarvisToggleSettings(); return; }
+  if (!goal.trim()) { alert('Please enter a goal for Jarvis.'); return; }
+
+  _jarvisStopped = false;
+  document.getElementById('jarvis-run-btn').style.display = 'none';
+  document.getElementById('jarvis-stop-btn').style.display = '';
+
+  _jarvisAppendLog('🤖 Goal: ' + goal, '#c678dd');
+
+  var systemPrompt = `You are Jarvis, an AI autopilot that controls a web IDE called Vibe Editor.
+You execute a goal step-by-step by emitting JSON action objects. Each response must be exactly ONE JSON object.
+
+Available actions:
+- {"action":"switchTab","tab":"start"|"agent"|"preview"|"code"|"context"|"chat"} — switch main tab
+- {"action":"switchAgentTab","tab":"run"|"session"|"tracker"|"jarvis"} — switch agent inner tab
+- {"action":"setAgentPrompt","text":"..."} — type into the agent prompt box
+- {"action":"clickAddTask"} — click Add Task button
+- {"action":"clickProcessQueue"} — click Process Queue button
+- {"action":"clickStopQueue"} — click Stop Queue button
+- {"action":"setSessionIntent","intent":"..."} — set the session goal/intent
+- {"action":"takeScreenshot"} — capture the preview screenshot
+- {"action":"newTrackerThread","name":"..."} — create a new tracker thread
+- {"action":"logTrackerEdit","text":"...","status":"pending"|"worked"|"failed"} — log an edit
+- {"action":"readPageState"} — read current UI state (returns JSON)
+- {"action":"wait","ms":500} — pause briefly
+- {"action":"done","summary":"..."} — signal completion with a summary
+
+Rules:
+- Output ONLY the raw JSON object, no markdown, no explanation.
+- After readPageState you will receive the state in the next user message prefixed with STATE:.
+- Be efficient. Complete the goal in as few steps as possible.
+- Always end with {"action":"done","summary":"..."}.
+`;
+
+  var messages = [{ role: 'user', parts: [{ text: 'Goal: ' + goal }] }];
+  var steps = 0;
+
+  while (steps < maxSteps && !_jarvisStopped) {
+    steps++;
+    _jarvisAppendLog('⏳ Step ' + steps + '…', '#5c6370');
+
+    var body = JSON.stringify({
+      contents: messages,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
+    });
+
+    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
+
+    var resp, data, rawText;
+    try {
+      resp = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+      data = await resp.json();
+      rawText = ((data.candidates || [])[0] || {}).content?.parts?.[0]?.text || '';
+      if (!rawText) throw new Error(JSON.stringify(data));
+    } catch(e) {
+      _jarvisAppendLog('❌ API error: ' + (e.message || e), '#e06c75');
+      break;
+    }
+
+    // Parse the action
+    var actionObj;
+    try {
+      var clean = rawText.trim().replace(/^```json\s*/i,'').replace(/```$/,'').trim();
+      actionObj = JSON.parse(clean);
+    } catch(e) {
+      _jarvisAppendLog('⚠ Could not parse action: ' + rawText.slice(0, 120), '#e5c07b');
+      break;
+    }
+
+    if (actionObj.action === 'done') {
+      _jarvisAppendLog('✅ Done: ' + (actionObj.summary || ''), '#98c379');
+      break;
+    }
+
+    // Execute action
+    var fn = JARVIS_ACTIONS[actionObj.action];
+    var result = '';
+    if (fn) {
+      try {
+        var r = fn(actionObj);
+        result = (r instanceof Promise) ? await r : r;
+        _jarvisAppendLogRaw('<span style="color:#61afef">▶ ' + _esc(actionObj.action) + '</span> <span style="color:#5c6370">→ ' + _esc(String(result).slice(0, 120)) + '</span>');
+      } catch(e) {
+        result = 'Error: ' + e.message;
+        _jarvisAppendLog('⚠ ' + result, '#e06c75');
+      }
+    } else {
+      result = 'Unknown action: ' + actionObj.action;
+      _jarvisAppendLog('⚠ ' + result, '#e5c07b');
+    }
+
+    // Feed result back as next turn
+    messages.push({ role: 'model', parts: [{ text: rawText }] });
+    messages.push({ role: 'user',  parts: [{ text: (actionObj.action === 'readPageState' ? 'STATE: ' : 'RESULT: ') + result }] });
+
+    // Small pause between steps
+    await new Promise(function(r) { setTimeout(r, 300); });
+  }
+
+  if (steps >= maxSteps && !_jarvisStopped) {
+    _jarvisAppendLog('⏹ Max steps reached (' + maxSteps + ').', '#e5c07b');
+  }
+
+  document.getElementById('jarvis-run-btn').style.display = '';
+  document.getElementById('jarvis-stop-btn').style.display = 'none';
+  _jarvisStopped = false;
+}
+
+// Load settings on boot
+document.addEventListener('DOMContentLoaded', function() {
+  jarvisLoadSettings();
+});
 </script>
+
+<!-- ══════════════════════════════════════
+     ANNOTATE MODAL
+════════════════════════════════════════ -->
+<div id="annotate-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);display:none;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="background:#1e2227;border:1px solid #3e4451;border-radius:10px;width:min(96vw,900px);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">
+        <!-- toolbar -->
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #2d333b;flex-shrink:0;flex-wrap:wrap;">
+            <span style="font-size:12px;font-weight:700;color:#c678dd;letter-spacing:.05em;text-transform:uppercase;">✏️ Annotate</span>
+            <div style="width:1px;height:18px;background:#2d333b;margin:0 4px;"></div>
+            <!-- tools -->
+            <button class="ann-tool ann-tool-active" id="ann-tool-pen"    onclick="annSetTool('pen')"    title="Pen">🖊</button>
+            <button class="ann-tool" id="ann-tool-arrow"  onclick="annSetTool('arrow')"  title="Arrow">↗</button>
+            <button class="ann-tool" id="ann-tool-rect"   onclick="annSetTool('rect')"   title="Rectangle">▭</button>
+            <button class="ann-tool" id="ann-tool-text"   onclick="annSetTool('text')"   title="Text">T</button>
+            <button class="ann-tool" id="ann-tool-erase"  onclick="annSetTool('erase')"  title="Eraser">⌫</button>
+            <div style="width:1px;height:18px;background:#2d333b;margin:0 4px;"></div>
+            <!-- colour swatches -->
+            <div style="display:flex;gap:4px;">
+                <button class="ann-swatch ann-swatch-active" data-color="#ef5350" onclick="annSetColor(this)" style="background:#ef5350;" title="Red"></button>
+                <button class="ann-swatch" data-color="#ffee58" onclick="annSetColor(this)" style="background:#ffee58;" title="Yellow"></button>
+                <button class="ann-swatch" data-color="#66bb6a" onclick="annSetColor(this)" style="background:#66bb6a;" title="Green"></button>
+                <button class="ann-swatch" data-color="#42a5f5" onclick="annSetColor(this)" style="background:#42a5f5;" title="Blue"></button>
+                <button class="ann-swatch" data-color="#ffffff" onclick="annSetColor(this)" style="background:#ffffff;border-color:#555;" title="White"></button>
+            </div>
+            <!-- stroke width -->
+            <select id="ann-stroke" onchange="annSetStroke(this.value)" style="background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:3px 6px;font-size:12px;">
+                <option value="2">Thin</option>
+                <option value="4" selected>Normal</option>
+                <option value="8">Thick</option>
+                <option value="16">Huge</option>
+            </select>
+            <div style="display:flex;gap:5px;margin-left:auto;">
+                <button class="action-button small" onclick="annUndo()" title="Undo">↩ Undo</button>
+                <button class="action-button small" onclick="annClear()" style="border-color:#e06c75;color:#e06c75;">🗑 Clear</button>
+                <button class="action-button small" onclick="annSubmit()" style="border-color:#98c379;color:#98c379;font-weight:700;">✓ Use Image</button>
+                <button class="action-button small secondary" onclick="annotateClose()">✕</button>
+            </div>
+        </div>
+        <!-- canvas area -->
+        <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#111;padding:10px;min-height:0;">
+            <div style="position:relative;display:inline-block;line-height:0;">
+                <img id="ann-base-img" style="display:block;max-width:100%;max-height:70vh;user-select:none;pointer-events:none;" draggable="false">
+                <canvas id="ann-canvas" style="position:absolute;top:0;left:0;cursor:crosshair;touch-action:none;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
 
 </body>
     </html>
