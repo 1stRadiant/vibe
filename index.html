@@ -3147,6 +3147,68 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+/* ── HTML escape helper ── */
+function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── anc* functions: session intent + node context panel ──
+   These are called from inline onclick handlers. They manipulate
+   DOM elements that app3.js (module) populates. If a newer app3.js
+   already defines these on window they will be overridden; otherwise
+   these implementations are used.                               */
+function ancEditIntent() {
+  var bar = document.getElementById('anc-intent-bar');
+  var ed  = document.getElementById('anc-intent-editor');
+  var inp = document.getElementById('anc-intent-input');
+  var txt = document.getElementById('anc-intent-text');
+  if (!bar || !ed) return;
+  // pre-fill editor with current text (skip the placeholder text)
+  if (inp && txt) {
+    var cur = txt.getAttribute('data-intent') || '';
+    inp.value = cur;
+  }
+  bar.style.display = 'none';
+  ed.style.display  = 'block';
+  if (inp) inp.focus();
+}
+function ancSaveIntent() {
+  var bar = document.getElementById('anc-intent-bar');
+  var ed  = document.getElementById('anc-intent-editor');
+  var inp = document.getElementById('anc-intent-input');
+  var txt = document.getElementById('anc-intent-text');
+  if (!bar || !ed) return;
+  var val = inp ? inp.value.trim() : '';
+  if (txt) {
+    txt.textContent = val || '(no intent set — click edit to describe what you\'re working on)';
+    txt.setAttribute('data-intent', val);
+  }
+  // Persist to sessionStorage so app3.js can read it
+  try { sessionStorage.setItem('apui_session_intent', val); } catch(e){}
+  bar.style.display = 'block';
+  ed.style.display  = 'none';
+}
+function ancCancelIntent() {
+  var bar = document.getElementById('anc-intent-bar');
+  var ed  = document.getElementById('anc-intent-editor');
+  if (bar) bar.style.display = 'block';
+  if (ed)  ed.style.display  = 'none';
+}
+function ancSwitchTab(name, btn) {
+  // Switch between description/pseudocode/code/diff/ai panes inside the node context panel
+  document.querySelectorAll('.anc-pane').forEach(function(p) { p.classList.remove('anc-pane-active'); });
+  document.querySelectorAll('.anc-stab').forEach(function(b) { b.classList.remove('anc-stab-active'); });
+  var pane = document.getElementById('anc-pane-' + name);
+  if (pane) pane.classList.add('anc-pane-active');
+  if (btn)  btn.classList.add('anc-stab-active');
+}
+function ancAnalyzeState() {
+  var btn = document.getElementById('anc-analyze-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ analyzing…'; }
+  // Restore button after a moment — actual analysis is handled by app3.js if loaded
+  setTimeout(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '✦ analyze'; }
+  }, 3000);
+}
+
 /* ── Agent inner tab switcher ── */
 function agtSwitchTab(name, btn) {
   document.querySelectorAll('.agt-pane').forEach(function(p) { p.classList.remove('agt-pane-active'); });
