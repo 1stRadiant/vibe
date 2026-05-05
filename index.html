@@ -399,22 +399,55 @@
 
     /* ── Agent tab ── */
     .agent-container {
-        padding: 16px !important;
+        padding: 0 !important;
         height: 100% !important;
-        overflow-y: auto !important;
+        overflow: hidden !important;
         background: transparent !important;
-    }
-    .agent-container h2 { margin-bottom: 6px !important; }
-
-    /* Agent log scrollable area */
-    #agent-output-container {
         display: flex !important;
         flex-direction: column !important;
-        margin-top: 14px !important;
     }
+
+    /* ── Inner agent tab bar ── */
+    #agent-inner-tabbar { flex-shrink: 0; }
+    .agt-itab {
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--apui-text-dim);
+        font-family: 'Fira Code', monospace;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .07em;
+        padding: 9px 14px 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: color .15s, border-color .15s;
+    }
+    .agt-itab:hover { color: var(--apui-text); }
+    .agt-itab-active {
+        color: var(--apui-secondary) !important;
+        border-bottom-color: var(--apui-primary) !important;
+    }
+
+    /* ── Inner agent panes ── */
+    .agt-pane {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px 16px;
+        flex-direction: column;
+    }
+    .agt-pane-active { display: flex; }
+
+    /* Agent log scrollable area */
+    #agent-output-container { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 10px; }
     #agent-output {
-        min-height: 160px !important;
-        max-height: 38vh !important;
+        flex: 1;
+        min-height: 120px;
         overflow-y: auto !important;
         background: rgba(5,8,18,0.7) !important;
         border: 1px solid var(--apui-border) !important;
@@ -425,21 +458,17 @@
         line-height: 1.6 !important;
     }
 
-    /* Task tracker edit list — fills available space in the thread view */
+    /* Task tracker edit list */
+    #tt-thread-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     #tt-edit-list {
-        min-height: 120px !important;
-        max-height: 36vh !important;
+        flex: 1;
+        min-height: 100px;
         overflow-y: auto !important;
     }
 
-    /* Intent bar height clamp */
-    #anc-intent-bar {
-        background: rgba(16,24,48,0.8) !important;
-        border: 1px solid var(--apui-border) !important;
-        border-radius: 6px !important;
-        max-height: 40vh !important;
-        overflow-y: auto !important;
-    }
+    /* Session pane scrollable sections */
+    #agt-pane-session .anc-pane { max-height: 32vh !important; }
+    #anc-att-list { max-height: 40vh; overflow-y: auto; }
     #anc-intent-bar > div:first-child {
         background: rgba(65,105,225,0.12) !important;
         border-bottom: 1px solid var(--apui-border) !important;
@@ -2101,139 +2130,151 @@
                             </div>
                         </div>
                         <div id="agent" class="tab-content">
-                            <div class="agent-container">
-                                <h2 style="font-family:'Orbitron',sans-serif;color:#87CEEB;text-shadow:0 0 10px #4169e1;">APUI</h2>
-                                <p>Add one or more tasks for the AI to complete. It will process them sequentially when you click "Process Queue".</p>
+                            <div class="agent-container" style="display:flex;flex-direction:column;padding:0!important;height:100%;overflow:hidden;">
 
-                                <!-- ══ APUI: Session Intent ══ -->
-                                <div id="anc-intent-bar" style="margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
-                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b">
-                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">session intent</span>
-                                        <button class="action-button small" onclick="ancEditIntent()" style="padding:3px 10px;font-size:11px">edit</button>
-                                    </div>
-                                    <div id="anc-intent-text" style="padding:12px 14px;font-size:13px;color:#abb2bf;line-height:1.7;min-height:44px">(no intent set — click <b>edit</b> to describe what you're working on)</div>
-                                </div>
-                                <div id="anc-intent-editor" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #61afef;border-radius:6px;padding:14px">
-                                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:8px">session goal / intent</div>
-                                    <textarea id="anc-intent-input" rows="3" placeholder="e.g. Fix the nav scroll behaviour and tighten card spacing across the homepage…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:9px 11px;font-size:13px;resize:vertical;line-height:1.6"></textarea>
-                                    <div style="display:flex;gap:8px;margin-top:9px">
-                                        <button class="action-button small" onclick="ancSaveIntent()">save intent</button>
-                                        <button class="action-button small secondary" onclick="ancCancelIntent()">cancel</button>
-                                    </div>
+                                <!-- ══ Inner tab bar ══ -->
+                                <div id="agent-inner-tabbar" style="display:flex;align-items:center;gap:0;border-bottom:1px solid var(--apui-border);background:rgba(10,14,28,0.85);flex-shrink:0;padding:0 4px;">
+                                    <button class="agt-itab agt-itab-active" onclick="agtSwitchTab('run',this)" title="Task queue &amp; agent log">
+                                        <i class="bi bi-play-circle"></i> Run
+                                    </button>
+                                    <button class="agt-itab" onclick="agtSwitchTab('session',this)" title="Session intent &amp; node context">
+                                        <i class="bi bi-crosshair"></i> Session
+                                    </button>
+                                    <button class="agt-itab" onclick="agtSwitchTab('tracker',this)" title="Task &amp; edit tracker">
+                                        <i class="bi bi-kanban"></i> Tracker
+                                    </button>
                                 </div>
 
-                                <!-- ══ APUI: Node Context Panel ══ -->
-                                <div id="anc-panel" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
-                                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b;gap:8px">
-                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="anc-panel-label">current state</span>
-                                        <span id="anc-type-badge" style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;white-space:nowrap"></span>
-                                        <button class="action-button small" id="anc-analyze-btn" onclick="ancAnalyzeState()" style="padding:4px 11px;font-size:12px;border-color:#c678dd;color:#c678dd">✦ analyze</button>
-                                    </div>
-                                    <!-- State tabs -->
-                                    <div id="anc-stabs" style="display:flex;border-bottom:1px solid #2d333b;overflow-x:auto">
-                                        <button class="anc-stab anc-stab-active" onclick="ancSwitchTab('desc',this)">description</button>
-                                        <button class="anc-stab" onclick="ancSwitchTab('pseudo',this)">pseudocode</button>
-                                        <button class="anc-stab" onclick="ancSwitchTab('code',this)">code</button>
-                                        <button class="anc-stab" onclick="ancSwitchTab('diff',this)">diff</button>
-                                        <button class="anc-stab" onclick="ancSwitchTab('ai',this)">✦ AI state</button>
-                                    </div>
-                                    <div id="anc-pane-desc"   class="anc-pane anc-pane-active" style="color:#abb2bf"></div>
-                                    <div id="anc-pane-pseudo" class="anc-pane anc-pane-code"></div>
-                                    <div id="anc-pane-code"   class="anc-pane anc-pane-code"></div>
-                                    <div id="anc-pane-diff"   class="anc-pane"></div>
-                                    <div id="anc-pane-ai"     class="anc-pane" style="color:#abb2bf"><span style="color:#5c6370;font-size:13px">Click <b>✦ analyze</b> to get an AI summary of the current node state.</span></div>
-                                </div>
-
-                                <!-- ══ APUI: Quick re-invoke ══ -->
-                                <div id="anc-quick" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
-                                    <div style="padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b">
-                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370">quick re-invoke</span>
-                                    </div>
-                                    <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
-                                        <div id="anc-last-row" style="display:none">
-                                            <div class="anc-quick-label">last attempt</div>
-                                            <div id="anc-last-pills" class="anc-pill-row"></div>
+                                <!-- ══ RUN pane ══ -->
+                                <div id="agt-pane-run" class="agt-pane agt-pane-active">
+                                    <div id="agent-controls">
+                                        <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
+                                        <div id="agent-image-previews" style="display:none;padding:4px 0 2px;"></div>
+                                        <div class="agent-vision-bar" style="display:flex;gap:6px;align-items:center;margin:4px 0 6px;flex-wrap:wrap;">
+                                            <input type="file" id="agent-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('agent',this.files);this.value=''">
+                                            <button id="agent-screenshot-btn" class="action-button small" onclick="screenshotAndEdit('agent')" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
+                                            <button class="action-button small" onclick="document.getElementById('agent-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach</button>
+                                            <span id="agent-vision-label" style="font-size:0.7rem;color:rgba(135,206,235,0.4);font-family:'Fira Code',monospace;">vision-enabled</span>
                                         </div>
-                                        <div id="anc-ok-row" style="display:none">
-                                            <div class="anc-quick-label">✓ worked before</div>
-                                            <div id="anc-ok-pills" class="anc-pill-row"></div>
+                                        <div class="agent-buttons-container">
+                                            <button id="run-agent-single-task-button" class="action-button">Add Task</button>
+                                            <button id="start-iterative-session-button" class="action-button">Process Queue</button>
+                                            <button id="end-session-button" style="display:none;">Stop Queue</button>
                                         </div>
-                                        <div id="anc-all-row" style="display:none">
-                                            <div class="anc-quick-label">all tried on this node</div>
-                                            <div id="anc-all-pills" class="anc-pill-row"></div>
+                                    </div>
+                                    <div id="agent-output-container" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+                                        <h3 style="flex-shrink:0;margin:12px 0 6px;font-size:0.8rem;text-transform:uppercase;letter-spacing:.07em;color:var(--apui-text-dim);">Agent Log</h3>
+                                        <div id="agent-output" style="flex:1;min-height:0;">
+                                            <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
                                         </div>
-                                        <div id="anc-quick-empty" style="color:#5c6370;font-size:13px;text-align:center;padding:6px 0">No attempts yet on this node</div>
                                     </div>
                                 </div>
 
-                                <!-- ══ APUI: Attempt history ══ -->
-                                <div id="anc-history" style="display:none;margin-bottom:14px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden">
-                                    <div style="padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b">
-                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370" id="anc-history-label">attempts</span>
+                                <!-- ══ SESSION pane ══ -->
+                                <div id="agt-pane-session" class="agt-pane">
+
+                                    <!-- Session Intent -->
+                                    <div id="anc-intent-bar" style="margin-bottom:12px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:#21252b;border-bottom:1px solid #2d333b;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;">session intent</span>
+                                            <button class="action-button small" onclick="ancEditIntent()" style="padding:3px 10px;font-size:11px;">edit</button>
+                                        </div>
+                                        <div id="anc-intent-text" style="padding:12px 14px;font-size:13px;color:#abb2bf;line-height:1.7;min-height:44px;">(no intent set — click <b>edit</b> to describe what you're working on)</div>
                                     </div>
-                                    <div id="anc-att-list" style="display:flex;flex-direction:column;gap:0"></div>
+                                    <div id="anc-intent-editor" style="display:none;margin-bottom:12px;background:#1e2227;border:1px solid #61afef;border-radius:6px;padding:14px;">
+                                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:8px;">session goal / intent</div>
+                                        <textarea id="anc-intent-input" rows="3" placeholder="e.g. Fix the nav scroll behaviour and tighten card spacing…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:9px 11px;font-size:13px;resize:vertical;line-height:1.6;"></textarea>
+                                        <div style="display:flex;gap:8px;margin-top:9px;">
+                                            <button class="action-button small" onclick="ancSaveIntent()">save intent</button>
+                                            <button class="action-button small secondary" onclick="ancCancelIntent()">cancel</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Node Context Panel -->
+                                    <div id="anc-panel" style="display:none;margin-bottom:12px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b;gap:8px;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="anc-panel-label">current state</span>
+                                            <span id="anc-type-badge" style="font-size:11px;padding:3px 10px;border-radius:10px;font-weight:700;white-space:nowrap;"></span>
+                                            <button class="action-button small" id="anc-analyze-btn" onclick="ancAnalyzeState()" style="padding:4px 11px;font-size:12px;border-color:#c678dd;color:#c678dd;">✦ analyze</button>
+                                        </div>
+                                        <div id="anc-stabs" style="display:flex;border-bottom:1px solid #2d333b;overflow-x:auto;">
+                                            <button class="anc-stab anc-stab-active" onclick="ancSwitchTab('desc',this)">description</button>
+                                            <button class="anc-stab" onclick="ancSwitchTab('pseudo',this)">pseudocode</button>
+                                            <button class="anc-stab" onclick="ancSwitchTab('code',this)">code</button>
+                                            <button class="anc-stab" onclick="ancSwitchTab('diff',this)">diff</button>
+                                            <button class="anc-stab" onclick="ancSwitchTab('ai',this)">✦ AI state</button>
+                                        </div>
+                                        <div id="anc-pane-desc"   class="anc-pane anc-pane-active" style="color:#abb2bf;"></div>
+                                        <div id="anc-pane-pseudo" class="anc-pane anc-pane-code"></div>
+                                        <div id="anc-pane-code"   class="anc-pane anc-pane-code"></div>
+                                        <div id="anc-pane-diff"   class="anc-pane"></div>
+                                        <div id="anc-pane-ai"     class="anc-pane" style="color:#abb2bf;"><span style="color:#5c6370;font-size:13px;">Click <b>✦ analyze</b> to get an AI summary.</span></div>
+                                    </div>
+
+                                    <!-- Quick re-invoke -->
+                                    <div id="anc-quick" style="display:none;margin-bottom:12px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden;">
+                                        <div style="padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;">quick re-invoke</span>
+                                        </div>
+                                        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+                                            <div id="anc-last-row" style="display:none;">
+                                                <div class="anc-quick-label">last attempt</div>
+                                                <div id="anc-last-pills" class="anc-pill-row"></div>
+                                            </div>
+                                            <div id="anc-ok-row" style="display:none;">
+                                                <div class="anc-quick-label">✓ worked before</div>
+                                                <div id="anc-ok-pills" class="anc-pill-row"></div>
+                                            </div>
+                                            <div id="anc-all-row" style="display:none;">
+                                                <div class="anc-quick-label">all tried on this node</div>
+                                                <div id="anc-all-pills" class="anc-pill-row"></div>
+                                            </div>
+                                            <div id="anc-quick-empty" style="color:#5c6370;font-size:13px;text-align:center;padding:6px 0;">No attempts yet on this node</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Attempt history -->
+                                    <div id="anc-history" style="display:none;margin-bottom:12px;background:#1e2227;border:1px solid #2d333b;border-radius:6px;overflow:hidden;">
+                                        <div style="padding:10px 14px;background:#21252b;border-bottom:1px solid #2d333b;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;" id="anc-history-label">attempts</span>
+                                        </div>
+                                        <div id="anc-att-list" style="display:flex;flex-direction:column;gap:0;"></div>
+                                    </div>
                                 </div>
 
-                                <div id="agent-controls">
-                                    <textarea id="agent-prompt-input" rows="3" placeholder="Describe a task to add to the queue..."></textarea>
-                                    <!-- Vision toolbar -->
-                                    <div id="agent-image-previews" style="display:none;padding:4px 0 2px;"></div>
-                                    <div class="agent-vision-bar" style="display:flex;gap:6px;align-items:center;margin:4px 0 6px;flex-wrap:wrap;">
-                                        <input type="file" id="agent-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('agent',this.files);this.value=''">
-                                        <button id="agent-screenshot-btn" class="action-button small" title="Capture a screenshot of the live preview and attach it" onclick="screenshotAndEdit('agent')" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
-                                        <button class="action-button small" title="Upload an image to attach" onclick="document.getElementById('agent-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach Image</button>
-                                        <span id="agent-vision-label" style="font-size:0.7rem;color:rgba(135,206,235,0.5);font-family:'Fira Code',monospace;">vision-enabled</span>
-                                    </div>
-                                    <div class="agent-buttons-container">
-                                        <button id="run-agent-single-task-button" class="action-button">Add Task</button>
-                                        <button id="start-iterative-session-button" class="action-button">Process Queue</button>
-                                        <button id="end-session-button" style="display: none;">Stop Queue</button>
-                                    </div>
-                                </div>
-
-                                <div id="agent-output-container">
-                                    <h3>Agent Log</h3>
-                                    <div id="agent-output">
-                                        <div class="agent-message-placeholder">The agent's plan and actions will appear here.</div>
-                                    </div>
-                                </div>
-
-                                <!-- ══ TASK TRACKER ══ -->
-                                <div id="task-tracker-panel" style="margin-top:18px;border-top:1px solid var(--apui-border);padding-top:14px;">
-                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+                                <!-- ══ TRACKER pane ══ -->
+                                <div id="agt-pane-tracker" class="agt-pane">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
                                         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--apui-ai-edit);display:flex;align-items:center;gap:6px;"><i class="bi bi-kanban"></i> Task Tracker</span>
                                         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                                            <input type="text" id="tt-thread-search" placeholder="Search threads…" style="padding:5px 10px;font-size:12px;width:170px;" oninput="ttFilterThreads(this.value)">
-                                            <button class="action-button small" onclick="ttNewThread()" style="border-color:var(--apui-ai-edit);color:var(--apui-ai-edit);"><i class="bi bi-plus-circle"></i> New Thread</button>
+                                            <input type="text" id="tt-thread-search" placeholder="Search threads…" style="padding:5px 10px;font-size:12px;width:160px;" oninput="ttFilterThreads(this.value)">
+                                            <button class="action-button small" onclick="ttNewThread()" style="border-color:var(--apui-ai-edit);color:var(--apui-ai-edit);"><i class="bi bi-plus-circle"></i> New</button>
                                         </div>
                                     </div>
 
-                                    <!-- Thread selector -->
                                     <div id="tt-thread-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
 
-                                    <!-- Active thread -->
-                                    <div id="tt-thread-view" style="display:none;background:rgba(10,14,28,0.8);border:1px solid var(--apui-border);border-radius:7px;overflow:hidden;">
-                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--apui-border);gap:8px;">
+                                    <div id="tt-thread-view" style="display:none;background:rgba(10,14,28,0.8);border:1px solid var(--apui-border);border-radius:7px;overflow:hidden;display:flex;flex-direction:column;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--apui-border);gap:8px;flex-shrink:0;">
                                             <span id="tt-thread-title" style="font-size:0.85rem;font-weight:700;color:var(--apui-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer;" onclick="ttRenameActiveThread()" title="Click to rename"></span>
                                             <div style="display:flex;gap:5px;">
-                                                <button class="action-button small secondary" onclick="ttCloseThread()" title="Back to thread list"><i class="bi bi-arrow-left"></i></button>
-                                                <button class="action-button small danger" onclick="ttDeleteThread()" title="Delete thread"><i class="bi bi-trash"></i></button>
+                                                <button class="action-button small secondary" onclick="ttCloseThread()"><i class="bi bi-arrow-left"></i></button>
+                                                <button class="action-button small danger" onclick="ttDeleteThread()"><i class="bi bi-trash"></i></button>
                                             </div>
                                         </div>
-                                        <!-- Edit log -->
-                                        <div id="tt-edit-list" style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;"></div>
-                                        <!-- Add edit form -->
-                                        <div style="padding:10px 12px;border-top:1px solid var(--apui-border);background:rgba(0,0,0,0.15);display:flex;flex-direction:column;gap:6px;">
+                                        <div id="tt-edit-list" style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;flex:1;"></div>
+                                        <div style="padding:10px 12px;border-top:1px solid var(--apui-border);background:rgba(0,0,0,0.15);display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
                                             <textarea id="tt-edit-input" rows="2" placeholder="Describe an edit / attempt…" style="width:100%;font-size:12px;resize:vertical;"></textarea>
-                                            <div style="display:flex;gap:6px;">
-                                                <button class="action-button small" onclick="ttAddEdit('pending')" style="flex:1;"><i class="bi bi-plus"></i> Log Edit</button>
-                                                <button class="action-button small" onclick="ttAddEdit('worked')" style="flex:1;border-color:#98c379;color:#98c379;"><i class="bi bi-check-circle"></i> Mark Worked</button>
-                                                <button class="action-button small" onclick="ttAddEdit('failed')" style="flex:1;border-color:#e06c75;color:#e06c75;"><i class="bi bi-x-circle"></i> Mark Failed</button>
+                                            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                                                <button class="action-button small" onclick="ttAddEdit('pending')" style="flex:1;min-width:80px;"><i class="bi bi-plus"></i> Log</button>
+                                                <button class="action-button small" onclick="ttAddEdit('worked')" style="flex:1;min-width:80px;border-color:#98c379;color:#98c379;"><i class="bi bi-check-circle"></i> Worked</button>
+                                                <button class="action-button small" onclick="ttAddEdit('failed')" style="flex:1;min-width:80px;border-color:#e06c75;color:#e06c75;"><i class="bi bi-x-circle"></i> Failed</button>
                                             </div>
                                         </div>
                                     </div>
-                                    <div id="tt-empty" style="text-align:center;color:var(--apui-text-dim);font-size:0.82rem;padding:10px 0;display:none;">No threads yet. Create one to start tracking edits.</div>
+                                    <div id="tt-empty" style="text-align:center;color:var(--apui-text-dim);font-size:0.82rem;padding:16px 0;">No threads yet — create one to start tracking edits.</div>
                                 </div>
+
                             </div>
                         </div>
                         <div id="chat" class="tab-content">
@@ -3105,6 +3146,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+/* ── Agent inner tab switcher ── */
+function agtSwitchTab(name, btn) {
+  document.querySelectorAll('.agt-pane').forEach(function(p) { p.classList.remove('agt-pane-active'); });
+  document.querySelectorAll('.agt-itab').forEach(function(b) { b.classList.remove('agt-itab-active'); });
+  var pane = document.getElementById('agt-pane-' + name);
+  if (pane) pane.classList.add('agt-pane-active');
+  if (btn) btn.classList.add('agt-itab-active');
+  // Re-init tracker when switching to it
+  if (name === 'tracker') { _ttInit(); }
+}
 
 /* ── Project Search (Home tab) ── */
 function filterProjectList(query) {
