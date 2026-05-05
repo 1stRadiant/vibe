@@ -2376,65 +2376,110 @@ const _pendingImages = { agent: [], chat: [] };
  * via a foreign-object SVG trick (works same-origin or srcdoc iframes).
  */
 /**
- * Capture the live preview iframe as a PNG dataURL.
+ * Capture the live preview as a PNG dataURL.
  *
- * Strategy order:
- *  1. Load html2canvas in the PARENT window, run it against iframe.contentDocument.body
- *     (same-origin doc.write iframe — most reliable)
- *  2. SVG foreignObject trick — serialise the iframe HTML into a blob, draw on canvas
- *  3. Blank placeholder canvas so the button never hard-fails
+ * The preview is written via doc.write() so we cannot inject a <script> into its
+ * already-closed document reliably. Instead we:
+ *   1. Grab the full rendered HTML from the live iframe's DOM.
+ *   2. Wrap it in a Blob URL and load it into a hidden offscreen iframe
+ *      (Blob URL iframes are same-origin to themselves → html2canvas works).
+ *   3. Inject html2canvas into the offscreen iframe, capture, destroy the iframe.
+ *   4. Fall back to SVG foreignObject if the above fails.
  */
 async function capturePreviewScreenshot() {
-    const iframe = document.getElementById('website-preview');
-    if (!iframe) throw new Error('Preview iframe not found.');
+    const liveIframe = document.getElementById('website-preview');
+    if (!liveIframe) throw new Error('Preview iframe not found.');
 
-    // ── Strategy 1: html2canvas loaded in the PARENT, aimed at iframe body ──
+    const iDoc = liveIframe.contentDocument || liveIframe.contentWindow?.document;
+    if (!iDoc || !iDoc.body) throw new Error('Preview iframe not ready.');
+
+    // ── Strategy 1: offscreen blob-URL iframe + html2canvas (mirrors apui.html) ──
     try {
-        const iWin = iframe.contentWindow;
-        const iDoc = iframe.contentDocument || iWin?.document;
-        if (!iDoc || !iDoc.body) throw new Error('iframe document not accessible');
-
-        // Load html2canvas into the parent window (not the iframe)
-        await _ensureHtml2Canvas();
-
-        const canvas = await window.html2canvas(iDoc.body, {
-            useCORS:         true,
-            allowTaint:      true,
-            scale:           Math.min(window.devicePixelRatio || 1, 2) * 0.6,
-            logging:         false,
-            backgroundColor: '#ffffff',
-            windowWidth:     iDoc.documentElement.scrollWidth,
-            windowHeight:    iDoc.documentElement.scrollHeight,
-            scrollX:         0,
-            scrollY:         0,
-            x:               0,
-            y:               0,
-        });
-        return canvas.toDataURL('image/png');
+        const html = iDoc.documentElement.outerHTML;
+        const dataURL = await _captureViaOffscreenIframe(html,
+            liveIframe.offsetWidth  || 900,
+            liveIframe.offsetHeight || 600);
+        return dataURL;
     } catch (e) {
-        console.warn('[Screenshot] html2canvas in parent failed:', e.message || e);
+        console.warn('[Screenshot] offscreen iframe strategy failed:', e.message || e);
     }
 
-    // ── Strategy 2: SVG foreignObject ──
+    // ── Strategy 2: SVG foreignObject (works if no cross-origin resources) ──
     try {
-        return await _svgScreenshotFallback(iframe);
+        return await _svgScreenshotFallback(liveIframe);
     } catch (e) {
         console.warn('[Screenshot] SVG fallback failed:', e.message || e);
     }
 
-    // ── Strategy 3: Placeholder so the user gets something ──
-    return _blankCanvasFallback(iframe);
+    // ── Strategy 3: placeholder so the button never shows ✗ ──
+    return _blankCanvasFallback(liveIframe);
 }
 
-/** Ensure html2canvas is available in the parent window */
-function _ensureHtml2Canvas() {
-    if (window.html2canvas) return Promise.resolve();
+/**
+ * Create a hidden offscreen iframe from a blob URL, inject html2canvas into it
+ * (exactly like apui.html does), capture the body, destroy the iframe.
+ */
+function _captureViaOffscreenIframe(html, W, H) {
     return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.onload  = resolve;
-        s.onerror = () => reject(new Error('Failed to load html2canvas in parent'));
-        document.head.appendChild(s);
+        const blob   = new Blob([html], { type: 'text/html' });
+        const blobURL = URL.createObjectURL(blob);
+
+        const frame = document.createElement('iframe');
+        frame.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${W}px;height:${H}px;visibility:hidden;pointer-events:none;border:none;`;
+        frame.src = blobURL;
+
+        const cleanup = () => {
+            try { document.body.removeChild(frame); } catch(_) {}
+            URL.revokeObjectURL(blobURL);
+        };
+
+        const timeout = setTimeout(() => {
+            cleanup();
+            reject(new Error('Offscreen iframe timed out'));
+        }, 12000);
+
+        frame.onload = async () => {
+            try {
+                const iWin = frame.contentWindow;
+                const iDoc = frame.contentDocument || iWin.document;
+
+                // Inject html2canvas into the blob-URL iframe (same as apui.html)
+                if (!iWin.html2canvas) {
+                    await new Promise((res, rej) => {
+                        const s = iDoc.createElement('script');
+                        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                        s.onload  = res;
+                        s.onerror = () => rej(new Error('html2canvas failed to load in offscreen iframe'));
+                        iDoc.head.appendChild(s);
+                    });
+                }
+
+                const canvas = await iWin.html2canvas(iDoc.body, {
+                    useCORS:         true,
+                    allowTaint:      true,
+                    scale:           0.7,
+                    logging:         false,
+                    backgroundColor: '#ffffff',
+                });
+
+                const dataURL = canvas.toDataURL('image/png');
+                clearTimeout(timeout);
+                cleanup();
+                resolve(dataURL);
+            } catch (err) {
+                clearTimeout(timeout);
+                cleanup();
+                reject(err);
+            }
+        };
+
+        frame.onerror = (ev) => {
+            clearTimeout(timeout);
+            cleanup();
+            reject(new Error('Offscreen iframe failed to load'));
+        };
+
+        document.body.appendChild(frame);
     });
 }
 
@@ -2490,10 +2535,10 @@ function _blankCanvasFallback(iframe) {
     ctx.fillStyle = 'rgba(135,206,235,0.6)';
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('[ Preview Screenshot ]', W / 2, H / 2 - 10);
+    ctx.fillText('[ Preview Screenshot — open Preview tab first ]', W / 2, H / 2 - 10);
     ctx.font = '13px sans-serif';
     ctx.fillStyle = 'rgba(135,206,235,0.35)';
-    ctx.fillText('Attach your own image below if needed', W / 2, H / 2 + 18);
+    ctx.fillText('Or attach an image manually below', W / 2, H / 2 + 18);
     return canvas.toDataURL('image/png');
 }
 
@@ -9189,4 +9234,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+    }
