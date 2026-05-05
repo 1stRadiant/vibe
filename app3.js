@@ -8519,6 +8519,8 @@ window.vibeAPI = {
 window.screenshotAndEdit = screenshotAndEdit;
 window.handleImageFileInput = handleImageFileInput;
 window.addPendingImage = addPendingImage;
+window.capturePreviewScreenshot = capturePreviewScreenshot;
+window._pendingImages = _pendingImages;
 
 console.log("Vibe Automation API exposed as window.vibeAPI");
 
@@ -9234,4 +9236,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+                      }
