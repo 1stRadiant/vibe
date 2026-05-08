@@ -2238,6 +2238,29 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
     return data.candidates[0].content.parts[0].text;
 }
 
+/**
+ * Robustly parse a JSON string returned by an AI model.
+ * Strips markdown fences, finds the outermost { } or [ ], then parses.
+ */
+function _parseAIJson(raw) {
+    // Fast path
+    try { return JSON.parse(raw); } catch(_) {}
+    // Strip fences
+    let s = raw.trim()
+        .replace(/^```json\s*/i, '').replace(/^```\s*/, '')
+        .replace(/\s*```$/, '').trim();
+    // Extract outermost object or array
+    const oc = s.indexOf('{'), ac = s.indexOf('[');
+    let start = -1, endChar = '';
+    if (oc !== -1 && (ac === -1 || oc < ac)) { start = oc; endChar = '}'; }
+    else if (ac !== -1)                        { start = ac; endChar = ']'; }
+    if (start !== -1) {
+        const end = s.lastIndexOf(endChar);
+        if (end > start) s = s.slice(start, end + 1);
+    }
+    return JSON.parse(s); // throws if still broken — caller handles
+}
+
 
 async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCallback = null, images = []) {
     if (!geminiApiKey) {
@@ -2376,111 +2399,108 @@ const _pendingImages = { agent: [], chat: [] };
  * via a foreign-object SVG trick (works same-origin or srcdoc iframes).
  */
 /**
- * Capture the live preview as a PNG dataURL.
+ * Capture the LIVE preview iframe as a PNG dataURL.
  *
- * The preview is written via doc.write() so we cannot inject a <script> into its
- * already-closed document reliably. Instead we:
- *   1. Grab the full rendered HTML from the live iframe's DOM.
- *   2. Wrap it in a Blob URL and load it into a hidden offscreen iframe
- *      (Blob URL iframes are same-origin to themselves → html2canvas works).
- *   3. Inject html2canvas into the offscreen iframe, capture, destroy the iframe.
- *   4. Fall back to SVG foreignObject if the above fails.
+ * Key insight: website-preview is populated via doc.write() making it same-origin.
+ * We load html2canvas into the PARENT window and point it at iDoc.body directly —
+ * this captures the actual live rendered state including any JS-driven navigation.
+ * No offscreen iframe needed (that approach always captured static initial HTML).
  */
 async function capturePreviewScreenshot() {
     const liveIframe = document.getElementById('website-preview');
     if (!liveIframe) throw new Error('Preview iframe not found.');
 
+    // Switch to preview tab so the iframe is visible and laid out
+    const previewTabBtn = document.querySelector('.tab-button[data-tab="preview"]')
+                       || document.querySelector('[onclick*="preview"]');
+    if (previewTabBtn) previewTabBtn.click();
+    await new Promise(r => setTimeout(r, 300));
+
     const iDoc = liveIframe.contentDocument || liveIframe.contentWindow?.document;
     if (!iDoc || !iDoc.body) throw new Error('Preview iframe not ready.');
 
-    // ── Strategy 1: offscreen blob-URL iframe + html2canvas (mirrors apui.html) ──
+    const W = liveIframe.offsetWidth  || liveIframe.clientWidth  || 900;
+    const H = liveIframe.offsetHeight || liveIframe.clientHeight || 600;
+
+    // ── Strategy 1: html2canvas in PARENT window targeting live iframe body ──
     try {
-        const html = iDoc.documentElement.outerHTML;
-        const dataURL = await _captureViaOffscreenIframe(html,
-            liveIframe.offsetWidth  || 900,
-            liveIframe.offsetHeight || 600);
-        return dataURL;
-    } catch (e) {
-        console.warn('[Screenshot] offscreen iframe strategy failed:', e.message || e);
+        await _ensureHtml2CanvasInParent();
+        const canvas = await window.html2canvas(iDoc.body, {
+            useCORS:         true,
+            allowTaint:      true,
+            scale:           0.75,
+            logging:         false,
+            backgroundColor: '#ffffff',
+            width:           W,
+            height:          H,
+            windowWidth:     iDoc.documentElement.scrollWidth  || W,
+            windowHeight:    iDoc.documentElement.scrollHeight || H,
+        });
+        return canvas.toDataURL('image/png');
+    } catch(e) {
+        console.warn('[Screenshot] html2canvas parent strategy failed:', e.message || e);
     }
 
-    // ── Strategy 2: SVG foreignObject (works if no cross-origin resources) ──
+    // ── Strategy 2: inject html2canvas INTO the live iframe (same-origin) ──
+    try {
+        return await _captureViaInjection(liveIframe, W, H);
+    } catch(e) {
+        console.warn('[Screenshot] injection strategy failed:', e.message || e);
+    }
+
+    // ── Strategy 3: SVG foreignObject ──
     try {
         return await _svgScreenshotFallback(liveIframe);
-    } catch (e) {
+    } catch(e) {
         console.warn('[Screenshot] SVG fallback failed:', e.message || e);
     }
 
-    // ── Strategy 3: placeholder so the button never shows ✗ ──
     return _blankCanvasFallback(liveIframe);
 }
 
-/**
- * Create a hidden offscreen iframe from a blob URL, inject html2canvas into it
- * (exactly like apui.html does), capture the body, destroy the iframe.
- */
-function _captureViaOffscreenIframe(html, W, H) {
+/** Load html2canvas into the parent window once */
+function _ensureHtml2CanvasInParent() {
+    if (window.html2canvas) return Promise.resolve();
     return new Promise((resolve, reject) => {
-        const blob   = new Blob([html], { type: 'text/html' });
-        const blobURL = URL.createObjectURL(blob);
-
-        const frame = document.createElement('iframe');
-        frame.style.cssText = `position:fixed;left:-9999px;top:-9999px;width:${W}px;height:${H}px;visibility:hidden;pointer-events:none;border:none;`;
-        frame.src = blobURL;
-
-        const cleanup = () => {
-            try { document.body.removeChild(frame); } catch(_) {}
-            URL.revokeObjectURL(blobURL);
-        };
-
-        const timeout = setTimeout(() => {
-            cleanup();
-            reject(new Error('Offscreen iframe timed out'));
-        }, 12000);
-
-        frame.onload = async () => {
-            try {
-                const iWin = frame.contentWindow;
-                const iDoc = frame.contentDocument || iWin.document;
-
-                // Inject html2canvas into the blob-URL iframe (same as apui.html)
-                if (!iWin.html2canvas) {
-                    await new Promise((res, rej) => {
-                        const s = iDoc.createElement('script');
-                        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                        s.onload  = res;
-                        s.onerror = () => rej(new Error('html2canvas failed to load in offscreen iframe'));
-                        iDoc.head.appendChild(s);
-                    });
-                }
-
-                const canvas = await iWin.html2canvas(iDoc.body, {
-                    useCORS:         true,
-                    allowTaint:      true,
-                    scale:           0.7,
-                    logging:         false,
-                    backgroundColor: '#ffffff',
-                });
-
-                const dataURL = canvas.toDataURL('image/png');
-                clearTimeout(timeout);
-                cleanup();
-                resolve(dataURL);
-            } catch (err) {
-                clearTimeout(timeout);
-                cleanup();
-                reject(err);
-            }
-        };
-
-        frame.onerror = (ev) => {
-            clearTimeout(timeout);
-            cleanup();
-            reject(new Error('Offscreen iframe failed to load'));
-        };
-
-        document.body.appendChild(frame);
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload  = resolve;
+        s.onerror = () => reject(new Error('Failed to load html2canvas'));
+        document.head.appendChild(s);
     });
+}
+
+/**
+ * Inject html2canvas directly into the live same-origin iframe and call it there.
+ * Works because doc.write() iframes are same-origin — script tags CAN be appended
+ * after doc.close() and will execute; we just need to wait for them.
+ */
+function _captureViaInjection(iframe, W, H) {
+    return new Promise((resolve, reject) => {
+        const iWin = iframe.contentWindow;
+        const iDoc = iframe.contentDocument || iWin.document;
+        if (!iDoc || !iDoc.head) return reject(new Error('Cannot access iframe document'));
+
+        if (iWin.html2canvas) {
+            _runHtml2CanvasInIframe(iWin, iDoc, W, H, resolve, reject);
+            return;
+        }
+
+        const s = iDoc.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload  = () => _runHtml2CanvasInIframe(iWin, iDoc, W, H, resolve, reject);
+        s.onerror = () => reject(new Error('html2canvas failed to load in iframe'));
+        iDoc.head.appendChild(s);
+    });
+}
+
+function _runHtml2CanvasInIframe(iWin, iDoc, W, H, resolve, reject) {
+    iWin.html2canvas(iDoc.body, {
+        useCORS: true, allowTaint: true, scale: 0.75,
+        logging: false, backgroundColor: '#ffffff',
+        width: W, height: H,
+    }).then(canvas => resolve(canvas.toDataURL('image/png')))
+      .catch(reject);
 }
 
 async function _svgScreenshotFallback(iframe) {
@@ -4068,7 +4088,30 @@ async function executeSingleTask(promptContext, images = []) {
         const userPrompt = `User Request History:\n"${promptContext}"${imageNote}\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true, null, images);
-        const agentDecision = JSON.parse(rawResponse);
+        
+        // Robustly clean and parse the JSON response
+        let agentDecision;
+        try {
+            agentDecision = JSON.parse(rawResponse);
+        } catch(parseErr) {
+            // Strip markdown fences then retry
+            let cleaned = rawResponse.trim()
+                .replace(/^```json\s*/i, '').replace(/^```\s*/i, '')
+                .replace(/\s*```$/, '').trim();
+            // Find the first { and last } to extract just the JSON object
+            const start = cleaned.indexOf('{');
+            const end   = cleaned.lastIndexOf('}');
+            if (start !== -1 && end !== -1 && end > start) {
+                cleaned = cleaned.slice(start, end + 1);
+            }
+            try {
+                agentDecision = JSON.parse(cleaned);
+            } catch(e2) {
+                // Last resort: ask model what it meant
+                console.error('JSON parse failed even after cleaning. Raw:', rawResponse.slice(0, 300));
+                throw new Error('Agent returned invalid JSON. Try again or simplify your request.');
+            }
+        }
         
         if (agentDecision.question) {
             renderAgentQuestionUI(agentDecision.question);
@@ -9236,4 +9279,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                     }
+    }
