@@ -4274,46 +4274,98 @@ async function jarvisRun(background) {
 }
 
 async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
-  var mem   = _jrvMemorySummary();
-  var state = _jrvReadState();
-  var skills = _jrvSkillsLoad().map(function(s){ return s.name + ': ' + s.description; }).join('\n') || 'none';
+  var mem    = _jrvMemorySummary();
+  var state  = _jrvReadState();
+  var skills = _jrvSkillsLoad().map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
 
-  var actionMenu = [
-    'switchTab <tab>        — start agent preview code context chat',
-    'agentTab <tab>         — run session tracker jarvis',
-    'setPrompt <text>       — type into agent prompt',
-    'addTask                — click Add Task',
-    'processQueue           — start processing queue',
-    'stopQueue              — stop the queue',
-    'setIntent <text>       — set session intent',
-    'screenshot             — screenshot current preview state',
-    'screenshotNav <hint>   — navigate preview to <hint> element then screenshot',
-    'clickPreview <text>    — click element with matching text in preview',
-    'newThread <name>       — create tracker thread',
-    'logWorked <text>       — log worked edit',
-    'logFailed <text>       — log failed edit',
-    'addMemory <text>       — save something to remember',
-    'readState              — get current UI state',
-    'reply <text>           — give a conversational reply to the user',
-    'wait                   — pause briefly',
-    'done <summary>         — finish',
+  var systemPrompt = [
+'You are Jarvis, a wholesome AI autopilot embedded in APUI Vibe Editor — a web IDE for building and editing live websites.',
+'',
+'=== VIBE EDITOR SYSTEM DOCUMENTATION ===',
+'',
+'MAIN TABS (use switchtab):',
+'  start   — Home screen. Shows saved projects. User can open or create projects.',
+'  agent   — AI Agent tab. Has its own inner tabs: run, session, tracker, jarvis.',
+'  preview — Live website preview. Shows the rendered HTML of the current project.',
+'  code    — Full code editor. Shows and edits the raw HTML/CSS/JS.',
+'  context — Project context tree. Shows component structure.',
+'  chat    — Chat with Claude AI about the project.',
+'',
+'AGENT INNER TABS (use agenttab):',
+'  run     — Task queue and agent log. THIS IS WHERE TASKS ARE TYPED AND RUN.',
+'  session — Session intent and node context panel.',
+'  tracker — Task tracker with threads and edit logs.',
+'  jarvis  — This pane (you are here).',
+'',
+'HOW TO RUN AN AGENT TASK:',
+'  The SIMPLEST way is: DO: addandrun <your task description>',
+'  This sets the prompt, adds it to queue, AND starts processing. Use this for most tasks.',
+'  Manual way: setprompt → addtask → processqueue (three separate steps).',
+'  The queue button only works when there are tasks queued AND the agent is not already running.',
+'',
+'TASK TRACKER:',
+'  newthread <name> — Creates a thread and opens it. REQUIRED before logging edits.',
+'  logedit <text>   — Logs a pending/in-progress edit.',
+'  logworked <text> — Logs an edit that succeeded.',
+'  logfailed <text> — Logs an edit that failed.',
+'  All three log directly without needing the UI focused.',
+'',
+'SCREENSHOTS:',
+'  screenshot         — Switches to Preview tab and captures it.',
+'  screenshotnav <x>  — Clicks element matching <x> text in preview, then captures.',
+'  clickpreview <x>   — Clicks element in preview matching text <x>.',
+'  Always switch to preview tab before screenshotting if you need current state.',
+'',
+'MEMORY:',
+'  addmemory <text>   — Saves text to persistent memory (survives page reload).',
+'  Use this to remember decisions, completed tasks, user preferences.',
+'',
+'SESSION INTENT:',
+'  setintent <text>   — Sets the session goal shown in the Session tab.',
+'  This helps the AI agent understand what the overall project goal is.',
+'',
+'=== YOUR CURRENT CONTEXT ===',
+'State: ' + state,
+'',
+'Your Memory:',
+mem,
+'',
+'Your Skills:',
+skills,
+'',
+'=== RESPONSE FORMAT ===',
+'Reply with EXACTLY two lines — no more, no less:',
+'THINK: <one sentence of reasoning>',
+'DO: <action> <arg>',
+'',
+'ACTIONS LIST:',
+'  addandrun <task>        BEST for agent tasks — queues AND runs in one step',
+'  switchtab <tab>         switch main tab: start agent preview code context chat',
+'  agenttab <tab>          switch agent inner tab: run session tracker jarvis',
+'  setprompt <text>        type into agent prompt box (use addandrun instead)',
+'  addtask                 add prompt to queue (use addandrun instead)',
+'  processqueue            start queue (use addandrun instead)',
+'  stopqueue               stop the running queue',
+'  setintent <text>        set session intent/goal',
+'  screenshot              capture preview screenshot',
+'  screenshotnav <hint>    navigate preview then screenshot',
+'  clickpreview <text>     click element in preview by text',
+'  newthread <name>        create tracker thread',
+'  logedit <text>          log edit (pending)',
+'  logworked <text>        log edit that worked',
+'  logfailed <text>        log edit that failed',
+'  addmemory <text>        save to persistent memory',
+'  readstate               read current UI state',
+'  reply <text>            give conversational reply to user',
+'  wait                    pause 0.8s',
+'  done <summary>          finish with summary',
+'',
+'RULES:',
+'1. Exactly two lines. No markdown. No JSON. No extra text.',
+'2. Use addandrun for agent tasks — it is the most reliable single action.',
+'3. Be warm and proactive. You are a wholesome assistant.',
+'4. Always end with done.',
   ].join('\n');
-
-  var systemPrompt = 'You are Jarvis, a wholesome AI assistant embedded in a web IDE called Vibe Editor.\n'
-    + 'You are warm, proactive, and genuinely helpful. You remember context, learn from experience, and always complete goals thoroughly.\n\n'
-    + 'CURRENT STATE:\n' + state + '\n\n'
-    + 'YOUR MEMORY:\n' + mem + '\n\n'
-    + 'YOUR SKILLS:\n' + skills + '\n\n'
-    + 'RESPONSE FORMAT — exactly two lines:\n'
-    + 'THINK: <brief reasoning>\n'
-    + 'DO: <action> <arg>\n\n'
-    + 'ACTIONS:\n' + actionMenu + '\n\n'
-    + 'RULES:\n'
-    + '1. Only two lines. No markdown. No extra text.\n'
-    + '2. Be efficient. Accomplish goals in minimal steps.\n'
-    + '3. Use "reply" for conversational responses.\n'
-    + '4. Always end with "done".\n'
-    + '5. For screenshots: use screenshotNav if you need to navigate first.\n';
 
   var messages = [{ role: 'user', parts: [{ text: 'Goal: ' + goal }] }];
   var lastResult = '';
@@ -4325,7 +4377,7 @@ async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
     var body = JSON.stringify({
       contents: messages,
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { temperature: 0.1, maxOutputTokens: 90, topP: 0.85 },
+      generationConfig: { temperature: 0.1, maxOutputTokens: 100, topP: 0.85 },
     });
 
     var rawText;
@@ -4335,24 +4387,29 @@ async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
       var data = await resp.json();
       if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
       rawText = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
+      if (!rawText) throw new Error('Empty response from model');
     } catch(e) {
       _jrvLog('❌ ' + (e.message || e), 'jrv-msg-err');
       break;
     }
 
-    // Parse THINK / DO
+    // Parse THINK / DO — lenient: accept any line starting with those words
     var thinkLine = '', doLine = '';
     rawText.trim().split('\n').forEach(function(l) {
       l = l.trim();
-      if (!thinkLine && /^think[:\s]/i.test(l)) thinkLine = l.replace(/^think[:\s]*/i,'').trim();
-      if (!doLine   && /^do[:\s]/i.test(l))    doLine    = l.replace(/^do[:\s]*/i,'').trim();
+      if (!thinkLine && /^think[:\-\s]/i.test(l)) thinkLine = l.replace(/^think[:\-\s]*/i,'').trim();
+      if (!doLine   && /^do[:\-\s]/i.test(l))    doLine    = l.replace(/^do[:\-\s]*/i,'').trim();
     });
-    if (!doLine) doLine = rawText.trim().split('\n').filter(Boolean).pop() || '';
+    // Fallback: if model ignored format, use last non-empty line
+    if (!doLine) {
+      var lines = rawText.trim().split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      doLine = lines[lines.length - 1] || '';
+    }
 
     if (!silent && thinkLine) _jrvLog('💭 ' + thinkLine, 'jrv-msg-think');
 
     var parts  = doLine.split(/\s+/);
-    var action = (parts[0] || '').toLowerCase();
+    var action = (parts[0] || '').toLowerCase().replace(/[^a-z]/g,'');
     var arg    = parts.slice(1).join(' ').trim();
 
     if (action === 'done') {
@@ -4365,46 +4422,42 @@ async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
       _jrvLog('🤖 ' + arg, 'jrv-msg-jarvis');
       lastResult = arg;
       messages.push({ role: 'model', parts: [{ text: rawText }] });
-      messages.push({ role: 'user',  parts: [{ text: 'OK' }] });
+      messages.push({ role: 'user',  parts: [{ text: 'OK, continue.' }] });
       continue;
     }
 
     var result = await _jrvExec(action, arg);
 
     if (!silent) {
-      _jrvLogRaw('<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
-        + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0,50)) + '</span>' : '')
-        + (result && typeof result === 'string' && result.length < 200
-            ? ' <span style="color:#5c6370">→ ' + _esc(result.slice(0,100)) + '</span>' : ''));
-    }
-
-    // If screenshot returned a dataURL, show thumbnail
-    if (typeof result === 'string' && result.startsWith('data:image')) {
-      if (!silent) {
+      if (typeof result === 'string' && result.startsWith('data:image')) {
         var logEl = document.getElementById('jarvis-log');
         if (logEl) {
           var img = document.createElement('img');
           img.src = result;
-          img.style.cssText = 'max-width:100%;border-radius:4px;margin:4px 0;border:1px solid var(--apui-border);';
+          img.style.cssText = 'max-width:100%;border-radius:4px;margin:4px 0;border:1px solid var(--apui-border);display:block;';
           logEl.appendChild(img);
           logEl.scrollTop = logEl.scrollHeight;
         }
+        result = '[screenshot]';
+      } else {
+        _jrvLogRaw('<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
+          + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0,50)) + '</span>' : '')
+          + (result ? ' <span style="color:#5c6370">→ ' + _esc(String(result).slice(0,100)) + '</span>' : ''));
       }
-      result = '[screenshot captured]';
     }
 
     messages.push({ role: 'model', parts: [{ text: rawText }] });
-    var fb = action === 'readstate' ? 'STATE: ' + result : 'OK: ' + String(result || '').slice(0, 150);
+    var fb = action === 'readstate' ? 'STATE: ' + result : 'OK: ' + String(result || 'done').slice(0, 150);
     messages.push({ role: 'user', parts: [{ text: fb }] });
 
-    // Keep context window lean for small models
-    if (messages.length > 16) messages.splice(1, 2);
+    // Keep context lean for small models
+    if (messages.length > 18) messages.splice(1, 2);
 
-    await new Promise(function(r) { setTimeout(r, 200); });
+    await new Promise(function(r) { setTimeout(r, 250); });
   }
 
   if (steps >= maxSteps && !_jarvisStopped) {
-    if (!silent) _jrvLog('⏹ Max steps reached.', 'jrv-msg-err');
+    if (!silent) _jrvLog('⏹ Max steps (' + maxSteps + ') reached.', 'jrv-msg-err');
   }
 
   return lastResult;
@@ -4416,30 +4469,69 @@ async function _jrvExec(action, arg) {
       var t = arg.split(/\s+/)[0];
       if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(t);
       else if (typeof switchToTab === 'function') switchToTab(t);
-      await new Promise(function(r) { setTimeout(r, 400); });
+      await new Promise(function(r) { setTimeout(r, 500); });
       return 'switched to ' + t;
     }
     case 'agenttab': {
       var t = arg.split(/\s+/)[0];
       var btn = document.querySelector('.agt-itab[onclick*="' + t + '"]');
       agtSwitchTab(t, btn);
+      await new Promise(function(r) { setTimeout(r, 300); });
       return 'agent tab: ' + t;
     }
     case 'setprompt': {
+      // Must be on Run tab with agent tab visible
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('agent');
+      await new Promise(function(r) { setTimeout(r, 300); });
+      var runBtn = document.querySelector('.agt-itab[onclick*="run"]');
+      agtSwitchTab('run', runBtn);
+      await new Promise(function(r) { setTimeout(r, 200); });
       var el = document.getElementById('agent-prompt-input');
-      if (el) { el.value = arg; el.dispatchEvent(new Event('input')); }
-      return 'prompt set';
+      if (el) { el.value = arg; el.dispatchEvent(new Event('input')); el.focus(); }
+      return 'prompt set: ' + arg.slice(0, 60);
     }
     case 'addtask': {
+      // Navigate to agent > run tab first, then click
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('agent');
+      await new Promise(function(r) { setTimeout(r, 350); });
+      var runBtn = document.querySelector('.agt-itab[onclick*="run"]');
+      agtSwitchTab('run', runBtn);
+      await new Promise(function(r) { setTimeout(r, 250); });
       var b = document.getElementById('run-agent-single-task-button');
-      if (b) b.click();
-      await new Promise(function(r) { setTimeout(r, 300); });
-      return 'task added';
+      if (b && !b.disabled) b.click();
+      await new Promise(function(r) { setTimeout(r, 400); });
+      return 'task added to queue';
     }
     case 'processqueue': {
+      // Must be on agent > run tab and queue must have items
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('agent');
+      await new Promise(function(r) { setTimeout(r, 350); });
+      var runBtn = document.querySelector('.agt-itab[onclick*="run"]');
+      agtSwitchTab('run', runBtn);
+      await new Promise(function(r) { setTimeout(r, 300); });
       var b = document.getElementById('start-iterative-session-button');
-      if (b) b.click();
-      return 'queue started';
+      if (b && !b.disabled) {
+        b.click();
+        return 'process queue clicked — agent is now running';
+      }
+      return 'button not available (queue may be empty or already running)';
+    }
+    case 'addandrun': {
+      // Combined: set prompt, add task, process — all in one action for small models
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('agent');
+      await new Promise(function(r) { setTimeout(r, 400); });
+      var runBtn = document.querySelector('.agt-itab[onclick*="run"]');
+      agtSwitchTab('run', runBtn);
+      await new Promise(function(r) { setTimeout(r, 300); });
+      var el = document.getElementById('agent-prompt-input');
+      if (el) { el.value = arg; el.dispatchEvent(new Event('input')); }
+      await new Promise(function(r) { setTimeout(r, 200); });
+      var addBtn = document.getElementById('run-agent-single-task-button');
+      if (addBtn && !addBtn.disabled) addBtn.click();
+      await new Promise(function(r) { setTimeout(r, 500); });
+      var runQBtn = document.getElementById('start-iterative-session-button');
+      if (runQBtn && !runQBtn.disabled) runQBtn.click();
+      return 'task queued and processing started: ' + arg.slice(0, 60);
     }
     case 'stopqueue': {
       var b = document.getElementById('end-session-button');
@@ -4452,7 +4544,7 @@ async function _jrvExec(action, arg) {
       if (inp) inp.value = arg;
       if (txt) { txt.textContent = arg; txt.setAttribute('data-intent', arg); }
       try { sessionStorage.setItem('apui_session_intent', arg); } catch(e){}
-      return 'intent set';
+      return 'intent set: ' + arg.slice(0, 60);
     }
     case 'screenshot': {
       return await _jrvScreenshot();
@@ -4465,44 +4557,65 @@ async function _jrvExec(action, arg) {
       if (!liveIframe || !liveIframe.contentDocument) return 'no preview';
       try {
         var iDoc = liveIframe.contentDocument;
-        var els = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick],h1,h2,h3,nav,header'));
+        var els = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick],h1,h2,h3,nav,header,li,span'));
         var match = els.find(function(e) { return e.textContent.trim().toLowerCase().includes(arg.toLowerCase()); });
-        if (match) { match.click(); await new Promise(function(r) { setTimeout(r, 700); }); return 'clicked: ' + match.tagName; }
-      } catch(e) {}
+        if (match) { match.click(); await new Promise(function(r) { setTimeout(r, 800); }); return 'clicked: ' + match.tagName + ' "' + match.textContent.trim().slice(0,30) + '"'; }
+      } catch(e) { return 'error: ' + e.message; }
       return 'element not found: ' + arg;
     }
     case 'newthread': {
+      // Navigate to tracker tab first
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('agent');
+      await new Promise(function(r) { setTimeout(r, 300); });
+      var tBtn = document.querySelector('.agt-itab[onclick*="tracker"]');
+      agtSwitchTab('tracker', tBtn);
+      await new Promise(function(r) { setTimeout(r, 200); });
       _ttLoad();
       var id = 'tt_' + Date.now();
-      _ttDB[id] = { id: id, name: arg || 'Jarvis', edits: [], created: Date.now() };
-      _ttSave(); ttRenderThreadList(); ttOpenThread(id);
-      return 'thread: ' + arg;
+      var name = arg || 'Jarvis Thread';
+      _ttDB[id] = { id: id, name: name, edits: [], created: Date.now() };
+      _ttSave();
+      ttRenderThreadList();
+      ttOpenThread(id);
+      return 'tracker thread opened: ' + name;
     }
-    case 'logworked': {
-      var i = document.getElementById('tt-edit-input');
-      if (i) i.value = arg;
-      ttAddEdit('worked');
-      return 'logged worked';
-    }
+    case 'logedit':
+    case 'logworked':
     case 'logfailed': {
-      var i = document.getElementById('tt-edit-input');
-      if (i) i.value = arg;
-      ttAddEdit('failed');
-      return 'logged failed';
+      // Direct API — doesn't rely on UI input field being focused or visible
+      var status = action === 'logworked' ? 'worked' : action === 'logfailed' ? 'failed' : 'pending';
+      if (!_ttActiveThread) {
+        // Auto-create a thread if none open
+        _ttLoad();
+        var id = 'tt_' + Date.now();
+        _ttDB[id] = { id: id, name: 'Jarvis', edits: [], created: Date.now() };
+        _ttSave();
+        _ttActiveThread = id;
+      }
+      _ttLoad();
+      var t = _ttDB[_ttActiveThread];
+      if (!t) return 'no active thread';
+      if (!t.edits) t.edits = [];
+      var text = arg || ('Jarvis ' + status);
+      t.edits.push({ id: 'e_' + Date.now(), text: text, status: status, ts: Date.now() });
+      _ttSave();
+      ttRenderEditList();
+      ttRenderThreadList();
+      return 'logged ' + status + ': ' + text.slice(0, 60);
     }
     case 'addmemory': {
       jarvisAddMemory(arg, 'jarvis');
-      return 'memory saved';
+      return 'memory saved: ' + arg.slice(0, 60);
     }
     case 'readstate': {
       return _jrvReadState();
     }
     case 'wait': {
-      await new Promise(function(r) { setTimeout(r, 700); });
+      await new Promise(function(r) { setTimeout(r, 800); });
       return 'waited';
     }
     default:
-      return 'unknown: ' + action;
+      return 'unknown action "' + action + '" — valid actions: switchtab agenttab setprompt addtask processqueue addandrun stopqueue setintent screenshot screenshotnav clickpreview newthread logedit logworked logfailed addmemory readstate wait done reply';
   }
 }
 
