@@ -466,9 +466,44 @@
         overflow-y: auto !important;
     }
 
-    /* Session pane scrollable sections */
-    #agt-pane-session .anc-pane { max-height: 32vh !important; }
-    #anc-att-list { max-height: 40vh; overflow-y: auto; }
+    /* Jarvis sub-tabs */
+    .jrv-stab {
+        background:transparent;border:none;border-bottom:2px solid transparent;
+        color:var(--apui-text-dim);font-family:'Fira Code',monospace;font-size:11px;
+        font-weight:700;padding:8px 12px 7px;cursor:pointer;white-space:nowrap;
+        transition:color .15s,border-color .15s;
+    }
+    .jrv-stab:hover { color:var(--apui-text); }
+    .jrv-stab-active { color:#c678dd!important;border-bottom-color:#c678dd!important; }
+    .jrv-pane { display:none;flex:1;overflow-y:auto;min-height:0; }
+    .jrv-pane-active { display:flex; }
+    .jrv-welcome { text-align:center;padding:28px 16px;color:#abb2bf; }
+    /* Jarvis chat messages */
+    .jrv-msg { padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);line-height:1.65; }
+    .jrv-msg-user { color:#61afef; }
+    .jrv-msg-jarvis { color:#abb2bf; }
+    .jrv-msg-action { color:#5c6370;font-size:11px; }
+    .jrv-msg-ok { color:#98c379; }
+    .jrv-msg-err { color:#e06c75; }
+    .jrv-msg-think { color:#5c6370;font-style:italic;font-size:11px; }
+    /* Memory + skill cards */
+    .jrv-card {
+        background:rgba(0,0,0,0.3);border:1px solid var(--apui-border);border-radius:5px;
+        padding:8px 10px;font-size:12px;color:#abb2bf;line-height:1.55;
+        display:flex;gap:8px;align-items:flex-start;
+    }
+    .jrv-card-del { background:none;border:none;color:#5c6370;cursor:pointer;padding:0;flex-shrink:0;font-size:13px;line-height:1; }
+    .jrv-card-del:hover { color:#e06c75; }
+    .jrv-suggestion {
+        background:rgba(97,175,239,0.07);border:1px solid rgba(97,175,239,0.25);
+        border-radius:5px;padding:7px 10px;font-size:12px;color:#abb2bf;
+        cursor:pointer;transition:background .15s;
+    }
+    .jrv-suggestion:hover { background:rgba(97,175,239,0.14); }
+    .jrv-bg-item {
+        background:rgba(0,0,0,0.3);border:1px solid var(--apui-border);border-radius:5px;
+        padding:8px 10px;font-size:12px;color:#abb2bf;
+    }
     #anc-intent-bar > div:first-child {
         background: rgba(65,105,225,0.12) !important;
         border-bottom: 1px solid var(--apui-border) !important;
@@ -2280,57 +2315,101 @@
                                 </div>
 
                                 <!-- ══ JARVIS AUTOPILOT pane ══ -->
-                                <div id="agt-pane-jarvis" class="agt-pane" style="flex-direction:column;gap:0;">
-                                    <!-- Header -->
-                                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-shrink:0;">
-                                        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#c678dd,#61afef);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🤖</div>
-                                        <div>
-                                            <div style="font-size:14px;font-weight:700;color:#c678dd;letter-spacing:.04em;">JARVIS AUTOPILOT</div>
-                                            <div style="font-size:11px;color:var(--apui-text-dim);">AI that controls the full vibe system</div>
+                                <div id="agt-pane-jarvis" class="agt-pane" style="flex-direction:column;gap:0;padding:0;">
+
+                                    <!-- Sub-tabs inside Jarvis -->
+                                    <div style="display:flex;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.2);flex-shrink:0;">
+                                        <button class="jrv-stab jrv-stab-active" onclick="jrvTab('chat',this)">🤖 Chat</button>
+                                        <button class="jrv-stab" onclick="jrvTab('memory',this)">🧠 Memory</button>
+                                        <button class="jrv-stab" onclick="jrvTab('skills',this)">⚡ Skills</button>
+                                        <button class="jrv-stab" onclick="jrvTab('bg',this)">🌙 Background</button>
+                                        <button class="jrv-stab" onclick="jarvisToggleSettings()" style="margin-left:auto;color:#5c6370;">⚙</button>
+                                    </div>
+
+                                    <!-- Settings (shared overlay) -->
+                                    <div id="jarvis-settings" style="display:none;background:#1a1f2e;border-bottom:1px solid #3e4451;padding:12px 14px;flex-shrink:0;">
+                                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                            <div>
+                                                <label style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:3px;">Gemini API Key</label>
+                                                <input type="password" id="jarvis-api-key" placeholder="AIza…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:6px 9px;font-size:12px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div>
+                                                <label style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:3px;">Model</label>
+                                                <input type="text" id="jarvis-model" placeholder="gemini-2.0-flash" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:6px 9px;font-size:12px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div>
+                                                <label style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:3px;">Max steps</label>
+                                                <input type="number" id="jarvis-max-steps" min="1" max="50" value="12" style="width:70px;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:6px 9px;font-size:12px;" oninput="jarvisSaveSettings()">
+                                            </div>
+                                            <div style="display:flex;align-items:flex-end;">
+                                                <button class="action-button small" onclick="jarvisClearMemory()" style="border-color:#e06c75;color:#e06c75;">🗑 Clear Memory</button>
+                                            </div>
                                         </div>
-                                        <div style="margin-left:auto;display:flex;gap:6px;">
-                                            <button class="action-button small" id="jarvis-settings-btn" onclick="jarvisToggleSettings()" style="border-color:#5c6370;color:#5c6370;"><i class="bi bi-gear"></i></button>
-                                            <button class="action-button small" id="jarvis-clear-btn" onclick="jarvisClearLog()" style="border-color:#5c6370;color:#5c6370;"><i class="bi bi-trash"></i></button>
+                                        <div id="jarvis-settings-status" style="font-size:11px;color:#98c379;margin-top:6px;display:none;">✓ Saved</div>
+                                    </div>
+
+                                    <!-- ── CHAT sub-pane ── -->
+                                    <div id="jrv-pane-chat" class="jrv-pane jrv-pane-active" style="flex-direction:column;">
+                                        <div id="jarvis-log" style="flex:1;min-height:0;overflow-y:auto;padding:10px 12px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.7;">
+                                            <div class="jrv-welcome">
+                                                <div style="font-size:22px;margin-bottom:8px;">🤖</div>
+                                                <div style="font-size:13px;font-weight:700;color:#c678dd;margin-bottom:6px;">JARVIS — Wholesome AI Autopilot</div>
+                                                <div style="font-size:12px;color:#5c6370;line-height:1.8;">I remember context across sessions, work in the background, take real screenshots of any page state, and get smarter over time. What shall we build?</div>
+                                            </div>
+                                        </div>
+                                        <div style="flex-shrink:0;padding:10px 12px;border-top:1px solid var(--apui-border);background:rgba(0,0,0,0.2);display:flex;flex-direction:column;gap:6px;">
+                                            <textarea id="jarvis-input" rows="2" placeholder="Ask Jarvis anything — tasks, questions, suggestions, autopilot goals…" style="width:100%;font-size:12px;resize:vertical;border-radius:6px;"></textarea>
+                                            <div style="display:flex;gap:5px;">
+                                                <button class="action-button" id="jarvis-run-btn" onclick="jarvisRun(false)" style="flex:1;border-color:#c678dd;color:#c678dd;background:rgba(198,120,221,0.08);font-size:12px;">
+                                                    <i class="bi bi-robot"></i> Run
+                                                </button>
+                                                <button class="action-button small" onclick="jarvisRun(true)" style="border-color:#61afef;color:#61afef;" title="Run in background without blocking UI">
+                                                    🌙 BG
+                                                </button>
+                                                <button class="action-button small" id="jarvis-stop-btn" onclick="jarvisStop()" style="display:none;border-color:#e06c75;color:#e06c75;">■ Stop</button>
+                                                <button class="action-button small" onclick="jarvisClearLog()" style="border-color:#5c6370;color:#5c6370;">🗑</button>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <!-- Settings panel -->
-                                    <div id="jarvis-settings" style="display:none;background:#1e2227;border:1px solid #3e4451;border-radius:6px;padding:12px;margin-bottom:12px;flex-shrink:0;">
-                                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:10px;">Configuration</div>
-                                        <div style="display:flex;flex-direction:column;gap:8px;">
-                                            <div>
-                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Gemini API Key</label>
-                                                <input type="password" id="jarvis-api-key" placeholder="AIza…" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
+                                    <!-- ── MEMORY sub-pane ── -->
+                                    <div id="jrv-pane-memory" class="jrv-pane" style="flex-direction:column;padding:12px;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#c678dd;">🧠 Jarvis Memory</span>
+                                            <div style="display:flex;gap:5px;">
+                                                <button class="action-button small" onclick="jarvisAddMemoryManual()" style="border-color:#61afef;color:#61afef;">+ Add</button>
+                                                <button class="action-button small" onclick="jarvisClearMemory()" style="border-color:#e06c75;color:#e06c75;">Clear All</button>
                                             </div>
-                                            <div>
-                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Model name</label>
-                                                <input type="text" id="jarvis-model" placeholder="gemini-2.0-flash" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;font-family:'Fira Code',monospace;" oninput="jarvisSaveSettings()">
-                                            </div>
-                                            <div>
-                                                <label style="font-size:11px;color:#abb2bf;display:block;margin-bottom:3px;">Max steps per run</label>
-                                                <input type="number" id="jarvis-max-steps" min="1" max="30" value="8" style="width:80px;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:7px 10px;font-size:13px;" oninput="jarvisSaveSettings()">
-                                            </div>
-                                            <div id="jarvis-settings-status" style="font-size:11px;color:#98c379;display:none;">✓ Settings saved</div>
+                                        </div>
+                                        <div id="jrv-memory-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+                                            <div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No memories yet. Jarvis will remember important things automatically.</div>
                                         </div>
                                     </div>
 
-                                    <!-- Activity log -->
-                                    <div id="jarvis-log" style="flex:1;min-height:120px;overflow-y:auto;background:rgba(5,8,18,0.7);border:1px solid var(--apui-border);border-radius:6px;padding:10px 12px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.7;margin-bottom:10px;">
-                                        <div style="color:#5c6370;text-align:center;padding:20px 0;">Jarvis is ready. Give it a goal and it will autonomously control the system.</div>
+                                    <!-- ── SKILLS sub-pane ── -->
+                                    <div id="jrv-pane-skills" class="jrv-pane" style="flex-direction:column;padding:12px;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#e5c07b;">⚡ Jarvis Skills</span>
+                                            <button class="action-button small" onclick="jarvisGenerateSkill()" style="border-color:#e5c07b;color:#e5c07b;">✦ Generate</button>
+                                        </div>
+                                        <div id="jrv-skills-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
                                     </div>
 
-                                    <!-- Input -->
-                                    <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;">
-                                        <textarea id="jarvis-input" rows="2" placeholder="e.g. Switch to the Preview tab, take a screenshot, then open the Agent tab and queue a task to fix the layout…" style="width:100%;font-size:13px;resize:vertical;"></textarea>
-                                        <div style="display:flex;gap:6px;align-items:center;">
-                                            <button class="action-button" id="jarvis-run-btn" onclick="jarvisRun()" style="flex:1;border-color:#c678dd;color:#c678dd;background:rgba(198,120,221,0.08);">
-                                                <i class="bi bi-robot"></i> Run Jarvis
-                                            </button>
-                                            <button class="action-button small" id="jarvis-stop-btn" onclick="jarvisStop()" style="display:none;border-color:#e06c75;color:#e06c75;">
-                                                <i class="bi bi-stop-circle"></i> Stop
-                                            </button>
+                                    <!-- ── BACKGROUND sub-pane ── -->
+                                    <div id="jrv-pane-bg" class="jrv-pane" style="flex-direction:column;padding:12px;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
+                                            <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#61afef;">🌙 Background Tasks</span>
+                                            <button class="action-button small" onclick="jarvisRunBackground()" style="border-color:#61afef;color:#61afef;">+ Queue Task</button>
+                                        </div>
+                                        <div id="jrv-bg-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+                                            <div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No background tasks running.</div>
+                                        </div>
+                                        <div style="flex-shrink:0;margin-top:10px;border-top:1px solid var(--apui-border);padding-top:10px;">
+                                            <div style="font-size:11px;color:#5c6370;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Suggestions from Jarvis</div>
+                                            <div id="jrv-suggestions" style="display:flex;flex-direction:column;gap:5px;"></div>
                                         </div>
                                     </div>
+
                                 </div>
 
                             </div>
@@ -3811,141 +3890,433 @@ function annotateFromScreenshot(ctx) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   JARVIS AUTOPILOT
+   JARVIS — Wholesome AI Autopilot
    ══════════════════════════════════════════════════════════ */
-var _jarvisStopped = false;
-var _jarvisLog = [];
 
+// ── Sub-tab switcher ──
+function jrvTab(name, btn) {
+  document.querySelectorAll('.jrv-pane').forEach(function(p) { p.classList.remove('jrv-pane-active'); });
+  document.querySelectorAll('.jrv-stab').forEach(function(b) { b.classList.remove('jrv-stab-active'); });
+  var p = document.getElementById('jrv-pane-' + name);
+  if (p) p.classList.add('jrv-pane-active');
+  if (btn) btn.classList.add('jrv-stab-active');
+  if (name === 'memory') jrvRenderMemory();
+  if (name === 'skills') jrvRenderSkills();
+  if (name === 'bg') jrvRenderBg();
+}
+
+// ── Settings ──
 function jarvisToggleSettings() {
   var s = document.getElementById('jarvis-settings');
-  if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
-  // Load saved settings
+  if (!s) return;
+  s.style.display = s.style.display === 'none' ? 'block' : 'none';
   jarvisLoadSettings();
 }
-
 function jarvisLoadSettings() {
   try {
-    var saved = JSON.parse(localStorage.getItem('jarvis_settings') || '{}');
-    var keyEl   = document.getElementById('jarvis-api-key');
-    var modelEl = document.getElementById('jarvis-model');
-    var stepsEl = document.getElementById('jarvis-max-steps');
-    if (keyEl   && saved.apiKey)    keyEl.value   = saved.apiKey;
-    if (modelEl && saved.model)     modelEl.value = saved.model;
-    if (stepsEl && saved.maxSteps)  stepsEl.value = saved.maxSteps;
+    var d = JSON.parse(localStorage.getItem('jarvis_settings') || '{}');
+    var f = function(id, val) { var e = document.getElementById(id); if (e && val) e.value = val; };
+    f('jarvis-api-key', d.apiKey);
+    f('jarvis-model',   d.model);
+    f('jarvis-max-steps', d.maxSteps);
   } catch(e) {}
 }
-
 function jarvisSaveSettings() {
   try {
-    var saved = {
-      apiKey:   (document.getElementById('jarvis-api-key')   || {}).value || '',
-      model:    (document.getElementById('jarvis-model')      || {}).value || 'gemini-2.0-flash',
-      maxSteps: (document.getElementById('jarvis-max-steps')  || {}).value || '8',
-    };
-    localStorage.setItem('jarvis_settings', JSON.stringify(saved));
+    var g = function(id) { return (document.getElementById(id) || {}).value || ''; };
+    localStorage.setItem('jarvis_settings', JSON.stringify({ apiKey: g('jarvis-api-key'), model: g('jarvis-model'), maxSteps: g('jarvis-max-steps') }));
     var st = document.getElementById('jarvis-settings-status');
-    if (st) { st.style.display = 'block'; clearTimeout(st._t); st._t = setTimeout(function(){ st.style.display='none'; }, 1500); }
+    if (st) { st.style.display = 'block'; clearTimeout(st._t); st._t = setTimeout(function() { st.style.display = 'none'; }, 1400); }
   } catch(e) {}
+}
+function _jrvGet(id) { return ((document.getElementById(id) || {}).value || '').trim(); }
+
+// ── Memory ──
+function _jrvMemLoad() {
+  try { return JSON.parse(localStorage.getItem('jarvis_memory') || '[]'); } catch(e) { return []; }
+}
+function _jrvMemSave(mem) {
+  try { localStorage.setItem('jarvis_memory', JSON.stringify(mem.slice(-80))); } catch(e) {}
+}
+function jarvisAddMemory(text, type) {
+  if (!text || !text.trim()) return;
+  var mem = _jrvMemLoad();
+  mem.push({ id: 'mem_' + Date.now(), text: text.trim(), type: type || 'fact', ts: Date.now() });
+  _jrvMemSave(mem);
+  jrvRenderMemory();
+}
+function jarvisAddMemoryManual() {
+  var txt = prompt('Add a memory for Jarvis:');
+  if (txt && txt.trim()) { jarvisAddMemory(txt.trim(), 'manual'); }
+}
+function jarvisClearMemory() {
+  if (!confirm('Clear all Jarvis memories?')) return;
+  localStorage.removeItem('jarvis_memory');
+  jrvRenderMemory();
+}
+function jrvRenderMemory() {
+  var el = document.getElementById('jrv-memory-list');
+  if (!el) return;
+  var mem = _jrvMemLoad();
+  if (!mem.length) { el.innerHTML = '<div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No memories yet.</div>'; return; }
+  el.innerHTML = '';
+  mem.slice().reverse().forEach(function(m) {
+    var d = document.createElement('div');
+    d.className = 'jrv-card';
+    var icon = m.type === 'skill' ? '⚡' : m.type === 'task' ? '✅' : m.type === 'manual' ? '📝' : '🧠';
+    d.innerHTML = '<span style="flex:1"><span style="color:#5c6370;font-size:10px;">' + icon + ' ' + new Date(m.ts).toLocaleDateString() + '</span><br>' + _esc(m.text) + '</span>'
+      + '<button class="jrv-card-del" onclick="jrvDeleteMemory(\'' + m.id + '\')">✕</button>';
+    el.appendChild(d);
+  });
+}
+function jrvDeleteMemory(id) {
+  var mem = _jrvMemLoad().filter(function(m) { return m.id !== id; });
+  _jrvMemSave(mem);
+  jrvRenderMemory();
+}
+function _jrvMemorySummary() {
+  var mem = _jrvMemLoad();
+  if (!mem.length) return '(no memories yet)';
+  return mem.slice(-12).map(function(m) { return '• ' + m.text; }).join('\n');
+}
+
+// ── Skills ──
+function _jrvSkillsLoad() {
+  try { return JSON.parse(localStorage.getItem('jarvis_skills') || '[]'); } catch(e) { return []; }
+}
+function _jrvSkillsSave(sk) {
+  try { localStorage.setItem('jarvis_skills', JSON.stringify(sk)); } catch(e) {}
+}
+function jrvRenderSkills() {
+  var el = document.getElementById('jrv-skills-list');
+  if (!el) return;
+  var sk = _jrvSkillsLoad();
+  if (!sk.length) {
+    el.innerHTML = '<div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No custom skills yet.<br>Click ✦ Generate to let Jarvis create new capabilities.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  sk.forEach(function(s, i) {
+    var d = document.createElement('div');
+    d.className = 'jrv-card';
+    d.style.flexDirection = 'column';
+    d.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+      + '<span style="color:#e5c07b;font-weight:700;font-size:12px;">⚡ ' + _esc(s.name) + '</span>'
+      + '<button class="jrv-card-del" onclick="jrvDeleteSkill(' + i + ')">✕</button></div>'
+      + '<div style="color:#5c6370;font-size:11px;margin-bottom:4px;">' + _esc(s.description) + '</div>'
+      + '<button class="action-button small" onclick="jrvRunSkill(' + i + ')" style="align-self:flex-start;font-size:10px;padding:2px 8px;">▶ Run</button>';
+    el.appendChild(d);
+  });
+}
+function jrvDeleteSkill(i) {
+  var sk = _jrvSkillsLoad();
+  sk.splice(i, 1);
+  _jrvSkillsSave(sk);
+  jrvRenderSkills();
+}
+function jrvRunSkill(i) {
+  var sk = _jrvSkillsLoad();
+  if (!sk[i]) return;
+  var inp = document.getElementById('jarvis-input');
+  if (inp) inp.value = sk[i].prompt || sk[i].description;
+  jrvTab('chat', document.querySelector('.jrv-stab'));
+  document.querySelector('.jrv-stab').click();
+  jarvisRun(false);
+}
+
+async function jarvisGenerateSkill() {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) { alert('Set your Gemini API key in settings first.'); return; }
+
+  _jrvLog('⚡ Generating new skill…', 'jrv-msg');
+  jrvTab('skills', null);
+
+  var state = _jrvReadState();
+  var mem   = _jrvMemorySummary();
+  var prompt = 'You are Jarvis, an AI assistant for a web IDE. Based on the current state and memory, suggest ONE new automation skill that would genuinely help this developer.\n\nState: ' + state + '\nMemories:\n' + mem + '\n\nRespond with exactly:\nNAME: <short skill name>\nDESC: <one sentence description>\nPROMPT: <the exact jarvis goal text to run this skill>';
+
+  var resp = await _jrvCall(apiKey, model, prompt, 120);
+  if (!resp) return;
+
+  var name = (resp.match(/NAME:\s*(.+)/i) || [])[1] || 'New Skill';
+  var desc = (resp.match(/DESC:\s*(.+)/i) || [])[1] || '';
+  var prmt = (resp.match(/PROMPT:\s*([\s\S]+)/i) || [])[1] || desc;
+
+  var sk = _jrvSkillsLoad();
+  sk.push({ name: name.trim(), description: desc.trim(), prompt: prmt.trim(), created: Date.now() });
+  _jrvSkillsSave(sk);
+  jarvisAddMemory('Created skill: ' + name.trim(), 'skill');
+  jrvRenderSkills();
+  _jrvLog('✅ New skill created: ' + name.trim(), 'jrv-msg-ok');
+}
+
+// ── Background tasks ──
+var _jrvBgTasks = [];
+function jrvRenderBg() {
+  var el = document.getElementById('jrv-bg-list');
+  if (!el) return;
+  if (!_jrvBgTasks.length) { el.innerHTML = '<div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No background tasks running.</div>'; return; }
+  el.innerHTML = '';
+  _jrvBgTasks.forEach(function(t) {
+    var d = document.createElement('div');
+    d.className = 'jrv-bg-item';
+    var statusColor = t.status === 'done' ? '#98c379' : t.status === 'error' ? '#e06c75' : '#e5c07b';
+    d.innerHTML = '<div style="display:flex;justify-content:space-between;"><span style="color:#61afef;">' + _esc(t.goal.slice(0, 60)) + '</span><span style="color:' + statusColor + ';font-size:10px;">' + t.status + '</span></div>'
+      + (t.result ? '<div style="color:#5c6370;font-size:11px;margin-top:3px;">' + _esc(t.result.slice(0, 120)) + '</div>' : '');
+    el.appendChild(d);
+  });
+}
+function jarvisRunBackground() {
+  var goal = prompt('Background task goal:');
+  if (!goal) return;
+  var task = { goal: goal, status: 'running', result: '', ts: Date.now() };
+  _jrvBgTasks.push(task);
+  jrvRenderBg();
+  _jrvBgRun(task);
+}
+async function _jrvBgRun(task) {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) { task.status = 'error'; task.result = 'No API key'; jrvRenderBg(); return; }
+  // Run silently
+  await _jrvExecutePlan(apiKey, model, task.goal, 10, true);
+  task.status = 'done';
+  task.result = 'Completed';
+  jrvRenderBg();
+  // Badge the BG tab
+  var bgBtn = document.querySelector('.jrv-stab[onclick*="bg"]');
+  if (bgBtn && !bgBtn.textContent.includes('✓')) bgBtn.textContent = '🌙 BG ✓';
+}
+
+// ── Suggestions ──
+async function jarvisGenerateSuggestions() {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) return;
+  var el = document.getElementById('jrv-suggestions');
+  if (!el) return;
+
+  var state = _jrvReadState();
+  var mem   = _jrvMemorySummary();
+  var prompt = 'You are Jarvis. Based on the state and memory below, give exactly 3 short helpful suggestions for what the developer could do next. Each must be a single line starting with a number and period.\n\nState: ' + state + '\nMemories:\n' + mem;
+
+  var resp = await _jrvCall(apiKey, model, prompt, 150);
+  if (!resp) return;
+
+  el.innerHTML = '';
+  resp.split('\n').filter(function(l) { return /^\d\./.test(l.trim()); }).slice(0, 3).forEach(function(s) {
+    var text = s.replace(/^\d\.\s*/, '').trim();
+    var d = document.createElement('div');
+    d.className = 'jrv-suggestion';
+    d.textContent = text;
+    d.onclick = function() {
+      var inp = document.getElementById('jarvis-input');
+      if (inp) inp.value = text;
+    };
+    el.appendChild(d);
+  });
+}
+
+// ── Screenshot with page interaction ──
+async function _jrvScreenshot() {
+  // Switch to preview tab first, wait for render, then capture
+  if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('preview');
+  else if (typeof switchToTab === 'function') switchToTab('preview');
+
+  await new Promise(function(r) { setTimeout(r, 600); }); // let preview render
+
+  var capFn = window.capturePreviewScreenshot || (typeof capturePreviewScreenshot === 'function' ? capturePreviewScreenshot : null);
+  if (!capFn) return null;
+
+  try {
+    return await capFn();
+  } catch(e) {
+    _jrvLog('⚠ Screenshot failed: ' + e.message, 'jrv-msg-err');
+    return null;
+  }
+}
+
+// Jarvis-specific screenshot that navigates to a specific state first
+async function _jrvScreenshotAfterNav(navHint) {
+  // If navHint describes a state, try to navigate there first
+  if (navHint) {
+    var liveIframe = document.getElementById('website-preview');
+    if (liveIframe && liveIframe.contentWindow) {
+      try {
+        // Try clicking element matching hint text
+        var iDoc = liveIframe.contentDocument || liveIframe.contentWindow.document;
+        var all = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick]'));
+        var match = all.find(function(el) {
+          return el.textContent.toLowerCase().includes(navHint.toLowerCase());
+        });
+        if (match) {
+          match.click();
+          await new Promise(function(r) { setTimeout(r, 800); });
+        }
+      } catch(e) {}
+    }
+  }
+  return _jrvScreenshot();
+}
+
+// ── Core API call ──
+async function _jrvCall(apiKey, model, prompt, maxTokens) {
+  try {
+    var body = JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens || 80, topP: 0.85 },
+    });
+    var r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+    var d = await r.json();
+    if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+    return ((((d.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
+  } catch(e) {
+    _jrvLog('❌ API: ' + (e.message || e), 'jrv-msg-err');
+    return null;
+  }
+}
+
+// ── Read state ──
+function _jrvReadState() {
+  var activeTab = ((document.querySelector('.tab-button.active') || {}).textContent || '').trim();
+  var agentLog  = ((document.getElementById('agent-output') || {}).innerText || '').slice(-200);
+  var intent    = ((document.getElementById('anc-intent-text') || {}).getAttribute('data-intent') || '');
+  var proj      = '';
+  try { var p = document.querySelector('.project-list-item.active, .project-list-item'); if (p) proj = p.textContent.trim().slice(0, 40); } catch(e) {}
+  return 'tab=' + activeTab + ' project=' + proj + ' intent=' + intent.slice(0,60) + ' agentLog=' + agentLog.replace(/\n/g,' ').slice(0,150);
+}
+
+// ── Log helpers ──
+function _jrvLog(msg, cls) {
+  var log = document.getElementById('jarvis-log');
+  if (!log) return;
+  // Remove welcome if present
+  var welcome = log.querySelector('.jrv-welcome');
+  if (welcome) welcome.remove();
+  var d = document.createElement('div');
+  d.className = 'jrv-msg ' + (cls || 'jrv-msg');
+  var ts = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  d.innerHTML = '<span style="color:#3e4451;font-size:10px;">' + ts + '</span> ' + msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+function _jrvLogRaw(html) {
+  var log = document.getElementById('jarvis-log');
+  if (!log) return;
+  var welcome = log.querySelector('.jrv-welcome');
+  if (welcome) welcome.remove();
+  var d = document.createElement('div');
+  d.className = 'jrv-msg';
+  var ts = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  d.innerHTML = '<span style="color:#3e4451;font-size:10px;">' + ts + '</span> ' + html;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
 }
 
 function jarvisClearLog() {
-  _jarvisLog = [];
   var log = document.getElementById('jarvis-log');
-  if (log) log.innerHTML = '<div style="color:#5c6370;text-align:center;padding:20px 0;">Log cleared. Give Jarvis a goal.</div>';
+  if (log) log.innerHTML = '<div class="jrv-welcome"><div style="font-size:18px;margin-bottom:6px;">🤖</div><div style="color:#5c6370;font-size:12px;">Log cleared.</div></div>';
 }
+
+var _jarvisStopped = false;
 
 function jarvisStop() {
   _jarvisStopped = true;
-  _jarvisAppendLog('⛔ Stopped by user.', '#e06c75');
-  document.getElementById('jarvis-run-btn').style.display = '';
-  document.getElementById('jarvis-stop-btn').style.display = 'none';
+  _jrvLog('⛔ Stopped.', 'jrv-msg-err');
+  var r = document.getElementById('jarvis-run-btn');
+  var s = document.getElementById('jarvis-stop-btn');
+  if (r) r.style.display = '';
+  if (s) s.style.display = 'none';
 }
 
-function _jarvisAppendLog(msg, color) {
-  var log = document.getElementById('jarvis-log');
-  if (!log) return;
-  var line = document.createElement('div');
-  line.style.cssText = 'padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:' + (color || '#abb2bf');
-  var ts = new Date().toLocaleTimeString();
-  line.innerHTML = '<span style="color:#5c6370;font-size:10px;">[' + ts + ']</span> ' + _esc(msg);
-  log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
-}
-
-function _jarvisAppendLogRaw(html) {
-  var log = document.getElementById('jarvis-log');
-  if (!log) return;
-  var line = document.createElement('div');
-  line.style.cssText = 'padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);';
-  var ts = new Date().toLocaleTimeString();
-  line.innerHTML = '<span style="color:#5c6370;font-size:10px;">[' + ts + ']</span> ' + html;
-  log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
-}
-
-async function jarvisRun() {
+// ── Main run ──
+async function jarvisRun(background) {
   jarvisLoadSettings();
-  var apiKey   = (document.getElementById('jarvis-api-key')  || {}).value || '';
-  var model    = (document.getElementById('jarvis-model')    || {}).value || 'gemini-2.0-flash';
-  var maxSteps = parseInt((document.getElementById('jarvis-max-steps') || {}).value || '8', 10);
-  var goal     = (document.getElementById('jarvis-input')    || {}).value || '';
+  var apiKey   = _jrvGet('jarvis-api-key');
+  var model    = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  var maxSteps = parseInt(_jrvGet('jarvis-max-steps') || '12', 10);
+  var goal     = _jrvGet('jarvis-input');
 
-  if (!apiKey) { alert('Please set your Gemini API key in Jarvis settings ⚙'); jarvisToggleSettings(); return; }
-  if (!goal.trim()) { alert('Please enter a goal for Jarvis.'); return; }
+  if (!apiKey) { alert('Set your Gemini API key in ⚙ settings.'); jarvisToggleSettings(); return; }
+  if (!goal)   { alert('Enter a goal for Jarvis.'); return; }
+
+  var inp = document.getElementById('jarvis-input');
+  if (inp) inp.value = '';
 
   _jarvisStopped = false;
-  document.getElementById('jarvis-run-btn').style.display = 'none';
-  document.getElementById('jarvis-stop-btn').style.display = '';
+  if (!background) {
+    var r = document.getElementById('jarvis-run-btn');
+    var s = document.getElementById('jarvis-stop-btn');
+    if (r) r.style.display = 'none';
+    if (s) s.style.display = '';
+  }
 
-  _jarvisAppendLog('🤖 Goal: ' + goal, '#c678dd');
+  _jrvLog('👤 ' + goal, 'jrv-msg-user');
 
-  // ── Ultra-simple prompt for tiny models ──
-  // Output format: exactly two lines — THINK: ... and DO: ACTION arg
-  // No JSON, no markdown, no nesting.
+  var result = await _jrvExecutePlan(apiKey, model, goal, maxSteps, background);
+
+  if (!background) {
+    var r2 = document.getElementById('jarvis-run-btn');
+    var s2 = document.getElementById('jarvis-stop-btn');
+    if (r2) r2.style.display = '';
+    if (s2) s2.style.display = 'none';
+  }
+
+  // Auto-save important memory
+  if (result) jarvisAddMemory('Task: ' + goal.slice(0, 80) + ' → ' + result.slice(0, 80), 'task');
+
+  // Generate suggestions after completing a task
+  setTimeout(function() { jarvisGenerateSuggestions(); }, 1000);
+
+  _jarvisStopped = false;
+}
+
+async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
+  var mem   = _jrvMemorySummary();
+  var state = _jrvReadState();
+  var skills = _jrvSkillsLoad().map(function(s){ return s.name + ': ' + s.description; }).join('\n') || 'none';
+
   var actionMenu = [
-    'switchTab <tab>         — tabs: start agent preview code context chat',
-    'agentTab <tab>          — tabs: run session tracker jarvis',
-    'setPrompt <text>        — type text into agent prompt box',
-    'addTask                 — click Add Task button',
-    'processQueue            — click Process Queue button',
-    'stopQueue               — click Stop Queue button',
-    'setIntent <text>        — set session intent/goal text',
-    'screenshot              — capture preview screenshot',
-    'newThread <name>        — create tracker thread with name',
-    'logEdit <text>          — log a pending edit in current thread',
-    'logWorked <text>        — log an edit that worked',
-    'logFailed <text>        — log an edit that failed',
-    'readState               — read current UI state',
-    'wait                    — pause briefly',
-    'done <summary>          — finish and summarise what was done',
+    'switchTab <tab>        — start agent preview code context chat',
+    'agentTab <tab>         — run session tracker jarvis',
+    'setPrompt <text>       — type into agent prompt',
+    'addTask                — click Add Task',
+    'processQueue           — start processing queue',
+    'stopQueue              — stop the queue',
+    'setIntent <text>       — set session intent',
+    'screenshot             — screenshot current preview state',
+    'screenshotNav <hint>   — navigate preview to <hint> element then screenshot',
+    'clickPreview <text>    — click element with matching text in preview',
+    'newThread <name>       — create tracker thread',
+    'logWorked <text>       — log worked edit',
+    'logFailed <text>       — log failed edit',
+    'addMemory <text>       — save something to remember',
+    'readState              — get current UI state',
+    'reply <text>           — give a conversational reply to the user',
+    'wait                   — pause briefly',
+    'done <summary>         — finish',
   ].join('\n');
 
-  var systemPrompt = [
-    'You are Jarvis, an AI that controls a web IDE by issuing one action per turn.',
-    'RULES:',
-    '1. Reply with EXACTLY two lines. No more, no less.',
-    '2. Line 1: THINK: <one sentence of reasoning>',
-    '3. Line 2: DO: <action> <optional arg>',
-    '4. Never use JSON, markdown, or bullet points.',
-    '5. The arg for DO is everything after the action name on that line.',
-    '',
-    'ACTIONS:',
-    actionMenu,
-    '',
-    'EXAMPLES:',
-    'THINK: I need to switch to the agent tab first.',
-    'DO: switchTab agent',
-    '',
-    'THINK: Now I will type the task into the prompt box.',
-    'DO: setPrompt Fix the navigation bar layout',
-    '',
-    'THINK: Task is queued, I am done.',
-    'DO: done Switched to agent tab and queued fix-nav task',
-  ].join('\n');
+  var systemPrompt = 'You are Jarvis, a wholesome AI assistant embedded in a web IDE called Vibe Editor.\n'
+    + 'You are warm, proactive, and genuinely helpful. You remember context, learn from experience, and always complete goals thoroughly.\n\n'
+    + 'CURRENT STATE:\n' + state + '\n\n'
+    + 'YOUR MEMORY:\n' + mem + '\n\n'
+    + 'YOUR SKILLS:\n' + skills + '\n\n'
+    + 'RESPONSE FORMAT — exactly two lines:\n'
+    + 'THINK: <brief reasoning>\n'
+    + 'DO: <action> <arg>\n\n'
+    + 'ACTIONS:\n' + actionMenu + '\n\n'
+    + 'RULES:\n'
+    + '1. Only two lines. No markdown. No extra text.\n'
+    + '2. Be efficient. Accomplish goals in minimal steps.\n'
+    + '3. Use "reply" for conversational responses.\n'
+    + '4. Always end with "done".\n'
+    + '5. For screenshots: use screenshotNav if you need to navigate first.\n';
 
-  var messages = [
-    { role: 'user', parts: [{ text: 'Goal: ' + goal }] }
-  ];
+  var messages = [{ role: 'user', parts: [{ text: 'Goal: ' + goal }] }];
+  var lastResult = '';
   var steps = 0;
 
   while (steps < maxSteps && !_jarvisStopped) {
@@ -3954,97 +4325,102 @@ async function jarvisRun() {
     var body = JSON.stringify({
       contents: messages,
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 80,  // force brevity
-        topP: 0.8,
-      },
+      generationConfig: { temperature: 0.1, maxOutputTokens: 90, topP: 0.85 },
     });
 
-    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/'
-      + encodeURIComponent(model) + ':generateContent?key=' + apiKey;
-
-    var resp, data, rawText;
+    var rawText;
     try {
-      resp = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
-      data = await resp.json();
+      var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+      var data = await resp.json();
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
       rawText = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
-      if (!rawText && data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     } catch(e) {
-      _jarvisAppendLog('❌ API error: ' + (e.message || String(e)), '#e06c75');
+      _jrvLog('❌ ' + (e.message || e), 'jrv-msg-err');
       break;
     }
 
-    // Parse THINK + DO lines — be lenient about format
+    // Parse THINK / DO
     var thinkLine = '', doLine = '';
-    var lines = rawText.trim().split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    lines.forEach(function(l) {
-      if (!thinkLine && /^think[:\s]/i.test(l)) thinkLine = l.replace(/^think[:\s]*/i, '').trim();
-      if (!doLine   && /^do[:\s]/i.test(l))    doLine    = l.replace(/^do[:\s]*/i,    '').trim();
+    rawText.trim().split('\n').forEach(function(l) {
+      l = l.trim();
+      if (!thinkLine && /^think[:\s]/i.test(l)) thinkLine = l.replace(/^think[:\s]*/i,'').trim();
+      if (!doLine   && /^do[:\s]/i.test(l))    doLine    = l.replace(/^do[:\s]*/i,'').trim();
     });
-    // Fallback: if model ignored format, treat entire output as a DO line
-    if (!doLine && lines.length > 0) doLine = lines[lines.length - 1];
+    if (!doLine) doLine = rawText.trim().split('\n').filter(Boolean).pop() || '';
 
-    if (thinkLine) _jarvisAppendLog('💭 ' + thinkLine, '#5c6370');
+    if (!silent && thinkLine) _jrvLog('💭 ' + thinkLine, 'jrv-msg-think');
 
-    if (!doLine) {
-      _jarvisAppendLog('⚠ No DO line found in response, stopping.', '#e5c07b');
-      break;
-    }
-
-    // Split action from arg
     var parts  = doLine.split(/\s+/);
     var action = (parts[0] || '').toLowerCase();
     var arg    = parts.slice(1).join(' ').trim();
 
     if (action === 'done') {
-      _jarvisAppendLog('✅ Done: ' + (arg || 'Task complete'), '#98c379');
+      if (!silent) _jrvLog('✅ ' + (arg || 'Done'), 'jrv-msg-ok');
+      lastResult = arg;
       break;
     }
 
-    // Execute
-    var result = _jarvisExecAction(action, arg);
-    if (result instanceof Promise) result = await result;
+    if (action === 'reply') {
+      _jrvLog('🤖 ' + arg, 'jrv-msg-jarvis');
+      lastResult = arg;
+      messages.push({ role: 'model', parts: [{ text: rawText }] });
+      messages.push({ role: 'user',  parts: [{ text: 'OK' }] });
+      continue;
+    }
 
-    _jarvisAppendLogRaw(
-      '<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
-      + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0, 60)) + '</span>' : '')
-      + ' <span style="color:#5c6370">→ ' + _esc(String(result || 'ok').slice(0, 100)) + '</span>'
-    );
+    var result = await _jrvExec(action, arg);
 
-    // Feed result back
+    if (!silent) {
+      _jrvLogRaw('<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
+        + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0,50)) + '</span>' : '')
+        + (result && typeof result === 'string' && result.length < 200
+            ? ' <span style="color:#5c6370">→ ' + _esc(result.slice(0,100)) + '</span>' : ''));
+    }
+
+    // If screenshot returned a dataURL, show thumbnail
+    if (typeof result === 'string' && result.startsWith('data:image')) {
+      if (!silent) {
+        var logEl = document.getElementById('jarvis-log');
+        if (logEl) {
+          var img = document.createElement('img');
+          img.src = result;
+          img.style.cssText = 'max-width:100%;border-radius:4px;margin:4px 0;border:1px solid var(--apui-border);';
+          logEl.appendChild(img);
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+      }
+      result = '[screenshot captured]';
+    }
+
     messages.push({ role: 'model', parts: [{ text: rawText }] });
-    var feedback = action === 'readState'
-      ? 'STATE: ' + result
-      : 'OK: ' + String(result || 'done').slice(0, 120);
-    messages.push({ role: 'user', parts: [{ text: feedback }] });
+    var fb = action === 'readstate' ? 'STATE: ' + result : 'OK: ' + String(result || '').slice(0, 150);
+    messages.push({ role: 'user', parts: [{ text: fb }] });
 
-    // Keep conversation short for small models — drop early turns
-    if (messages.length > 14) messages.splice(1, 2);
+    // Keep context window lean for small models
+    if (messages.length > 16) messages.splice(1, 2);
 
-    await new Promise(function(r) { setTimeout(r, 250); });
+    await new Promise(function(r) { setTimeout(r, 200); });
   }
 
   if (steps >= maxSteps && !_jarvisStopped) {
-    _jarvisAppendLog('⏹ Max steps (' + maxSteps + ') reached.', '#e5c07b');
+    if (!silent) _jrvLog('⏹ Max steps reached.', 'jrv-msg-err');
   }
 
-  document.getElementById('jarvis-run-btn').style.display = '';
-  document.getElementById('jarvis-stop-btn').style.display = 'none';
-  _jarvisStopped = false;
+  return lastResult;
 }
 
-function _jarvisExecAction(action, arg) {
+async function _jrvExec(action, arg) {
   switch (action) {
-    case 'switchtab':
     case 'switchtab': {
-      var tab = arg.trim().split(/\s+/)[0];
-      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(tab);
-      else if (typeof switchToTab === 'function') switchToTab(tab);
-      return 'switched to ' + tab;
+      var t = arg.split(/\s+/)[0];
+      if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab(t);
+      else if (typeof switchToTab === 'function') switchToTab(t);
+      await new Promise(function(r) { setTimeout(r, 400); });
+      return 'switched to ' + t;
     }
     case 'agenttab': {
-      var t = arg.trim().split(/\s+/)[0];
+      var t = arg.split(/\s+/)[0];
       var btn = document.querySelector('.agt-itab[onclick*="' + t + '"]');
       agtSwitchTab(t, btn);
       return 'agent tab: ' + t;
@@ -4057,17 +4433,18 @@ function _jarvisExecAction(action, arg) {
     case 'addtask': {
       var b = document.getElementById('run-agent-single-task-button');
       if (b) b.click();
-      return 'add task clicked';
+      await new Promise(function(r) { setTimeout(r, 300); });
+      return 'task added';
     }
     case 'processqueue': {
       var b = document.getElementById('start-iterative-session-button');
       if (b) b.click();
-      return 'process queue clicked';
+      return 'queue started';
     }
     case 'stopqueue': {
       var b = document.getElementById('end-session-button');
       if (b && b.style.display !== 'none') b.click();
-      return 'stop clicked';
+      return 'queue stopped';
     }
     case 'setintent': {
       var inp = document.getElementById('anc-intent-input');
@@ -4078,36 +4455,66 @@ function _jarvisExecAction(action, arg) {
       return 'intent set';
     }
     case 'screenshot': {
-      var fn = window.screenshotAndEdit || screenshotAndEdit;
-      if (fn) fn('agent');
-      return 'screenshot triggered';
+      return await _jrvScreenshot();
+    }
+    case 'screenshotnav': {
+      return await _jrvScreenshotAfterNav(arg);
+    }
+    case 'clickpreview': {
+      var liveIframe = document.getElementById('website-preview');
+      if (!liveIframe || !liveIframe.contentDocument) return 'no preview';
+      try {
+        var iDoc = liveIframe.contentDocument;
+        var els = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick],h1,h2,h3,nav,header'));
+        var match = els.find(function(e) { return e.textContent.trim().toLowerCase().includes(arg.toLowerCase()); });
+        if (match) { match.click(); await new Promise(function(r) { setTimeout(r, 700); }); return 'clicked: ' + match.tagName; }
+      } catch(e) {}
+      return 'element not found: ' + arg;
     }
     case 'newthread': {
       _ttLoad();
       var id = 'tt_' + Date.now();
       _ttDB[id] = { id: id, name: arg || 'Jarvis', edits: [], created: Date.now() };
       _ttSave(); ttRenderThreadList(); ttOpenThread(id);
-      return 'thread created: ' + arg;
+      return 'thread: ' + arg;
     }
-    case 'logedit':   { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('pending'); return 'logged'; }
-    case 'logworked': { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('worked');  return 'logged worked'; }
-    case 'logfailed': { var inp = document.getElementById('tt-edit-input'); if (inp) inp.value = arg; ttAddEdit('failed');  return 'logged failed'; }
+    case 'logworked': {
+      var i = document.getElementById('tt-edit-input');
+      if (i) i.value = arg;
+      ttAddEdit('worked');
+      return 'logged worked';
+    }
+    case 'logfailed': {
+      var i = document.getElementById('tt-edit-input');
+      if (i) i.value = arg;
+      ttAddEdit('failed');
+      return 'logged failed';
+    }
+    case 'addmemory': {
+      jarvisAddMemory(arg, 'jarvis');
+      return 'memory saved';
+    }
     case 'readstate': {
-      var activeTab = ((document.querySelector('.tab-button.active') || {}).textContent || '').trim();
-      var agentLog  = ((document.getElementById('agent-output') || {}).innerText || '').slice(-300);
-      var intent    = ((document.getElementById('anc-intent-text') || {}).textContent || '').trim();
-      return 'tab=' + activeTab + ' intent=' + intent.slice(0,60) + ' log=' + agentLog.slice(0,120);
+      return _jrvReadState();
     }
-    case 'wait':
-      return new Promise(function(r) { setTimeout(function() { r('waited'); }, 600); });
+    case 'wait': {
+      await new Promise(function(r) { setTimeout(r, 700); });
+      return 'waited';
+    }
     default:
-      return 'unknown action: ' + action;
+      return 'unknown: ' + action;
   }
 }
 
-// Load settings on boot
+// Boot
 document.addEventListener('DOMContentLoaded', function() {
   jarvisLoadSettings();
+  jrvRenderMemory();
+  jrvRenderSkills();
+  // Generate suggestions after 3s if API key set
+  setTimeout(function() {
+    if (_jrvGet('jarvis-api-key')) jarvisGenerateSuggestions();
+  }, 3000);
 });
 </script>
 
