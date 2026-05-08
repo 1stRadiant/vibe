@@ -2341,9 +2341,23 @@
                                                 <label style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:3px;">Max steps</label>
                                                 <input type="number" id="jarvis-max-steps" min="1" max="50" value="12" style="width:70px;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:6px 9px;font-size:12px;" oninput="jarvisSaveSettings()">
                                             </div>
-                                            <div style="display:flex;align-items:flex-end;">
-                                                <button class="action-button small" onclick="jarvisClearMemory()" style="border-color:#e06c75;color:#e06c75;">🗑 Clear Memory</button>
+                                            <div>
+                                                <label style="font-size:10px;color:#5c6370;text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:3px;">Step delay (rate limit)</label>
+                                                <select id="jarvis-heartbeat" style="width:100%;background:#282c34;border:1px solid #3e4451;color:#abb2bf;border-radius:4px;padding:6px 9px;font-size:12px;" onchange="jarvisSaveSettings()">
+                                                    <option value="250">Fast (0.25s)</option>
+                                                    <option value="1000">1 second</option>
+                                                    <option value="2000">2 seconds</option>
+                                                    <option value="5000" selected>5 seconds</option>
+                                                    <option value="10000">10 seconds</option>
+                                                    <option value="20000">20 seconds</option>
+                                                    <option value="30000">30 seconds</option>
+                                                    <option value="60000">1 minute</option>
+                                                </select>
                                             </div>
+                                        </div>
+                                        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+                                            <button class="action-button small" onclick="jarvisClearMemory()" style="border-color:#e06c75;color:#e06c75;">🗑 Clear Memory</button>
+                                            <span style="font-size:10px;color:#5c6370;">Step delay avoids Gemini rate limits — set higher for free-tier keys</span>
                                         </div>
                                         <div id="jarvis-settings-status" style="font-size:11px;color:#98c379;margin-top:6px;display:none;">✓ Saved</div>
                                     </div>
@@ -3639,7 +3653,7 @@ function annotateOpenForContext(ctx) {
   // No pending image — auto-take a screenshot of the preview
   var captureFn = window.capturePreviewScreenshot || (typeof capturePreviewScreenshot === 'function' ? capturePreviewScreenshot : null);
   if (captureFn) {
-    _jarvisAppendLog && _jarvisAppendLog('Taking screenshot for annotate…');
+    _jrvLog && _jrvLog("📷 Taking screenshot for annotate…", "jrv-msg-think");
     var btn = document.querySelector('[onclick*="annotateOpenForContext"]');
     if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
     captureFn().then(function(dataURL) {
@@ -3915,16 +3929,22 @@ function jarvisToggleSettings() {
 function jarvisLoadSettings() {
   try {
     var d = JSON.parse(localStorage.getItem('jarvis_settings') || '{}');
-    var f = function(id, val) { var e = document.getElementById(id); if (e && val) e.value = val; };
+    var f = function(id, val) { var e = document.getElementById(id); if (e && val !== undefined) e.value = val; };
     f('jarvis-api-key', d.apiKey);
     f('jarvis-model',   d.model);
     f('jarvis-max-steps', d.maxSteps);
+    f('jarvis-heartbeat', d.heartbeat || '5000');
   } catch(e) {}
 }
 function jarvisSaveSettings() {
   try {
     var g = function(id) { return (document.getElementById(id) || {}).value || ''; };
-    localStorage.setItem('jarvis_settings', JSON.stringify({ apiKey: g('jarvis-api-key'), model: g('jarvis-model'), maxSteps: g('jarvis-max-steps') }));
+    localStorage.setItem('jarvis_settings', JSON.stringify({
+      apiKey:    g('jarvis-api-key'),
+      model:     g('jarvis-model'),
+      maxSteps:  g('jarvis-max-steps'),
+      heartbeat: g('jarvis-heartbeat') || '5000',
+    }));
     var st = document.getElementById('jarvis-settings-status');
     if (st) { st.style.display = 'block'; clearTimeout(st._t); st._t = setTimeout(function() { st.style.display = 'none'; }, 1400); }
   } catch(e) {}
@@ -4120,44 +4140,85 @@ async function jarvisGenerateSuggestions() {
 
 // ── Screenshot with page interaction ──
 async function _jrvScreenshot() {
-  // Switch to preview tab first, wait for render, then capture
+  // Ensure preview tab is active so iframe is laid out
   if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('preview');
   else if (typeof switchToTab === 'function') switchToTab('preview');
-
-  await new Promise(function(r) { setTimeout(r, 600); }); // let preview render
+  await new Promise(function(r) { setTimeout(r, 500); });
 
   var capFn = window.capturePreviewScreenshot || (typeof capturePreviewScreenshot === 'function' ? capturePreviewScreenshot : null);
-  if (!capFn) return null;
-
+  if (!capFn) return '[screenshot: capturePreviewScreenshot not available]';
   try {
     return await capFn();
   } catch(e) {
     _jrvLog('⚠ Screenshot failed: ' + e.message, 'jrv-msg-err');
-    return null;
+    return '[screenshot failed: ' + e.message + ']';
   }
 }
 
-// Jarvis-specific screenshot that navigates to a specific state first
-async function _jrvScreenshotAfterNav(navHint) {
-  // If navHint describes a state, try to navigate there first
-  if (navHint) {
-    var liveIframe = document.getElementById('website-preview');
-    if (liveIframe && liveIframe.contentWindow) {
-      try {
-        // Try clicking element matching hint text
-        var iDoc = liveIframe.contentDocument || liveIframe.contentWindow.document;
-        var all = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick]'));
-        var match = all.find(function(el) {
-          return el.textContent.toLowerCase().includes(navHint.toLowerCase());
-        });
-        if (match) {
-          match.click();
-          await new Promise(function(r) { setTimeout(r, 800); });
-        }
-      } catch(e) {}
-    }
+/**
+ * Navigate the live preview through a comma-separated sequence of element clicks,
+ * waiting after each for the page to settle, then take a screenshot.
+ * e.g. "Start Game,Play Level 1" clicks "Start Game", waits, clicks "Play Level 1", waits, captures.
+ */
+async function _jrvScreenshotFrame(path) {
+  if (window.vibeAPI && window.vibeAPI.switchToTab) window.vibeAPI.switchToTab('preview');
+  else if (typeof switchToTab === 'function') switchToTab('preview');
+  await new Promise(function(r) { setTimeout(r, 500); });
+
+  var steps = path.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+
+  for (var i = 0; i < steps.length; i++) {
+    var label = steps[i];
+    var clicked = await _jrvClickPreview(label);
+    _jrvLog('🖱 frame nav: ' + clicked, 'jrv-msg-think');
+    await new Promise(function(r) { setTimeout(r, 900); }); // wait for page transition
   }
-  return _jrvScreenshot();
+
+  return await _jrvScreenshot();
+}
+
+async function _jrvScreenshotAfterNav(navHint) {
+  if (navHint) await _jrvClickPreview(navHint);
+  await new Promise(function(r) { setTimeout(r, 800); });
+  return await _jrvScreenshot();
+}
+
+async function _jrvClickPreview(text) {
+  if (!text) return 'no text provided';
+  var liveIframe = document.getElementById('website-preview');
+  if (!liveIframe) return 'no preview iframe';
+  try {
+    var iDoc = liveIframe.contentDocument || liveIframe.contentWindow.document;
+    // Cast a wide net: all interactive and text elements
+    var candidates = Array.from(iDoc.querySelectorAll(
+      'a, button, [role="button"], [onclick], input[type="submit"], input[type="button"], ' +
+      'h1, h2, h3, h4, li, span, p, div[class], nav, header, [class*="btn"], [class*="button"], [class*="menu"]'
+    ));
+    var lower = text.toLowerCase();
+    // Best match: exact text
+    var match = candidates.find(function(el) {
+      return el.textContent.trim().toLowerCase() === lower;
+    });
+    // Good match: contains text
+    if (!match) match = candidates.find(function(el) {
+      return el.textContent.trim().toLowerCase().includes(lower);
+    });
+    // Partial word match
+    if (!match) match = candidates.find(function(el) {
+      return lower.split(' ').every(function(word) {
+        return el.textContent.toLowerCase().includes(word);
+      });
+    });
+    if (match) {
+      match.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      match.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true }));
+      match.click();
+      return 'clicked "' + match.textContent.trim().slice(0, 40) + '" (' + match.tagName + ')';
+    }
+    return 'element not found: "' + text + '"';
+  } catch(e) {
+    return 'click error: ' + e.message;
+  }
 }
 
 // ── Core API call ──
@@ -4274,6 +4335,202 @@ async function jarvisRun(background) {
 }
 
 async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
+  var mem    = _jrvMemorySummary();
+  var state  = _jrvReadState();
+  var skills = _jrvSkillsLoad().map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
+  var heartbeatMs = parseInt((document.getElementById('jarvis-heartbeat') || {}).value || '5000', 10);
+
+  var systemPrompt = [
+'You are Jarvis, a wholesome AI autopilot embedded in APUI Vibe Editor — a web IDE for building and editing live websites.',
+'',
+'=== VIBE EDITOR SYSTEM DOCUMENTATION ===',
+'',
+'MAIN TABS (use switchtab):',
+'  start   — Home screen. Shows saved projects. User can open or create projects.',
+'  agent   — AI Agent tab. Has its own inner tabs: run, session, tracker, jarvis.',
+'  preview — Live website preview. Shows the rendered HTML of the current project.',
+'  code    — Full code editor. Shows and edits the raw HTML/CSS/JS.',
+'  context — Project context tree. Shows component structure.',
+'  chat    — Chat with Claude AI about the project.',
+'',
+'AGENT INNER TABS (use agenttab):',
+'  run     — Task queue and agent log. THIS IS WHERE TASKS ARE TYPED AND RUN.',
+'  session — Session intent and node context panel.',
+'  tracker — Task tracker with threads and edit logs.',
+'  jarvis  — This pane (you are here).',
+'',
+'HOW TO RUN AN AGENT TASK:',
+'  BEST: DO: addandrun <your task description>',
+'  This sets the prompt, adds it to queue, AND starts processing in one step.',
+'',
+'TASK TRACKER:',
+'  newthread <name> — Creates a thread and opens it. Do this before logging.',
+'  logedit <text>   — Log a pending edit.',
+'  logworked <text> — Log an edit that succeeded.',
+'  logfailed <text> — Log an edit that failed.',
+'',
+'SCREENSHOTS — HOW TO GET THE RIGHT SCREEN STATE:',
+'  screenshot              — Captures the preview in its current state.',
+'  screenshotframe <path>  — Navigate to a specific state then capture.',
+'    <path> is a comma-separated sequence of element texts to click, e.g.:',
+'    "Start Game"          — clicks "Start Game" then screenshots',
+'    "Menu,Settings,Audio" — clicks Menu, then Settings, then Audio, then screenshots',
+'    "Login,Dashboard"     — logs past a login screen etc.',
+'  screenshotnav <hint>    — Single click on hint text then screenshot.',
+'  clickpreview <text>     — Click element in preview (no screenshot).',
+'  Use screenshotframe when the preview shows a start/splash/login screen.',
+'',
+'MEMORY:',
+'  addmemory <text> — Saves text persistently across sessions.',
+'',
+'=== YOUR CURRENT CONTEXT ===',
+'State: ' + state,
+'',
+'Your Memory:',
+mem,
+'',
+'Your Skills:',
+skills,
+'',
+'=== RESPONSE FORMAT ===',
+'Exactly two lines:',
+'THINK: <one sentence of reasoning>',
+'DO: <action> <arg>',
+'',
+'ACTIONS:',
+'  addandrun <task>              queue AND run agent task (best for coding tasks)',
+'  switchtab <tab>               start agent preview code context chat',
+'  agenttab <tab>                run session tracker jarvis',
+'  setprompt <text>              type into agent prompt',
+'  addtask                       add prompt to queue',
+'  processqueue                  start queue',
+'  stopqueue                     stop queue',
+'  setintent <text>              set session intent',
+'  screenshot                    capture current preview state',
+'  screenshotframe <a,b,c>       click elements a then b then c then screenshot',
+'  screenshotnav <hint>          click one element then screenshot',
+'  clickpreview <text>           click element in preview',
+'  newthread <name>              create tracker thread',
+'  logedit <text>                log pending edit',
+'  logworked <text>              log worked edit',
+'  logfailed <text>              log failed edit',
+'  addmemory <text>              save to memory',
+'  readstate                     read current UI state',
+'  reply <text>                  conversational reply',
+'  wait                          pause',
+'  done <summary>                finish',
+'',
+'RULES:',
+'1. Exactly two lines. No markdown. No JSON. No extra text.',
+'2. Use addandrun for agent coding tasks.',
+'3. Use screenshotframe to navigate past start screens before capturing.',
+'4. Be warm and wholesome.',
+'5. Always end with done.',
+  ].join('\n');
+
+  var messages = [{ role: 'user', parts: [{ text: 'Goal: ' + goal }] }];
+  var lastResult = '';
+  var steps = 0;
+
+  while (steps < maxSteps && !_jarvisStopped) {
+    steps++;
+
+    // ── Heartbeat delay (rate limit protection) ──
+    if (steps > 1) {
+      if (!silent) {
+        var hbLabel = heartbeatMs >= 1000
+          ? '⏱ Waiting ' + (heartbeatMs / 1000) + 's (rate limit delay)…'
+          : null;
+        if (hbLabel) _jrvLog(hbLabel, 'jrv-msg-think');
+      }
+      await new Promise(function(r) { setTimeout(r, heartbeatMs); });
+      if (_jarvisStopped) break;
+    }
+
+    var body = JSON.stringify({
+      contents: messages,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { temperature: 0.1, maxOutputTokens: 100, topP: 0.85 },
+    });
+
+    var rawText;
+    try {
+      var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+      var data = await resp.json();
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      rawText = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
+      if (!rawText) throw new Error('Empty response from model');
+    } catch(e) {
+      _jrvLog('❌ ' + (e.message || e), 'jrv-msg-err');
+      break;
+    }
+
+    // Parse THINK / DO
+    var thinkLine = '', doLine = '';
+    rawText.trim().split('\n').forEach(function(l) {
+      l = l.trim();
+      if (!thinkLine && /^think[:\-\s]/i.test(l)) thinkLine = l.replace(/^think[:\-\s]*/i,'').trim();
+      if (!doLine   && /^do[:\-\s]/i.test(l))    doLine    = l.replace(/^do[:\-\s]*/i,'').trim();
+    });
+    if (!doLine) {
+      var lines = rawText.trim().split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      doLine = lines[lines.length - 1] || '';
+    }
+
+    if (!silent && thinkLine) _jrvLog('💭 ' + thinkLine, 'jrv-msg-think');
+
+    var parts  = doLine.split(/\s+/);
+    var action = (parts[0] || '').toLowerCase().replace(/[^a-z]/g,'');
+    var arg    = parts.slice(1).join(' ').trim();
+
+    if (action === 'done') {
+      if (!silent) _jrvLog('✅ ' + (arg || 'Done'), 'jrv-msg-ok');
+      lastResult = arg;
+      break;
+    }
+
+    if (action === 'reply') {
+      _jrvLog('🤖 ' + arg, 'jrv-msg-jarvis');
+      lastResult = arg;
+      messages.push({ role: 'model', parts: [{ text: rawText }] });
+      messages.push({ role: 'user',  parts: [{ text: 'OK, continue.' }] });
+      continue;
+    }
+
+    var result = await _jrvExec(action, arg);
+
+    if (!silent) {
+      if (typeof result === 'string' && result.startsWith('data:image')) {
+        var logEl = document.getElementById('jarvis-log');
+        if (logEl) {
+          var img = document.createElement('img');
+          img.src = result;
+          img.style.cssText = 'max-width:100%;border-radius:4px;margin:4px 0;border:1px solid var(--apui-border);display:block;';
+          logEl.appendChild(img);
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        result = '[screenshot captured]';
+      } else {
+        _jrvLogRaw('<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
+          + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0,50)) + '</span>' : '')
+          + (result ? ' <span style="color:#5c6370">→ ' + _esc(String(result).slice(0,100)) + '</span>' : ''));
+      }
+    }
+
+    messages.push({ role: 'model', parts: [{ text: rawText }] });
+    var fb = action === 'readstate' ? 'STATE: ' + result : 'OK: ' + String(result || 'done').slice(0, 150);
+    messages.push({ role: 'user', parts: [{ text: fb }] });
+
+    if (messages.length > 18) messages.splice(1, 2);
+  }
+
+  if (steps >= maxSteps && !_jarvisStopped) {
+    if (!silent) _jrvLog('⏹ Max steps (' + maxSteps + ') reached.', 'jrv-msg-err');
+  }
+
+  return lastResult;
+}
   var mem    = _jrvMemorySummary();
   var state  = _jrvReadState();
   var skills = _jrvSkillsLoad().map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
@@ -4549,19 +4806,17 @@ async function _jrvExec(action, arg) {
     case 'screenshot': {
       return await _jrvScreenshot();
     }
+    case 'screenshotframe': {
+      // arg is comma-separated nav path: "Start,Play" clicks "Start" then "Play" then captures
+      return await _jrvScreenshotFrame(arg);
+    }
     case 'screenshotnav': {
       return await _jrvScreenshotAfterNav(arg);
     }
     case 'clickpreview': {
-      var liveIframe = document.getElementById('website-preview');
-      if (!liveIframe || !liveIframe.contentDocument) return 'no preview';
-      try {
-        var iDoc = liveIframe.contentDocument;
-        var els = Array.from(iDoc.querySelectorAll('a,button,[role="button"],[onclick],h1,h2,h3,nav,header,li,span'));
-        var match = els.find(function(e) { return e.textContent.trim().toLowerCase().includes(arg.toLowerCase()); });
-        if (match) { match.click(); await new Promise(function(r) { setTimeout(r, 800); }); return 'clicked: ' + match.tagName + ' "' + match.textContent.trim().slice(0,30) + '"'; }
-      } catch(e) { return 'error: ' + e.message; }
-      return 'element not found: ' + arg;
+      var result = await _jrvClickPreview(arg);
+      await new Promise(function(r) { setTimeout(r, 600); });
+      return result;
     }
     case 'newthread': {
       // Navigate to tracker tab first
