@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>APUI // Vibe Coding System</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -4117,6 +4117,7 @@ async function jarvisGenerateSuggestions() {
   if (!el) return;
 
   var state = _jrvReadState();
+  var mem   = _jrvMemorySummary();
   var prompt = 'You are Jarvis. Based on the state and memory below, give exactly 3 short helpful suggestions for what the developer could do next. Each must be a single line starting with a number and period.\n\nState: ' + state + '\nMemories:\n' + mem;
 
   var resp = await _jrvCall(apiKey, model, prompt, 150);
@@ -4683,6 +4684,13 @@ async function _jrvExec(action, arg) {
       return 'unknown action "' + action + '" — valid actions: switchtab agenttab setprompt addtask processqueue addandrun stopqueue setintent screenshot screenshotnav clickpreview newthread logedit logworked logfailed addmemory readstate wait done reply';
   }
 }
+
+// Disable pinch-to-zoom
+document.addEventListener('touchmove', function(e) {
+  if (e.touches && e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
 
 // Boot
 document.addEventListener('DOMContentLoaded', function() {
