@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APUI // Vibe Coding System</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -2080,6 +2080,14 @@
                                                     <h3>From a High-Level Goal</h3>
                                                     <p>Describe your website, and let the AI figure out the structure and code.</p>
                                                     <textarea id="project-prompt-input" placeholder="e.g., 'A modern portfolio website for a photographer...'"></textarea>
+                                                    <!-- Image reference upload -->
+                                                    <div id="project-image-area" style="margin:8px 0;">
+                                                        <input type="file" id="project-image-input" accept="image/*" multiple style="display:none" onchange="handleProjectImageSelect(this.files)">
+                                                        <div id="project-image-previews" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
+                                                        <button type="button" class="action-button small" onclick="document.getElementById('project-image-input').click()" style="border-color:rgba(97,175,239,0.5);color:#87CEEB;font-size:11px;">
+                                                            🖼 Add reference image
+                                                        </button>
+                                                    </div>
                                                     <div class="button-container">
 <button hidden id="generate-project-button" class="action-button primary"><i class="bi bi-stars me-2"></i>Generate Project</button>                                                        
                                                         <button id="start-iterative-build-button" class="action-button agent"><i class="bi bi-robot me-2"></i>Build</button>
@@ -2392,6 +2400,7 @@
                                             <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#c678dd;">🧠 Jarvis Memory</span>
                                             <div style="display:flex;gap:5px;">
                                                 <button class="action-button small" onclick="jarvisAddMemoryManual()" style="border-color:#61afef;color:#61afef;">+ Add</button>
+                                                <button class="action-button small" onclick="jarvisExportJSON()" style="border-color:#98c379;color:#98c379;" title="Download memories &amp; skills as JSON">⬇ Export</button>
                                                 <button class="action-button small" onclick="jarvisClearMemory()" style="border-color:#e06c75;color:#e06c75;">Clear All</button>
                                             </div>
                                         </div>
@@ -4685,23 +4694,380 @@ async function _jrvExec(action, arg) {
   }
 }
 
-// Disable pinch-to-zoom
-document.addEventListener('touchmove', function(e) {
-  if (e.touches && e.touches.length > 1) e.preventDefault();
-}, { passive: false });
-document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
-document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+/* ══════════════════════════════════════════════════════════
+   PROJECT CREATION — IMAGE REFERENCE UPLOAD
+   ══════════════════════════════════════════════════════════ */
+var _projectImages = []; // array of dataURL strings
 
-// Boot
+function handleProjectImageSelect(files) {
+  Array.from(files).forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      _projectImages.push(e.target.result);
+      _renderProjectImagePreviews();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function _renderProjectImagePreviews() {
+  var container = document.getElementById('project-image-previews');
+  if (!container) return;
+  container.innerHTML = '';
+  _projectImages.forEach(function(dataURL, i) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;display:inline-block;';
+    var img = document.createElement('img');
+    img.src = dataURL;
+    img.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:5px;border:1px solid var(--apui-border);';
+    var del = document.createElement('button');
+    del.textContent = '✕';
+    del.style.cssText = 'position:absolute;top:-4px;right:-4px;background:#e06c75;border:none;border-radius:50%;width:16px;height:16px;font-size:9px;cursor:pointer;color:#fff;line-height:16px;text-align:center;padding:0;';
+    del.onclick = function() { _projectImages.splice(i, 1); _renderProjectImagePreviews(); };
+    wrap.appendChild(img); wrap.appendChild(del);
+    container.appendChild(wrap);
+  });
+}
+
+// Expose so app3.js can read the images when generating
+window._getProjectImages = function() { return _projectImages.slice(); };
+window._clearProjectImages = function() { _projectImages = []; _renderProjectImagePreviews(); };
+
+/* ══════════════════════════════════════════════════════════
+   JARVIS INDEXEDDB — persistent storage for memory, skills, change log
+   ══════════════════════════════════════════════════════════ */
+var _jrvDB = null;
+var JRV_DB_NAME = 'jarvis_db';
+var JRV_DB_VERSION = 1;
+
+function _jrvOpenDB() {
+  if (_jrvDB) return Promise.resolve(_jrvDB);
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open(JRV_DB_NAME, JRV_DB_VERSION);
+    req.onupgradeneeded = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains('memory'))    db.createObjectStore('memory',    { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('skills'))    db.createObjectStore('skills',    { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('changelog')) db.createObjectStore('changelog', { keyPath: 'id' });
+    };
+    req.onsuccess = function(e) { _jrvDB = e.target.result; resolve(_jrvDB); };
+    req.onerror   = function(e) { reject(e.target.error); };
+  });
+}
+
+function _idbGetAll(storeName) {
+  return _jrvOpenDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction(storeName, 'readonly');
+      var req = tx.objectStore(storeName).getAll();
+      req.onsuccess = function() { resolve(req.result || []); };
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+function _idbPut(storeName, obj) {
+  return _jrvOpenDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction(storeName, 'readwrite');
+      var req = tx.objectStore(storeName).put(obj);
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+function _idbDelete(storeName, key) {
+  return _jrvOpenDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction(storeName, 'readwrite');
+      var req = tx.objectStore(storeName).delete(key);
+      req.onsuccess = resolve;
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+function _idbClear(storeName) {
+  return _jrvOpenDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction(storeName, 'readwrite');
+      var req = tx.objectStore(storeName).clear();
+      req.onsuccess = resolve;
+      req.onerror   = function() { reject(req.error); };
+    });
+  });
+}
+
+/* ── IDB-backed Memory ── */
+function jarvisAddMemory(text, type) {
+  if (!text || !text.trim()) return;
+  var mem = { id: 'mem_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+              text: text.trim(), type: type || 'fact', ts: Date.now() };
+  _idbPut('memory', mem).then(function() { jrvRenderMemory(); }).catch(console.error);
+}
+
+function jarvisAddMemoryManual() {
+  var txt = prompt('Add a memory for Jarvis:');
+  if (txt && txt.trim()) jarvisAddMemory(txt.trim(), 'manual');
+}
+
+function jarvisClearMemory() {
+  if (!confirm('Clear all Jarvis memories?')) return;
+  _idbClear('memory').then(function() { jrvRenderMemory(); }).catch(console.error);
+}
+
+function jrvDeleteMemory(id) {
+  _idbDelete('memory', id).then(function() { jrvRenderMemory(); }).catch(console.error);
+}
+
+function jrvRenderMemory() {
+  var el = document.getElementById('jrv-memory-list');
+  if (!el) return;
+  _idbGetAll('memory').then(function(mem) {
+    if (!mem.length) {
+      el.innerHTML = '<div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No memories yet. Jarvis will remember important things automatically.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    mem.slice().sort(function(a,b){return b.ts-a.ts;}).forEach(function(m) {
+      var d = document.createElement('div');
+      d.className = 'jrv-card';
+      var icon = m.type === 'skill' ? '⚡' : m.type === 'task' ? '✅' : m.type === 'changelog' ? '📋' : m.type === 'manual' ? '📝' : '🧠';
+      d.innerHTML = '<span style="flex:1"><span style="color:#5c6370;font-size:10px;">' + icon + ' ' + new Date(m.ts).toLocaleDateString() + '</span><br>' + _esc(m.text) + '</span>'
+        + '<button class="jrv-card-del" onclick="jrvDeleteMemory(\'' + m.id + '\')">✕</button>';
+      el.appendChild(d);
+    });
+  }).catch(console.error);
+}
+
+function _jrvMemorySummary() {
+  // Synchronous fallback reads from localStorage if IDB not yet loaded
+  // Async version is used in _jrvExecutePlan
+  try {
+    var cached = sessionStorage.getItem('_jrv_mem_cache');
+    return cached || '(memories loading…)';
+  } catch(e) { return '(no memory)'; }
+}
+
+async function _jrvMemorySummaryAsync() {
+  try {
+    var mem = await _idbGetAll('memory');
+    var summary = mem.slice(-15).map(function(m) { return '• ' + m.text; }).join('\n') || '(no memories yet)';
+    try { sessionStorage.setItem('_jrv_mem_cache', summary); } catch(e){}
+    return summary;
+  } catch(e) { return '(memory unavailable)'; }
+}
+
+/* ── IDB-backed Skills ── */
+function _jrvSkillsLoad() {
+  // Returns a promise now — callers that need sync get cached value
+  return _idbGetAll('skills').catch(function() { return []; });
+}
+
+function _jrvSkillsSaveNew(skill) {
+  skill.id = skill.id || ('sk_' + Date.now());
+  return _idbPut('skills', skill);
+}
+
+function _jrvSkillsSaveAll(skills) {
+  // Replace all — clear then put each
+  return _idbClear('skills').then(function() {
+    return Promise.all(skills.map(function(s) {
+      s.id = s.id || ('sk_' + Date.now() + '_' + Math.random().toString(36).slice(2,5));
+      return _idbPut('skills', s);
+    }));
+  });
+}
+
+function jrvRenderSkills() {
+  var el = document.getElementById('jrv-skills-list');
+  if (!el) return;
+  _idbGetAll('skills').then(function(sk) {
+    if (!sk.length) {
+      el.innerHTML = '<div style="color:#5c6370;font-size:12px;text-align:center;padding:20px 0;">No custom skills yet.<br>Click ✦ Generate to let Jarvis create new capabilities.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    sk.forEach(function(s, i) {
+      var d = document.createElement('div');
+      d.className = 'jrv-card'; d.style.flexDirection = 'column';
+      d.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+        + '<span style="color:#e5c07b;font-weight:700;font-size:12px;">⚡ ' + _esc(s.name) + '</span>'
+        + '<button class="jrv-card-del" onclick="jrvDeleteSkill(\'' + s.id + '\')">✕</button></div>'
+        + '<div style="color:#5c6370;font-size:11px;margin-bottom:4px;">' + _esc(s.description) + '</div>'
+        + '<button class="action-button small" onclick="jrvRunSkillById(\'' + s.id + '\')" style="align-self:flex-start;font-size:10px;padding:2px 8px;">▶ Run</button>';
+      el.appendChild(d);
+    });
+  }).catch(console.error);
+}
+
+function jrvDeleteSkill(id) {
+  _idbDelete('skills', id).then(function() { jrvRenderSkills(); }).catch(console.error);
+}
+
+function jrvRunSkillById(id) {
+  _idbGetAll('skills').then(function(sk) {
+    var s = sk.find(function(x) { return x.id === id; });
+    if (!s) return;
+    var inp = document.getElementById('jarvis-input');
+    if (inp) inp.value = s.prompt || s.description;
+    // Switch to chat tab
+    var chatBtn = document.querySelector('.jrv-stab[onclick*="chat"]');
+    jrvTab('chat', chatBtn);
+    jarvisRun(false);
+  });
+}
+
+async function jarvisGenerateSkill() {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) { alert('Set your Gemini API key in settings first.'); return; }
+
+  _jrvLog('⚡ Generating new skill…', 'jrv-msg');
+  jrvTab('skills', document.querySelector('.jrv-stab[onclick*="skills"]'));
+
+  var state = _jrvReadState();
+  var mem   = await _jrvMemorySummaryAsync();
+  var prompt = 'You are Jarvis, an AI assistant for a web IDE. Based on the current state and memory, suggest ONE new automation skill that would genuinely help this developer.\n\nState: ' + state + '\nMemories:\n' + mem + '\n\nRespond with exactly:\nNAME: <short skill name>\nDESC: <one sentence description>\nPROMPT: <the exact jarvis goal text to run this skill>';
+
+  var resp = await _jrvCall(apiKey, model, prompt, 150);
+  if (!resp) return;
+
+  var name = (resp.match(/NAME:\s*(.+)/i) || [])[1] || 'New Skill';
+  var desc = (resp.match(/DESC:\s*(.+)/i) || [])[1] || '';
+  var prmt = (resp.match(/PROMPT:\s*([\s\S]+)/i) || [])[1] || desc;
+
+  var skill = { id: 'sk_' + Date.now(), name: name.trim(), description: desc.trim(), prompt: prmt.trim(), created: Date.now() };
+  await _jrvSkillsSaveNew(skill);
+  jarvisAddMemory('Created skill: ' + name.trim(), 'skill');
+  jrvRenderSkills();
+  _jrvLog('✅ New skill created: ' + name.trim(), 'jrv-msg-ok');
+}
+
+/* ── Change Log (per-project, stored in IDB) ── */
+function _jrvLogChange(projectId, action, detail) {
+  if (!projectId) return;
+  var entry = {
+    id:        'cl_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    projectId: projectId,
+    action:    action || 'edit',
+    detail:    (detail || '').slice(0, 300),
+    ts:        Date.now(),
+  };
+  _idbPut('changelog', entry).catch(console.error);
+  // Also save a condensed memory so Jarvis learns from it
+  jarvisAddMemory('Project "' + projectId + '" — ' + action + ': ' + (detail || '').slice(0, 80), 'changelog');
+}
+
+// Expose globally so app3.js can call it after agent tasks
+window.jrvLogChange = _jrvLogChange;
+
+async function _jrvGetProjectLog(projectId) {
+  var all = await _idbGetAll('changelog');
+  return all.filter(function(e) { return e.projectId === projectId; })
+            .sort(function(a,b) { return b.ts - a.ts; })
+            .slice(0, 50);
+}
+
+/* ── Export JSON ── */
+function jarvisExportJSON() {
+  Promise.all([
+    _idbGetAll('memory'),
+    _idbGetAll('skills'),
+    _idbGetAll('changelog'),
+  ]).then(function(results) {
+    var data = {
+      exported:  new Date().toISOString(),
+      memory:    results[0],
+      skills:    results[1],
+      changelog: results[2],
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'jarvis-export-' + Date.now() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
+    _jrvLog('⬇ Exported memory + skills + changelog', 'jrv-msg-ok');
+  }).catch(function(e) { alert('Export failed: ' + e.message); });
+}
+
+/* ── Update _jrvExecutePlan to use async memory ── */
+// Patch: intercept the plan execution to load memory async before running
+var _jrvOrigExecutePlan = _jrvExecutePlan;
+_jrvExecutePlan = async function(apiKey, model, goal, maxSteps, silent) {
+  // Pre-load memory into session cache so _jrvMemorySummary() is fresh
+  await _jrvMemorySummaryAsync();
+  return _jrvOrigExecutePlan(apiKey, model, goal, maxSteps, silent);
+};
+
+/* ── Suggestions using async memory ── */
+async function jarvisGenerateSuggestions() {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) return;
+  var el = document.getElementById('jrv-suggestions');
+  if (!el) return;
+
+  var state = _jrvReadState();
+  var mem   = await _jrvMemorySummaryAsync();
+  var prompt = 'You are Jarvis. Based on the state and memory below, give exactly 3 short helpful suggestions for what the developer could do next. Each must be a single line starting with a number and period.\n\nState: ' + state + '\nMemories:\n' + mem;
+
+  var resp = await _jrvCall(apiKey, model, prompt, 150);
+  if (!resp) return;
+
+  el.innerHTML = '';
+  resp.split('\n').filter(function(l) { return /^\d\./.test(l.trim()); }).slice(0, 3).forEach(function(s) {
+    var text = s.replace(/^\d\.\s*/, '').trim();
+    var d = document.createElement('div');
+    d.className = 'jrv-suggestion';
+    d.textContent = text;
+    d.onclick = function() { var inp = document.getElementById('jarvis-input'); if (inp) inp.value = text; };
+    el.appendChild(d);
+  });
+}
+
+/* ── Boot: migrate localStorage → IDB, init IDB ── */
 document.addEventListener('DOMContentLoaded', function() {
   jarvisLoadSettings();
-  jrvRenderMemory();
-  jrvRenderSkills();
-  // Generate suggestions after 3s if API key set
-  setTimeout(function() {
-    if (_jrvGet('jarvis-api-key')) jarvisGenerateSuggestions();
-  }, 3000);
+
+  // Migrate old localStorage memories → IDB
+  _jrvOpenDB().then(function() {
+    try {
+      var oldMem = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
+      if (oldMem.length) {
+        oldMem.forEach(function(m) { _idbPut('memory', m).catch(console.error); });
+        localStorage.removeItem('jarvis_memory');
+        console.log('[Jarvis] Migrated', oldMem.length, 'memories from localStorage to IndexedDB');
+      }
+    } catch(e) {}
+
+    // Migrate old localStorage skills → IDB
+    try {
+      var oldSk = JSON.parse(localStorage.getItem('jarvis_skills') || '[]');
+      if (oldSk.length) {
+        oldSk.forEach(function(s) {
+          s.id = s.id || ('sk_' + Date.now() + '_' + Math.random().toString(36).slice(2,5));
+          _idbPut('skills', s).catch(console.error);
+        });
+        localStorage.removeItem('jarvis_skills');
+        console.log('[Jarvis] Migrated', oldSk.length, 'skills from localStorage to IndexedDB');
+      }
+    } catch(e) {}
+
+    jrvRenderMemory();
+    jrvRenderSkills();
+    // Generate suggestions after 4s
+    setTimeout(function() {
+      if (_jrvGet('jarvis-api-key')) jarvisGenerateSuggestions();
+    }, 4000);
+  }).catch(console.error);
 });
+
+
 </script>
 
 <!-- ══════════════════════════════════════
