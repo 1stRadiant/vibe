@@ -2626,7 +2626,7 @@ async function screenshotAndEdit(context = 'agent') {
 }
 
 
-async function generateCompleteSubtree(parentNode, streamCallback = null) {
+async function generateCompleteSubtree(parentNode, streamCallback = null, refImages = []) {
     console.log(`Generating subtree for parent: ${parentNode.id}`);
 
     const systemPrompt = `You are an expert UI/UX designer and frontend architect with a focus on creating beautifully structured, self-documenting code.
@@ -2676,7 +2676,7 @@ ${getImageGenerationInstructions()}
     "newDescription": "${parentNode.description}"
 }`;
 
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback);
+    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
     
     try {
         let jsonResponse = rawResponse.trim();
@@ -3945,6 +3945,10 @@ function handleAddTaskToQueue() {
         executeSingleTask(currentAgentTaskContext)
             .then(() => {
                 logToAgent(`<strong>Task completed successfully.</strong>`, 'info');
+                // Log to Jarvis change log for learning
+                if (window.jrvLogChange && currentProjectId && currentAgentTaskContext) {
+                    window.jrvLogChange(currentProjectId, 'agent-task', (currentAgentTaskContext.task || '').slice(0, 200));
+                }
                 taskQueue.shift(); 
                 renderTaskQueue();
                 updateTaskQueueUI();
@@ -8215,6 +8219,9 @@ async function handleGenerateProject() {
             return;
         }
 
+        // Collect reference images from the project creation form
+        const refImages = (window._getProjectImages && window._getProjectImages()) || [];
+
         const storageType = document.querySelector('input[name="projectStorage"]:checked').value;
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
@@ -8233,7 +8240,7 @@ async function handleGenerateProject() {
         liveCodeOutput.textContent = '';
 
         vibeTree = { id: 'whole-page', type: 'container', description: prompt, children: [] };
-        vibeTree.children = await generateCompleteSubtree(vibeTree);
+        vibeTree.children = await generateCompleteSubtree(vibeTree, null, refImages);
 
         currentProjectId = projectId;
         currentProjectStorageType = storageType;
@@ -8246,7 +8253,11 @@ async function handleGenerateProject() {
         generationStatusText.textContent = 'Project generated! Finalizing...';
 
         autoSaveProject();
-        saveSessionMetadata(); // Save state
+        saveSessionMetadata();
+
+        // Log creation to Jarvis change log
+        if (window.jrvLogChange) window.jrvLogChange(projectId, 'project-created', prompt.slice(0, 150));
+        if (window._clearProjectImages) window._clearProjectImages();
 
         await populateProjectList(storageType);
         
@@ -9279,4 +9290,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+}
