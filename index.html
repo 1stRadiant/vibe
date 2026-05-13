@@ -401,7 +401,7 @@
     .agent-container {
         padding: 0 !important;
         height: 100% !important;
-        overflow: hidden !important;
+        overflow-y: auto !important;
         background: transparent !important;
         display: flex !important;
         flex-direction: column !important;
@@ -436,17 +436,15 @@
     /* ── Inner agent panes ── */
     .agt-pane {
         display: none;
-        flex: 1;
-        overflow-y: auto;
+        overflow-y: visible;
         padding: 14px 16px;
         flex-direction: column;
     }
     .agt-pane-active { display: flex; }
 
     /* Agent log scrollable area */
-    #agent-output-container { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 10px; }
+    #agent-output-container { display: flex; flex-direction: column; margin-top: 10px; }
     #agent-output {
-        flex: 1;
         min-height: 120px;
         overflow-y: auto !important;
         background: rgba(5,8,18,0.7) !important;
@@ -459,9 +457,8 @@
     }
 
     /* Task tracker edit list */
-    #tt-thread-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #tt-thread-view { display: flex; flex-direction: column; }
     #tt-edit-list {
-        flex: 1;
         min-height: 100px;
         overflow-y: auto !important;
     }
@@ -475,7 +472,7 @@
     }
     .jrv-stab:hover { color:var(--apui-text); }
     .jrv-stab-active { color:#c678dd!important;border-bottom-color:#c678dd!important; }
-    .jrv-pane { display:none;flex:1;overflow-y:auto;min-height:0; }
+    .jrv-pane { display:none;overflow-y:visible; }
     .jrv-pane-active { display:flex; }
     .jrv-welcome { text-align:center;padding:28px 16px;color:#abb2bf; }
     /* Jarvis chat messages */
@@ -2439,7 +2436,7 @@
                                 </div>
 
                                 <!-- ══ WORKSHOP pane ══ -->
-                                <div id="agt-pane-workshop" class="agt-pane" style="flex-direction:column;gap:0;padding:0;overflow:hidden;">
+                                <div id="agt-pane-workshop" class="agt-pane" style="flex-direction:column;gap:0;padding:0;">
 
                                     <!-- Workshop toolbar -->
                                     <div id="ws-toolbar" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.25);flex-shrink:0;flex-wrap:wrap;">
@@ -2457,18 +2454,18 @@
                                     </div>
 
                                     <!-- Workshop body: element list + editor + preview -->
-                                    <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
+                                    <div style="display:flex;min-height:500px;">
 
                                         <!-- Left: Element list -->
-                                        <div id="ws-el-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);overflow-y:auto;background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;">
+                                        <div id="ws-el-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;">
                                             <div id="ws-el-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No elements yet.<br>Click <b style="color:#ffd54f">+ New</b> to begin.</div>
                                         </div>
 
                                         <!-- Right: editor + preview stacked -->
-                                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
+                                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
 
                                             <!-- Code editor area -->
-                                            <div style="flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--apui-border);">
+                                            <div style="display:flex;flex-direction:column;border-bottom:1px solid var(--apui-border);">
                                                 <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(10,14,28,0.9);flex-shrink:0;border-bottom:1px solid rgba(65,105,225,0.15);">
                                                     <span id="ws-editor-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-text-dim);">— select an element —</span>
                                                     <div style="display:flex;gap:5px;">
@@ -2476,23 +2473,23 @@
                                                         <button class="action-button small ai-powered-button" onclick="wsAskAI()" title="Ask AI to work on this element"><i class="bi bi-stars"></i> AI</button>
                                                     </div>
                                                 </div>
-                                                <textarea id="ws-code-editor" spellcheck="false" style="flex:1;min-height:0;resize:none;background:rgba(5,8,18,0.95);color:#abb2bf;font-family:'Fira Code',monospace;font-size:12.5px;line-height:1.65;padding:10px 12px;border:none;outline:none;tab-size:2;" placeholder="Select or create an element to start coding…" oninput="wsDebouncedSave()"></textarea>
+                                                <textarea id="ws-code-editor" spellcheck="false" style="min-height:280px;resize:vertical;background:rgba(5,8,18,0.95);color:#abb2bf;font-family:'Fira Code',monospace;font-size:12.5px;line-height:1.65;padding:10px 12px;border:none;outline:none;tab-size:2;width:100%;" placeholder="Select or create an element to start coding…" oninput="wsDebouncedSave()"></textarea>
                                             </div>
 
                                             <!-- Live preview -->
-                                            <div style="height:220px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;">
+                                            <div style="display:flex;flex-direction:column;">
                                                 <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(10,14,28,0.9);flex-shrink:0;border-bottom:1px solid rgba(65,105,225,0.15);">
                                                     <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-text-dim);">Preview</span>
                                                     <button class="action-button small" id="ws-merge-btn" onclick="wsMergeToProject()" style="border-color:#98c379;color:#98c379;" title="Merge this element into the main project"><i class="bi bi-arrow-up-circle"></i> Merge to Project</button>
                                                 </div>
-                                                <iframe id="ws-preview-frame" style="flex:1;border:none;background:#fff;" sandbox="allow-scripts"></iframe>
+                                                <iframe id="ws-preview-frame" style="height:240px;border:none;background:#fff;width:100%;" sandbox="allow-scripts"></iframe>
                                             </div>
 
                                         </div>
                                     </div>
 
                                     <!-- AI prompt bar for workshop -->
-                                    <div id="ws-ai-bar" style="display:none;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.92);flex-shrink:0;">
+                                    <div id="ws-ai-bar" style="display:none;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.92);">
                                         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-ai-edit);margin-bottom:5px;">✦ AI — working on: <span id="ws-ai-target" style="color:#ffd54f;"></span></div>
                                         <textarea id="ws-ai-prompt" rows="2" placeholder="e.g. Make this SVG pulse with a glow animation, add a gradient fill…" style="width:100%;font-size:12px;resize:vertical;border-radius:5px;"></textarea>
                                         <div style="display:flex;gap:5px;margin-top:6px;">
@@ -3262,21 +3259,25 @@ window.wsSendAI = async function() {
     if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = '#ffd54f'; statusEl.textContent = '✦ Generating…'; }
     if (sendBtn) sendBtn.disabled = true;
     try {
-        var apiKey = localStorage.getItem('vibeApiKey') || localStorage.getItem('gemini-api-key') || '';
+        // Check all the places the app might store the Gemini key
+        var apiKey = localStorage.getItem('geminiApiKey')
+                  || localStorage.getItem('vibeApiKey')
+                  || localStorage.getItem('gemini-api-key')
+                  || (function(){ try { return JSON.parse(localStorage.getItem('jarvis_settings')||'{}').apiKey||''; } catch(e){ return ''; } })()
+                  || '';
         var model = localStorage.getItem('vibeModel') || 'gemini-2.5-flash';
         var newCode = '';
-        if (apiKey && apiKey.length > 10) {
-            var body = { contents: [{ role:'user', parts:[{ text: 'You are an expert developer. Return ONLY raw ' + el.type + ' code, no markdown fences.\n\nCurrent code:\n' + el.code + '\n\nRequest: ' + prompt }] }], generationConfig: { temperature: 0.3 } };
-            _wsAIController = new AbortController();
-            var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: _wsAIController.signal });
-            var data = await resp.json();
-            newCode = (((data.candidates||[])[0]||{}).content||{}).parts?.[0]?.text || '';
-        } else {
-            _wsAIController = new AbortController();
-            var ancResp = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2048, system:'Return ONLY raw ' + el.type + ' code.', messages:[{role:'user',content:'Code:\n' + el.code + '\n\nRequest: ' + prompt}] }), signal: _wsAIController.signal });
-            var ancData = await ancResp.json();
-            newCode = (ancData.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
+        if (!apiKey || apiKey.length < 10) {
+            if (statusEl) { statusEl.style.color = '#e06c75'; statusEl.textContent = '✗ No Gemini API key found. Add it in Agent → API Settings or Jarvis → ⚙ settings.'; }
+            if (sendBtn) sendBtn.disabled = false;
+            return;
         }
+        var body = { contents: [{ role:'user', parts:[{ text: 'You are an expert developer. Return ONLY raw ' + el.type + ' code with no markdown fences, no explanation, nothing else.\n\nCurrent code:\n' + el.code + '\n\nRequest: ' + prompt }] }], generationConfig: { temperature: 0.3 } };
+        _wsAIController = new AbortController();
+        var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: _wsAIController.signal });
+        if (!resp.ok) { throw new Error('Gemini API error ' + resp.status + ': ' + await resp.text()); }
+        var data = await resp.json();
+        newCode = (((data.candidates||[])[0]||{}).content||{}).parts?.[0]?.text || '';
         newCode = newCode.replace(/^```[a-z]*\n?/i,'').replace(/```\s*$/,'').trim();
         if (newCode) {
             el.code = newCode;
