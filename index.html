@@ -2491,7 +2491,17 @@
                                     <!-- AI prompt bar for workshop -->
                                     <div id="ws-ai-bar" style="display:none;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.92);">
                                         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-ai-edit);margin-bottom:5px;">✦ AI — working on: <span id="ws-ai-target" style="color:#ffd54f;"></span></div>
-                                        <textarea id="ws-ai-prompt" rows="2" placeholder="e.g. Make this SVG pulse with a glow animation, add a gradient fill…" style="width:100%;font-size:12px;resize:vertical;border-radius:5px;"></textarea>
+
+                                        <!-- Vision toolbar -->
+                                        <div id="workshop-image-previews" style="display:none;padding:4px 0 2px;flex-wrap:wrap;gap:4px;"></div>
+                                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+                                            <input type="file" id="ws-image-input" accept="image/*" multiple style="display:none" onchange="handleImageFileInput('workshop',this.files);this.value=''">
+                                            <button class="action-button small" title="Attach an image" onclick="document.getElementById('ws-image-input').click()" style="border-color:rgba(65,105,225,0.6);color:#87CEEB;">🖼 Attach</button>
+                                            <button id="ws-screenshot-btn" class="action-button small" title="Capture the workshop preview" onclick="screenshotAndEditWorkshop()" style="border-color:#00ffcc;color:#00ffcc;">📷 Screenshot</button>
+                                            <button class="action-button small" title="Screenshot + annotate the workshop preview" onclick="annotateOpenWorkshop()" style="border-color:#e5c07b;color:#e5c07b;">✏️ Annotate</button>
+                                        </div>
+
+                                        <textarea id="ws-ai-prompt" rows="2" placeholder="e.g. Make this SVG pulse with a glow animation, add a gradient fill… (attach an image for visual reference)" style="width:100%;font-size:12px;resize:vertical;border-radius:5px;"></textarea>
                                         <div style="display:flex;gap:5px;margin-top:6px;">
                                             <button class="action-button small ai-powered-button" id="ws-ai-send-btn" onclick="wsSendAI()" style="flex:1;"><i class="bi bi-stars"></i> Generate</button>
                                             <button class="action-button small secondary" onclick="wsCloseAIBar()">Cancel</button>
@@ -3272,7 +3282,26 @@ window.wsSendAI = async function() {
             if (sendBtn) sendBtn.disabled = false;
             return;
         }
-        var body = { contents: [{ role:'user', parts:[{ text: 'You are an expert developer. Return ONLY raw ' + el.type + ' code with no markdown fences, no explanation, nothing else.\n\nCurrent code:\n' + el.code + '\n\nRequest: ' + prompt }] }], generationConfig: { temperature: 0.3 } };
+
+        // Collect any pending workshop images
+        var pendingImgs = (window._pendingImages && window._pendingImages['workshop']) ? window._pendingImages['workshop'].slice() : [];
+        if (window._pendingImages) window._pendingImages['workshop'] = [];
+        if (typeof window._refreshImagePreviews === 'function') window._refreshImagePreviews('workshop');
+        else {
+            var previewContainer = document.getElementById('workshop-image-previews');
+            if (previewContainer) { previewContainer.innerHTML = ''; previewContainer.style.display = 'none'; }
+        }
+
+        // Build the parts array — text first, then any images
+        var parts = [{ text: 'You are an expert developer. Return ONLY raw ' + el.type + ' code with no markdown fences, no explanation, nothing else.\n\nCurrent code:\n' + el.code + '\n\nRequest: ' + prompt }];
+        pendingImgs.forEach(function(dataURL) {
+            var match = dataURL.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+                parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+            }
+        });
+
+        var body = { contents: [{ role:'user', parts: parts }], generationConfig: { temperature: 0.3 } };
         _wsAIController = new AbortController();
         var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: _wsAIController.signal });
         if (!resp.ok) { throw new Error('Gemini API error ' + resp.status + ': ' + await resp.text()); }
@@ -4232,6 +4261,40 @@ function annotateFromScreenshot(ctx) {
     }).catch(function(e) { console.warn('Screenshot for annotate failed:', e); });
   }
 }
+
+// Workshop annotate: screenshots the ws-preview-frame, opens annotate modal with context 'workshop'
+function annotateOpenWorkshop() {
+  _annContext = 'workshop';
+  // Check for a pending workshop image to annotate first
+  var pend = (window._pendingImages && window._pendingImages['workshop']) || [];
+  if (pend.length > 0) {
+    _annotateOpen(pend[pend.length - 1], false);
+    return;
+  }
+  // No pending image — capture the workshop preview iframe
+  var captureFn = window.captureWorkshopPreviewScreenshot || (typeof captureWorkshopPreviewScreenshot === 'function' ? captureWorkshopPreviewScreenshot : null);
+  if (captureFn) {
+    var btn = document.querySelector('[onclick*="annotateOpenWorkshop"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+    captureFn().then(function(dataURL) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '✏️ Annotate'; }
+      _annotateOpen(dataURL, true);
+    }).catch(function(e) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '✏️ Annotate'; }
+      console.warn('Workshop annotate screenshot failed:', e);
+      // Fall back to blank canvas
+      var bc = document.createElement('canvas'); bc.width = 600; bc.height = 240;
+      var bctx = bc.getContext('2d'); bctx.fillStyle = '#1a1a2e'; bctx.fillRect(0, 0, 600, 240);
+      _annotateOpen(bc.toDataURL('image/png'), true);
+    });
+  } else {
+    // captureWorkshopPreviewScreenshot not yet loaded — use blank canvas
+    var bc = document.createElement('canvas'); bc.width = 600; bc.height = 240;
+    var bctx = bc.getContext('2d'); bctx.fillStyle = '#1a1a2e'; bctx.fillRect(0, 0, 600, 240);
+    _annotateOpen(bc.toDataURL('image/png'), true);
+  }
+}
+
 
 /* ══════════════════════════════════════════════════════════
    JARVIS — Wholesome AI Autopilot
