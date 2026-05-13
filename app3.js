@@ -2390,7 +2390,7 @@ async function callGeminiAI(systemPrompt, userPrompt, forJson = false, streamCal
 
 // Pending images for the next AI call (agent or chat)
 // Each entry is a dataURL string  
-const _pendingImages = { agent: [], chat: [] };
+const _pendingImages = { agent: [], chat: [], workshop: [] };
 
 /**
  * Capture the live preview iframe as a PNG dataURL.
@@ -2625,6 +2625,65 @@ async function screenshotAndEdit(context = 'agent') {
     }
 }
 
+
+/**
+ * Capture the Workshop preview iframe (ws-preview-frame) as a PNG dataURL.
+ * Mirrors capturePreviewScreenshot but targets the workshop iframe.
+ */
+async function captureWorkshopPreviewScreenshot() {
+    const wsIframe = document.getElementById('ws-preview-frame');
+    if (!wsIframe) throw new Error('Workshop preview iframe not found.');
+
+    const iDoc = wsIframe.contentDocument || wsIframe.contentWindow?.document;
+    if (!iDoc || !iDoc.body) throw new Error('Workshop preview iframe not ready.');
+
+    const W = wsIframe.offsetWidth  || wsIframe.clientWidth  || 600;
+    const H = wsIframe.offsetHeight || wsIframe.clientHeight || 240;
+
+    // Strategy 1: html2canvas in parent targeting the workshop iframe body
+    try {
+        await _ensureHtml2CanvasInParent();
+        const canvas = await window.html2canvas(iDoc.body, {
+            useCORS: true, allowTaint: true, scale: 0.75,
+            logging: false, backgroundColor: '#ffffff', width: W, height: H,
+            windowWidth:  iDoc.documentElement.scrollWidth  || W,
+            windowHeight: iDoc.documentElement.scrollHeight || H,
+        });
+        return canvas.toDataURL('image/png');
+    } catch(e) {
+        console.warn('[WS Screenshot] html2canvas failed:', e.message || e);
+    }
+
+    // Strategy 2: inject html2canvas into the workshop iframe
+    try {
+        return await _captureViaInjection(wsIframe, W, H);
+    } catch(e) {
+        console.warn('[WS Screenshot] injection failed:', e.message || e);
+    }
+
+    // Strategy 3: SVG foreignObject
+    try {
+        return await _svgScreenshotFallback(wsIframe);
+    } catch(e) {
+        console.warn('[WS Screenshot] SVG fallback failed:', e.message || e);
+    }
+
+    return _blankCanvasFallback(wsIframe);
+}
+
+/** One-click: screenshot the workshop preview → add to workshop pending images */
+async function screenshotAndEditWorkshop() {
+    const btn = document.getElementById('ws-screenshot-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '📷 Capturing…'; }
+    try {
+        const dataURL = await captureWorkshopPreviewScreenshot();
+        addPendingImage('workshop', dataURL);
+        if (btn) { btn.textContent = '✓ Captured'; setTimeout(() => { btn.disabled = false; btn.innerHTML = '📷 Screenshot'; }, 1400); }
+    } catch(e) {
+        console.error('WS Screenshot failed:', e);
+        if (btn) { btn.textContent = '✗ Failed'; setTimeout(() => { btn.disabled = false; btn.innerHTML = '📷 Screenshot'; }, 2000); }
+    }
+}
 
 async function generateCompleteSubtree(parentNode, streamCallback = null, refImages = []) {
     console.log(`Generating subtree for parent: ${parentNode.id}`);
@@ -8572,9 +8631,12 @@ window.vibeAPI = {
 // Expose vision/image functions globally so inline onclick handlers work
 window.screenshotAndEdit = screenshotAndEdit;
 window.handleImageFileInput = handleImageFileInput;
+window.screenshotAndEditWorkshop = screenshotAndEditWorkshop;
+window.captureWorkshopPreviewScreenshot = captureWorkshopPreviewScreenshot;
 window.addPendingImage = addPendingImage;
 window.capturePreviewScreenshot = capturePreviewScreenshot;
 window._pendingImages = _pendingImages;
+window._refreshImagePreviews = _refreshImagePreviews;
 
 console.log("Vibe Automation API exposed as window.vibeAPI");
 
@@ -9290,4 +9352,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+  }
