@@ -2186,6 +2186,9 @@
                                     <button class="agt-itab" onclick="agtSwitchTab('tracker',this)" title="Task &amp; edit tracker">
                                         <i class="bi bi-kanban"></i> Tracker
                                     </button>
+                                    <button class="agt-itab" onclick="agtSwitchTab('workshop',this)" title="Element Workshop — build &amp; merge" style="color:#ffd54f;">
+                                        <i class="bi bi-tools"></i> Workshop
+                                    </button>
                                     <button class="agt-itab" onclick="agtSwitchTab('jarvis',this)" title="Jarvis Autopilot" style="color:#c678dd;margin-left:auto;">
                                         <i class="bi bi-robot"></i> Jarvis
                                     </button>
@@ -2431,6 +2434,72 @@
                                             <div style="font-size:11px;color:#5c6370;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Suggestions from Jarvis</div>
                                             <div id="jrv-suggestions" style="display:flex;flex-direction:column;gap:5px;"></div>
                                         </div>
+                                    </div>
+
+                                </div>
+
+                                <!-- ══ WORKSHOP pane ══ -->
+                                <div id="agt-pane-workshop" class="agt-pane" style="flex-direction:column;gap:0;padding:0;overflow:hidden;">
+
+                                    <!-- Workshop toolbar -->
+                                    <div id="ws-toolbar" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.25);flex-shrink:0;flex-wrap:wrap;">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#ffd54f;display:flex;align-items:center;gap:5px;"><i class="bi bi-tools"></i> Workshop</span>
+                                        <input type="text" id="ws-el-name" placeholder="Element name…" style="flex:1;min-width:100px;max-width:180px;padding:5px 9px;font-size:12px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
+                                        <select id="ws-el-type" style="padding:5px 8px;font-size:12px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
+                                            <option value="html">HTML</option>
+                                            <option value="svg">SVG</option>
+                                            <option value="css">CSS</option>
+                                            <option value="javascript">JavaScript</option>
+                                        </select>
+                                        <button class="action-button small" onclick="wsNewElement()" style="border-color:#ffd54f;color:#ffd54f;"><i class="bi bi-plus-circle"></i> New</button>
+                                        <button class="action-button small" onclick="wsDuplicateElement()" title="Duplicate selected element"><i class="bi bi-copy"></i></button>
+                                        <button class="action-button small danger" onclick="wsDeleteElement()" title="Delete selected element"><i class="bi bi-trash"></i></button>
+                                    </div>
+
+                                    <!-- Workshop body: element list + editor + preview -->
+                                    <div style="display:flex;flex:1;min-height:0;overflow:hidden;">
+
+                                        <!-- Left: Element list -->
+                                        <div id="ws-el-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);overflow-y:auto;background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;">
+                                            <div id="ws-el-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No elements yet.<br>Click <b style="color:#ffd54f">+ New</b> to begin.</div>
+                                        </div>
+
+                                        <!-- Right: editor + preview stacked -->
+                                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;">
+
+                                            <!-- Code editor area -->
+                                            <div style="flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--apui-border);">
+                                                <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(10,14,28,0.9);flex-shrink:0;border-bottom:1px solid rgba(65,105,225,0.15);">
+                                                    <span id="ws-editor-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-text-dim);">— select an element —</span>
+                                                    <div style="display:flex;gap:5px;">
+                                                        <button class="action-button small" onclick="wsRefreshPreview()" style="border-color:#00ffcc;color:#00ffcc;" title="Refresh preview"><i class="bi bi-play-fill"></i> Run</button>
+                                                        <button class="action-button small ai-powered-button" onclick="wsAskAI()" title="Ask AI to work on this element"><i class="bi bi-stars"></i> AI</button>
+                                                    </div>
+                                                </div>
+                                                <textarea id="ws-code-editor" spellcheck="false" style="flex:1;min-height:0;resize:none;background:rgba(5,8,18,0.95);color:#abb2bf;font-family:'Fira Code',monospace;font-size:12.5px;line-height:1.65;padding:10px 12px;border:none;outline:none;tab-size:2;" placeholder="Select or create an element to start coding…" oninput="wsDebouncedSave()"></textarea>
+                                            </div>
+
+                                            <!-- Live preview -->
+                                            <div style="height:220px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;">
+                                                <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(10,14,28,0.9);flex-shrink:0;border-bottom:1px solid rgba(65,105,225,0.15);">
+                                                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-text-dim);">Preview</span>
+                                                    <button class="action-button small" id="ws-merge-btn" onclick="wsMergeToProject()" style="border-color:#98c379;color:#98c379;" title="Merge this element into the main project"><i class="bi bi-arrow-up-circle"></i> Merge to Project</button>
+                                                </div>
+                                                <iframe id="ws-preview-frame" style="flex:1;border:none;background:#fff;" sandbox="allow-scripts"></iframe>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                    <!-- AI prompt bar for workshop -->
+                                    <div id="ws-ai-bar" style="display:none;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.92);flex-shrink:0;">
+                                        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--apui-ai-edit);margin-bottom:5px;">✦ AI — working on: <span id="ws-ai-target" style="color:#ffd54f;"></span></div>
+                                        <textarea id="ws-ai-prompt" rows="2" placeholder="e.g. Make this SVG pulse with a glow animation, add a gradient fill…" style="width:100%;font-size:12px;resize:vertical;border-radius:5px;"></textarea>
+                                        <div style="display:flex;gap:5px;margin-top:6px;">
+                                            <button class="action-button small ai-powered-button" id="ws-ai-send-btn" onclick="wsSendAI()" style="flex:1;"><i class="bi bi-stars"></i> Generate</button>
+                                            <button class="action-button small secondary" onclick="wsCloseAIBar()">Cancel</button>
+                                        </div>
+                                        <div id="ws-ai-status" style="font-size:11px;color:var(--apui-text-dim);margin-top:5px;display:none;"></div>
                                     </div>
 
                                 </div>
@@ -3024,6 +3093,257 @@
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app3.js"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   WORKSHOP — Element sandbox with AI assist + Merge to Project
+   ══════════════════════════════════════════════════════════════ */
+(function() {
+
+var _wsElements = [];
+var _wsActiveId = null;
+var _wsSaveTimer = null;
+var _wsAIController = null;
+
+var WS_TYPE_COLORS = { html:'#81c784', svg:'#4dd0e1', css:'#ce93d8', javascript:'#ffb74d' };
+var WS_PLACEHOLDERS = {
+    html: '<!-- Write your HTML snippet here -->\n<div class="my-element">\n  Hello World\n</div>',
+    svg:  '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">\n  <circle cx="100" cy="100" r="80" fill="#4169e1" />\n</svg>',
+    css:  '/* Write standalone CSS here */\n.my-element {\n  color: royalblue;\n  font-size: 1.5rem;\n}',
+    javascript: '// Write standalone JS here\nconsole.log("Hello from Workshop!");',
+};
+
+function _wsGetEditor() { return document.getElementById('ws-code-editor'); }
+function _wsFind(id) { return _wsElements.find(function(e){ return e.id === id; }); }
+function _wsGenId() { return 'ws_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+
+function wsRenderList() {
+    var list = document.getElementById('ws-el-list');
+    if (!list) return;
+    var empty = document.getElementById('ws-el-empty');
+    Array.from(list.querySelectorAll('.ws-item')).forEach(function(n){ n.remove(); });
+    if (_wsElements.length === 0) { if (empty) empty.style.display = ''; return; }
+    if (empty) empty.style.display = 'none';
+    _wsElements.forEach(function(el) {
+        var btn = document.createElement('button');
+        btn.className = 'ws-item';
+        btn.dataset.id = el.id;
+        var isActive = el.id === _wsActiveId;
+        btn.style.cssText = 'display:flex;align-items:center;gap:5px;width:100%;padding:6px 8px;background:' + (isActive ? 'rgba(65,105,225,0.2)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(65,105,225,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;text-align:left;font-family:"Fira Code",monospace;font-size:11px;color:' + (isActive ? '#87CEEB' : '#7a8aaa') + ';';
+        var dot = document.createElement('span');
+        dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (WS_TYPE_COLORS[el.type] || '#888') + ';';
+        var label = document.createElement('span');
+        label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+        label.textContent = el.name;
+        var typeBadge = document.createElement('span');
+        typeBadge.style.cssText = 'font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.4);color:' + (WS_TYPE_COLORS[el.type] || '#888') + ';flex-shrink:0;';
+        typeBadge.textContent = el.type;
+        btn.appendChild(dot); btn.appendChild(label); btn.appendChild(typeBadge);
+        btn.onclick = function() { wsSelectElement(el.id); };
+        list.appendChild(btn);
+    });
+}
+
+window.wsSelectElement = function(id) {
+    _wsActiveId = id;
+    var el = _wsFind(id);
+    var editor = _wsGetEditor();
+    var label = document.getElementById('ws-editor-label');
+    if (el && editor) {
+        editor.value = el.code;
+        editor.disabled = false;
+        if (label) { label.textContent = el.name + ' [' + el.type + ']'; label.style.color = WS_TYPE_COLORS[el.type] || 'var(--apui-text-dim)'; }
+        wsRefreshPreview();
+    }
+    wsRenderList();
+};
+
+window.wsNewElement = function() {
+    var nameInput = document.getElementById('ws-el-name');
+    var typeSelect = document.getElementById('ws-el-type');
+    var name = nameInput ? nameInput.value.trim() : '';
+    var type = typeSelect ? typeSelect.value : 'html';
+    if (!name) name = type + '-' + (_wsElements.length + 1);
+    var el = { id: _wsGenId(), name: name, type: type, code: WS_PLACEHOLDERS[type] || '' };
+    _wsElements.push(el);
+    if (nameInput) nameInput.value = '';
+    wsRenderList();
+    wsSelectElement(el.id);
+};
+
+window.wsDuplicateElement = function() {
+    if (!_wsActiveId) return;
+    var src = _wsFind(_wsActiveId);
+    if (!src) return;
+    var copy = { id: _wsGenId(), name: src.name + '-copy', type: src.type, code: src.code };
+    _wsElements.push(copy);
+    wsRenderList();
+    wsSelectElement(copy.id);
+};
+
+window.wsDeleteElement = function() {
+    if (!_wsActiveId) return;
+    _wsElements = _wsElements.filter(function(e){ return e.id !== _wsActiveId; });
+    _wsActiveId = _wsElements.length ? _wsElements[_wsElements.length - 1].id : null;
+    var editor = _wsGetEditor();
+    if (!_wsActiveId && editor) {
+        editor.value = ''; editor.disabled = true;
+        var label = document.getElementById('ws-editor-label');
+        if (label) { label.textContent = '— select an element —'; label.style.color = 'var(--apui-text-dim)'; }
+        var frame = document.getElementById('ws-preview-frame');
+        if (frame) frame.srcdoc = '';
+    }
+    wsRenderList();
+    if (_wsActiveId) wsSelectElement(_wsActiveId);
+};
+
+window.wsDebouncedSave = function() {
+    clearTimeout(_wsSaveTimer);
+    _wsSaveTimer = setTimeout(function() {
+        if (!_wsActiveId) return;
+        var el = _wsFind(_wsActiveId);
+        if (el && _wsGetEditor()) el.code = _wsGetEditor().value;
+    }, 300);
+};
+
+window.wsRefreshPreview = function() {
+    if (!_wsActiveId) return;
+    clearTimeout(_wsSaveTimer);
+    var el = _wsFind(_wsActiveId);
+    if (!el) return;
+    var editor = _wsGetEditor();
+    var code = editor ? editor.value : el.code;
+    el.code = code;
+    var frame = document.getElementById('ws-preview-frame');
+    if (!frame) return;
+    var doc;
+    if (el.type === 'css') {
+        doc = '<!DOCTYPE html><html><head><style>' + code + '</style></head><body style="background:#1a1f2e;color:#ccc;padding:16px;font-family:sans-serif;"><p style="opacity:.4;font-size:12px">CSS preview — element below uses these styles:</p><div class="ws-sample-target" style="padding:12px;border:1px dashed rgba(255,255,255,0.15);border-radius:6px;margin-top:8px;">Sample element</div></body></html>';
+    } else if (el.type === 'javascript') {
+        doc = '<!DOCTYPE html><html><head></head><body style="background:#1a1f2e;color:#abb2bf;padding:16px;font-family:\\\'Fira Code\\\',monospace;font-size:12px;"><pre id="ws-js-out" style="margin:0;white-space:pre-wrap;word-break:break-all;"></pre><script>var __out=document.getElementById("ws-js-out");var __orig=console.log;console.log=function(){__out.textContent+=Array.from(arguments).join(" ")+"\\n";__orig.apply(console,arguments);}; ' + code + ' <\/script></body></html>';
+    } else {
+        doc = '<!DOCTYPE html><html><head><style>body{margin:0;padding:12px;background:#1a1f2e;display:flex;align-items:center;justify-content:center;min-height:100vh;box-sizing:border-box;}</style></head><body>' + code + '</body></html>';
+    }
+    frame.srcdoc = doc;
+};
+
+window.wsAskAI = function() {
+    if (!_wsActiveId) { alert('Select an element first.'); return; }
+    var el = _wsFind(_wsActiveId);
+    var bar = document.getElementById('ws-ai-bar');
+    if (!bar) return;
+    var tgt = document.getElementById('ws-ai-target');
+    if (tgt && el) tgt.textContent = el.name;
+    bar.style.display = 'flex';
+    bar.style.flexDirection = 'column';
+    var p = document.getElementById('ws-ai-prompt');
+    if (p) p.focus();
+};
+
+window.wsCloseAIBar = function() {
+    var bar = document.getElementById('ws-ai-bar');
+    if (bar) bar.style.display = 'none';
+    var st = document.getElementById('ws-ai-status');
+    if (st) st.style.display = 'none';
+    var p = document.getElementById('ws-ai-prompt');
+    if (p) p.value = '';
+    if (_wsAIController) { _wsAIController.abort(); _wsAIController = null; }
+};
+
+window.wsSendAI = async function() {
+    if (!_wsActiveId) return;
+    var el = _wsFind(_wsActiveId);
+    if (!el) return;
+    var promptEl = document.getElementById('ws-ai-prompt');
+    var prompt = promptEl ? promptEl.value.trim() : '';
+    if (!prompt) return;
+    var statusEl = document.getElementById('ws-ai-status');
+    var sendBtn = document.getElementById('ws-ai-send-btn');
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = '#ffd54f'; statusEl.textContent = '✦ Generating…'; }
+    if (sendBtn) sendBtn.disabled = true;
+    try {
+        var apiKey = localStorage.getItem('vibeApiKey') || localStorage.getItem('gemini-api-key') || '';
+        var model = localStorage.getItem('vibeModel') || 'gemini-2.5-flash';
+        var newCode = '';
+        if (apiKey && apiKey.length > 10) {
+            var body = { contents: [{ role:'user', parts:[{ text: 'You are an expert developer. Return ONLY raw ' + el.type + ' code, no markdown fences.\n\nCurrent code:\n' + el.code + '\n\nRequest: ' + prompt }] }], generationConfig: { temperature: 0.3 } };
+            _wsAIController = new AbortController();
+            var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body), signal: _wsAIController.signal });
+            var data = await resp.json();
+            newCode = (((data.candidates||[])[0]||{}).content||{}).parts?.[0]?.text || '';
+        } else {
+            _wsAIController = new AbortController();
+            var ancResp = await fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:2048, system:'Return ONLY raw ' + el.type + ' code.', messages:[{role:'user',content:'Code:\n' + el.code + '\n\nRequest: ' + prompt}] }), signal: _wsAIController.signal });
+            var ancData = await ancResp.json();
+            newCode = (ancData.content||[]).filter(function(b){return b.type==='text';}).map(function(b){return b.text;}).join('');
+        }
+        newCode = newCode.replace(/^```[a-z]*\n?/i,'').replace(/```\s*$/,'').trim();
+        if (newCode) {
+            el.code = newCode;
+            if (_wsGetEditor()) _wsGetEditor().value = newCode;
+            wsRefreshPreview();
+            if (statusEl) { statusEl.style.color = '#98c379'; statusEl.textContent = '✓ Done — preview updated.'; }
+        } else {
+            if (statusEl) { statusEl.style.color = '#e06c75'; statusEl.textContent = '✗ No API key configured. Add Gemini key in API Settings.'; }
+        }
+    } catch(err) {
+        if (err.name !== 'AbortError' && statusEl) { statusEl.style.color = '#e06c75'; statusEl.textContent = '✗ ' + err.message; }
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        _wsAIController = null;
+    }
+};
+
+window.wsMergeToProject = function() {
+    if (!_wsActiveId) return;
+    clearTimeout(_wsSaveTimer);
+    var el = _wsFind(_wsActiveId);
+    if (!el) return;
+    var editor = _wsGetEditor();
+    if (editor) el.code = editor.value;
+    var nodeTypeMap = { html:'html', svg:'html', css:'css', javascript:'javascript' };
+    var nodeId = 'ws-merge-' + el.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') + '-' + Date.now().toString(36);
+    var newNode = { id: nodeId, type: nodeTypeMap[el.type] || 'html', description: '[Workshop] ' + el.name + ' (' + el.type + ')', code: el.code, children: [] };
+    var merged = false;
+    if (typeof vibeTree !== 'undefined' && typeof refreshAllUI === 'function') {
+        if (!vibeTree.children) vibeTree.children = [];
+        if (typeof recordHistory === 'function') recordHistory('Workshop merge: ' + nodeId);
+        vibeTree.children.push(newNode);
+        if (typeof autoSaveProject === 'function') autoSaveProject();
+        refreshAllUI();
+        merged = true;
+    }
+    if (!merged) { document.dispatchEvent(new CustomEvent('ws-merge-node', { detail: { newNode: newNode } })); }
+    var mergeBtn = document.getElementById('ws-merge-btn');
+    if (mergeBtn) {
+        var orig = mergeBtn.innerHTML;
+        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Merged!';
+        mergeBtn.disabled = true;
+        setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 2200);
+    }
+    setTimeout(function() {
+        if (typeof switchToTab === 'function') { switchToTab('editor'); }
+        else { document.querySelectorAll('.tab-button').forEach(function(b){ if(b.dataset.tab==='editor') b.click(); }); }
+    }, 600);
+};
+
+document.addEventListener('ws-merge-node', function(e) {
+    var nn = e.detail && e.detail.newNode;
+    if (!nn || typeof vibeTree === 'undefined') return;
+    if (!vibeTree.children) vibeTree.children = [];
+    vibeTree.children.push(nn);
+    if (typeof autoSaveProject === 'function') autoSaveProject();
+    if (typeof refreshAllUI === 'function') refreshAllUI();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var ed = document.getElementById('ws-code-editor');
+    if (ed) ed.disabled = true;
+});
+
+})();
+</script>
+
 
 
 <script>
