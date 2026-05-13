@@ -1,5 +1,3 @@
-
-
 body {
     font-family: 'Inter', sans-serif;
     background-color: #1a1a1a;
@@ -20,7 +18,7 @@ body {
     gap: 0;
     width: 100%;
     max-width: 1600px;
-    height: calc(100vh - 40px);
+    min-height: calc(100vh - 40px);
     margin: auto;
 }
 
@@ -513,19 +511,15 @@ body {
 /* END OF FIX */
 
 .tab-content-area {
-    flex-grow: 1;
     background-color: #282c34;
     border-radius: 8px;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
-    overflow-y: auto;
-    position: relative; /* For child absolute positioning if needed */
+    position: relative;
 }
 
 .tab-content {
     display: none;
-    height: 100%;
-    overflow-y: auto;
     padding: 20px;
     box-sizing: border-box;
 }
@@ -535,24 +529,21 @@ body {
 }
 
 .preview-container, .editor-container, .agent-container, #console-container, .full-code-container {
-    background-color: transparent; /* Parent .tab-content-area provides the background */
+    background-color: transparent;
     border-radius: 0;
-    padding: 0; /* Reset padding, handled by .tab-content */
-    box-shadow: none; /* No shadow needed inside tabs */
+    padding: 0;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
-    height: 100%;
 }
 
 .preview-container {
-    flex: 2;
     min-width: 400px;
+    min-height: calc(100vh - 120px);
 }
 
 .editor-container {
-    flex: 1;
     min-width: 350px;
-    max-height: none; /* Let parent handle height */
 }
 
 /* NEW: Editor Header Styles */
@@ -644,23 +635,22 @@ h2 {
     background-color: #fff;
     color: #333;
     border-radius: 4px;
-    min-height: 400px;
-    height: 100%; /* Fill available height */
+    min-height: calc(100vh - 160px);
     overflow-y: auto;
     transition: all 0.5s ease-in-out;
-    flex-grow: 1; /* Allow it to grow */
-    border: none; /* Remove default iframe border */
-    display: block; /* Ensure iframe takes up block space */
+    border: none;
+    display: block;
+    width: 100%;
 }
 
 #console-container {
-    margin-top: 0; /* Reset margin */
+    margin-top: 0;
     background-color: #21252b;
     border-radius: 4px;
-    border-top: none; /* Header has border bottom */
+    border-top: none;
     display: flex;
     flex-direction: column;
-    height: 100%; /* Fill tab */
+    min-height: 400px;
 }
 
 #console-container h3 {
