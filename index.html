@@ -5515,94 +5515,225 @@ function _jrvAutoStopBadge() {
 }
 
 // ── Pick an inspired project goal ──────────────────────────────────
+// ── Derive a clean slug from a project title ───────────────────────
+function _jrvAutoSlug(title) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s\-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 40)
+    .replace(/^-|-$/g, '') || ('jarvis-' + Date.now());
+}
+
+// ── Pick an inspired project (returns {title, slug, description}) ──
 async function _jrvAutoPickGoal() {
   var apiKey = _jrvGet('jarvis-api-key');
   var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
   if (!apiKey) return null;
 
-  // Pull memories and past self-projects for context
-  var mem = await _jrvMemorySummaryAsync();
-  var pastTitles = _jrvAutoProjects.slice(-6).map(function(p){ return p.goal; }).join('; ') || '(none yet)';
+  var mem = (typeof _jrvMemorySummaryAsync === 'function')
+    ? await _jrvMemorySummaryAsync().catch(function(){ return _jrvMemorySummary(); })
+    : _jrvMemorySummary();
+  var pastTitles = _jrvAutoProjects.slice(-8).map(function(p){ return p.title; }).join(', ') || 'none';
 
   var prompt = [
-    'You are Jarvis. The developer is away. Inspire yourself from their past work and invent ONE new mini side-project to build inside their Vibe Editor.',
+    'You are Jarvis. The developer is away. Invent ONE new self-contained interactive web project inspired by their past work.',
+    '',
+    'Respond with EXACTLY this format (no extra lines, no markdown, no quotes):',
+    'TITLE: <short 2–5 word project name, e.g. "Pixel Rain Sim">',
+    'DESC: <one sentence description of what to build>',
     '',
     'Rules:',
-    '- Must be a self-contained interactive web widget or tool (game, visualizer, utility, art piece, etc.).',
-    '- Directly inspired by patterns or themes from the developer\'s project memories.',
-    '- Must be NEW — different from these already done: ' + pastTitles + '.',
-    '- Respond with ONLY a single sentence goal for Jarvis to execute (no quotes, no markdown).',
-    '  Example: "Create an animated particle clock widget with the APUI colour palette"',
+    '- Must be a complete, self-contained HTML/CSS/JS page (game, tool, visualiser, art, utility).',
+    '- Inspired by the developer\'s existing projects below.',
+    '- Must be DIFFERENT from these already built: ' + pastTitles,
+    '- TITLE must be 2–5 words, Title Case, no punctuation.',
     '',
     'Developer project memories:',
     mem,
   ].join('\n');
 
-  var goal = await _jrvCall(apiKey, model, prompt, 60);
-  return goal ? goal.trim().replace(/^["']|["']$/g, '') : null;
+  var raw = await _jrvCall(apiKey, model, prompt, 150);
+  if (!raw) return null;
+  var titleMatch = raw.match(/TITLE:\s*(.+)/i);
+  var descMatch  = raw.match(/DESC:\s*(.+)/i);
+  var title = titleMatch ? titleMatch[1].trim().replace(/^["']|["']$/g, '') : null;
+  var desc  = descMatch  ? descMatch[1].trim().replace(/^["']|["']$/g, '') : title;
+  if (!title) return null;
+  return { title: title, slug: _jrvAutoSlug(title), description: desc || title };
+}
+
+// ── Generate the full project HTML in one large API call ──────────
+async function _jrvAutoGenerateCode(apiKey, model, title, description) {
+  var prompt = [
+    'You are Jarvis. Build the following self-contained interactive web project as a SINGLE complete HTML file.',
+    '',
+    'Project: ' + title,
+    'Description: ' + description,
+    '',
+    'Requirements:',
+    '- Output ONLY valid HTML starting with <!DOCTYPE html> — no markdown, no code fences, no explanation.',
+    '- Must be entirely self-contained: all CSS in <style>, all JS in <script>.',
+    '- Must be interactive and visually polished.',
+    '- Use a dark theme consistent with a developer tool aesthetic.',
+    '- Output the COMPLETE file — do not truncate or summarise any section.',
+  ].join('\n');
+
+  var apiKey2 = _jrvGet('jarvis-api-key');
+  var body = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 8192, topP: 0.95 },
+  });
+
+  var resp = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey2,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body }
+  );
+  var data = await resp.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  var raw = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
+  // Strip markdown fences if present
+  raw = raw.replace(/^```html?\s*/i, '').replace(/```\s*$/, '').trim();
+  if (!raw.match(/<!DOCTYPE/i) && raw.match(/<html/i)) {
+    // tolerate missing doctype
+  } else if (!raw.match(/<html/i)) {
+    throw new Error('Model did not return valid HTML');
+  }
+  return raw;
+}
+
+// ── Save generated code as a real local project ────────────────────
+async function _jrvAutoSaveProject(projectId, title, htmlCode) {
+  // Build a vibeTree with a single raw-html-container node
+  var tree = {
+    id: 'whole-page',
+    type: 'raw-html-container',
+    description: title,
+    code: htmlCode,
+    children: [],
+  };
+
+  // Use the same localApi that the rest of the editor uses
+  if (window.localApi && typeof window.localApi.saveProject === 'function') {
+    await window.localApi.saveProject(projectId, tree);
+    return true;
+  }
+  // Fallback: save directly to IDB store 'local_projects'
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open('VibeEditorDB', 1);
+    req.onsuccess = function(ev) {
+      var db = ev.target.result;
+      var stores = Array.from(db.objectStoreNames);
+      var storeName = stores.find(function(s){ return /project/i.test(s); }) || stores[0];
+      if (!storeName) { reject(new Error('No IDB store found')); return; }
+      var tx = db.transaction(storeName, 'readwrite');
+      var st = tx.objectStore(storeName);
+      // Try to detect what key the store uses
+      var keyPath = st.keyPath || 'projectId';
+      var obj = {};
+      obj[keyPath] = projectId;
+      obj.data = tree;
+      st.put(obj).onsuccess = function(){ resolve(true); };
+      tx.onerror = function(e){ reject(e.target.error); };
+    };
+    req.onerror = function(e){ reject(e.target.error); };
+  });
+}
+
+// ── Refresh the project list UI without disrupting the active project
+async function _jrvAutoRefreshProjectList() {
+  try {
+    if (typeof populateProjectList === 'function') {
+      await populateProjectList('local');
+    }
+  } catch(e) { /* non-fatal */ }
 }
 
 // ── The autonomous work loop ────────────────────────────────────────
 function _jrvAutoStartLoop() {
-  if (_jrvAutoLoopTimer) return; // already running
+  if (_jrvAutoLoopTimer) return;
   _jrvAutoLoopTimer = setInterval(async function() {
     if (!_jrvAutoEnabled) { clearInterval(_jrvAutoLoopTimer); _jrvAutoLoopTimer = null; return; }
-    if (_jrvAutoRunning) return;      // already doing something
-    if (!_jrvAutoIsIdle()) {          // user is active — stay quiet
-      if (_jrvAutoProjects.length) _jrvAutoStopBadge();
-      return;
-    }
+    if (_jrvAutoRunning) return;
+    if (!_jrvAutoIsIdle()) { _jrvAutoStopBadge(); return; }
 
     var apiKey = _jrvGet('jarvis-api-key');
     if (!apiKey) return;
 
-    // Pick a goal
+    // 1 — Pick a goal
     var goal = await _jrvAutoPickGoal();
     if (!goal) return;
 
     _jrvAutoRunning = true;
-    _jrvAutoShowBadge('working on ' + goal.slice(0, 50) + '…');
-    _jrvLog('🛸 Autonomous: starting self-project — "' + goal + '"', 'jrv-msg-think');
 
-    // Register as a background task so it shows in the BG pane
-    var task = { goal: '[Auto] ' + goal, status: 'running', result: '', ts: Date.now() };
+    // 2 — Build project ID with -jarvis suffix
+    var projectId = goal.slug + '-jarvis';
+    // Deduplicate if already exists
+    if (window.localApi && typeof window.localApi.listProjects === 'function') {
+      try {
+        var existing = await window.localApi.listProjects();
+        if (existing.includes(projectId)) {
+          projectId = goal.slug + '-jarvis-' + Date.now();
+        }
+      } catch(e) {}
+    }
+
+    _jrvAutoShowBadge('building ' + goal.title + '…');
+    _jrvLog('🛸 Auto: starting "' + goal.title + '" (' + projectId + ')', 'jrv-msg-think');
+
+    // Register in BG pane
+    var task = { goal: '[Auto] ' + goal.title, status: 'running', result: '', ts: Date.now() };
     _jrvBgTasks.push(task);
     jrvRenderBg();
 
-    // Remember what we're attempting
-    _jrvAutoProjects.push({ goal: goal, ts: Date.now() });
-    jarvisAddMemory('Jarvis self-project: ' + goal, 'auto');
+    _jrvAutoProjects.push({ title: goal.title, id: projectId, ts: Date.now() });
+    jarvisAddMemory('Jarvis self-project started: ' + goal.title + ' (' + projectId + ')', 'auto');
 
-    // Execute
-    var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
-    var maxSt  = Math.min(parseInt(_jrvGet('jarvis-max-steps') || '12', 10), 14);
+    var model = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+    // Respect the configured heartbeat between API calls
+    var heartbeatMs = parseInt((document.getElementById('jarvis-heartbeat') || {}).value || '5000', 10);
 
     try {
-      var result = await _jrvExecutePlan(apiKey, model, goal, maxSt, true);
+      // 3 — Wait one heartbeat before the code-gen call (respects rate limit setting)
+      await new Promise(function(r){ setTimeout(r, heartbeatMs); });
+      if (!_jrvAutoEnabled) { _jrvAutoRunning = false; return; }
+
+      // 4 — Generate the full project code in ONE large call
+      _jrvAutoShowBadge('generating ' + goal.title + '…');
+      var htmlCode = await _jrvAutoGenerateCode(apiKey, model, goal.title, goal.description);
+
+      // 5 — Save as a real local project
+      await _jrvAutoSaveProject(projectId, goal.title, htmlCode);
+
+      // 6 — Refresh the project list so it appears immediately
+      await _jrvAutoRefreshProjectList();
+
       task.status = 'done';
-      task.result = result || 'Completed';
-      jarvisAddMemory('Completed self-project: ' + goal + (result ? ' → ' + result.slice(0, 80) : ''), 'auto');
-      _jrvLog('🛸 Autonomous: finished "' + goal.slice(0, 60) + '"', 'jrv-msg-ok');
-      _jrvAutoShowBadge('done — ' + goal.slice(0, 45));
+      task.result = projectId;
+      jarvisAddMemory('Jarvis self-project done: ' + goal.title + ' → saved as "' + projectId + '"', 'auto');
+      _jrvLog('🛸 Auto: finished "' + goal.title + '" → saved as project "' + projectId + '"', 'jrv-msg-ok');
+      _jrvAutoShowBadge('✓ ' + goal.title + ' saved');
       setTimeout(_jrvAutoStopBadge, 8000);
+
     } catch(e) {
       task.status = 'error';
-      task.result = e && e.message ? e.message : 'Error';
-      _jrvLog('🛸 Autonomous error: ' + (e && e.message ? e.message : e), 'jrv-msg-err');
+      task.result = e && e.message ? e.message : String(e);
+      _jrvLog('🛸 Auto error: ' + (e && e.message ? e.message : e), 'jrv-msg-err');
       _jrvAutoStopBadge();
     }
 
     jrvRenderBg();
-    // Badge the BG tab
     var bgBtn = document.querySelector('.jrv-stab[onclick*="bg"]');
     if (bgBtn && !bgBtn.textContent.includes('✓')) bgBtn.textContent = '🌙 Background ✓';
 
     _jrvAutoRunning = false;
 
-    // Cool-down — wait at least 3 min before picking another project
-    await new Promise(function(r) { setTimeout(r, 180000); });
+    // Cool-down: 3 min + one extra heartbeat before next project
+    await new Promise(function(r){ setTimeout(r, 180000 + heartbeatMs); });
 
-  }, 15000); // check every 15 s
+  }, 15000);
 }
 
 /* ── Boot: migrate localStorage → IDB, init IDB ── */
