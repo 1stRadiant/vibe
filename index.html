@@ -4730,7 +4730,9 @@ async function jarvisRun(background) {
 async function _jrvExecutePlan(apiKey, model, goal, maxSteps, silent) {
   var mem    = _jrvMemorySummary();
   var state  = _jrvReadState();
-  var skills = _jrvSkillsLoad().map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
+  var _skRaw = _jrvSkillsLoad();
+  var _skArr = (_skRaw && typeof _skRaw.then === 'function') ? (await _skRaw.catch(function(){ return []; })) : (Array.isArray(_skRaw) ? _skRaw : []);
+  var skills = _skArr.map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
   var heartbeatMs = parseInt((document.getElementById('jarvis-heartbeat') || {}).value || '5000', 10);
 
   var systemPrompt = [
@@ -5700,4 +5702,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-        </html>
+    </html>
