@@ -2331,7 +2331,8 @@
                                         <button class="jrv-stab" onclick="jrvTab('memory',this)">🧠 Memory</button>
                                         <button class="jrv-stab" onclick="jrvTab('skills',this)">⚡ Skills</button>
                                         <button class="jrv-stab" onclick="jrvTab('bg',this)">🌙 Background</button>
-                                        <button class="jrv-stab" onclick="jarvisToggleSettings()" style="margin-left:auto;color:#5c6370;">⚙</button>
+                                        <button class="jrv-stab" id="jrv-auto-toggle-btn" onclick="jrvAutoToggle()" style="margin-left:auto;color:#5c6370;" title="Autonomous Mode — Jarvis works on its own projects when you are idle">🛸 Auto</button>
+                                        <button class="jrv-stab" onclick="jarvisToggleSettings()" style="color:#5c6370;">⚙</button>
                                     </div>
 
                                     <!-- Settings (shared overlay) -->
@@ -5414,6 +5415,194 @@ async function jarvisGenerateSuggestions() {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   JARVIS AUTONOMOUS MODE
+   When enabled, Jarvis works on its own side-projects while the user
+   is idle (no mouse/keyboard/touch activity for _jrvAutoIdleMs).
+   It reads your existing project memories for inspiration, picks a
+   fresh idea, builds it silently as a background task, and saves a
+   memory entry so you can find it later. It pauses the moment you
+   come back and resumes when you leave again.
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ── State ──────────────────────────────────────────────────────────
+var _jrvAutoEnabled   = false;   // master switch (persisted in localStorage)
+var _jrvAutoRunning   = false;   // true while a self-project task is executing
+var _jrvAutoLastInput = Date.now();
+var _jrvAutoIdleMs    = 90000;   // wait 90 s of inactivity before kicking in
+var _jrvAutoLoopTimer = null;
+var _jrvAutoProjects  = [];      // list of self-project tasks Jarvis has done
+
+// ── Idle tracker ───────────────────────────────────────────────────
+(function() {
+  function _resetIdle() { _jrvAutoLastInput = Date.now(); }
+  ['mousemove','mousedown','keydown','touchstart','wheel','click'].forEach(function(ev) {
+    document.addEventListener(ev, _resetIdle, { passive: true });
+  });
+})();
+
+function _jrvAutoIsIdle() {
+  return (Date.now() - _jrvAutoLastInput) >= _jrvAutoIdleMs;
+}
+
+// ── Persist enabled state ──────────────────────────────────────────
+function _jrvAutoLoad() {
+  _jrvAutoEnabled = localStorage.getItem('jarvis_auto_enabled') === '1';
+}
+function _jrvAutoSave() {
+  localStorage.setItem('jarvis_auto_enabled', _jrvAutoEnabled ? '1' : '0');
+}
+
+// ── Toggle (called by the 🛸 Auto button) ──────────────────────────
+function jrvAutoToggle() {
+  _jrvAutoEnabled = !_jrvAutoEnabled;
+  _jrvAutoSave();
+  _jrvAutoUpdateUI();
+  if (_jrvAutoEnabled) {
+    _jrvLog('🛸 Autonomous Mode ON — Jarvis will work on its own projects while you are away.', 'jrv-msg-ok');
+    _jrvAutoStartLoop();
+  } else {
+    _jrvLog('🛸 Autonomous Mode OFF.', 'jrv-msg-think');
+    _jrvAutoStopBadge();
+  }
+}
+
+function _jrvAutoUpdateUI() {
+  var btn = document.getElementById('jrv-auto-toggle-btn');
+  if (!btn) return;
+  if (_jrvAutoEnabled) {
+    btn.style.color = '#ff00ff';
+    btn.style.textShadow = '0 0 8px #ff00ff';
+    btn.title = 'Autonomous Mode ON — click to disable';
+  } else {
+    btn.style.color = '#5c6370';
+    btn.style.textShadow = 'none';
+    btn.title = 'Autonomous Mode OFF — click to enable';
+  }
+}
+
+// ── Floating status badge ──────────────────────────────────────────
+function _jrvAutoShowBadge(text) {
+  var badge = document.getElementById('jrv-auto-badge');
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.id = 'jrv-auto-badge';
+    badge.style.cssText = [
+      'position:fixed;bottom:18px;left:50%;transform:translateX(-50%)',
+      'background:rgba(10,5,25,0.92)',
+      'border:1px solid #ff00ff',
+      'box-shadow:0 0 18px rgba(255,0,255,0.35)',
+      'color:#ff00ff',
+      'font-family:"Fira Code",monospace',
+      'font-size:11px',
+      'padding:6px 14px',
+      'border-radius:20px',
+      'z-index:99999',
+      'pointer-events:none',
+      'letter-spacing:.04em',
+      'transition:opacity .4s',
+    ].join(';');
+    document.body.appendChild(badge);
+  }
+  badge.textContent = '🛸 Jarvis: ' + text;
+  badge.style.opacity = '1';
+}
+function _jrvAutoStopBadge() {
+  var badge = document.getElementById('jrv-auto-badge');
+  if (badge) badge.style.opacity = '0';
+}
+
+// ── Pick an inspired project goal ──────────────────────────────────
+async function _jrvAutoPickGoal() {
+  var apiKey = _jrvGet('jarvis-api-key');
+  var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+  if (!apiKey) return null;
+
+  // Pull memories and past self-projects for context
+  var mem = await _jrvMemorySummaryAsync();
+  var pastTitles = _jrvAutoProjects.slice(-6).map(function(p){ return p.goal; }).join('; ') || '(none yet)';
+
+  var prompt = [
+    'You are Jarvis. The developer is away. Inspire yourself from their past work and invent ONE new mini side-project to build inside their Vibe Editor.',
+    '',
+    'Rules:',
+    '- Must be a self-contained interactive web widget or tool (game, visualizer, utility, art piece, etc.).',
+    '- Directly inspired by patterns or themes from the developer\'s project memories.',
+    '- Must be NEW — different from these already done: ' + pastTitles + '.',
+    '- Respond with ONLY a single sentence goal for Jarvis to execute (no quotes, no markdown).',
+    '  Example: "Create an animated particle clock widget with the APUI colour palette"',
+    '',
+    'Developer project memories:',
+    mem,
+  ].join('\n');
+
+  var goal = await _jrvCall(apiKey, model, prompt, 60);
+  return goal ? goal.trim().replace(/^["']|["']$/g, '') : null;
+}
+
+// ── The autonomous work loop ────────────────────────────────────────
+function _jrvAutoStartLoop() {
+  if (_jrvAutoLoopTimer) return; // already running
+  _jrvAutoLoopTimer = setInterval(async function() {
+    if (!_jrvAutoEnabled) { clearInterval(_jrvAutoLoopTimer); _jrvAutoLoopTimer = null; return; }
+    if (_jrvAutoRunning) return;      // already doing something
+    if (!_jrvAutoIsIdle()) {          // user is active — stay quiet
+      if (_jrvAutoProjects.length) _jrvAutoStopBadge();
+      return;
+    }
+
+    var apiKey = _jrvGet('jarvis-api-key');
+    if (!apiKey) return;
+
+    // Pick a goal
+    var goal = await _jrvAutoPickGoal();
+    if (!goal) return;
+
+    _jrvAutoRunning = true;
+    _jrvAutoShowBadge('working on ' + goal.slice(0, 50) + '…');
+    _jrvLog('🛸 Autonomous: starting self-project — "' + goal + '"', 'jrv-msg-think');
+
+    // Register as a background task so it shows in the BG pane
+    var task = { goal: '[Auto] ' + goal, status: 'running', result: '', ts: Date.now() };
+    _jrvBgTasks.push(task);
+    jrvRenderBg();
+
+    // Remember what we're attempting
+    _jrvAutoProjects.push({ goal: goal, ts: Date.now() });
+    jarvisAddMemory('Jarvis self-project: ' + goal, 'auto');
+
+    // Execute
+    var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+    var maxSt  = Math.min(parseInt(_jrvGet('jarvis-max-steps') || '12', 10), 14);
+
+    try {
+      var result = await _jrvExecutePlan(apiKey, model, goal, maxSt, true);
+      task.status = 'done';
+      task.result = result || 'Completed';
+      jarvisAddMemory('Completed self-project: ' + goal + (result ? ' → ' + result.slice(0, 80) : ''), 'auto');
+      _jrvLog('🛸 Autonomous: finished "' + goal.slice(0, 60) + '"', 'jrv-msg-ok');
+      _jrvAutoShowBadge('done — ' + goal.slice(0, 45));
+      setTimeout(_jrvAutoStopBadge, 8000);
+    } catch(e) {
+      task.status = 'error';
+      task.result = e && e.message ? e.message : 'Error';
+      _jrvLog('🛸 Autonomous error: ' + (e && e.message ? e.message : e), 'jrv-msg-err');
+      _jrvAutoStopBadge();
+    }
+
+    jrvRenderBg();
+    // Badge the BG tab
+    var bgBtn = document.querySelector('.jrv-stab[onclick*="bg"]');
+    if (bgBtn && !bgBtn.textContent.includes('✓')) bgBtn.textContent = '🌙 Background ✓';
+
+    _jrvAutoRunning = false;
+
+    // Cool-down — wait at least 3 min before picking another project
+    await new Promise(function(r) { setTimeout(r, 180000); });
+
+  }, 15000); // check every 15 s
+}
+
 /* ── Boot: migrate localStorage → IDB, init IDB ── */
 document.addEventListener('DOMContentLoaded', function() {
   jarvisLoadSettings();
@@ -5448,6 +5637,14 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
       if (_jrvGet('jarvis-api-key')) jarvisGenerateSuggestions();
     }, 4000);
+
+    // Autonomous Mode — restore from localStorage and start loop if it was on
+    _jrvAutoLoad();
+    _jrvAutoUpdateUI();
+    if (_jrvAutoEnabled) {
+      _jrvAutoStartLoop();
+      _jrvLog('🛸 Autonomous Mode restored — Jarvis will work on projects while you are away.', 'jrv-msg-think');
+    }
   }).catch(console.error);
 });
 
@@ -5503,4 +5700,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+        </html>
