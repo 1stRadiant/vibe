@@ -5576,15 +5576,40 @@ async function _jrvAutoPickGoal() {
 
 // ── Build a skeleton vibeTree for a new self-project ──────────────
 function _jrvAutoBuildSkeleton(title, description) {
+  // Flat children on the root — matches how rebuildFromTree spawns nodes
   return {
     id: 'whole-page',
     type: 'container',
     description: title,
     children: [
-      { id: 'head-meta',  type: 'head',       description: 'Page head',     code: '<title>' + title + '</title>', children: [] },
-      { id: 'html-body',  type: 'html',        description: 'Body markup',   code: '<div id="app">\n  <h1>' + title + '</h1>\n  <p>' + description + '</p>\n</div>', children: [] },
-      { id: 'css-main',   type: 'css',         description: 'Styles',        code: 'body{margin:0;background:#0a0e18;color:#e6e6ff;font-family:system-ui;}#app{padding:40px;text-align:center;}', children: [] },
-      { id: 'js-main',    type: 'javascript',  description: 'Logic',         code: '// ' + title + '\ndocument.addEventListener("DOMContentLoaded", function() {\n  console.log("' + title + ' ready");\n});', children: [] },
+      {
+        id: 'head-meta',
+        type: 'head',
+        description: 'Page head',
+        code: '<title>' + title + '</title>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">',
+        children: [],
+      },
+      {
+        id: 'html-body',
+        type: 'html',
+        description: 'Body markup — BUILD THIS OUT FULLY',
+        code: '<!-- ' + title + ' -->\n<!-- Jarvis: replace this with the complete page markup for: ' + description + ' -->',
+        children: [],
+      },
+      {
+        id: 'css-main',
+        type: 'css',
+        description: 'Styles — BUILD THIS OUT FULLY',
+        code: '/* ' + title + ' styles */\n/* Jarvis: replace this with complete CSS for: ' + description + ' */',
+        children: [],
+      },
+      {
+        id: 'js-main',
+        type: 'javascript',
+        description: 'Logic — BUILD THIS OUT FULLY',
+        code: '// ' + title + '\n// Jarvis: replace this with complete JS for: ' + description,
+        children: [],
+      },
     ],
   };
 }
@@ -5880,4 +5905,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+                    </html>
