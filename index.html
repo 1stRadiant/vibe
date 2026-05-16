@@ -5606,7 +5606,6 @@ async function _jrvAutoGenerateCode(apiKey, model, title, description) {
 
 // ── Save generated code as a real local project ────────────────────
 async function _jrvAutoSaveProject(projectId, title, htmlCode) {
-  // Build a vibeTree with a single raw-html-container node
   var tree = {
     id: 'whole-page',
     type: 'raw-html-container',
@@ -5615,30 +5614,29 @@ async function _jrvAutoSaveProject(projectId, title, htmlCode) {
     children: [],
   };
 
-  // Use the same localApi that the rest of the editor uses
+  // Primary path: use the editor's own localApi (defined in app3.js)
   if (window.localApi && typeof window.localApi.saveProject === 'function') {
     await window.localApi.saveProject(projectId, tree);
     return true;
   }
-  // Fallback: save directly to IDB store 'local_projects'
+
+  // Fallback: write directly to 'VibeLocalDB' / store 'projects' / keyPath 'projectId'
   return new Promise(function(resolve, reject) {
-    var req = indexedDB.open('VibeEditorDB', 1);
+    var req = indexedDB.open('VibeLocalDB', 2);
+    req.onupgradeneeded = function(ev) {
+      var db = ev.target.result;
+      if (!db.objectStoreNames.contains('projects')) {
+        db.createObjectStore('projects', { keyPath: 'projectId' });
+      }
+    };
     req.onsuccess = function(ev) {
       var db = ev.target.result;
-      var stores = Array.from(db.objectStoreNames);
-      var storeName = stores.find(function(s){ return /project/i.test(s); }) || stores[0];
-      if (!storeName) { reject(new Error('No IDB store found')); return; }
-      var tx = db.transaction(storeName, 'readwrite');
-      var st = tx.objectStore(storeName);
-      // Try to detect what key the store uses
-      var keyPath = st.keyPath || 'projectId';
-      var obj = {};
-      obj[keyPath] = projectId;
-      obj.data = tree;
-      st.put(obj).onsuccess = function(){ resolve(true); };
-      tx.onerror = function(e){ reject(e.target.error); };
+      var tx = db.transaction('projects', 'readwrite');
+      tx.objectStore('projects').put({ projectId: projectId, data: tree });
+      tx.oncomplete = function() { resolve(true); };
+      tx.onerror    = function(e) { reject(e.target.error); };
     };
-    req.onerror = function(e){ reject(e.target.error); };
+    req.onerror = function(e) { reject(e.target.error); };
   });
 }
 
@@ -5833,4 +5831,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+                    </html>
