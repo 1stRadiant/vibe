@@ -1731,12 +1731,16 @@ async function apuiScreenshot() {
 // Context: open vibe nodes (editor value preferred over tree value)
 function getVibeContext() {
     const out = [];
-    AppState.nodes.forEach((_, id) => {
-        if (['preview','chat','console','settings'].includes(id)) return;
-        const node   = findNodeInTree(id);
-        const editor = document.getElementById(`ed-${id}`);
-        if (node) out.push({ id: node.id, type: node.type, description: node.description || '', code: editor ? editor.value : (node.code || '') });
-    });
+    const systemIds = new Set(['preview','chat','console','settings']);
+    // Walk the full vibeTree so Jarvis sees all nodes, even ones not yet spawned as DOM elements
+    function walk(node) {
+        if (!node) return;
+        if (systemIds.has(node.id)) return;
+        const editor = document.getElementById(`ed-${node.id}`);
+        out.push({ id: node.id, type: node.type, description: node.description || '', code: editor ? editor.value : (node.code || '') });
+        (node.children || []).forEach(walk);
+    }
+    walk(vibeTree);
     return out;
 }
 
@@ -2047,11 +2051,13 @@ Return ONLY valid JSON — no other text:
 
 Set "done": true if the goal is fully achieved and no more edits are needed.
 RULES:
-1. FULL code for every node — never truncate or use ellipsis.
-2. Prefer updating existing nodes over creating new ones.
-3. HTML: body-level markup only. CSS: standalone. JS: standalone.
-4. Make progress each beat — never repeat the exact same change.
-5. narration field: plain English, conversational, 2-3 sentences max.`;
+1. FULL, REAL, WORKING code for every node — never truncate, never use ellipsis, never use placeholder comments.
+2. On beat 1: completely replace ALL placeholder/comment-only nodes with real working code. html-body must have actual markup. css-main must have actual styles. js-main must have actual logic.
+3. Prefer updating existing nodes over creating new ones.
+4. HTML: body-level markup only (no <html>/<head>/<body> tags). CSS: standalone rules. JS: standalone script.
+5. Make progress each beat — never repeat the exact same change.
+6. narration field: plain English, conversational, 2-3 sentences max.
+7. NEVER output a node whose code is only comments or a single title tag — always write real implementation code.`;
 
         const user = `VIBE TREE:
 ${JSON.stringify(context, null, 2)}
@@ -3142,4 +3148,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-        </html>
+    </html>
