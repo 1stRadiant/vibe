@@ -802,6 +802,35 @@ window.addEventListener('message', e => {
         if (d.level === 'error') attributeRuntimeError(d.msg);
         return;
     }
+
+    // ── Autonomous Mode: parent asks Jarvis to start on a self-project ──
+    if (d.type === 'apui-jarvis-start') {
+        // Apply credentials if provided
+        if (d.apiKey)  { AppState.settings.apiKey = d.apiKey;  localStorage.setItem('apui_gemini_key', d.apiKey); }
+        if (d.model)   { AppState.settings.model  = d.model;   localStorage.setItem('apui_model', d.model); }
+        // Apply heartbeat
+        if (d.heartbeatMs && d.heartbeatMs >= 5000) Jarvis.heartbeatMs = d.heartbeatMs;
+        // Load the provided skeleton vibeTree (if given), otherwise keep current
+        if (d.vibeTree) {
+            receiveVibeTree(d.vibeTree, []);
+        }
+        // Stop any existing Jarvis run cleanly
+        if (Jarvis.running) Jarvis.stop();
+        // Start with the given goal
+        const goal = (d.goal || '').trim();
+        if (!goal) { logToChat('system', '⚠ apui-jarvis-start: no goal provided'); return; }
+        logToChat('system', `🛸 Autonomous Mode: Jarvis waking up for "${goal}"`);
+        Jarvis.goal = goal;
+        Jarvis.start(goal);
+        return;
+    }
+
+    // ── Autonomous Mode: parent asks Jarvis to stop ──
+    if (d.type === 'apui-jarvis-stop') {
+        if (Jarvis.running) Jarvis.stop();
+        logToChat('system', '🛸 Autonomous Mode: Jarvis paused by parent');
+        return;
+    }
 });
 
 function requestTree() {
@@ -2120,6 +2149,8 @@ Return the JSON object now.`;
         if (plan.done) {
             logToChat('ai', `🏁 Jarvis: goal complete after ${this.beat} beat(s)!`);
             trackerLog('ai', null, `Jarvis goal complete · ${this.beat} beats`);
+            // Tell parent that this autonomous project is finished
+            postToParent('apui-jarvis-done', { beat: this.beat, goal: this.goal, vibeTree: JSON.parse(JSON.stringify(vibeTree)) });
             this.stop();
         }
     }
@@ -3111,4 +3142,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-    </html>
+        </html>
