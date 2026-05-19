@@ -610,6 +610,60 @@
     display: none;
   }
   #drag-ghost img { width: 80px; height: 80px; object-fit: contain; }
+
+  /* layer drag handle */
+  .lr-drag {
+    width: 14px;
+    flex-shrink: 0;
+    color: var(--dim);
+    font-size: 10px;
+    cursor: grab;
+    user-select: none;
+    text-align: center;
+    opacity: .6;
+  }
+  .lr-drag:hover { opacity: 1; color: var(--text); }
+  .layer-row.drag-over-top    { border-top: 2px solid var(--accent); }
+  .layer-row.drag-over-bottom { border-bottom: 2px solid var(--accent); }
+  .layer-row.dragging         { opacity: .4; }
+
+  /* overlap picker popup */
+  #overlap-picker {
+    position: fixed;
+    z-index: 9000;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.6);
+    padding: 6px;
+    min-width: 140px;
+    display: none;
+    flex-direction: column;
+    gap: 3px;
+  }
+  #overlap-picker.visible { display: flex; }
+  #overlap-picker .op-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-transform: uppercase;
+    padding: 2px 4px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2px;
+  }
+  .op-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .op-item:hover { background: rgba(61,111,255,.25); }
+  .op-item img { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
+  .op-item span { font-size: 9px; color: var(--text); }
 </style>
 </head>
 <body>
@@ -721,6 +775,9 @@
 
 <!-- drag ghost -->
 <div id="drag-ghost"><img id="ghost-img" src="" alt=""></div>
+
+<!-- overlap picker -->
+<div id="overlap-picker"><div class="op-title">Select item</div></div>
 
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -1046,10 +1103,11 @@ document.addEventListener('mouseup', () => {
   if (panning) { panning = false; canvasWrap.style.cursor = ''; }
 });
 
-// deselect on world click
+// deselect on world click (background only)
 world.addEventListener('mousedown', e => {
   if (e.target === world) {
     if (selectedEl) { selectedEl.el.classList.remove('selected'); selectedEl = null; updateInfoBar(); refreshLayers(); }
+    // don't stopPropagation - let canvasWrap start pan
   }
 });
 
@@ -1333,6 +1391,7 @@ let touchIds = [];
 
 canvasWrap.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
+    e.preventDefault();
     // begin pinch
     pinching = true; panning = false; movingEl = null; resizing = false;
     const a = e.touches[0], b = e.touches[1];
@@ -1342,14 +1401,16 @@ canvasWrap.addEventListener('touchstart', e => {
     pinchMidY = (a.clientY + b.clientY) / 2;
     return;
   }
-  // single touch on empty canvas → pan
-  if (e.target === canvasWrap || e.target === world) {
+  // single touch on background → pan
+  if (!e.target.closest('.canvas-item') && !e.target.closest('#zoom-controls')) {
     if (movingEl || resizing) return;
+    e.preventDefault();
+    cancelFocusAnim();
     panning = true;
     panStartX = e.touches[0].clientX; panStartY = e.touches[0].clientY;
     panStartPX = panX; panStartPY = panY;
   }
-}, { passive: true });
+}, { passive: false });
 
 document.addEventListener('touchmove', e => {
   if (pinching && e.touches.length === 2) {
@@ -1731,8 +1792,22 @@ function focusOnItem(item) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// LAYERS PANEL
+// LAYERS PANEL  (with drag-to-reorder)
 // ═══════════════════════════════════════════════════════════
+let layerDragItem = null; // item data being dragged in layers panel
+
+function reassignZFromLayerOrder() {
+  // Rebuild z values so the layers list order (top = highest z) is reflected on canvas.
+  // We redistribute z values starting from 100, keeping relative order.
+  const sorted = [...items].sort((a, b) => b.z - a.z); // current order top→bottom
+  const base = 100;
+  sorted.forEach((item, i) => {
+    item.z = base + (sorted.length - 1 - i);
+    item.el.style.zIndex = item.z;
+  });
+  zCounter = base + sorted.length;
+}
+
 function refreshLayers() {
   const list = document.getElementById('layers-list');
   list.innerHTML = '';
@@ -1744,6 +1819,13 @@ function refreshLayers() {
   sorted.forEach(item => {
     const row = document.createElement('div');
     row.className = 'layer-row' + (item === selectedEl ? ' active' : '');
+    row.dataset.id = item.id;
+
+    // drag handle
+    const drag = document.createElement('div');
+    drag.className = 'lr-drag';
+    drag.textContent = '⠿';
+    drag.title = 'Drag to reorder';
 
     const thumb = document.createElement('div');
     thumb.className = 'lr-thumb';
@@ -1759,19 +1841,143 @@ function refreshLayers() {
     del.className = 'lr-del';
     del.textContent = '×';
 
+    row.appendChild(drag);
     row.appendChild(thumb);
     row.appendChild(name);
     row.appendChild(del);
     list.appendChild(row);
 
+    // ── click to select & focus ──
     row.addEventListener('click', e => {
-      if (e.target === del) return;
+      if (e.target === del || e.target === drag) return;
       selectItem(item);
       focusOnItem(item);
     });
     del.addEventListener('click', e => { e.stopPropagation(); removeItem(item); });
+
+    // ── drag to reorder ──
+    drag.addEventListener('mousedown', e => {
+      e.stopPropagation();
+      layerDragItem = item;
+      row.classList.add('dragging');
+    });
   });
+
+  // drag-over and drop listeners on the list
+  list.addEventListener('dragover', e => e.preventDefault(), { once: false });
 }
+
+// Layer reorder via mousemove/mouseup on document
+document.addEventListener('mousemove', e => {
+  if (!layerDragItem) return;
+  const list = document.getElementById('layers-list');
+  const rows = [...list.querySelectorAll('.layer-row:not(.dragging)')];
+  rows.forEach(r => r.classList.remove('drag-over-top','drag-over-bottom'));
+  for (const r of rows) {
+    const rect = r.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (e.clientY < rect.bottom && e.clientY > rect.top) {
+      r.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+      break;
+    }
+  }
+});
+
+document.addEventListener('mouseup', e => {
+  if (!layerDragItem) return;
+  const list = document.getElementById('layers-list');
+  const rows = [...list.querySelectorAll('.layer-row')];
+
+  let insertBeforeId = null;
+  let insertAfter = false;
+  for (const r of rows) {
+    if (r.classList.contains('drag-over-top')) { insertBeforeId = r.dataset.id; insertAfter = false; break; }
+    if (r.classList.contains('drag-over-bottom')) { insertBeforeId = r.dataset.id; insertAfter = true; break; }
+  }
+
+  if (insertBeforeId) {
+    // Re-order: build new top-to-bottom array
+    const sorted = [...items].sort((a, b) => b.z - a.z);
+    const dragged = layerDragItem;
+    const without = sorted.filter(it => it !== dragged);
+    const targetIdx = without.findIndex(it => String(it.id) === insertBeforeId);
+    if (targetIdx !== -1) {
+      without.splice(insertAfter ? targetIdx + 1 : targetIdx, 0, dragged);
+      // Reassign z: index 0 = top (highest z)
+      const base = 100;
+      without.forEach((it, i) => {
+        it.z = base + (without.length - 1 - i);
+        it.el.style.zIndex = it.z;
+      });
+      zCounter = base + without.length;
+    }
+  }
+
+  rows.forEach(r => r.classList.remove('drag-over-top','drag-over-bottom','dragging'));
+  layerDragItem = null;
+  refreshLayers();
+  saveScene();
+});
+
+// ═══════════════════════════════════════════════════════════
+// OVERLAP PICKER
+// ═══════════════════════════════════════════════════════════
+const overlapPicker = document.getElementById('overlap-picker');
+let pickerTimeout = null;
+
+function closeOverlapPicker() {
+  overlapPicker.classList.remove('visible');
+}
+
+// Close picker on outside click
+document.addEventListener('mousedown', e => {
+  if (!overlapPicker.contains(e.target)) closeOverlapPicker();
+}, true);
+
+// On canvas click, find all items under the cursor
+canvasWrap.addEventListener('click', e => {
+  if (e.target.closest('#zoom-controls')) return;
+  if (e.target.closest('#overlap-picker')) return;
+  if (movingEl || resizing || panning) return;
+
+  const wp = screenToWorld(e.clientX, e.clientY);
+  const hits = items.filter(it =>
+    wp.x >= it.wx && wp.x <= it.wx + it.w &&
+    wp.y >= it.wy && wp.y <= it.wy + it.h
+  ).sort((a, b) => b.z - a.z);
+
+  if (hits.length === 0) { closeOverlapPicker(); return; }
+  if (hits.length === 1) { closeOverlapPicker(); selectItem(hits[0]); return; }
+
+  // Multiple overlapping items — show picker
+  // Remove old options (keep title)
+  while (overlapPicker.children.length > 1) overlapPicker.removeChild(overlapPicker.lastChild);
+
+  hits.forEach(item => {
+    const opt = document.createElement('div');
+    opt.className = 'op-item';
+    const img = document.createElement('img');
+    img.src = item.asset.url;
+    const lbl = document.createElement('span');
+    lbl.textContent = item.asset.name;
+    if (item === selectedEl) lbl.style.color = 'var(--gold)';
+    opt.appendChild(img);
+    opt.appendChild(lbl);
+    opt.addEventListener('mousedown', ev => {
+      ev.stopPropagation();
+      selectItem(item);
+      closeOverlapPicker();
+    });
+    overlapPicker.appendChild(opt);
+  });
+
+  // Position near click, keep on screen
+  const px = Math.min(e.clientX + 8, window.innerWidth - 160);
+  const py = Math.min(e.clientY + 8, window.innerHeight - overlapPicker.offsetHeight - 10);
+  overlapPicker.style.left = px + 'px';
+  overlapPicker.style.top  = py + 'px';
+  overlapPicker.classList.add('visible');
+});
 
 // ═══════════════════════════════════════════════════════════
 // INIT
@@ -1784,4 +1990,4 @@ updateInfoBar();
 refreshLayers();
 </script>
 </body>
-  </html>
+        </html>
