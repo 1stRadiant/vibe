@@ -664,6 +664,12 @@
   .op-item:hover { background: rgba(61,111,255,.25); }
   .op-item img { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
   .op-item span { font-size: 9px; color: var(--text); }
+
+  /* move mode */
+  #btn-move-mode.active { background: var(--gold); border-color: var(--gold); color: #000; }
+  #canvas-wrap.move-mode { cursor: grab !important; }
+  #canvas-wrap.move-mode:active { cursor: grabbing !important; }
+  #canvas-wrap.move-mode .canvas-item { pointer-events: none; cursor: inherit; }
 </style>
 </head>
 <body>
@@ -698,6 +704,10 @@
     <div class="tool-group">
       <div class="panel-toggle" id="toggle-left">☰ Assets</div>
       <div class="panel-toggle" id="toggle-right">Layers ☰</div>
+    </div>
+    <div class="tool-group">
+      <span class="tool-label">Mode</span>
+      <button class="btn" id="btn-move-mode" title="Move canvas (M)">✥ Move</button>
     </div>
     <div class="tool-group">
       <span class="tool-label">Layer</span>
@@ -970,6 +980,7 @@ let selectedEl = null;
 let items = [];
 let zCounter = 100;
 let currentCat = 'all';
+let moveMode = false;
 
 // ── Viewport transform ──
 let panX = 0, panY = 0, zoom = 1;
@@ -1076,13 +1087,32 @@ document.getElementById('btn-zoom-reset').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// MOVE MODE
+// ═══════════════════════════════════════════════════════════
+function setMoveMode(on) {
+  moveMode = on;
+  canvasWrap.classList.toggle('move-mode', on);
+  document.getElementById('btn-move-mode').classList.toggle('active', on);
+}
+
+document.getElementById('btn-move-mode').addEventListener('click', () => setMoveMode(!moveMode));
+
+// Keyboard shortcut: M
+document.addEventListener('keydown', e => {
+  if (document.activeElement !== document.body) return;
+  if (e.key === 'm' || e.key === 'M') setMoveMode(!moveMode);
+});
+
+// ═══════════════════════════════════════════════════════════
 // PAN (drag empty canvas)
 // ═══════════════════════════════════════════════════════════
 const canvasWrap = document.getElementById('canvas-wrap');
 
 canvasWrap.addEventListener('mousedown', e => {
-  // Pan on background — not on canvas items or zoom controls
-  if (e.target.closest && (e.target.closest('.canvas-item') || e.target.closest('#zoom-controls'))) return;
+  if (e.target.closest && e.target.closest('#zoom-controls')) return;
+  // In move mode, pan always (items have pointer-events:none so clicks pass through)
+  // In select mode, only pan on background
+  if (!moveMode && e.target.closest && e.target.closest('.canvas-item')) return;
   if (movingEl || resizing) return;
   cancelFocusAnim();
   panning = true;
@@ -1264,6 +1294,7 @@ function placeItem(asset, wx, wy, size = 140, opts = {}) {
 
   // ── mouse events ──
   el.addEventListener('mousedown', e => {
+    if (moveMode) return; // let pan handler take over
     if (e.target === rh || e.target === dh) return;
     e.stopPropagation();
     selectItem(data);
@@ -1277,6 +1308,7 @@ function placeItem(asset, wx, wy, size = 140, opts = {}) {
 
   // ── touch events ──
   el.addEventListener('touchstart', e => {
+    if (moveMode) return; // let canvas pan handler take over
     if (e.target === rh || e.target === dh) return;
     e.stopPropagation();
     selectItem(data);
@@ -1401,8 +1433,8 @@ canvasWrap.addEventListener('touchstart', e => {
     pinchMidY = (a.clientY + b.clientY) / 2;
     return;
   }
-  // single touch on background → pan
-  if (!e.target.closest('.canvas-item') && !e.target.closest('#zoom-controls')) {
+  // single touch on background (or anywhere in move mode) → pan
+  if (moveMode || (!e.target.closest('.canvas-item') && !e.target.closest('#zoom-controls'))) {
     if (movingEl || resizing) return;
     e.preventDefault();
     cancelFocusAnim();
@@ -1936,6 +1968,7 @@ document.addEventListener('mousedown', e => {
 
 // On canvas click, find all items under the cursor
 canvasWrap.addEventListener('click', e => {
+  if (moveMode) return; // no selection in move mode
   if (e.target.closest('#zoom-controls')) return;
   if (e.target.closest('#overlap-picker')) return;
   if (movingEl || resizing || panning) return;
@@ -1990,4 +2023,4 @@ updateInfoBar();
 refreshLayers();
 </script>
 </body>
-        </html>
+  </html>
