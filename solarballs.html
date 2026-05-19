@@ -1002,20 +1002,20 @@ function zoomAt(newZoom, pivotSX, pivotSY) {
 document.getElementById('canvas-wrap').addEventListener('wheel', e => {
   e.preventDefault();
   const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-  zoomAt(clampZoom(zoom * factor), e.clientX, e.clientY);
+  cancelFocusAnim(); zoomAt(clampZoom(zoom * factor), e.clientX, e.clientY);
 }, { passive: false });
 
 // ── Zoom buttons ──
 document.getElementById('btn-zoom-in').addEventListener('click', () => {
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  zoomAt(clampZoom(zoom * 1.25), wrap.left + wrap.width/2, wrap.top + wrap.height/2);
+  cancelFocusAnim(); zoomAt(clampZoom(zoom * 1.25), wrap.left + wrap.width/2, wrap.top + wrap.height/2);
 });
 document.getElementById('btn-zoom-out').addEventListener('click', () => {
   const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
-  zoomAt(clampZoom(zoom / 1.25), wrap.left + wrap.width/2, wrap.top + wrap.height/2);
+  cancelFocusAnim(); zoomAt(clampZoom(zoom / 1.25), wrap.left + wrap.width/2, wrap.top + wrap.height/2);
 });
 document.getElementById('btn-zoom-reset').addEventListener('click', () => {
-  panX = 0; panY = 0; zoom = 1; applyViewport();
+  cancelFocusAnim(); panX = 0; panY = 0; zoom = 1; applyViewport();
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -1024,11 +1024,10 @@ document.getElementById('btn-zoom-reset').addEventListener('click', () => {
 const canvasWrap = document.getElementById('canvas-wrap');
 
 canvasWrap.addEventListener('mousedown', e => {
-  // only pan when clicking directly on wrap or world (not on items)
-  if (e.target !== canvasWrap && e.target !== world &&
-      !e.target.id.startsWith('starfield') && e.target.id !== 'drop-hint' &&
-      !e.target.closest('#zoom-controls') && !e.target.closest('#drop-hint')) return;
+  // Pan on background — not on canvas items or zoom controls
+  if (e.target.closest && (e.target.closest('.canvas-item') || e.target.closest('#zoom-controls'))) return;
   if (movingEl || resizing) return;
+  cancelFocusAnim();
   panning = true;
   panStartX = e.clientX; panStartY = e.clientY;
   panStartPX = panX; panStartPY = panY;
@@ -1247,8 +1246,7 @@ function selectItem(data) {
   selectedEl = data;
   if (data) {
     data.el.classList.add('selected');
-    data.el.style.zIndex = ++zCounter;
-    data.z = zCounter;
+    // Do NOT change zIndex — preserve existing layer order
     syncSlider(data);
   }
   updateInfoBar();
@@ -1265,6 +1263,7 @@ function syncSlider(data) {
 // MOVE ITEM
 // ═══════════════════════════════════════════════════════════
 function startMoveItem(e, data) {
+  cancelFocusAnim();
   movingEl = data;
   const wp = screenToWorld(e.clientX, e.clientY);
   moveStartCX = wp.x; moveStartCY = wp.y;
@@ -1686,7 +1685,14 @@ panelRight.classList.add('collapsed');
 // ═══════════════════════════════════════════════════════════
 // FOCUS / ZOOM TO ITEM
 // ═══════════════════════════════════════════════════════════
+let focusAnimId = null; // cancellation token for running focus animation
+
+function cancelFocusAnim() {
+  if (focusAnimId !== null) { cancelAnimationFrame(focusAnimId); focusAnimId = null; }
+}
+
 function focusOnItem(item) {
+  cancelFocusAnim();
   const wrap = document.getElementById('canvas-wrap');
   const vw = wrap.offsetWidth;
   const vh = wrap.offsetHeight;
@@ -1695,15 +1701,10 @@ function focusOnItem(item) {
   const itemCX = item.wx + item.w / 2;
   const itemCY = item.wy + item.h / 2;
 
-  // Target zoom: fit the item at ~40% of the smaller viewport dimension,
-  // but never zoom out below current zoom if already visible enough,
-  // and cap at ZOOM_MAX.
+  // Target zoom: fit item at ~40% of the smaller viewport dimension
   const TARGET_FILL = 0.4;
   const targetZoom = clampZoom(Math.min(vw, vh) * TARGET_FILL / Math.max(item.w, item.h, 1));
-
-  // Only zoom in — don't zoom out if item is already big enough on screen
-  const newZoom = Math.max(targetZoom, zoom < targetZoom ? targetZoom : Math.min(zoom, targetZoom * 2));
-  const finalZoom = clampZoom(newZoom < 0.5 ? targetZoom : newZoom);
+  const finalZoom = clampZoom(Math.max(targetZoom, 0.5));
 
   // Target pan so item centre lands at viewport centre
   const targetPanX = vw / 2 - itemCX * finalZoom;
@@ -1723,9 +1724,10 @@ function focusOnItem(item) {
     panX = startPanX + (targetPanX - startPanX) * e;
     panY = startPanY + (targetPanY - startPanY) * e;
     applyViewport();
-    if (t < 1) requestAnimationFrame(step);
+    if (t < 1) { focusAnimId = requestAnimationFrame(step); }
+    else { focusAnimId = null; }
   }
-  requestAnimationFrame(step);
+  focusAnimId = requestAnimationFrame(step);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1782,4 +1784,4 @@ updateInfoBar();
 refreshLayers();
 </script>
 </body>
-</html>
+  </html>
