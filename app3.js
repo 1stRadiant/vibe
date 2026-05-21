@@ -1031,6 +1031,13 @@ function renderConsoleMessage(level, args) {
         reportNervousSystemError(null, errorMessage);
         // Forward to APUI iframe if visible
         try { const f=document.getElementById('apui-frame'); if(f) f.contentWindow.postMessage({type:'apui-node-error',nodeId:null,message:errorMessage},'*'); } catch(e) {}
+        // Forward as outer console error so Jarvis in APUI can auto-fix it
+        try {
+            const apuiF = document.getElementById('apui-frame');
+            if (apuiF && apuiF.contentWindow) {
+                apuiF.contentWindow.postMessage({ type: 'apui-outer-console-error', message: errorMessage }, '*');
+            }
+        } catch(e) {}
     }
 
     const msgEl = document.createElement('div');
@@ -5363,7 +5370,14 @@ function getDb() {
             };
 
             request.onsuccess = (event) => {
-                resolve(event.target.result);
+                const db = event.target.result;
+                // If another tab opens a newer DB version, close gracefully so it can upgrade
+                db.onversionchange = () => {
+                    db.close();
+                    dbPromise = null;
+                    console.warn('IndexedDB: version change detected — connection closed. Will re-open on next access.');
+                };
+                resolve(db);
             };
 
             request.onerror = (event) => {
@@ -5371,7 +5385,12 @@ function getDb() {
                 dbPromise = null;
                 reject(event.target.error);
             };
-        });
+
+            request.onblocked = () => {
+                console.warn('IndexedDB open blocked — another tab may be holding an old version open.');
+            };
+        // Ensure a rejected promise also clears the cache so the next call can retry
+        }).catch(err => { dbPromise = null; return Promise.reject(err); });
     }
     return dbPromise;
 }
@@ -8745,7 +8764,12 @@ async function restoreSession() {
     } catch (e) {
         console.error("Failed to restore session:", e);
         if (startPageGenerationOutput) startPageGenerationOutput.style.display = 'none';
-        await clearSessionMetadata(); 
+        // Only wipe session metadata when the project is definitively gone (not on transient
+        // network / IndexedDB errors that might succeed on the next load).
+        const isNotFound = e && (e.message || '').toLowerCase().includes('not found');
+        if (isNotFound) {
+            await clearSessionMetadata();
+        }
         resetToStartPage();
     }
 }
@@ -9239,6 +9263,14 @@ function handleApuiMessage(e) {
             break;
         }
 
+        // APUI Jarvis asks parent to switch to a specific outer-UI tab
+        case 'apui-navigate': {
+            if (d.tabId && typeof switchToTab === 'function') {
+                switchToTab(d.tabId);
+            }
+            break;
+        }
+
         // APUI sends a prompt to be run through the native Vibe agent
         case 'apui-run-agent': {
             const { prompt: agentPromptText, attemptId, nodeId: focusNodeId, sessionIntent } = d;
@@ -9352,4 +9384,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+          }
