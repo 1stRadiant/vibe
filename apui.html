@@ -737,10 +737,10 @@
         </svg>
     </div>
     <button class="os-menu-btn btn-1" onclick="jarvisToggle()">🤖 Jarvis</button>
-    <button class="os-menu-btn btn-2" onclick="jarvisReturnFocus()">🔭 Focus</button>
-    <button class="os-menu-btn btn-3" onclick="jarvisSetGoal()">🎯 Goal</button>
-    <button class="os-menu-btn btn-4" onclick="openJarvisSettings()">⚡ Interval</button>
-    <button class="os-menu-btn btn-5" onclick="handleCommand('settings')">⚙ Settings</button>
+    <button class="os-menu-btn btn-2" onclick="jarvisCheckConsoleErrors()">🐛 Fix Errors</button>
+    <button class="os-menu-btn btn-3" onclick="jarvisReturnFocus()">🔭 Focus</button>
+    <button class="os-menu-btn btn-4" onclick="jarvisSetGoal()">🎯 Goal</button>
+    <button class="os-menu-btn btn-5" onclick="openJarvisSettings()">⚡ Interval</button>
     <button class="os-menu-btn btn-6" onclick="pushAllToVibeTree()">⬆ Push</button>
 </div>
 
@@ -769,6 +769,24 @@ const dirtyNodes = new Set();
 function postToParent(type, payload) {
     try { window.parent.postMessage({ source: 'apui-vibe', type, ...payload }, '*'); }
     catch (_) { /* standalone mode */ }
+}
+
+/* ── Outer UI Navigation ─────────────────────────────────────────
+   Tells the parent app to switch to one of its top-level tabs
+   ('preview', 'console', 'agent', 'chat', 'editor', 'start', etc.)
+*/
+function navigateParent(tabId) {
+    postToParent('apui-navigate', { tabId });
+}
+
+/* ── Outer Console Error Buffer ──────────────────────────────────
+   The parent forwards its console errors here so Jarvis can act on them.
+*/
+const _outerConsoleErrors = [];   // [ { message, time } ]
+let   _outerErrorSeq      = 0;   // monotonic counter to detect new errors
+
+function getUnseenErrors(sinceSeq) {
+    return _outerConsoleErrors.filter(e => e.seq > sinceSeq);
 }
 
 // Listen for messages arriving from the parent app3.js host
@@ -800,6 +818,16 @@ window.addEventListener('message', e => {
     if (d.type === 'console') {
         logToConsole(d.msg, d.level || 'info');
         if (d.level === 'error') attributeRuntimeError(d.msg);
+        return;
+    }
+
+    // Outer UI forwards its console errors so Jarvis can auto-fix them
+    if (d.type === 'apui-outer-console-error') {
+        _outerErrorSeq++;
+        _outerConsoleErrors.push({ message: d.message || '', seq: _outerErrorSeq, time: Date.now() });
+        // Keep buffer bounded
+        if (_outerConsoleErrors.length > 50) _outerConsoleErrors.shift();
+        logToConsole(`⚠ Outer console error: ${d.message}`, 'error');
         return;
     }
 
@@ -1948,13 +1976,15 @@ const Jarvis = {
     _userPanning:   false,
     _inBeat:        false,   // true only while _runBeat is executing
     _snapHintTimer: null,
+    _lastErrorSeq:  0,       // tracks which outer console errors have been seen
 
     start(goal) {
         if (this.running) { this.stop(); }
-        this.goal    = goal;
-        this.beat    = 0;
-        this.memory  = [];
-        this.running = true;
+        this.goal          = goal;
+        this.beat          = 0;
+        this.memory        = [];
+        this.running       = true;
+        this._lastErrorSeq = _outerErrorSeq; // don't re-fix pre-existing errors
         document.getElementById('taskbar')?.classList.add('jarvis-active');
         logToChat('system', `🤖 Jarvis started · Goal: "${goal}"`);
         logToChat('system', `⚡ Heartbeat every ${this.heartbeatMs / 1000}s · tap 🤖 to stop`);
@@ -2152,9 +2182,84 @@ Return the JSON object now.`;
         updatePreview();
         this._userPanning = false; // reset snap state for next beat
 
+        // ── Console error auto-fix pass ──────────────────────────────
+        // Navigate outer UI to console, collect new errors, then fix each one.
+        const newErrors = getUnseenErrors(this._lastErrorSeq);
+        if (newErrors.length > 0) {
+            this._lastErrorSeq = _outerErrorSeq; // mark all seen
+            logToChat('system', `🔍 Jarvis detected ${newErrors.length} console error(s) — navigating to console…`);
+
+            // 1. Show the outer console tab so the user can see the errors
+            navigateParent('console');
+            await delay(600);
+
+            // 2. Fix each error sequentially
+            for (const errEntry of newErrors) {
+                if (!this.running) break;
+                logToChat('system', `🔧 Auto-fixing: ${errEntry.message.slice(0, 80)}…`);
+                this.setStatus(`Fixing error: ${errEntry.message.slice(0, 50)}…`);
+
+                const fixPrompt = `Fix this runtime error that appeared in the browser console: "${errEntry.message}". Find the node(s) responsible and correct the code.`;
+                try {
+                    // Re-use the same AI pipeline: build a plan that targets the error
+                    const fixContext = getVibeContext();
+                    const fixSys = `You are Jarvis, an autonomous web-development agent.
+A runtime error was detected in the browser console. Fix it immediately.
+Return ONLY valid JSON — no other text:
+{
+  "plan": "one-line description of the fix",
+  "done": false,
+  "actions": [
+    { "actionType": "update", "nodeId": "EXISTING_ID", "newCode": "complete fixed code", "narration": "what you fixed and why" }
+  ]
+}
+RULES: Provide FULL replacement code. If the error source is unclear, fix the most likely JS/declaration node.`;
+                    const fixUser = `VIBE TREE:\n${JSON.stringify(fixContext, null, 2)}\n\nERROR: "${errEntry.message}"\n\nReturn the JSON fix now.`;
+                    const fixRaw = await callGemini(fixSys, fixUser, true, []);
+                    let fixPlan;
+                    try { fixPlan = JSON.parse(fixRaw); } catch { logToChat('system', '⚠ Jarvis: invalid JSON for error fix'); continue; }
+
+                    const fixPushUpdates = [];
+                    for (const action of (fixPlan.actions || [])) {
+                        if (action.actionType !== 'update') continue;
+                        const treeNode = findNodeInTree(action.nodeId);
+                        if (!treeNode) continue;
+                        const domNode = AppState.nodes.get(action.nodeId);
+                        if (domNode) { bringToFront(domNode); domNode.classList.add('ai-updating'); }
+                        if (action.narration) await streamToExplainPane(action.nodeId, action.narration, 28);
+                        else await delay(400);
+                        treeNode.code = action.newCode;
+                        const editor = document.getElementById(`ed-${action.nodeId}`);
+                        if (editor) { editor.value = action.newCode; syncHighlight(action.nodeId); }
+                        clearNodeError(action.nodeId);
+                        dirtyNodes.delete(action.nodeId);
+                        updateDirtyDot(action.nodeId);
+                        fixPushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
+                        await delay(300);
+                        if (domNode) domNode.classList.remove('ai-updating');
+                    }
+                    if (fixPushUpdates.length) {
+                        postToParent('apui-bulk-update', { updates: fixPushUpdates });
+                        logToChat('ai', `✅ Fixed error in beat ${this.beat}`);
+                    }
+                    updatePreview();
+                    await delay(400);
+                } catch(fixErr) {
+                    logToChat('system', `⚠ Error fix failed: ${fixErr.message}`);
+                }
+            }
+
+            // 3. After fixing errors, navigate to preview so user can verify
+            logToChat('system', '👁 Navigating to Preview to verify fixes…');
+            navigateParent('preview');
+            await delay(300);
+        }
+
         if (plan.done) {
             logToChat('ai', `🏁 Jarvis: goal complete after ${this.beat} beat(s)!`);
             trackerLog('ai', null, `Jarvis goal complete · ${this.beat} beats`);
+            // Navigate to preview tab to show the result
+            navigateParent('preview');
             // Tell parent that this autonomous project is finished
             postToParent('apui-jarvis-done', { beat: this.beat, goal: this.goal, vibeTree: JSON.parse(JSON.stringify(vibeTree)) });
             this.stop();
@@ -2191,6 +2296,61 @@ function openJarvisSettings() {
     toast(`⚡ Jarvis heartbeat set to ${n}s`);
     document.getElementById('os-menu-container')?.classList.remove('open');
 }
+
+/* Manual trigger: check outer console for errors and fix each one */
+async function jarvisCheckConsoleErrors() {
+    document.getElementById('os-menu-container')?.classList.remove('open');
+    if (!AppState.settings.apiKey) {
+        toast('⚠ API key needed — open Settings');
+        return;
+    }
+    const allErrors = _outerConsoleErrors.slice(-10); // last 10 errors
+    if (!allErrors.length) {
+        toast('✅ No console errors found');
+        navigateParent('console');
+        return;
+    }
+    ensureChat(); centerOnNode('chat', 350);
+    logToChat('system', `🐛 Manual error check — ${allErrors.length} error(s) found`);
+    navigateParent('console');
+    await delay(500);
+
+    for (const errEntry of allErrors) {
+        logToChat('system', `🔧 Fixing: ${errEntry.message.slice(0, 80)}`);
+        const fixContext = getVibeContext();
+        const fixSys = `You are a web developer fixing a runtime error. Return ONLY valid JSON:\n{"plan":"short fix description","actions":[{"actionType":"update","nodeId":"NODE_ID","newCode":"complete fixed code","narration":"what you fixed"}]}\nUse FULL replacement code. No truncation.`;
+        const fixUser = `VIBE TREE:\n${JSON.stringify(fixContext, null, 2)}\n\nERROR: "${errEntry.message}"\n\nReturn the JSON fix now.`;
+        try {
+            const raw = await callGemini(fixSys, fixUser, true, []);
+            let fixPlan;
+            try { fixPlan = JSON.parse(raw); } catch { logToChat('system', '⚠ Bad JSON from AI'); continue; }
+            const updates = [];
+            for (const action of (fixPlan.actions || [])) {
+                if (action.actionType !== 'update') continue;
+                const treeNode = findNodeInTree(action.nodeId);
+                if (!treeNode) continue;
+                const domNode = AppState.nodes.get(action.nodeId);
+                if (domNode) { bringToFront(domNode); domNode.classList.add('ai-updating'); }
+                if (action.narration) await streamToExplainPane(action.nodeId, action.narration, 28);
+                else await delay(300);
+                treeNode.code = action.newCode;
+                const editor = document.getElementById(`ed-${action.nodeId}`);
+                if (editor) { editor.value = action.newCode; syncHighlight(action.nodeId); }
+                clearNodeError(action.nodeId);
+                dirtyNodes.delete(action.nodeId);
+                updateDirtyDot(action.nodeId);
+                updates.push({ nodeId: action.nodeId, newCode: action.newCode });
+                await delay(300);
+                if (domNode) domNode.classList.remove('ai-updating');
+            }
+            if (updates.length) { postToParent('apui-bulk-update', { updates }); logToChat('ai', `✅ Fixed: ${fixPlan.plan}`); }
+            updatePreview();
+        } catch(e) { logToChat('system', `⚠ Fix failed: ${e.message}`); }
+    }
+    logToChat('system', '👁 Done — showing Preview');
+    navigateParent('preview');
+}
+
 function jarvisReturnFocus() {
     // Re-centre the camera on the most recently changed node, or chat node
     const lastBeat = Jarvis.memory[Jarvis.memory.length - 1];
