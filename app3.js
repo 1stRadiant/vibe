@@ -1031,12 +1031,10 @@ function renderConsoleMessage(level, args) {
         reportNervousSystemError(null, errorMessage);
         // Forward to APUI iframe if visible
         try { const f=document.getElementById('apui-frame'); if(f) f.contentWindow.postMessage({type:'apui-node-error',nodeId:null,message:errorMessage},'*'); } catch(e) {}
-        // Forward as outer console error so Jarvis in APUI can auto-fix it
+        // Also forward as outer-console-error so Jarvis in APUI can auto-fix it
         try {
-            const apuiF = document.getElementById('apui-frame');
-            if (apuiF && apuiF.contentWindow) {
-                apuiF.contentWindow.postMessage({ type: 'apui-outer-console-error', message: errorMessage }, '*');
-            }
+            const f = document.getElementById('apui-frame');
+            if (f && f.contentWindow) f.contentWindow.postMessage({ type: 'apui-outer-console-error', message: errorMessage }, '*');
         } catch(e) {}
     }
 
@@ -1644,6 +1642,12 @@ async function handleSaveToCloud() {
         
         document.querySelector('.storage-toggle button[data-storage="cloud"]').click();
 
+        // Auto-checkpoint on every successful save
+        try {
+            await checkpointApi.save(currentProjectId, `💾 Saved to cloud`, vibeTree);
+            renderCheckpointPanel();
+        } catch(e) { /* non-critical */ }
+
         setTimeout(() => {
             button.innerHTML = originalHtml;
             updateSaveButtonStates();
@@ -1693,6 +1697,12 @@ async function handleSaveToLocal() {
         populateProjectList('local');
         
         document.querySelector('.storage-toggle button[data-storage="local"]').click();
+
+        // Auto-checkpoint on every successful save
+        try {
+            await checkpointApi.save(currentProjectId, `💾 Saved locally`, vibeTree);
+            renderCheckpointPanel();
+        } catch(e) { /* non-critical */ }
 
         setTimeout(() => {
             button.innerHTML = originalHtml;
@@ -2124,6 +2134,13 @@ function refreshAllUI() {
             }, '*');
         }
     } catch(e) {}
+    // Keep checkpoint panel in sync whenever UI refreshes
+    const cpPanel = document.getElementById('checkpoint-panel');
+    if (cpPanel && cpPanel.classList.contains('open')) {
+        const lbl = document.getElementById('cp-project-label');
+        if (lbl) lbl.textContent = currentProjectId ? `Project: ${currentProjectId}` : 'No project loaded';
+        renderCheckpointPanel();
+    }
 }
 
 function getComponentContextForAI() {
@@ -4281,6 +4298,61 @@ async function handleFixError(errorMessage, fixButton) {
     }
 }
 
+/**
+ * Check the console for unfixed errors and click every "Fix with AI" button.
+ * Called by Jarvis/APUI or manually via the toolbar.
+ */
+async function vibeCheckAndFixErrors() {
+    // 1. Navigate to console so errors are visible
+    switchToTab('console');
+    await new Promise(r => setTimeout(r, 300));
+
+    const fixButtons = Array.from(document.querySelectorAll('.fix-error-button:not([disabled])'));
+
+    if (!fixButtons.length) {
+        showToast('✅ No unfixed console errors found');
+        // Navigate to preview to confirm things look good
+        setTimeout(() => switchToTab('preview'), 800);
+        return;
+    }
+
+    showToast(`🔧 Found ${fixButtons.length} error(s) — auto-fixing…`);
+
+    // Auto-checkpoint before fixing so the user can roll back
+    if (currentProjectId) {
+        try {
+            await checkpointApi.save(currentProjectId, `⚡ Before auto-fix (${fixButtons.length} error${fixButtons.length>1?'s':''})`, vibeTree);
+            renderCheckpointPanel();
+        } catch(e) { console.warn('Auto-checkpoint before fix failed:', e); }
+    }
+
+    // Click each fix button one at a time (they disable themselves when clicked)
+    for (const btn of fixButtons) {
+        if (btn.disabled) continue;
+        const errorMsg = btn._errorMessage || btn.closest('.console-message')?.textContent?.replace('Fix with AI','').trim() || 'Unknown error';
+        await handleFixError(errorMsg, btn);
+        // Wait for the agent queue to drain before fixing the next error
+        await new Promise(resolve => {
+            const check = setInterval(() => {
+                if (!isTaskQueueRunning) { clearInterval(check); resolve(); }
+            }, 600);
+            // Safety timeout: 90s max per error
+            setTimeout(() => { clearInterval(check); resolve(); }, 90000);
+        });
+        await new Promise(r => setTimeout(r, 500));
+    }
+
+    showToast('✅ Auto-fix complete — switching to Preview');
+    // Save a checkpoint after fixes
+    if (currentProjectId) {
+        try {
+            await checkpointApi.save(currentProjectId, `✅ After auto-fix`, vibeTree);
+            renderCheckpointPanel();
+        } catch(e) {}
+    }
+    setTimeout(() => switchToTab('preview'), 800);
+}
+
 function executeAgentPlan(agentDecision, agentLogger) {
     if (!agentDecision.plan || !Array.isArray(agentDecision.actions)) {
         console.error("AI returned a malformed plan object. Check AI logs for details.");
@@ -5341,9 +5413,10 @@ function initializeMermaid() {
 }
 
 const DB_NAME = 'VibeLocalDB';
-const DB_VERSION = 2; // UPDATED: Incremented to trigger onupgradeneeded
+const DB_VERSION = 3; // bumped to add checkpoints store
 const STORE_NAME = 'projects';
-const KV_STORE_NAME = 'appState'; // FIXED: Defined this missing variable
+const KV_STORE_NAME = 'appState';
+const CHECKPOINT_STORE_NAME = 'checkpoints';
 let dbPromise = null;
 
 function getDb() {
@@ -5363,21 +5436,20 @@ function getDb() {
                     db.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
                 }
 
-                // Ensure 'appState' store exists (This previously caused the error)
+                // Ensure 'appState' store exists
                 if (!db.objectStoreNames.contains(KV_STORE_NAME)) {
                     db.createObjectStore(KV_STORE_NAME, { keyPath: 'key' });
+                }
+
+                // Checkpoints: keyed by auto-increment id, indexed by projectId
+                if (!db.objectStoreNames.contains(CHECKPOINT_STORE_NAME)) {
+                    const cpStore = db.createObjectStore(CHECKPOINT_STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    cpStore.createIndex('projectId', 'projectId', { unique: false });
                 }
             };
 
             request.onsuccess = (event) => {
-                const db = event.target.result;
-                // If another tab opens a newer DB version, close gracefully so it can upgrade
-                db.onversionchange = () => {
-                    db.close();
-                    dbPromise = null;
-                    console.warn('IndexedDB: version change detected — connection closed. Will re-open on next access.');
-                };
-                resolve(db);
+                resolve(event.target.result);
             };
 
             request.onerror = (event) => {
@@ -5385,12 +5457,7 @@ function getDb() {
                 dbPromise = null;
                 reject(event.target.error);
             };
-
-            request.onblocked = () => {
-                console.warn('IndexedDB open blocked — another tab may be holding an old version open.');
-            };
-        // Ensure a rejected promise also clears the cache so the next call can retry
-        }).catch(err => { dbPromise = null; return Promise.reject(err); });
+        });
     }
     return dbPromise;
 }
@@ -5465,7 +5532,212 @@ const localApi = {
     }
 };
 
-async function populateProjectList(storageType = 'cloud') {
+/* ════════════════════════════════════════════════════════════════
+   CHECKPOINT API — named snapshots per project stored in IndexedDB
+   ════════════════════════════════════════════════════════════════ */
+const checkpointApi = {
+    /** Save a checkpoint for the current project */
+    async save(projectId, label, treeData) {
+        const db = await getDb();
+        const compressed = compressProjectData(treeData);
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CHECKPOINT_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(CHECKPOINT_STORE_NAME);
+            const record = {
+                projectId,
+                label: label || `Checkpoint ${new Date().toLocaleString()}`,
+                data: compressed,
+                time: Date.now()
+            };
+            const req = store.add(record);
+            req.onsuccess = () => resolve(req.result); // returns generated id
+            req.onerror  = (e) => reject(e.target.error);
+        });
+    },
+
+    /** List all checkpoints for a project, newest first */
+    async list(projectId) {
+        const db = await getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CHECKPOINT_STORE_NAME, 'readonly');
+            const store = tx.objectStore(CHECKPOINT_STORE_NAME);
+            const index = store.index('projectId');
+            const req = index.getAll(IDBKeyRange.only(projectId));
+            req.onsuccess = () => {
+                const results = (req.result || []).sort((a, b) => b.time - a.time);
+                resolve(results);
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /** Load a checkpoint by its auto-increment id */
+    async load(id) {
+        const db = await getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CHECKPOINT_STORE_NAME, 'readonly');
+            const store = tx.objectStore(CHECKPOINT_STORE_NAME);
+            const req = store.get(id);
+            req.onsuccess = () => {
+                if (req.result) resolve(req.result);
+                else reject(new Error(`Checkpoint ${id} not found`));
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+
+    /** Delete a checkpoint by id */
+    async delete(id) {
+        const db = await getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CHECKPOINT_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(CHECKPOINT_STORE_NAME);
+            const req = store.delete(id);
+            req.onsuccess = () => resolve();
+            req.onerror  = (e) => reject(e.target.error);
+        });
+    },
+
+    /** Delete ALL checkpoints for a project */
+    async deleteAll(projectId) {
+        const db = await getDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(CHECKPOINT_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(CHECKPOINT_STORE_NAME);
+            const index = store.index('projectId');
+            const req = index.openKeyCursor(IDBKeyRange.only(projectId));
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) { store.delete(cursor.primaryKey); cursor.continue(); }
+                else resolve();
+            };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    }
+};
+
+/* ── Checkpoint UI helpers ──────────────────────────────────────── */
+
+/** Create a named checkpoint for the current project */
+async function createCheckpoint(label) {
+    if (!currentProjectId) {
+        alert('Save your project first before creating a checkpoint.');
+        return;
+    }
+    const name = label || prompt('Checkpoint name:', `CP ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+    try {
+        recordHistory(`Checkpoint: ${name}`);
+        await checkpointApi.save(currentProjectId, name, vibeTree);
+        showToast(`✅ Checkpoint saved: "${name}"`);
+        renderCheckpointPanel();
+    } catch(e) {
+        console.error('Checkpoint save failed:', e);
+        alert('Failed to save checkpoint: ' + e.message);
+    }
+}
+
+/** Restore a checkpoint by id */
+async function restoreCheckpoint(id) {
+    try {
+        const cp = await checkpointApi.load(id);
+        if (!confirm(`Restore checkpoint "${cp.label}"?\n\nThis will replace your current project state. A recovery checkpoint will be saved first.`)) return;
+        // Save a recovery checkpoint first
+        await checkpointApi.save(currentProjectId, `⟳ Before restore: ${cp.label}`, vibeTree);
+        recordHistory(`Restore checkpoint: ${cp.label}`);
+        vibeTree = decompressProjectData(cp.data);
+        historyState.lastSnapshotSerialized = JSON.stringify(vibeTree);
+        refreshAllUI();
+        autoSaveProject();
+        showToast(`⏪ Restored: "${cp.label}"`);
+        renderCheckpointPanel();
+    } catch(e) {
+        console.error('Checkpoint restore failed:', e);
+        alert('Failed to restore checkpoint: ' + e.message);
+    }
+}
+
+/** Delete a checkpoint */
+async function deleteCheckpoint(id, label) {
+    if (!confirm(`Delete checkpoint "${label}"?`)) return;
+    try {
+        await checkpointApi.delete(id);
+        renderCheckpointPanel();
+        showToast('Checkpoint deleted');
+    } catch(e) {
+        console.error('Checkpoint delete failed:', e);
+    }
+}
+
+/** Render the checkpoint panel content */
+async function renderCheckpointPanel() {
+    const panel = document.getElementById('checkpoint-panel');
+    const list  = document.getElementById('checkpoint-list');
+    if (!list) return;
+
+    if (!currentProjectId) {
+        list.innerHTML = '<div class="cp-empty">No project loaded.</div>';
+        return;
+    }
+
+    list.innerHTML = '<div class="cp-loading">Loading…</div>';
+    try {
+        const checkpoints = await checkpointApi.list(currentProjectId);
+        if (!checkpoints.length) {
+            list.innerHTML = `<div class="cp-empty">No checkpoints yet.<br><small>Click <strong>+ Checkpoint</strong> to save one.</small></div>`;
+            return;
+        }
+        list.innerHTML = '';
+        checkpoints.forEach(cp => {
+            const timeStr = new Date(cp.time).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            const el = document.createElement('div');
+            el.className = 'cp-item';
+            el.innerHTML = `
+                <div class="cp-item-info">
+                    <span class="cp-label" title="${cp.label}">${cp.label}</span>
+                    <span class="cp-time">${timeStr}</span>
+                </div>
+                <div class="cp-item-actions">
+                    <button class="cp-btn cp-restore" onclick="restoreCheckpoint(${cp.id})" title="Restore this checkpoint">⏪ Restore</button>
+                    <button class="cp-btn cp-delete"  onclick="deleteCheckpoint(${cp.id}, '${cp.label.replace(/'/g,'\\\'')}')" title="Delete">🗑</button>
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    } catch(e) {
+        list.innerHTML = `<div class="cp-empty">Error loading checkpoints.</div>`;
+        console.error(e);
+    }
+}
+
+function toggleCheckpointPanel() {
+    const panel = document.getElementById('checkpoint-panel');
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) {
+        const lbl = document.getElementById('cp-project-label');
+        if (lbl) lbl.textContent = currentProjectId ? `Project: ${currentProjectId}` : 'No project loaded';
+        renderCheckpointPanel();
+    }
+}
+
+/** Toast helper (reuse existing or fallback) */
+function showToast(msg) {
+    // Try existing notification system first
+    if (typeof showNotification === 'function') { showNotification(msg); return; }
+    // Fallback: create a simple toast
+    let t = document.getElementById('vibe-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'vibe-toast';
+        t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;background:rgba(0,255,204,0.12);border:1px solid #00ffcc;border-radius:6px;padding:10px 18px;font-family:"Fira Code",monospace;font-size:0.75rem;color:#00ffcc;pointer-events:none;opacity:0;transition:opacity 0.3s;max-width:320px;';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2800);
+}
     if (!currentUser && storageType === 'cloud') {
         projectListContainer.innerHTML = '';
         noProjectsMessage.style.display = 'block';
@@ -8644,7 +8916,14 @@ window.vibeAPI = {
     switchToTab: switchToTab,
     getCurrentProject: () => ({ id: currentProjectId, tree: vibeTree }),
     refreshUI: refreshAllUI,
-    handleQuickReply: handleQuickReply
+    handleQuickReply: handleQuickReply,
+    // Checkpoint API
+    createCheckpoint,
+    restoreCheckpoint,
+    renderCheckpointPanel,
+    toggleCheckpointPanel,
+    // Error auto-fix
+    checkAndFixErrors: vibeCheckAndFixErrors
 };
 
 // Expose vision/image functions globally so inline onclick handlers work
@@ -8764,12 +9043,7 @@ async function restoreSession() {
     } catch (e) {
         console.error("Failed to restore session:", e);
         if (startPageGenerationOutput) startPageGenerationOutput.style.display = 'none';
-        // Only wipe session metadata when the project is definitively gone (not on transient
-        // network / IndexedDB errors that might succeed on the next load).
-        const isNotFound = e && (e.message || '').toLowerCase().includes('not found');
-        if (isNotFound) {
-            await clearSessionMetadata();
-        }
+        await clearSessionMetadata(); 
         resetToStartPage();
     }
 }
@@ -9263,10 +9537,24 @@ function handleApuiMessage(e) {
             break;
         }
 
-        // APUI Jarvis asks parent to switch to a specific outer-UI tab
+        // Jarvis / APUI asks the outer UI to switch tab
         case 'apui-navigate': {
-            if (d.tabId && typeof switchToTab === 'function') {
-                switchToTab(d.tabId);
+            if (d.tabId && typeof switchToTab === 'function') switchToTab(d.tabId);
+            break;
+        }
+
+        // Jarvis / APUI asks the outer UI to check + fix console errors
+        case 'apui-check-and-fix-errors': {
+            vibeCheckAndFixErrors();
+            break;
+        }
+
+        // Jarvis / APUI asks to save a checkpoint
+        case 'apui-save-checkpoint': {
+            if (currentProjectId) {
+                checkpointApi.save(currentProjectId, d.label || `Jarvis checkpoint`, vibeTree)
+                    .then(() => renderCheckpointPanel())
+                    .catch(e => console.warn('Checkpoint from APUI failed:', e));
             }
             break;
         }
@@ -9384,4 +9672,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-          }
+            }
