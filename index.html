@@ -1982,6 +1982,22 @@
                                         <i class="bi bi-arrow-clockwise me-2"></i>Redo
                                     </button>
                                 </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item" type="button" onclick="createCheckpoint()">
+                                        <i class="bi bi-bookmark-plus me-2"></i>Save Checkpoint
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" type="button" onclick="toggleCheckpointPanel()">
+                                        <i class="bi bi-clock-history me-2"></i>History / Checkpoints
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" type="button" onclick="vibeCheckAndFixErrors()">
+                                        <i class="bi bi-bug me-2"></i>Check &amp; Fix Errors
+                                    </button>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -5904,5 +5920,118 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════
+     CHECKPOINT HISTORY PANEL
+     ═══════════════════════════════════════════════════════ -->
+<div id="checkpoint-panel">
+    <div class="cp-header">
+        <span class="cp-title"><i class="bi bi-clock-history me-2"></i>Checkpoint History</span>
+        <div class="cp-header-actions">
+            <button class="cp-hdr-btn" onclick="createCheckpoint()" title="Save a new checkpoint">＋ Save Now</button>
+            <button class="cp-hdr-btn cp-hdr-close" onclick="toggleCheckpointPanel()" title="Close">✕</button>
+        </div>
+    </div>
+    <div class="cp-subheader">
+        <span id="cp-project-label" style="font-size:0.65rem;color:#556;font-family:'Fira Code',monospace;"></span>
+        <button class="cp-hdr-btn cp-danger" onclick="if(confirm('Delete ALL checkpoints for this project?')){checkpointApi.deleteAll(currentProjectId).then(()=>{renderCheckpointPanel();showToast('All checkpoints deleted');})}" title="Delete all">Clear all</button>
+    </div>
+    <div id="checkpoint-list" class="cp-list"></div>
+</div>
+
+<style>
+/* ── Checkpoint Panel ─────────────────────────────────────────── */
+#checkpoint-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 320px;
+    background: #0d1117;
+    border-left: 1px solid rgba(65,105,225,0.35);
+    z-index: 99000;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: -8px 0 32px rgba(0,0,0,0.6);
+    font-family: 'Rajdhani', system-ui, sans-serif;
+}
+#checkpoint-panel.open { transform: translateX(0); }
+
+.cp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 14px 10px;
+    border-bottom: 1px solid rgba(65,105,225,0.2);
+    background: rgba(10,14,28,0.98);
+    flex-shrink: 0;
+}
+.cp-title {
+    font-weight: 700; font-size: 0.9rem;
+    color: #87ceeb; text-transform: uppercase; letter-spacing: 1px;
+}
+.cp-header-actions { display: flex; gap: 6px; align-items: center; }
+.cp-subheader {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px;
+    border-bottom: 1px solid rgba(65,105,225,0.1);
+    background: rgba(5,8,16,0.9);
+    flex-shrink: 0; min-height: 32px;
+}
+.cp-hdr-btn {
+    background: rgba(65,105,225,0.12);
+    border: 1px solid rgba(65,105,225,0.3);
+    color: #87ceeb; border-radius: 4px;
+    padding: 4px 10px; font-size: 0.72rem; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.cp-hdr-btn:hover { background: rgba(65,105,225,0.28); border-color: #87ceeb; }
+.cp-hdr-close { background: transparent; border-color: rgba(255,70,70,0.3); color: #ef9a9a; }
+.cp-hdr-close:hover { background: rgba(239,83,80,0.15); border-color: #ef9a9a; }
+.cp-danger { border-color: rgba(239,83,80,0.25); color: #ef9a9a; font-size: 0.65rem; padding: 3px 8px; }
+.cp-danger:hover { background: rgba(239,83,80,0.12); }
+
+.cp-list {
+    flex: 1; overflow-y: auto;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(65,105,225,0.3) transparent;
+}
+.cp-list::-webkit-scrollbar { width: 4px; }
+.cp-list::-webkit-scrollbar-thumb { background: rgba(65,105,225,0.3); border-radius: 2px; }
+
+.cp-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.12s;
+}
+.cp-item:hover { background: rgba(65,105,225,0.07); }
+.cp-item-info { flex: 1; min-width: 0; }
+.cp-label {
+    display: block; font-weight: 600; font-size: 0.82rem;
+    color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-time {
+    display: block; font-family: 'Fira Code', monospace;
+    font-size: 0.6rem; color: #484f58; margin-top: 2px;
+}
+.cp-item-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.cp-btn {
+    background: transparent; border-radius: 4px; cursor: pointer;
+    font-size: 0.7rem; font-weight: 600; padding: 4px 9px;
+    border: 1px solid transparent; transition: 0.12s; font-family: inherit;
+}
+.cp-restore {
+    border-color: rgba(65,105,225,0.35); color: #87ceeb;
+}
+.cp-restore:hover { background: rgba(65,105,225,0.2); border-color: #87ceeb; }
+.cp-delete { color: #484f58; border-color: transparent; font-size: 0.85rem; }
+.cp-delete:hover { color: #ef9a9a; background: rgba(239,83,80,0.1); border-color: rgba(239,83,80,0.3); }
+.cp-empty, .cp-loading {
+    padding: 28px 18px; text-align: center;
+    font-family: 'Fira Code', monospace; font-size: 0.68rem;
+    color: #484f58; line-height: 1.7;
+}
+</style>
+
 </body>
-                    </html>
+    </html>
