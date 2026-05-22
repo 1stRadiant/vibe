@@ -5449,7 +5449,14 @@ function getDb() {
             };
 
             request.onsuccess = (event) => {
-                resolve(event.target.result);
+                const db = event.target.result;
+                // Another tab opened a newer version — close gracefully so it can upgrade
+                db.onversionchange = () => {
+                    db.close();
+                    dbPromise = null;
+                    console.warn('IndexedDB: version change — connection closed, will reopen on next access.');
+                };
+                resolve(db);
             };
 
             request.onerror = (event) => {
@@ -5457,7 +5464,12 @@ function getDb() {
                 dbPromise = null;
                 reject(event.target.error);
             };
-        });
+
+            request.onblocked = () => {
+                console.warn('IndexedDB open blocked — another tab may be holding an old connection.');
+            };
+        // If the promise rejects, clear the cache so the next call can retry
+        }).catch(err => { dbPromise = null; return Promise.reject(err); });
     }
     return dbPromise;
 }
@@ -9043,7 +9055,13 @@ async function restoreSession() {
     } catch (e) {
         console.error("Failed to restore session:", e);
         if (startPageGenerationOutput) startPageGenerationOutput.style.display = 'none';
-        await clearSessionMetadata(); 
+        // Only wipe metadata when the project is definitively gone.
+        // Transient errors (network, IDB lock) must NOT clear the session or projects appear deleted.
+        const msg = (e && e.message || '').toLowerCase();
+        const isDefinitelyGone = msg.includes('not found') || msg.includes('does not exist');
+        if (isDefinitelyGone) {
+            await clearSessionMetadata();
+        }
         resetToStartPage();
     }
 }
@@ -9672,4 +9690,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-            }
+  }
