@@ -368,17 +368,29 @@
         writing-mode: horizontal-tb;
     }
     #jarvis-status-pill {
-        display: none; align-items: center; gap: 5px; flex-shrink: 0;
-        padding: 0 10px; border-right: 1px solid rgba(255,0,255,0.2);
-        height: 100%;
+        display: none; align-items: center; gap: 6px;
+        position: fixed; top: 10px; left: 10px; z-index: 28000;
+        background: rgba(8,12,24,0.92); border: 1px solid rgba(255,0,255,0.35);
+        border-radius: 20px; padding: 5px 11px 5px 8px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 12px rgba(255,0,255,0.2);
+        pointer-events: none;
+        transition: opacity 0.3s, border-color 0.3s, box-shadow 0.3s;
+        max-width: 200px;
     }
     #jarvis-status-pill.active { display: flex; }
-    #jarvis-status-pill.away-mode { border-right-color: rgba(65,105,225,0.3); }
-    #jarvis-status-pill.away-mode .jarvis-dot { background: #4169e1; animation: pulse-away 1.5s infinite; }
+    #jarvis-status-pill.away-mode {
+        border-color: rgba(65,105,225,0.5);
+        box-shadow: 0 2px 12px rgba(65,105,225,0.2);
+    }
+    #jarvis-status-pill.away-mode .jarvis-dot {
+        background: #4169e1;
+        animation: pulse-away 1.5s infinite;
+    }
     #jarvis-status-pill.away-mode #jarvis-status-text { color: #6688cc; }
     @keyframes pulse-away {
         0%, 100% { opacity: 0.4; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.3); }
+        50%       { opacity: 1;   transform: scale(1.3); }
     }
     .jarvis-dot {
         width: 6px; height: 6px; border-radius: 50%; background: var(--ai-glow);
@@ -686,16 +698,18 @@
 <!-- Taskbar: pinned nodes -->
 <div id="taskbar">
     <div id="taskbar-label">📌 Pinned</div>
-    <div id="jarvis-status-pill">
-        <div class="jarvis-dot"></div>
-        <span id="jarvis-status-text">Working…</span>
-        <span id="jarvis-heartbeat-counter">#0</span>
-    </div>
     <div id="taskbar-scroll">
         <span id="taskbar-empty">No pinned nodes — click 📌 on a node to pin it here</span>
     </div>
 </div>
-<div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · 🌙 Jarvis keeps building when you're away</div>
+<div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · Jarvis keeps working</div>
+
+<!-- Jarvis status — top-left, clear of mobile nav -->
+<div id="jarvis-status-pill">
+    <div class="jarvis-dot"></div>
+    <span id="jarvis-status-text">Working…</span>
+    <span id="jarvis-heartbeat-counter">#0</span>
+</div>
 <div id="overview-banner">Tap any node to open it · Pinch in to exit overview</div>
 
 <!-- Right Sidebar: Session Notes -->
@@ -2018,7 +2032,7 @@ const Jarvis = {
         const ctr  = document.getElementById('jarvis-heartbeat-counter');
         if (pill) {
             pill.classList.add('active');
-            pill.classList.toggle('away-mode', this._awayMode);
+            pill.classList.toggle('away-mode', !!this._awayMode);
         }
         if (txt)  txt.textContent  = text;
         if (ctr)  ctr.textContent  = `#${this.beat}`;
@@ -2283,7 +2297,7 @@ function jarvisToggle() {
     if (Jarvis.running) {
         Jarvis.stop();
     } else {
-        const goal = Jarvis.goal || prompt('🎯 Jarvis Goal\n\nDescribe what you want built. Jarvis will keep working even when you\'re away, creating complementary assets, plugins, and utilities.\n\nExample: "Build a polished task manager with animations, a plugin system, and a dark/light theme"');
+        const goal = Jarvis.goal || prompt('🎯 Jarvis Goal\n\nDescribe what you want built. Jarvis keeps working even when you\'re away, creating plugins, utilities, and assets.\n\nExample: "Build a polished task manager with animations, themes, and a plugin system"');
         if (!goal?.trim()) return;
         Jarvis.goal = goal.trim();
         Jarvis.start(Jarvis.goal);
