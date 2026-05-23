@@ -373,6 +373,13 @@
         height: 100%;
     }
     #jarvis-status-pill.active { display: flex; }
+    #jarvis-status-pill.away-mode { border-right-color: rgba(65,105,225,0.3); }
+    #jarvis-status-pill.away-mode .jarvis-dot { background: #4169e1; animation: pulse-away 1.5s infinite; }
+    #jarvis-status-pill.away-mode #jarvis-status-text { color: #6688cc; }
+    @keyframes pulse-away {
+        0%, 100% { opacity: 0.4; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.3); }
+    }
     .jarvis-dot {
         width: 6px; height: 6px; border-radius: 50%; background: var(--ai-glow);
         animation: pulse-sync 0.8s infinite; flex-shrink: 0;
@@ -688,7 +695,7 @@
         <span id="taskbar-empty">No pinned nodes — click 📌 on a node to pin it here</span>
     </div>
 </div>
-<div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · Jarvis keeps working</div>
+<div class="snap-out-hint" id="snap-out-hint">✋ Drag to pan · 🌙 Jarvis keeps building when you're away</div>
 <div id="overview-banner">Tap any node to open it · Pinch in to exit overview</div>
 
 <!-- Right Sidebar: Session Notes -->
@@ -737,7 +744,7 @@
         </svg>
     </div>
     <button class="os-menu-btn btn-1" onclick="jarvisToggle()">🤖 Jarvis</button>
-    <button class="os-menu-btn btn-2" onclick="jarvisFixErrors()">🐛 Fix Errors</button>
+    <button class="os-menu-btn btn-2" onclick="jarvisShowRoadmap()">🗺 Roadmap</button>
     <button class="os-menu-btn btn-3" onclick="jarvisReturnFocus()">🔭 Focus</button>
     <button class="os-menu-btn btn-4" onclick="jarvisSetGoal()">🎯 Goal</button>
     <button class="os-menu-btn btn-5" onclick="openJarvisSettings()">⚡ Interval</button>
@@ -771,30 +778,6 @@ function postToParent(type, payload) {
     catch (_) { /* standalone mode */ }
 }
 
-/** Switch the outer Vibe UI to any top-level tab ('preview', 'console', 'agent', etc.) */
-function navigateParent(tabId) {
-    postToParent('apui-navigate', { tabId });
-}
-
-/** Ask the outer UI to check + click all "Fix with AI" buttons in its console */
-function parentCheckAndFixErrors() {
-    postToParent('apui-check-and-fix-errors', {});
-}
-
-/** Ask the outer UI to save a named checkpoint */
-function parentSaveCheckpoint(label) {
-    postToParent('apui-save-checkpoint', { label });
-}
-
-/* ── Outer Console Error Buffer ──────────────────────────────────
-   Parent forwards its console errors here so Jarvis can react.
-*/
-const _outerConsoleErrors = [];
-let   _outerErrorSeq      = 0;
-function getUnseenErrors(sinceSeq) {
-    return _outerConsoleErrors.filter(e => e.seq > sinceSeq);
-}
-
 // Listen for messages arriving from the parent app3.js host
 window.addEventListener('message', e => {
     const d = e.data;
@@ -824,15 +807,6 @@ window.addEventListener('message', e => {
     if (d.type === 'console') {
         logToConsole(d.msg, d.level || 'info');
         if (d.level === 'error') attributeRuntimeError(d.msg);
-        return;
-    }
-
-    // Parent forwards its outer console errors so Jarvis can auto-fix them
-    if (d.type === 'apui-outer-console-error') {
-        _outerErrorSeq++;
-        _outerConsoleErrors.push({ message: d.message || '', seq: _outerErrorSeq, time: Date.now() });
-        if (_outerConsoleErrors.length > 50) _outerConsoleErrors.shift();
-        logToConsole(`⚠ Outer error: ${d.message}`, 'error');
         return;
     }
 
@@ -1976,23 +1950,48 @@ const Jarvis = {
     goal:           '',
     heartbeatMs:    8000,
     beat:           0,
-    memory:         [],
+    memory:         [],       // { beat, plan, nodeIds, category }
+    roadmap:        [],       // planned future work items
+    awayLog:        [],       // assets built while user was away
     _timeoutHandle: null,
     _userPanning:   false,
     _inBeat:        false,
     _snapHintTimer: null,
-    _lastErrorSeq:  0,    // tracks which outer console errors have already been seen
+    _roadmapHideTimer: null,
+    _awayMode:      false,
+    _awayStartBeat: 0,
+    _visibilityHandler: null,
 
     start(goal) {
         if (this.running) { this.stop(); }
-        this.goal          = goal;
-        this.beat          = 0;
-        this.memory        = [];
-        this.running       = true;
-        this._lastErrorSeq = _outerErrorSeq; // ignore pre-existing errors
+        this.goal    = goal;
+        this.beat    = 0;
+        this.memory  = [];
+        this.roadmap = [];
+        this.awayLog = [];
+        this.running = true;
+        this._awayMode = document.hidden;
+        this._awayStartBeat = 0;
+
+        // Track when the user leaves/returns
+        if (this._visibilityHandler) document.removeEventListener('visibilitychange', this._visibilityHandler);
+        this._visibilityHandler = () => {
+            const wasAway = this._awayMode;
+            this._awayMode = document.hidden;
+            if (!document.hidden && wasAway && this.awayLog.length) {
+                this._showAwaySummary();
+            }
+            if (document.hidden) {
+                this._awayStartBeat = this.beat;
+                logToChat('system', `🌙 Jarvis entering away mode — building in background`);
+            }
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+
         document.getElementById('taskbar')?.classList.add('jarvis-active');
         logToChat('system', `🤖 Jarvis started · Goal: "${goal}"`);
         logToChat('system', `⚡ Heartbeat every ${this.heartbeatMs / 1000}s · tap 🤖 to stop`);
+        logToChat('system', `🌙 Keeps building even when you switch tabs`);
         trackerLog('ai', null, `Jarvis started · "${goal.slice(0,60)}"`);
         this._tick();
     },
@@ -2000,8 +1999,15 @@ const Jarvis = {
     stop() {
         this.running = false;
         clearTimeout(this._timeoutHandle);
+        clearTimeout(this._roadmapHideTimer);
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
+        this._awayMode = false;
         document.getElementById('taskbar')?.classList.remove('jarvis-active');
         document.getElementById('jarvis-status-pill')?.classList.remove('active');
+        if (this.awayLog.length) this._showAwaySummary();
         logToChat('system', `🤖 Jarvis stopped after ${this.beat} beat(s)`);
         trackerLog('ai', null, `Jarvis stopped · ${this.beat} beat(s) completed`);
     },
@@ -2010,7 +2016,10 @@ const Jarvis = {
         const pill = document.getElementById('jarvis-status-pill');
         const txt  = document.getElementById('jarvis-status-text');
         const ctr  = document.getElementById('jarvis-heartbeat-counter');
-        if (pill) pill.classList.add('active');
+        if (pill) {
+            pill.classList.add('active');
+            pill.classList.toggle('away-mode', this._awayMode);
+        }
         if (txt)  txt.textContent  = text;
         if (ctr)  ctr.textContent  = `#${this.beat}`;
     },
@@ -2021,6 +2030,18 @@ const Jarvis = {
         hint.classList.add('show');
         clearTimeout(this._snapHintTimer);
         this._snapHintTimer = setTimeout(() => hint.classList.remove('show'), 2500);
+    },
+
+    _showAwaySummary() {
+        if (!this.awayLog.length) return;
+        const count = this.awayLog.length;
+        const beats = this.beat - this._awayStartBeat;
+        logToChat('system', `☀️ Welcome back! Jarvis built ${count} asset(s) across ${beats} beat(s):`);
+        this.awayLog.forEach((entry, i) => {
+            logToChat('ai', `  ${i+1}. [${entry.category}] ${entry.plan}`);
+        });
+        this.awayLog = [];
+        postToParent('apui-save-checkpoint', { label: `🌙 Away session: ${count} assets built` });
     },
 
     async _tick() {
@@ -2049,70 +2070,103 @@ const Jarvis = {
             logToChat('system', '⚠ Jarvis needs an API key — open Settings'); this.stop(); return;
         }
 
-        // Build memory summary for context (last 5 beats)
-        const recentMemory = this.memory.slice(-5).map(m =>
-            `Beat ${m.beat}: ${m.plan} → changed [${m.nodeIds.join(', ')}]`
-        ).join('\n') || 'None yet — this is the first beat.';
+        const isAway = this._awayMode;
+
+        const recentMemory = this.memory.slice(-6).map(m =>
+            `Beat ${m.beat} [${m.category||'edit'}]: ${m.plan} → [${m.nodeIds.join(', ')}]`
+        ).join('\n') || 'None yet — first beat.';
+
+        const roadmapStr = this.roadmap.length
+            ? this.roadmap.map((r,i) => `  ${i+1}. ${r}`).join('\n')
+            : 'Not yet planned — generate this beat.';
 
         const context = getVibeContext();
 
-        const sys = `You are Jarvis, an autonomous web-development agent making INCREMENTAL edits toward a long-term goal.
-You run on a heartbeat — each beat you make ONE focused improvement. Do not try to do everything at once.
+        const sys = `You are Jarvis, a senior autonomous full-stack agent. You work continuously toward a goal, creating COMPLEMENTARY ASSETS and PLUGINS that make the project complete, robust, and polished — even while the user is away.
 
 GOAL: "${this.goal}"
 
-YOUR MEMORY (recent beats):
+RECENT MEMORY:
 ${recentMemory}
 
-Return ONLY valid JSON — no other text:
+ROADMAP (planned future work):
+${roadmapStr}
+
+${isAway ? '⚠ USER IS AWAY — be bold: create full new assets, plugins, utilities, modules. Do not hold back.' : 'User is watching — make clear, visible improvements.'}
+
+Return ONLY valid JSON:
 {
-  "plan": "one-line description of what you will do THIS beat",
+  "plan": "one-line description of THIS beat's work",
+  "category": "layout|style|logic|plugin|utility|data|animation|component|config|asset",
   "done": false,
+  "roadmap_update": ["item 1 for next beats", "item 2", "item 3"],
   "actions": [
     {
       "actionType": "update",
-      "nodeId": "EXISTING_ID",
-      "newCode": "complete updated code",
-      "narration": "2-3 sentences explaining what you changed in this node and why, in plain English"
+      "nodeId": "EXISTING_NODE_ID",
+      "newCode": "complete replacement code — NEVER truncate or use ellipsis",
+      "narration": "2-3 sentences: what changed and why"
     },
     {
       "actionType": "create",
-      "parentId": "PARENT_ID",
-      "newNode": { "id": "id", "type": "html|css|javascript|js-function|declaration|head", "description": "desc", "code": "complete code" },
-      "narration": "2-3 sentences explaining what this new node does and why you created it"
+      "parentId": "PARENT_NODE_ID",
+      "newNode": {
+        "id": "unique-kebab-id",
+        "type": "html|css|javascript|js-function|declaration|head",
+        "description": "What this node does",
+        "code": "complete self-contained implementation — NEVER truncate"
+      },
+      "narration": "2-3 sentences: what this asset does and why it complements the project"
     }
   ]
 }
 
-Set "done": true if the goal is fully achieved and no more edits are needed.
+COMPLEMENTARY ASSET STRATEGY — pick the most valuable this beat:
+• plugin: self-contained JS module (toast system, modal manager, router, event bus, lazy loader, keyboard shortcuts)
+• utility: shared helpers (formatDate, debounce, throttle, fetchJSON, deepClone, storage wrapper, validators)
+• component: reusable UI widget (dropdown, accordion, card grid, skeleton loader, progress bar, tooltip)
+• data: config/constants node (theme tokens, API endpoints, site copy, i18n strings, feature flags)
+• animation: CSS keyframes or JS animation integration (entrance, transition, micro-interaction)
+• style: CSS custom properties, utility classes, responsive breakpoints, dark mode, print styles
+• logic: business logic module (state machine, form validation, search/filter, caching layer)
+• asset: SVG icon sprite, font preloader, image lazy-loader, service worker registration
+
 RULES:
-1. FULL, REAL, WORKING code for every node — never truncate, never use ellipsis, never use placeholder comments.
-2. On beat 1: completely replace ALL placeholder/comment-only nodes with real working code. html-body must have actual markup. css-main must have actual styles. js-main must have actual logic.
-3. Prefer updating existing nodes over creating new ones.
-4. HTML: body-level markup only (no <html>/<head>/<body> tags). CSS: standalone rules. JS: standalone script.
-5. Make progress each beat — never repeat the exact same change.
-6. narration field: plain English, conversational, 2-3 sentences max.
-7. NEVER output a node whose code is only comments or a single title tag — always write real implementation code.`;
+1. Every node must have FULL working code — never truncate, no TODO comments, no ellipsis.
+2. New nodes must be SELF-CONTAINED and IMMEDIATELY functional — import nothing that doesn't exist.
+3. When away: CREATE more new complementary nodes rather than only editing existing ones.
+4. roadmap_update: always provide 3 specific, actionable future items.
+5. Make real progress each beat — never repeat the exact same change.
+6. Set "done": true only when goal + all obvious complements are fully built.`;
 
         const user = `VIBE TREE:
 ${JSON.stringify(context, null, 2)}
 
-TREE ROOT ID: ${vibeTree.id}
+ROOT ID: ${vibeTree.id}
 BEAT: ${this.beat}
+AWAY MODE: ${isAway}
 
 Return the JSON object now.`;
 
-        this.setStatus(`Beat ${this.beat} · drafting…`);
-        logToChat('system', `🤖 Beat ${this.beat} · ${this.goal.slice(0, 50)}…`);
+        this.setStatus(`Beat ${this.beat} · ${isAway ? '🌙 away' : 'drafting'}…`);
+        if (!isAway) logToChat('system', `🤖 Beat ${this.beat} · ${this.goal.slice(0, 50)}…`);
 
         const raw = await callGemini(sys, user, true, []);
         let plan;
         try { plan = JSON.parse(raw); } catch { throw new Error('Jarvis returned invalid JSON'); }
 
-        logToChat('ai', `[B${this.beat}] ${plan.plan}`);
+        // Update roadmap
+        if (Array.isArray(plan.roadmap_update) && plan.roadmap_update.length) {
+            this.roadmap = plan.roadmap_update;
+            this._renderRoadmap();
+        }
+
+        if (!isAway) {
+            logToChat('ai', `[B${this.beat}][${plan.category||'edit'}] ${plan.plan}`);
+        }
         this.setStatus(`Beat ${this.beat} · applying ${plan.actions?.length || 0} edit(s)…`);
 
-        const changedIds = [];
+        const changedIds  = [];
         const pushUpdates = [];
 
         for (const action of (plan.actions || [])) {
@@ -2123,18 +2177,17 @@ Return the JSON object now.`;
                 const treeNode = findNodeInTree(action.nodeId);
                 if (!treeNode) continue;
 
-                if (domNode) {
+                if (!isAway && domNode) {
                     bringToFront(domNode);
                     domNode.classList.add('ai-updating');
                     if (!this._userPanning) this.showSnapHint();
                 }
-                if (!this._userPanning) centerOnNode(action.nodeId, 350);
+                if (!isAway && !this._userPanning) centerOnNode(action.nodeId, 350);
 
-                // Stream the narration — fully completed before applying code
-                if (action.narration) {
+                if (!isAway && action.narration) {
                     await streamToExplainPane(action.nodeId, action.narration, 32);
                 } else {
-                    await delay(400);
+                    await delay(isAway ? 60 : 400);
                 }
 
                 treeNode.code = action.newCode;
@@ -2145,8 +2198,7 @@ Return the JSON object now.`;
                 pushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
                 changedIds.push(action.nodeId);
 
-                await delay(300);
-                if (domNode) domNode.classList.remove('ai-updating');
+                if (!isAway) { await delay(300); if (domNode) domNode.classList.remove('ai-updating'); }
 
             } else if (action.actionType === 'create') {
                 const newNode = action.newNode;
@@ -2156,79 +2208,73 @@ Return the JSON object now.`;
                 addChildToTree(action.parentId || vibeTree.id, newNode);
                 const cx = (-AppState.pan.x + window.innerWidth / 2) / AppState.scale - 180;
                 const cy = (-AppState.pan.y + (window.innerHeight - 120) / 2) / AppState.scale - 130;
-                const newEl = createVibeNode(newNode, cx + Math.random() * 100, cy);
-                if (newEl) { bringToFront(newEl); newEl.classList.add('ai-updating'); }
+                const spread = isAway ? 200 : 100;
+                const newEl = createVibeNode(newNode, cx + (Math.random() * spread) - spread/2, cy + (Math.random() * 80) - 40);
+                if (newEl && !isAway) { bringToFront(newEl); newEl.classList.add('ai-updating'); }
                 buildConnections(); drawConnections();
-                if (!this._userPanning) centerOnNode(newNode.id, 350);
+                if (!isAway && !this._userPanning) centerOnNode(newNode.id, 350);
                 changedIds.push(newNode.id);
 
-                // Stream narration for the new node
-                if (action.narration) {
+                if (!isAway && action.narration) {
                     await streamToExplainPane(newNode.id, action.narration, 32);
                 } else {
-                    await delay(500);
+                    await delay(isAway ? 60 : 500);
                 }
 
-                if (newEl) newEl.classList.remove('ai-updating');
+                if (newEl && !isAway) newEl.classList.remove('ai-updating');
                 pushUpdates.push({ nodeId: newNode.id, newCode: newNode.code, isNew: true, newNode });
             }
         }
 
-        // Store beat in memory
-        this.memory.push({ beat: this.beat, plan: plan.plan, nodeIds: changedIds, summary: plan.plan });
+        const beatRecord = {
+            beat: this.beat,
+            plan: plan.plan,
+            nodeIds: changedIds,
+            category: plan.category || 'edit',
+            summary: plan.plan
+        };
+        this.memory.push(beatRecord);
 
-        // Push to parent
+        if (isAway && changedIds.length) {
+            this.awayLog.push(beatRecord);
+        }
+
         if (pushUpdates.length) {
             postToParent('apui-bulk-update', { updates: pushUpdates });
-            trackerLog('push', null, `Jarvis B${this.beat} pushed ${pushUpdates.length} update(s)`);
+            trackerLog('push', null, `Jarvis B${this.beat} [${plan.category||'edit'}] pushed ${pushUpdates.length} update(s)`);
         }
 
         renderSidebar();
         updatePreview();
         this._userPanning = false;
 
-        // ── Console error check & fix ─────────────────────────────
-        const newErrors = getUnseenErrors(this._lastErrorSeq);
-        if (newErrors.length > 0) {
-            this._lastErrorSeq = _outerErrorSeq;
-            logToChat('system', `🐛 ${newErrors.length} console error(s) detected — asking parent to fix…`);
-            this.setStatus(`Fixing ${newErrors.length} error(s)…`);
-
-            // Save a checkpoint before fixing
-            parentSaveCheckpoint(`⚡ Before error fix (beat ${this.beat})`);
-
-            // Navigate outer UI to console tab so user can watch
-            navigateParent('console');
-            await delay(400);
-
-            // Ask the outer UI to click all "Fix with AI" buttons
-            parentCheckAndFixErrors();
-
-            // Wait for fixes to complete (agent queue drain signal isn't available here,
-            // so we give it a generous wait based on error count, capped at 2 min)
-            const waitMs = Math.min(newErrors.length * 25000, 120000);
-            logToChat('system', `⏳ Waiting up to ${waitMs/1000}s for fixes to complete…`);
-            await delay(waitMs);
-
-            // Save a checkpoint after fixing
-            parentSaveCheckpoint(`✅ After error fix (beat ${this.beat})`);
-
-            // Show preview
-            navigateParent('preview');
-            logToChat('system', '👁 Preview shown after error fix');
-            await delay(600);
+        // Auto-checkpoint every 5 beats while away
+        if (isAway && this.beat % 5 === 0) {
+            postToParent('apui-save-checkpoint', { label: `🌙 Away B${this.beat}: ${plan.plan.slice(0,50)}` });
         }
 
         if (plan.done) {
             logToChat('ai', `🏁 Jarvis: goal complete after ${this.beat} beat(s)!`);
             trackerLog('ai', null, `Jarvis goal complete · ${this.beat} beats`);
-            // Save a final checkpoint
-            parentSaveCheckpoint(`🏁 Jarvis complete: ${this.goal.slice(0, 50)}`);
-            // Navigate to preview so user sees the result
-            navigateParent('preview');
             postToParent('apui-jarvis-done', { beat: this.beat, goal: this.goal, vibeTree: JSON.parse(JSON.stringify(vibeTree)) });
             this.stop();
         }
+    },
+
+    _renderRoadmap() {
+        let panel = document.getElementById('jarvis-roadmap-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'jarvis-roadmap-panel';
+            panel.style.cssText = 'position:fixed;bottom:140px;right:16px;z-index:19000;background:rgba(10,14,28,0.96);border:1px solid rgba(65,105,225,0.4);border-radius:8px;padding:10px 14px;min-width:220px;max-width:300px;font-family:\'Fira Code\',monospace;font-size:0.62rem;box-shadow:0 4px 24px rgba(0,0,0,0.6);pointer-events:none;opacity:0;transition:opacity 0.3s;';
+            document.body.appendChild(panel);
+        }
+        panel.style.opacity = '1';
+        panel.innerHTML = `<div style="color:#4169e1;font-weight:700;font-size:0.6rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;">🗺 Roadmap · Beat ${this.beat}</div>` +
+            this.roadmap.map((r, i) => `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04);"><span style="color:#4169e1;flex-shrink:0;">${i+1}.</span><span style="color:#8899bb;">${r}</span></div>`).join('') +
+            `<div style="color:#2a3050;font-size:0.55rem;margin-top:7px;">${this._awayMode ? '🌙 away mode' : '👁 present'} · next in ${this.heartbeatMs/1000}s</div>`;
+        clearTimeout(this._roadmapHideTimer);
+        this._roadmapHideTimer = setTimeout(() => { if (!this.running) panel.style.opacity = '0'; }, 7000);
     }
 };
 
@@ -2237,7 +2283,7 @@ function jarvisToggle() {
     if (Jarvis.running) {
         Jarvis.stop();
     } else {
-        const goal = Jarvis.goal || prompt('🎯 What is Jarvis\'s goal?\n\nDescribe the end-state you want (e.g. "Build a polished landing page with hero, features and footer"):');
+        const goal = Jarvis.goal || prompt('🎯 Jarvis Goal\n\nDescribe what you want built. Jarvis will keep working even when you\'re away, creating complementary assets, plugins, and utilities.\n\nExample: "Build a polished task manager with animations, a plugin system, and a dark/light theme"');
         if (!goal?.trim()) return;
         Jarvis.goal = goal.trim();
         Jarvis.start(Jarvis.goal);
@@ -2245,19 +2291,14 @@ function jarvisToggle() {
     document.getElementById('os-menu-container')?.classList.remove('open');
 }
 
-/** Manual trigger: navigate outer UI to console, click all Fix with AI buttons, then show preview */
-function jarvisFixErrors() {
+function jarvisShowRoadmap() {
+    if (!Jarvis.roadmap.length) {
+        toast('🗺 No roadmap yet — start Jarvis first');
+        document.getElementById('os-menu-container')?.classList.remove('open');
+        return;
+    }
+    Jarvis._renderRoadmap();
     document.getElementById('os-menu-container')?.classList.remove('open');
-    const hasKey = !!AppState.settings.apiKey;
-    if (!hasKey) { toast('⚠ API key needed — open Settings'); return; }
-    // Save a checkpoint first
-    parentSaveCheckpoint(`⚡ Before manual fix-errors`);
-    // Navigate outer UI to console
-    navigateParent('console');
-    // Ask outer UI to trigger the auto-fix
-    parentCheckAndFixErrors();
-    logToChat('system', '🐛 Checking outer console for errors…');
-    toast('🐛 Checking console for errors…');
 }
 
 function jarvisSetGoal() {
