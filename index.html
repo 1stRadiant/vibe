@@ -1982,22 +1982,6 @@
                                         <i class="bi bi-arrow-clockwise me-2"></i>Redo
                                     </button>
                                 </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <button class="dropdown-item" type="button" onclick="window.createCheckpoint()">
-                                        <i class="bi bi-bookmark-plus me-2"></i>Save Checkpoint
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item" type="button" onclick="window.toggleCheckpointPanel()">
-                                        <i class="bi bi-clock-history me-2"></i>History / Checkpoints
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item" type="button" onclick="window.vibeCheckAndFixErrors()">
-                                        <i class="bi bi-bug me-2"></i>Check &amp; Fix Errors
-                                    </button>
-                                </li>
                             </ul>
                         </div>
                     </div>
@@ -5515,7 +5499,7 @@ function _jrvAutoShowBadge(text) {
     badge = document.createElement('div');
     badge.id = 'jrv-auto-badge';
     badge.style.cssText = [
-      'position:fixed;bottom:18px;left:50%;transform:translateX(-50%)',
+      'position:fixed;top:10px;left:10px',
       'background:rgba(10,5,25,0.92)',
       'border:1px solid #ff00ff',
       'box-shadow:0 0 18px rgba(255,0,255,0.35)',
@@ -5919,36 +5903,6 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
-<!-- ── Checkpoint History Panel ───────────────────────────────── -->
-<div id="checkpoint-panel" style="position:fixed;top:0;right:0;bottom:0;width:300px;background:#0d1117;border-left:1px solid rgba(65,105,225,0.3);z-index:99000;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s ease;box-shadow:-8px 0 32px rgba(0,0,0,0.6);font-family:'Rajdhani',system-ui,sans-serif;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(65,105,225,0.2);background:rgba(10,14,28,0.98);flex-shrink:0;">
-        <span style="font-weight:700;font-size:0.85rem;color:#87ceeb;text-transform:uppercase;letter-spacing:1px;">⏱ History</span>
-        <div style="display:flex;gap:6px;">
-            <button onclick="window.createCheckpoint()" style="background:rgba(65,105,225,0.15);border:1px solid rgba(65,105,225,0.35);color:#87ceeb;border-radius:4px;padding:3px 10px;font-size:0.7rem;font-weight:600;cursor:pointer;">+ Save Now</button>
-            <button onclick="window.toggleCheckpointPanel()" style="background:transparent;border:1px solid rgba(239,83,80,0.3);color:#ef9a9a;border-radius:4px;padding:3px 8px;font-size:0.75rem;cursor:pointer;">✕</button>
-        </div>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(65,105,225,0.1);flex-shrink:0;min-height:28px;">
-        <span id="cp-project-label" style="font-size:0.6rem;color:#3a4050;font-family:'Fira Code',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;"></span>
-        <button onclick="if(confirm('Delete ALL checkpoints?'))window._checkpointApi.deleteAll(window._currentProjectIdForCP()).then(()=>{window._renderCheckpointPanel();window._vibeToastPublic('Cleared')})" style="background:transparent;border:none;color:#3a4050;font-size:0.65rem;cursor:pointer;padding:2px 6px;">Clear all</button>
-    </div>
-    <div id="checkpoint-list" style="flex:1;overflow-y:auto;padding:6px 0;scrollbar-width:thin;scrollbar-color:rgba(65,105,225,0.25) transparent;"></div>
-</div>
-<style>
-#checkpoint-panel.open { transform: translateX(0) !important; }
-.cp-item { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.04); }
-.cp-item:hover { background:rgba(65,105,225,0.07); }
-.cp-item-info { flex:1;min-width:0; }
-.cp-label { display:block;font-weight:600;font-size:0.8rem;color:#c9d1d9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.cp-time { display:block;font-family:'Fira Code',monospace;font-size:0.58rem;color:#3a4050;margin-top:1px; }
-.cp-item-actions { display:flex;gap:4px;flex-shrink:0; }
-.cp-btn { background:transparent;border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:600;padding:3px 8px;border:1px solid transparent;font-family:inherit; }
-.cp-restore { border-color:rgba(65,105,225,0.35);color:#87ceeb; }
-.cp-restore:hover { background:rgba(65,105,225,0.2); }
-.cp-delete { color:#3a4050; }
-.cp-delete:hover { color:#ef9a9a;background:rgba(239,83,80,0.1);border-color:rgba(239,83,80,0.25); }
-.cp-empty,.cp-loading { padding:24px 18px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#3a4050;line-height:1.7; }
-</style>
 
 </body>
     </html>
