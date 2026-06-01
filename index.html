@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Disable pull-to-refresh on mobile to prevent accidental page reloads -->
+    <style>
+        html, body { overscroll-behavior-y: none; }
+    </style>
     <title>APUI // Vibe Coding System</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -12,6 +16,33 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600;700&family=Fira+Code&family=Roboto+Mono:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="style.css">
+    <script>
+        // Block pull-to-refresh on mobile browsers (Android Chrome, WebView, Safari)
+        // overscroll-behavior-y:none handles most cases; this covers the rest.
+        (function() {
+            var lastY = 0;
+            document.addEventListener('touchstart', function(e) {
+                lastY = e.touches[0].clientY;
+            }, { passive: true });
+            document.addEventListener('touchmove', function(e) {
+                var el = e.target;
+                // Walk up to find a scrollable ancestor
+                while (el && el !== document.body) {
+                    var style = window.getComputedStyle(el);
+                    var overflow = style.overflowY;
+                    var canScroll = (overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight;
+                    if (canScroll) {
+                        // Allow scroll inside scrollable elements, but block at top boundary
+                        var atTop = el.scrollTop <= 0 && e.touches[0].clientY > lastY;
+                        if (!atTop) return; // normal scroll inside element — allow
+                    }
+                    el = el.parentElement;
+                }
+                // We're at the document root or a non-scrollable element pulling down — block it
+                if (e.touches[0].clientY > lastY) e.preventDefault();
+            }, { passive: false });
+        })();
+    </script>
     <!-- APUI Design System overrides -->
     <style>
     /* ══════════════════════════════════════════
@@ -497,27 +528,6 @@
         cursor:pointer;transition:background .15s;
     }
     .jrv-suggestion:hover { background:rgba(97,175,239,0.14); }
-    /* Task type buttons */
-    .jrv-task-type-btn {
-        padding:8px 6px;font-size:11px;font-weight:700;font-family:'Rajdhani',sans-serif;
-        text-transform:uppercase;letter-spacing:.06em;cursor:pointer;border-radius:5px;
-        background:rgba(0,0,0,0.3);border:1px solid var(--apui-border);
-        color:#5c6370;transition:all .15s;text-align:center;
-    }
-    .jrv-task-type-btn:hover { border-color:rgba(198,120,221,0.5);color:#c678dd;background:rgba(198,120,221,0.07); }
-    .jrv-task-type-active { border-color:#c678dd !important;color:#c678dd !important;background:rgba(198,120,221,0.12) !important;box-shadow:0 0 8px rgba(198,120,221,0.2); }
-    /* Checkpoint items */
-    .jrv-cp-item { padding:8px 14px;border-bottom:1px solid rgba(62,68,81,0.4);display:flex;align-items:flex-start;gap:8px; }
-    .jrv-cp-item:hover { background:rgba(97,175,239,0.05); }
-    .jrv-cp-info { flex:1;min-width:0; }
-    .jrv-cp-label { font-size:12px;color:#abb2bf;font-family:'Fira Code',monospace;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-    .jrv-cp-time  { font-size:10px;color:#5c6370;display:block;margin-top:2px; }
-    .jrv-cp-actions { display:flex;gap:4px;flex-shrink:0;margin-top:1px; }
-    .jrv-cp-btn { font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;border:1px solid;background:transparent;font-family:'Fira Code',monospace; }
-    .jrv-cp-restore { border-color:#61afef;color:#61afef; }
-    .jrv-cp-restore:hover { background:rgba(97,175,239,0.12); }
-    .jrv-cp-del { border-color:#e06c75;color:#e06c75; }
-    .jrv-cp-del:hover { background:rgba(224,108,117,0.12); }
     .jrv-bg-item {
         background:rgba(0,0,0,0.3);border:1px solid var(--apui-border);border-radius:5px;
         padding:8px 10px;font-size:12px;color:#abb2bf;
@@ -2348,123 +2358,12 @@
 
                                     <!-- Sub-tabs inside Jarvis -->
                                     <div style="display:flex;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.2);flex-shrink:0;">
-                                        <button class="jrv-stab jrv-stab-active" onclick="jrvTab('task',this)">🎯 Task</button>
-                                        <button class="jrv-stab" onclick="jrvTab('chat',this)">🤖 Chat</button>
-                                        <button class="jrv-stab" onclick="jrvTab('checkpoints',this)">💾 Checkpoints</button>
+                                        <button class="jrv-stab jrv-stab-active" onclick="jrvTab('chat',this)">🤖 Chat</button>
                                         <button class="jrv-stab" onclick="jrvTab('memory',this)">🧠 Memory</button>
                                         <button class="jrv-stab" onclick="jrvTab('skills',this)">⚡ Skills</button>
                                         <button class="jrv-stab" onclick="jrvTab('bg',this)">🌙 Background</button>
-                                        <button class="jrv-stab" onclick="jarvisToggleSettings()" style="margin-left:auto;color:#5c6370;">⚙</button>
-                                    </div>
-
-                                    <!-- ── TASK sub-pane ── -->
-                                    <div id="jrv-pane-task" class="jrv-pane jrv-pane-active" style="flex-direction:column;padding:0;overflow-y:auto;">
-
-                                        <!-- Task header -->
-                                        <div style="padding:12px 14px 8px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.2);flex-shrink:0;">
-                                            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#c678dd;margin-bottom:2px;">🎯 Give Jarvis a Task</div>
-                                            <div style="font-size:11px;color:#5c6370;line-height:1.5;">Point Jarvis at a project — it will work, test by clicking & screenshotting, then iterate until done.</div>
-                                        </div>
-
-                                        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">
-
-                                            <!-- Task type selector -->
-                                            <div>
-                                                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:6px;">Task Type</div>
-                                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;" id="jrv-task-type-grid">
-                                                    <button class="jrv-task-type-btn jrv-task-type-active" data-type="improve" onclick="jrvSelectTaskType('improve',this)">✨ Improve Project</button>
-                                                    <button class="jrv-task-type-btn" data-type="create" onclick="jrvSelectTaskType('create',this)">🏗 Create Project</button>
-                                                    <button class="jrv-task-type-btn" data-type="test" onclick="jrvSelectTaskType('test',this)">📸 Test &amp; Screenshot</button>
-                                                    <button class="jrv-task-type-btn" data-type="fix" onclick="jrvSelectTaskType('fix',this)">🔧 Fix Errors</button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Project target (shown for improve/test/fix) -->
-                                            <div id="jrv-task-project-row">
-                                                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:5px;">Target Project</div>
-                                                <div style="font-size:11px;color:#98c379;margin-bottom:5px;" id="jrv-current-project-hint">(loading…)</div>
-                                                <div style="display:flex;gap:5px;align-items:center;">
-                                                    <select id="jrv-task-project-select" style="flex:1;padding:6px 9px;font-size:12px;background:#1a1d24;border:1px solid var(--apui-border);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
-                                                        <option value="">— use currently open project —</option>
-                                                    </select>
-                                                    <button class="action-button small" onclick="jrvRefreshProjectDropdown()" title="Refresh project list" style="flex-shrink:0;">↺</button>
-                                                </div>
-                                                <div style="font-size:10px;color:#5c6370;margin-top:3px;">Select a project or leave blank to use whichever is currently open.</div>
-                                            </div>
-
-                                            <!-- New project name (shown for create) -->
-                                            <div id="jrv-task-newproject-row" style="display:none;">
-                                                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:5px;">New Project Name</div>
-                                                <input type="text" id="jrv-task-newproject-name" placeholder="e.g. my-todo-app" style="width:100%;padding:6px 9px;font-size:12px;background:#1a1d24;border:1px solid var(--apui-border);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
-                                            </div>
-
-                                            <!-- Task description -->
-                                            <div>
-                                                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:5px;" id="jrv-task-desc-label">What should Jarvis do?</div>
-                                                <textarea id="jrv-task-desc" rows="4" placeholder="e.g. Make the navbar sticky, improve the mobile layout, and fix the hover states on the buttons…" style="width:100%;font-size:12px;resize:vertical;background:#1a1d24;border:1px solid var(--apui-border);color:var(--apui-text);border-radius:5px;padding:8px 10px;font-family:'Rajdhani',sans-serif;line-height:1.5;"></textarea>
-                                            </div>
-
-                                            <!-- Screenshot loop option -->
-                                            <div style="display:flex;align-items:center;gap:8px;">
-                                                <input type="checkbox" id="jrv-task-screenshot-loop" checked style="accent-color:#c678dd;width:14px;height:14px;flex-shrink:0;">
-                                                <label for="jrv-task-screenshot-loop" style="font-size:11px;color:#7a8aaa;cursor:pointer;line-height:1.4;">Enable screenshot feedback loop — Jarvis will click buttons &amp; capture screenshots to verify its work</label>
-                                            </div>
-
-                                            <!-- Optional: navigation path for test -->
-                                            <div id="jrv-task-navpath-row" style="display:none;">
-                                                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;margin-bottom:5px;">Navigation path to test (optional)</div>
-                                                <input type="text" id="jrv-task-navpath" placeholder="e.g. Start Game,Level 1,Settings" style="width:100%;padding:6px 9px;font-size:12px;background:#1a1d24;border:1px solid var(--apui-border);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
-                                                <div style="font-size:10px;color:#5c6370;margin-top:3px;">Comma-separated element text labels to click through before screenshotting.</div>
-                                            </div>
-
-                                            <!-- Run buttons -->
-                                            <div style="display:flex;gap:6px;margin-top:4px;">
-                                                <button class="action-button" id="jrv-task-run-btn" onclick="jrvTaskRun(false)" style="flex:1;border-color:#c678dd;color:#c678dd;background:rgba(198,120,221,0.08);font-size:12px;font-weight:700;">
-                                                    <i class="bi bi-robot"></i> Run Task
-                                                </button>
-                                                <button class="action-button small" onclick="jrvTaskRun(true)" style="border-color:#61afef;color:#61afef;" title="Run in background without blocking UI">
-                                                    🌙 BG
-                                                </button>
-                                                <button class="action-button small" id="jrv-task-stop-btn" onclick="jarvisStop()" style="display:none;border-color:#e06c75;color:#e06c75;">■ Stop</button>
-                                            </div>
-
-                                        </div>
-
-                                        <!-- Task log (reuses jarvis-log) -->
-                                        <div style="border-top:1px solid var(--apui-border);flex-shrink:0;">
-                                            <div style="padding:6px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#5c6370;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:space-between;">
-                                                <span>Task Log</span>
-                                                <button class="action-button small" onclick="jarvisClearLog()" style="border-color:#5c6370;color:#5c6370;font-size:10px;">🗑 Clear</button>
-                                            </div>
-                                            <div id="jrv-task-log" style="max-height:220px;overflow-y:auto;padding:8px 12px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.7;background:rgba(5,8,18,0.7);">
-                                                <div style="color:#5c6370;font-size:11px;text-align:center;padding:10px 0;">Task output will appear here…</div>
-                                            </div>
-                                        </div>
-
-                                    </div>
-
-                                    <!-- ── CHECKPOINTS sub-pane ── -->
-                                    <div id="jrv-pane-checkpoints" class="jrv-pane" style="flex-direction:column;overflow-y:auto;">
-
-                                        <div style="padding:10px 14px 8px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.2);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
-                                            <div>
-                                                <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#e5c07b;margin-bottom:1px;">💾 Checkpoints</div>
-                                                <div style="font-size:10px;color:#5c6370;" id="jrv-cp-project-label">No project open</div>
-                                            </div>
-                                            <div style="display:flex;gap:5px;">
-                                                <button class="action-button small" onclick="jrvSaveCheckpoint()" style="border-color:#98c379;color:#98c379;font-size:11px;" title="Save a checkpoint now">+ Save Now</button>
-                                                <button class="action-button small" onclick="_jrvRenderCheckpoints()" style="font-size:11px;" title="Refresh list">↺</button>
-                                            </div>
-                                        </div>
-
-                                        <div style="padding:8px 14px;font-size:10px;color:#5c6370;background:rgba(0,0,0,0.15);border-bottom:1px solid var(--apui-border);flex-shrink:0;">
-                                            Jarvis auto-saves a checkpoint before every task. Click ⏪ to restore any previous state.
-                                        </div>
-
-                                        <div id="jrv-checkpoint-list" style="flex:1;overflow-y:auto;padding:6px 0;">
-                                            <div style="color:#5c6370;font-size:11px;text-align:center;padding:18px 0;">Open a project to see checkpoints.</div>
-                                        </div>
-
+                                        <button class="jrv-stab" id="jrv-auto-toggle-btn" onclick="jrvAutoToggle()" style="margin-left:auto;color:#5c6370;" title="Autonomous Mode — Jarvis works on its own projects when you are idle">🛸 Auto</button>
+                                        <button class="jrv-stab" onclick="jarvisToggleSettings()" style="color:#5c6370;">⚙</button>
                                     </div>
 
                                     <!-- Settings (shared overlay) -->
@@ -2504,7 +2403,7 @@
                                     </div>
 
                                     <!-- ── CHAT sub-pane ── -->
-                                    <div id="jrv-pane-chat" class="jrv-pane" style="flex-direction:column;">
+                                    <div id="jrv-pane-chat" class="jrv-pane jrv-pane-active" style="flex-direction:column;">
                                         <div id="jarvis-log" style="flex:1;min-height:0;overflow-y:auto;padding:10px 12px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.7;">
                                             <div class="jrv-welcome">
                                                 <div style="font-size:22px;margin-bottom:8px;">🤖</div>
@@ -4443,581 +4342,6 @@ function jrvTab(name, btn) {
   if (name === 'memory') jrvRenderMemory();
   if (name === 'skills') jrvRenderSkills();
   if (name === 'bg') jrvRenderBg();
-  if (name === 'task') jrvRefreshProjectDropdown();
-  if (name === 'checkpoints') _jrvRenderCheckpoints();
-}
-
-// ── Checkpoint UI (mirrors app3.js checkpoint panel inside APUI) ──
-async function _jrvRenderCheckpoints() {
-  var list = document.getElementById('jrv-checkpoint-list');
-  var lbl  = document.getElementById('jrv-cp-project-label');
-  if (!list) return;
-
-  // Get current project from parent frame
-  var projId = _jrvGetCurrentProjectId();
-  if (lbl) lbl.textContent = projId ? ('Project: ' + projId) : 'No project open';
-
-  if (!projId) {
-    list.innerHTML = '<div style="color:#5c6370;font-size:11px;text-align:center;padding:18px 0;">Open a project to see its checkpoints.</div>';
-    return;
-  }
-
-  list.innerHTML = '<div style="color:#5c6370;font-size:11px;text-align:center;padding:12px 0;">Loading…</div>';
-
-  // Try the exposed window._checkpointApi first (same-origin)
-  var checkpointApi = window._checkpointApi;
-  if (!checkpointApi) {
-    // Fallback: read directly from IndexedDB
-    try {
-      var cps = await _jrvReadCheckpointsFromIDB(projId);
-      _jrvRenderCheckpointList(list, cps, projId);
-    } catch(e) {
-      list.innerHTML = '<div style="color:#e06c75;font-size:11px;text-align:center;padding:12px;">' + (e.message || 'Error') + '</div>';
-    }
-    return;
-  }
-
-  try {
-    var cps = await checkpointApi.list(projId);
-    _jrvRenderCheckpointList(list, cps, projId);
-  } catch(e) {
-    list.innerHTML = '<div style="color:#e06c75;font-size:11px;text-align:center;padding:12px;">' + (e.message || 'Failed to load') + '</div>';
-  }
-}
-
-function _jrvRenderCheckpointList(list, cps, projId) {
-  if (!cps || !cps.length) {
-    list.innerHTML = '<div style="color:#5c6370;font-size:11px;text-align:center;padding:18px 8px;">No checkpoints yet for <strong>' + _esc(projId) + '</strong>.<br>Use <strong>+ Save Now</strong> or run a Jarvis task to create one.</div>';
-    return;
-  }
-  list.innerHTML = '';
-  cps.forEach(function(cp) {
-    var ts = new Date(cp.time).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-    var div = document.createElement('div');
-    div.className = 'jrv-cp-item';
-    div.innerHTML =
-      '<div class="jrv-cp-info">' +
-        '<span class="jrv-cp-label" title="' + _esc(cp.label) + '">' + _esc(cp.label) + '</span>' +
-        '<span class="jrv-cp-time">' + ts + '</span>' +
-      '</div>' +
-      '<div class="jrv-cp-actions">' +
-        '<button class="jrv-cp-btn jrv-cp-restore" onclick="jrvRestoreCheckpoint(' + cp.id + ',\'' + _esc(cp.label).replace(/'/g,"\\'") + '\')">⏪ Restore</button>' +
-        '<button class="jrv-cp-btn jrv-cp-del" onclick="jrvDeleteCheckpoint(' + cp.id + ',\'' + _esc(cp.label).replace(/'/g,"\\'") + '\')">🗑</button>' +
-      '</div>';
-    list.appendChild(div);
-  });
-}
-
-// Read checkpoints from IDB directly (fallback when _checkpointApi isn't in scope)
-function _jrvReadCheckpointsFromIDB(projId) {
-  return new Promise(function(resolve, reject) {
-    var req = indexedDB.open('VibeLocalDB', 3);
-    req.onsuccess = function(ev) {
-      var db = ev.target.result;
-      if (!db.objectStoreNames.contains('checkpoints')) { resolve([]); return; }
-      var tx  = db.transaction('checkpoints', 'readonly');
-      var idx = tx.objectStore('checkpoints').index('projectId');
-      var req2 = idx.getAll(IDBKeyRange.only(projId));
-      req2.onsuccess = function() {
-        var results = (req2.result || []).sort(function(a,b){ return b.time - a.time; });
-        resolve(results);
-      };
-      req2.onerror = function() { reject(new Error('IDB read failed')); };
-    };
-    req.onerror = function() { reject(new Error('IDB open failed')); };
-  });
-}
-
-async function jrvSaveCheckpoint() {
-  var projId = _jrvGetCurrentProjectId();
-  if (!projId) { alert('Open a project first.'); return; }
-  var label = prompt('Checkpoint label:', 'Manual save ' + new Date().toLocaleTimeString());
-  if (!label) return;
-  try {
-    if (window.createCheckpoint) {
-      await window.createCheckpoint(label);
-    } else if (window._checkpointApi) {
-      // Need vibeTree — get it from vibeAPI bridge
-      var tree = (window.vibeAPI && window.vibeAPI.getVibeTree) ? window.vibeAPI.getVibeTree() : null;
-      if (!tree) { alert('Cannot access project data from this panel. Use the main Checkpoints button instead.'); return; }
-      await window._checkpointApi.save(projId, label, tree);
-    } else {
-      // Post to parent
-      window.parent.postMessage({ type: 'apui-save-checkpoint', label: label }, '*');
-    }
-    _jrvLog('💾 Checkpoint saved: ' + label, 'jrv-msg-ok');
-    _jrvRenderCheckpoints();
-  } catch(e) { alert('Failed to save checkpoint: ' + e.message); }
-}
-
-async function jrvRestoreCheckpoint(id, label) {
-  if (!confirm('Restore checkpoint "' + label + '"?\n\nYour current state will be saved first as a safety backup.')) return;
-  try {
-    if (window._restoreCheckpoint) {
-      await window._restoreCheckpoint(id);
-      _jrvLog('⏪ Restored checkpoint: ' + label, 'jrv-msg-ok');
-      _jrvRenderCheckpoints();
-    } else {
-      alert('Restore is not available from this panel. Use the main Checkpoints (💾) button in the toolbar instead.');
-    }
-  } catch(e) { alert('Restore failed: ' + e.message); }
-}
-
-async function jrvDeleteCheckpoint(id, label) {
-  if (!confirm('Delete checkpoint "' + label + '"?')) return;
-  try {
-    if (window._deleteCheckpoint) {
-      await window._deleteCheckpoint(id, label);
-    } else if (window._checkpointApi) {
-      await window._checkpointApi.delete(id);
-    }
-    _jrvLog('🗑 Checkpoint deleted: ' + label, '');
-    _jrvRenderCheckpoints();
-  } catch(e) { alert('Delete failed: ' + e.message); }
-}
-
-// ── Task type selector ──
-var _jrvCurrentTaskType = 'improve';
-function jrvSelectTaskType(type, btn) {
-  _jrvCurrentTaskType = type;
-  document.querySelectorAll('.jrv-task-type-btn').forEach(function(b) { b.classList.remove('jrv-task-type-active'); });
-  if (btn) btn.classList.add('jrv-task-type-active');
-
-  var projectRow     = document.getElementById('jrv-task-project-row');
-  var newProjectRow  = document.getElementById('jrv-task-newproject-row');
-  var navPathRow     = document.getElementById('jrv-task-navpath-row');
-  var descLabel      = document.getElementById('jrv-task-desc-label');
-  var descTA         = document.getElementById('jrv-task-desc');
-
-  if (projectRow)    projectRow.style.display    = (type === 'create') ? 'none' : '';
-  if (newProjectRow) newProjectRow.style.display = (type === 'create') ? '' : 'none';
-  if (navPathRow)    navPathRow.style.display     = (type === 'test')   ? '' : 'none';
-
-  var labels = {
-    improve: 'What should Jarvis improve or change?',
-    create:  'Describe the project to create:',
-    test:    'What should Jarvis test and verify?',
-    fix:     'What errors or problems should Jarvis fix?',
-  };
-  var placeholders = {
-    improve: 'e.g. Make the navbar sticky, improve mobile layout, fix button hover states, add a dark mode toggle…',
-    create:  'e.g. A to-do list app with local storage, drag-to-reorder, and a clean minimal design…',
-    test:    'e.g. Click through all nav links, screenshot each page state, check that the modal opens and closes correctly…',
-    fix:     'e.g. There are JS errors in the console, the CSS is broken on mobile, and the form submit does nothing…',
-  };
-  if (descLabel) descLabel.textContent = labels[type] || 'What should Jarvis do?';
-  if (descTA)    descTA.placeholder    = placeholders[type] || '';
-}
-
-// ── Populate project dropdown — reads from parent vibeAPI bridge ──
-function jrvRefreshProjectDropdown() {
-  var sel = document.getElementById('jrv-task-project-select');
-  if (!sel) return;
-  while (sel.options.length > 1) sel.remove(1);
-
-  var currentId = _jrvGetCurrentProjectId();
-
-  function populateOptions(ids, storageLabel) {
-    (ids || []).forEach(function(id) {
-      if (!id || id.includes('__form__')) return;
-      var opt = document.createElement('option');
-      opt.value = id;
-      var icon = storageLabel === 'cloud' ? '☁️' : '💻';
-      opt.textContent = icon + ' ' + id;
-      sel.appendChild(opt);
-      // Auto-select the currently open project
-      if (id === currentId) opt.selected = true;
-    });
-  }
-
-  // Try vibeAPI bridge (most reliable — talks directly to parent frame)
-  var loaded = false;
-  if (window.vibeAPI) {
-    // Cloud projects
-    if (typeof window.vibeAPI.listCloudProjects === 'function') {
-      window.vibeAPI.listCloudProjects().then(function(ids) {
-        populateOptions(ids, 'cloud');
-        loaded = true;
-      }).catch(function(){});
-    }
-    // Local projects  
-    if (typeof window.vibeAPI.listLocalProjects === 'function') {
-      window.vibeAPI.listLocalProjects().then(function(ids) {
-        populateOptions(ids, 'local');
-        loaded = true;
-      }).catch(function(){});
-    }
-  }
-
-  // Always also try localApi (IndexedDB is same-origin and always accessible)
-  if (window.localApi && typeof window.localApi.listProjects === 'function') {
-    window.localApi.listProjects().then(function(ids) {
-      populateOptions(ids, 'local');
-    }).catch(function(){});
-  }
-
-  // Fallback: open IndexedDB directly
-  _jrvFallbackListProjects('local').then(function(ids) { populateOptions(ids, 'local'); }).catch(function(){});
-  _jrvFallbackListProjects('cloud').then(function(ids) { populateOptions(ids, 'cloud'); }).catch(function(){});
-
-  // Show current project label below select
-  var hint = document.getElementById('jrv-current-project-hint');
-  if (hint) {
-    hint.textContent = currentId ? '📂 Currently open: ' + currentId : '(no project open)';
-    hint.style.color = currentId ? '#98c379' : '#5c6370';
-  }
-}
-
-function _jrvFallbackListProjects(storageType) {
-  if (storageType === 'local') {
-    return new Promise(function(resolve) {
-      try {
-        var req = indexedDB.open('VibeLocalDB', 3);
-        req.onsuccess = function(ev) {
-          var db = ev.target.result;
-          if (!db.objectStoreNames.contains('projects')) { resolve([]); return; }
-          var tx  = db.transaction('projects', 'readonly');
-          var req2 = tx.objectStore('projects').getAllKeys();
-          req2.onsuccess = function() { resolve((req2.result || []).filter(function(k){ return !String(k).includes('__form__'); })); };
-          req2.onerror   = function() { resolve([]); };
-        };
-        req.onerror = function() { resolve([]); };
-      } catch(e) { resolve([]); }
-    });
-  }
-  // Cloud — can only list if vibeAPI exposes it; otherwise return []
-  if (window.vibeAPI && typeof window.vibeAPI.listCloudProjects === 'function') {
-    return window.vibeAPI.listCloudProjects().catch(function() { return []; });
-  }
-  // Try api.listProjects from parent scope
-  if (window.api && window.api.listProjects && window._currentUser) {
-    return window.api.listProjects(window._currentUser.userId).catch(function() { return []; });
-  }
-  return Promise.resolve([]);
-}
-
-// ── Task log helpers ──
-function _jrvTaskLog(msg, cls) {
-  var log = document.getElementById('jrv-task-log');
-  if (!log) return;
-  var placeholder = log.querySelector('div');
-  if (placeholder && placeholder.style.textAlign === 'center') placeholder.remove();
-  var d = document.createElement('div');
-  d.className = 'jrv-msg ' + (cls || 'jrv-msg');
-  var ts = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  d.innerHTML = '<span style="color:#3e4451;font-size:10px;">' + ts + '</span> ' + msg;
-  log.appendChild(d);
-  log.scrollTop = log.scrollHeight;
-  // Also mirror to main jarvis log for continuity
-  _jrvLog(msg, cls);
-}
-
-function _jrvTaskLogImg(dataURL) {
-  var log = document.getElementById('jrv-task-log');
-  if (!log) return;
-  var img = document.createElement('img');
-  img.src = dataURL;
-  img.style.cssText = 'max-width:100%;border-radius:4px;margin:4px 0;border:1px solid var(--apui-border);display:block;';
-  log.appendChild(img);
-  log.scrollTop = log.scrollHeight;
-  // Also add to main log
-  var mainLog = document.getElementById('jarvis-log');
-  if (mainLog) {
-    var img2 = img.cloneNode();
-    img2.src = dataURL;
-    mainLog.appendChild(img2);
-    mainLog.scrollTop = mainLog.scrollHeight;
-  }
-}
-
-// ── Build the goal string that gets sent to Jarvis ──
-function _jrvBuildTaskGoal() {
-  var type    = _jrvCurrentTaskType;
-  var desc    = (document.getElementById('jrv-task-desc') || {}).value || '';
-  var projSel = document.getElementById('jrv-task-project-select');
-  // If user selected a specific project use that; otherwise fall back to whatever is open
-  var selectedProject = projSel ? projSel.value : '';
-  var project = selectedProject || _jrvGetCurrentProjectId() || '';
-  var newProj = (document.getElementById('jrv-task-newproject-name') || {}).value || '';
-  var navPath = (document.getElementById('jrv-task-navpath') || {}).value || '';
-  var useLoop = document.getElementById('jrv-task-screenshot-loop');
-  var screenshotLoop = !useLoop || useLoop.checked;
-
-  if (!desc.trim()) { alert('Please describe the task for Jarvis.'); return null; }
-  if (type !== 'create' && !project) {
-    if (!confirm('No project is currently open and none was selected. Jarvis will try to work on whatever project is open when it runs. Continue?')) return null;
-  }
-
-  var lines = [];
-
-  if (type === 'create') {
-    var pName = newProj.trim() || ('jarvis-project-' + Date.now());
-    lines.push('CREATE a new project named "' + pName + '".');
-    lines.push('Description: ' + desc.trim());
-    lines.push('IMPORTANT: Do NOT touch or overwrite any existing open project. Navigate to the Start tab and create a brand-new project called "' + pName + '".');
-  } else if (type === 'improve') {
-    if (project) {
-      lines.push('IMPROVE the project "' + project + '".');
-      lines.push('CRITICAL: You must load project "' + project + '" first. Go to the Start tab, find "' + project + '" in the project list, and click Load. Do NOT work on any other project.');
-    } else {
-      lines.push('IMPROVE the currently open project (do NOT switch to or overwrite any other project).');
-    }
-    lines.push('Improvement task: ' + desc.trim());
-  } else if (type === 'test') {
-    if (project) {
-      lines.push('TEST the project "' + project + '". Load it from the Start tab first if it is not already open.');
-      lines.push('CRITICAL: Only work on project "' + project + '". Do not load or modify any other project.');
-    } else {
-      lines.push('TEST the currently open project.');
-    }
-    lines.push('What to test: ' + desc.trim());
-    if (navPath.trim()) lines.push('Navigation path to click through: ' + navPath.trim());
-  } else if (type === 'fix') {
-    if (project) {
-      lines.push('FIX errors in the project "' + project + '". Load it from the Start tab first if it is not already open.');
-      lines.push('CRITICAL: Only work on project "' + project + '". Do not load or modify any other project.');
-    } else {
-      lines.push('FIX errors in the currently open project.');
-    }
-    lines.push('Problems to fix: ' + desc.trim());
-  }
-
-  if (screenshotLoop) {
-    lines.push('After making changes: take a screenshot to verify, click interactive elements to test them, and iterate if anything looks wrong. Always verify with screenshots.');
-  }
-
-  // Auto-save a checkpoint before starting
-  lines.push('BEFORE making any changes: save a checkpoint using the savecheckpoint action so the user can roll back.');
-
-  return lines.join('\n');
-}
-
-// ── Task run ──
-async function jrvTaskRun(background) {
-  jarvisLoadSettings();
-  var apiKey   = _jrvGet('jarvis-api-key');
-  var model    = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
-  var maxSteps = parseInt(_jrvGet('jarvis-max-steps') || '20', 10);
-
-  if (!apiKey) { alert('Set your Gemini API key in ⚙ settings.'); jarvisToggleSettings(); return; }
-
-  var goal = _jrvBuildTaskGoal();
-  if (!goal) return;
-
-  _jarvisStopped = false;
-
-  // Toggle run/stop buttons
-  var runBtn  = document.getElementById('jrv-task-run-btn');
-  var stopBtn = document.getElementById('jrv-task-stop-btn');
-  if (!background) {
-    if (runBtn)  runBtn.style.display  = 'none';
-    if (stopBtn) stopBtn.style.display = '';
-  }
-
-  _jrvTaskLog('🎯 Task started: ' + goal.split('\n')[0], 'jrv-msg-user');
-
-  // Use the enhanced task-aware system prompt
-  var result = await _jrvExecuteTaskPlan(apiKey, model, goal, maxSteps, background);
-
-  if (!background) {
-    if (runBtn)  runBtn.style.display  = '';
-    if (stopBtn) stopBtn.style.display = 'none';
-  }
-
-  if (result) jarvisAddMemory('Task (' + _jrvCurrentTaskType + '): ' + goal.split('\n')[0].slice(0, 80) + ' → ' + result.slice(0, 80), 'task');
-  setTimeout(function() { jarvisGenerateSuggestions(); }, 1000);
-  _jarvisStopped = false;
-}
-
-// ── Task-aware execution plan (enhanced system prompt) ──
-async function _jrvExecuteTaskPlan(apiKey, model, goal, maxSteps, silent) {
-  var mem    = _jrvMemorySummary();
-  var state  = _jrvReadState();
-  var _skArr = Array.isArray(_jrvSkillsLoad()) ? _jrvSkillsLoad() : [];
-  var skills = _skArr.map(function(s){ return '- ' + s.name + ': ' + s.description; }).join('\n') || '(none)';
-  var heartbeatMs = parseInt((document.getElementById('jarvis-heartbeat') || {}).value || '5000', 10);
-
-  var systemPrompt = [
-'You are Jarvis, a focused AI assistant inside APUI Vibe Editor — a web IDE for building and editing live websites.',
-'You have been given a specific task by the user. Your job is to complete it thoroughly using the available actions.',
-'',
-'=== VIBE EDITOR DOCUMENTATION ===',
-'',
-'MAIN TABS (use switchtab):',
-'  start   — Home screen. Project list. Open/create projects here.',
-'  agent   — AI Agent tab with inner tabs: run, session, tracker, jarvis.',
-'  preview — Live website preview (rendered HTML of the current project).',
-'  editor  — Full code editor.',
-'  context — Project Vibe Tree structure.',
-'',
-'AGENT INNER TABS (use agenttab):',
-'  run     — Task queue and agent log. TYPE TASKS HERE and run them.',
-'  session — Session intent and node context.',
-'  tracker — Edit tracker.',
-'',
-'HOW TO RUN CODING TASKS:',
-'  addandrun <task description>  — Best: sets prompt, queues, AND starts in one step.',
-'  Wait for the agent to finish (use readstate or wait actions) before proceeding.',
-'',
-'HOW TO OPEN A PROJECT:',
-'  1. switchtab start',
-'  2. readstate   (look at the project list to find the project)',
-'  3. clickpreview <project name>  (or tell agent to open it)',
-'',
-'SCREENSHOT & TESTING — THE FEEDBACK LOOP:',
-'  After every significant change, you MUST verify it worked by:',
-'  1. screenshot          — Capture the current state',
-'  2. Look at the result. If something is wrong, use addandrun to fix it.',
-'  3. screenshot again    — Verify the fix worked.',
-'  4. screenshotframe <a,b,c>  — Click through elements then screenshot.',
-'     e.g. screenshotframe Login,Dashboard — clicks "Login" then "Dashboard" then screenshots.',
-'  5. clickpreview <text> — Click a button/link/element in the preview.',
-'  ALWAYS take at least one screenshot after completing your work to verify.',
-'',
-'GOOD TESTING PATTERNS:',
-'  - Click every interactive element (buttons, links, dropdowns, modals)',
-'  - Test responsive states by asking agent to add a viewport toggle',
-'  - For forms: fill and submit, screenshot the result',
-'  - For navigation: click each nav link, screenshot the resulting page state',
-'',
-'MEMORY:',
-'  addmemory <text> — Save important facts persistently.',
-'',
-'=== YOUR CURRENT CONTEXT ===',
-'State: ' + state,
-'',
-'Your Memory:',
-mem,
-'',
-'Your Skills:',
-skills,
-'',
-'=== RESPONSE FORMAT ===',
-'Exactly two lines, no markdown:',
-'THINK: <brief reasoning about what to do next>',
-'DO: <action> <arg>',
-'',
-'ACTIONS:',
-'  addandrun <task>              run an agent coding task',
-'  switchtab <tab>               navigate to a main tab',
-'  agenttab <tab>                navigate to an agent sub-tab',
-'  setintent <text>              set the session goal/intent',
-'  screenshot                    capture preview screenshot',
-'  screenshotframe <a,b,c>       click elements then screenshot',
-'  screenshotnav <hint>          click one element then screenshot',
-'  clickpreview <text>           click an element in the preview',
-'  newthread <name>              create a tracker thread',
-'  logworked <text>              log a successful edit',
-'  logfailed <text>              log a failed edit',
-'  savecheckpoint <label>         save a checkpoint of current state',
-'  listcheckpoints               list checkpoints for current project',
-'  restorecheckpoint <id>        restore a checkpoint by ID',
-'  addmemory <text>              save to memory',
-'  readstate                     read the current UI state',
-'  wait                          short pause',
-'  reply <text>                  send a message to the user',
-'  done <summary>                task complete — summarise what was done',
-'',
-'RULES:',
-'1. Exactly two lines. No markdown.',
-'2. Use addandrun for all coding/editing work.',
-'3. CRITICAL SAFETY: Only work on the specific project mentioned in the TASK. NEVER load, edit or overwrite a different project. If a project name is given, load THAT project — not the first one in the list.',
-'4. ALWAYS run savecheckpoint BEFORE making any edits, so the user can roll back.',
-'5. ALWAYS screenshot after changes to verify. Keep iterating if something looks wrong.',
-'6. Click through interactive elements to test them.',
-'7. Be methodical: think about what the user asked, do it, verify it.',
-'8. End with done once the task is fully completed and verified.',
-  ].join('\n');
-
-  var messages = [{ role: 'user', parts: [{ text: 'TASK:\n' + goal }] }];
-  var lastResult = '';
-  var steps = 0;
-  var logFn = silent ? function(){} : _jrvTaskLog;
-
-  while (steps < maxSteps && !_jarvisStopped) {
-    steps++;
-
-    if (steps > 1) {
-      if (!silent && heartbeatMs >= 1000) logFn('⏱ ' + (heartbeatMs/1000) + 's delay…', 'jrv-msg-think');
-      await new Promise(function(r) { setTimeout(r, heartbeatMs); });
-      if (_jarvisStopped) break;
-    }
-
-    var body = JSON.stringify({
-      contents: messages,
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { temperature: 0.1, maxOutputTokens: 120, topP: 0.85 },
-    });
-
-    var rawText;
-    try {
-      var resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + apiKey,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
-      var data = await resp.json();
-      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-      rawText = ((((data.candidates || [])[0] || {}).content || {}).parts || [{}])[0].text || '';
-      if (!rawText) throw new Error('Empty response');
-    } catch(e) {
-      logFn('❌ ' + (e.message || e), 'jrv-msg-err');
-      break;
-    }
-
-    var thinkLine = '', doLine = '';
-    rawText.trim().split('\n').forEach(function(l) {
-      l = l.trim();
-      if (!thinkLine && /^think[:\-\s]/i.test(l)) thinkLine = l.replace(/^think[:\-\s]*/i,'').trim();
-      if (!doLine   && /^do[:\-\s]/i.test(l))    doLine    = l.replace(/^do[:\-\s]*/i,'').trim();
-    });
-    if (!doLine) {
-      var lines2 = rawText.trim().split('\n').map(function(l){return l.trim();}).filter(Boolean);
-      doLine = lines2[lines2.length - 1] || '';
-    }
-
-    if (!silent && thinkLine) logFn('💭 ' + thinkLine, 'jrv-msg-think');
-
-    var parts2 = doLine.split(/\s+/);
-    var action = (parts2[0] || '').toLowerCase().replace(/[^a-z]/g,'');
-    var arg    = parts2.slice(1).join(' ').trim();
-
-    if (action === 'done') {
-      logFn('✅ ' + (arg || 'Task complete'), 'jrv-msg-ok');
-      lastResult = arg;
-      break;
-    }
-
-    if (action === 'reply') {
-      logFn('🤖 ' + arg, 'jrv-msg-jarvis');
-      lastResult = arg;
-      messages.push({ role: 'model', parts: [{ text: rawText }] });
-      messages.push({ role: 'user',  parts: [{ text: 'OK, continue.' }] });
-      continue;
-    }
-
-    var result = await _jrvExec(action, arg);
-
-    if (!silent) {
-      if (typeof result === 'string' && result.startsWith('data:image')) {
-        _jrvTaskLogImg(result);
-        result = '[screenshot captured]';
-      } else {
-        logFn('<span style="color:#61afef">▶ ' + _esc(action) + '</span>'
-          + (arg ? ' <span style="color:#e5c07b">' + _esc(arg.slice(0,60)) + '</span>' : '')
-          + (result ? ' <span style="color:#5c6370">→ ' + _esc(String(result).slice(0,120)) + '</span>' : ''), '');
-      }
-    }
-
-    messages.push({ role: 'model', parts: [{ text: rawText }] });
-    var fb = action === 'readstate' ? 'STATE: ' + result : 'OK: ' + String(result || 'done').slice(0, 150);
-    messages.push({ role: 'user', parts: [{ text: fb }] });
-
-    if (messages.length > 20) messages.splice(1, 2);
-  }
-
-  if (steps >= maxSteps && !_jarvisStopped) {
-    logFn('⏹ Max steps (' + maxSteps + ') reached.', 'jrv-msg-err');
-  }
-
-  return lastResult;
 }
 
 // ── Settings ──
@@ -5344,44 +4668,10 @@ function _jrvReadState() {
   var activeTab = ((document.querySelector('.tab-button.active') || {}).textContent || '').trim();
   var agentLog  = ((document.getElementById('agent-output') || {}).innerText || '').slice(-200);
   var intent    = ((document.getElementById('anc-intent-text') || {}).getAttribute('data-intent') || '');
-  // Pull current project directly from the live vibeAPI bridge (most reliable source)
-  var proj = _jrvGetCurrentProjectId() || '';
-  if (!proj) {
-    try { var p = document.querySelector('.project-list-item.active, .project-list-item'); if (p) proj = p.textContent.trim().slice(0, 40); } catch(e) {}
-  }
-  return 'tab=' + activeTab + ' currentProjectId=' + proj + ' intent=' + intent.slice(0,60) + ' agentLog=' + agentLog.replace(/\n/g,' ').slice(0,150);
+  var proj      = '';
+  try { var p = document.querySelector('.project-list-item.active, .project-list-item'); if (p) proj = p.textContent.trim().slice(0, 40); } catch(e) {}
+  return 'tab=' + activeTab + ' project=' + proj + ' intent=' + intent.slice(0,60) + ' agentLog=' + agentLog.replace(/\n/g,' ').slice(0,150);
 }
-
-// ── Get the currently open project ID from the vibeAPI bridge ──
-function _jrvGetCurrentProjectId() {
-  // Method 1: vibeAPI exposes currentProjectId directly
-  if (window.vibeAPI && window.vibeAPI.currentProjectId) return window.vibeAPI.currentProjectId;
-  // Method 2: app3.js exposes it on window via the APUI bridge postMessage init
-  if (window.__vibeBridge && window.__vibeBridge.projectId) return window.__vibeBridge.projectId;
-  // Method 3: read the DOM — the open project has class active or a highlighted row
-  try {
-    var activeItem = document.querySelector('.project-list-item.active .project-id-text') ||
-                     document.querySelector('.project-list-item .project-id-text');
-    if (activeItem) return activeItem.textContent.replace(/[☁️💻]/g,'').trim();
-  } catch(e) {}
-  // Method 4: listen for the last apui-init postMessage (stored on window)
-  return window._jrvLastProjectId || '';
-}
-
-// Listen for apui-init messages from the parent to track current project
-(function() {
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'apui-init' && e.data.projectId) {
-      window._jrvLastProjectId = e.data.projectId;
-      // Also refresh the task dropdown if it's open
-      var sel = document.getElementById('jrv-task-project-select');
-      if (sel && e.data.projectId) {
-        var exists = Array.from(sel.options).some(function(o) { return o.value === e.data.projectId; });
-        if (!exists) jrvRefreshProjectDropdown();
-      }
-    }
-  });
-})();
 
 // ── Log helpers ──
 function _jrvLog(msg, cls) {
@@ -5413,8 +4703,6 @@ function _jrvLogRaw(html) {
 function jarvisClearLog() {
   var log = document.getElementById('jarvis-log');
   if (log) log.innerHTML = '<div class="jrv-welcome"><div style="font-size:18px;margin-bottom:6px;">🤖</div><div style="color:#5c6370;font-size:12px;">Log cleared.</div></div>';
-  var tlog = document.getElementById('jrv-task-log');
-  if (tlog) tlog.innerHTML = '<div style="color:#5c6370;font-size:11px;text-align:center;padding:10px 0;">Task output will appear here…</div>';
 }
 
 var _jarvisStopped = false;
@@ -5812,47 +5100,6 @@ async function _jrvExec(action, arg) {
       jarvisAddMemory(arg, 'jarvis');
       return 'memory saved: ' + arg.slice(0, 60);
     }
-    case 'savecheckpoint': {
-      // Save a named checkpoint of the current project via the parent frame's _checkpointApi
-      var cpLabel = arg || ('Jarvis: ' + new Date().toLocaleTimeString());
-      try {
-        if (window.createCheckpoint) {
-          await window.createCheckpoint(cpLabel);
-          _jrvLog('💾 Checkpoint saved: ' + cpLabel, 'jrv-msg-ok');
-          _jrvRenderCheckpoints();
-          return 'checkpoint saved: ' + cpLabel;
-        }
-        // Fallback via postMessage to parent
-        window.parent.postMessage({ type: 'apui-save-checkpoint', label: cpLabel }, '*');
-        return 'checkpoint save requested: ' + cpLabel;
-      } catch(e) { return 'checkpoint save failed: ' + e.message; }
-    }
-    case 'listcheckpoints': {
-      try {
-        if (window._checkpointApi) {
-          var projId = _jrvGetCurrentProjectId();
-          if (!projId) return 'no project open';
-          var cps = await window._checkpointApi.list(projId);
-          return cps.map(function(c) { return '#' + c.id + ' ' + c.label + ' (' + new Date(c.time).toLocaleTimeString() + ')'; }).join(' | ') || 'no checkpoints';
-        }
-        return 'checkpoint API not available';
-      } catch(e) { return 'list failed: ' + e.message; }
-    }
-    case 'restorecheckpoint': {
-      // arg = checkpoint id (number) or label substring
-      try {
-        if (window._restoreCheckpoint) {
-          var cpId = parseInt(arg, 10);
-          if (!isNaN(cpId)) {
-            await window._restoreCheckpoint(cpId);
-            _jrvLog('⏪ Checkpoint restored: #' + cpId, 'jrv-msg-ok');
-            _jrvRenderCheckpoints();
-            return 'checkpoint restored: #' + cpId;
-          }
-        }
-        return 'restore failed: invalid id "' + arg + '"';
-      } catch(e) { return 'restore failed: ' + e.message; }
-    }
     case 'readstate': {
       return _jrvReadState();
     }
@@ -5861,7 +5108,7 @@ async function _jrvExec(action, arg) {
       return 'waited';
     }
     default:
-      return 'unknown action "' + action + '" — valid actions: switchtab agenttab setprompt addtask processqueue addandrun stopqueue setintent screenshot screenshotnav screenshotframe clickpreview newthread logedit logworked logfailed addmemory savecheckpoint listcheckpoints restorecheckpoint readstate wait done reply';
+      return 'unknown action "' + action + '" — valid actions: switchtab agenttab setprompt addtask processqueue addandrun stopqueue setintent screenshot screenshotnav clickpreview newthread logedit logworked logfailed addmemory readstate wait done reply';
   }
 }
 
@@ -6196,12 +5443,7 @@ async function jarvisGenerateSuggestions() {
     var d = document.createElement('div');
     d.className = 'jrv-suggestion';
     d.textContent = text;
-    d.onclick = function() {
-      var inp = document.getElementById('jarvis-input');
-      if (inp) inp.value = text;
-      var taskDesc = document.getElementById('jrv-task-desc');
-      if (taskDesc) taskDesc.value = text;
-    };
+    d.onclick = function() { var inp = document.getElementById('jarvis-input'); if (inp) inp.value = text; };
     el.appendChild(d);
   });
 }
@@ -6627,16 +5869,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     jrvRenderMemory();
     jrvRenderSkills();
-
-    // Populate task project dropdown on load
-    jrvRefreshProjectDropdown();
-    _jrvRenderCheckpoints();
-
     // Generate suggestions after 4s
     setTimeout(function() {
       if (_jrvGet('jarvis-api-key')) jarvisGenerateSuggestions();
     }, 4000);
 
+    // Autonomous Mode — restore from localStorage and start loop if it was on
+    _jrvAutoLoad();
+    _jrvAutoUpdateUI();
+    if (_jrvAutoEnabled) {
+      _jrvAutoStartLoop();
+      _jrvLog('🛸 Autonomous Mode restored — Jarvis will work on projects while you are away.', 'jrv-msg-think');
+    }
   }).catch(console.error);
 });
 
