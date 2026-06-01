@@ -3562,11 +3562,7 @@ async function apuiDownloadProjectZip() {
       } else if (typeof generateFullCodeString === 'function') {
         htmlContent = generateFullCodeString(tree, null, projectId);
       } else {
-        // Last resort: serialise from the preview iframe
-        try {
-          var doc = document.getElementById('preview-container') || document.querySelector('iframe');
-          htmlContent = doc ? doc.contentDocument.documentElement.outerHTML : JSON.stringify(tree, null, 2);
-        } catch(e2) { htmlContent = JSON.stringify(tree, null, 2); }
+        htmlContent = _apuiBuildHtmlFromTree(tree, projectId);
       }
       zip.file('index.html', htmlContent);
       zip.file('project.json', JSON.stringify(tree, null, 2));
@@ -3594,7 +3590,6 @@ async function apuiDownloadProjectById(projectId, storageType) {
     var rawData = null;
 
     if (storageType === 'cloud') {
-      // Cloud: needs the api module — call through app3's handleLoadProject path
       if (window.api && window._currentUser) {
         rawData = await window.api.loadProject(window._currentUser.userId, projectId);
       } else if (window.currentUser && window.api) {
@@ -3603,15 +3598,12 @@ async function apuiDownloadProjectById(projectId, storageType) {
         throw new Error('Not logged in — cannot download cloud project.');
       }
     } else {
-      // Local: read directly from IndexedDB (no version conflict — read-only, no upgradeneeded)
       rawData = await _apuiIdbLoadProject(projectId);
     }
 
     if (rawData === null || rawData === undefined) throw new Error('Project "' + projectId + '" not found.');
 
     // ── Decompress ────────────────────────────────────────────
-    // app3.js stores projects as base64-encoded JSON strings via compressProjectData.
-    // decompressProjectData handles: object passthrough, raw JSON string, and base64.
     var tree;
     if (typeof decompressProjectData === 'function') {
       tree = decompressProjectData(rawData);
@@ -3621,21 +3613,22 @@ async function apuiDownloadProjectById(projectId, storageType) {
 
     if (!tree) throw new Error('Could not decompress project "' + projectId + '".');
 
-    // ── Build HTML ────────────────────────────────────────────
+    // ── Build proper HTML ─────────────────────────────────────
     var htmlContent;
     if (tree.type === 'raw-html-container') {
+      // Already a complete HTML string — use as-is
       htmlContent = tree.code || '';
     } else if (typeof generateFullCodeString === 'function') {
+      // app3.js function accessible — use it (best path)
       htmlContent = generateFullCodeString(tree, null, projectId);
     } else {
-      htmlContent = '<!-- Could not render tree -->\n' + JSON.stringify(tree, null, 2);
+      // Fallback: build HTML ourselves from the vibe tree
+      htmlContent = _apuiBuildHtmlFromTree(tree, projectId);
     }
 
     // ── Package and download ──────────────────────────────────
     var zip = new JSZip();
     zip.file('index.html', htmlContent);
-    zip.file('project.json', JSON.stringify(tree, null, 2));
-
     var blob = await zip.generateAsync({ type: 'blob' });
     _apuiTriggerDownload(blob, projectId + '.zip');
 
@@ -3643,6 +3636,63 @@ async function apuiDownloadProjectById(projectId, storageType) {
     console.error('[APUI] Download failed:', e);
     alert('Download failed: ' + e.message);
   }
+}
+
+// ── Build proper HTML from a vibe tree (mirrors generateFullCodeString) ──
+function _apuiBuildHtmlFromTree(tree, projectId) {
+  var cssContent  = '';
+  var jsContent   = '';
+  var headContent = '<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + (projectId || 'Project') + '</title>';
+
+  // Collect CSS, JS, and head nodes via depth-first traversal
+  function traverse(node) {
+    if (!node) return;
+    switch (node.type) {
+      case 'head':        if (node.code) headContent = node.code; break;
+      case 'css':         if (node.code) cssContent  += node.code + '\n\n'; break;
+      case 'javascript':
+      case 'js-function':
+      case 'declaration': if (node.code) jsContent   += node.code + '\n\n'; break;
+    }
+    if (node.children) node.children.forEach(traverse);
+  }
+  traverse(tree);
+
+  // Build body HTML from html-type nodes recursively
+  function buildHtml(nodes) {
+    if (!nodes) return '';
+    var out = '';
+    nodes.filter(function(n){ return n.type === 'html'; }).forEach(function(node) {
+      var code = node.code || '';
+      if (node.children && node.children.length) {
+        var inner = buildHtml(node.children);
+        // Inject children into the first element
+        var tmp = document.createElement('div');
+        tmp.innerHTML = code;
+        if (tmp.firstElementChild) {
+          tmp.firstElementChild.innerHTML = inner;
+          out += tmp.innerHTML + '\n';
+        } else {
+          out += code + '\n';
+        }
+      } else {
+        out += code + '\n';
+      }
+    });
+    return out;
+  }
+
+  var bodyHtml = tree.children ? buildHtml(tree.children) : '';
+
+  var parts = ['<!DOCTYPE html>', '<html lang="en">', '<head>'];
+  parts.push('    ' + headContent.trim());
+  if (cssContent.trim()) parts.push('    <style>\n' + cssContent.trim() + '\n    </style>');
+  parts.push('</head>', '<body>');
+  parts.push(bodyHtml.trim());
+  if (jsContent.trim()) parts.push('    <script>\n' + jsContent.trim() + '\n    <\/script>');
+  parts.push('</body>', '</html>');
+
+  return parts.join('\n');
 }
 
 // Read a project's raw data straight from IndexedDB (read-only, no version bump)
@@ -6496,4 +6546,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-                                        </html>
+                    </html>
