@@ -356,6 +356,35 @@
     .settings-button:hover { background: rgba(65,105,225,0.3) !important; }
 
     .storage-toggle { margin-bottom: 12px !important; }
+    /* Start page options dropdown */
+    .start-opt-btn {
+        display:flex;align-items:center;gap:9px;width:100%;padding:10px 14px;
+        background:transparent;border:none;color:#abb2bf;font-size:13px;
+        font-family:'Rajdhani',sans-serif;font-weight:600;cursor:pointer;text-align:left;
+        transition:background .15s;
+    }
+    .start-opt-btn:hover { background:rgba(97,175,239,0.1);color:#e6e6ff; }
+    /* Per-project kebab menu */
+    .apui-kebab-btn {
+        background:transparent;border:1px solid rgba(65,105,225,0.35);color:#7a8aaa;
+        border-radius:5px;padding:4px 8px;cursor:pointer;font-size:14px;line-height:1;
+        transition:all .15s;flex-shrink:0;
+    }
+    .apui-kebab-btn:hover { border-color:#61afef;color:#e6e6ff;background:rgba(97,175,239,0.1); }
+    .apui-kebab-menu {
+        position:absolute;right:0;top:calc(100% + 4px);min-width:160px;
+        background:#1a1f2e;border:1px solid rgba(65,105,225,0.5);border-radius:8px;
+        box-shadow:0 8px 28px rgba(0,0,0,0.7);z-index:99999;overflow:hidden;
+    }
+    .apui-kebab-item {
+        display:flex;align-items:center;gap:9px;width:100%;padding:9px 14px;
+        background:transparent;border:none;color:#abb2bf;font-size:13px;
+        font-family:'Rajdhani',sans-serif;font-weight:600;cursor:pointer;text-align:left;
+        transition:background .12s;white-space:nowrap;
+    }
+    .apui-kebab-item:hover { background:rgba(97,175,239,0.1);color:#e6e6ff; }
+    .apui-kebab-danger:hover { background:rgba(224,108,117,0.12);color:#e06c75; }
+    .apui-kebab-divider { height:1px;background:rgba(65,105,225,0.2);margin:2px 0; }
 
     #project-list .project-item, .project-item {
         background: rgba(16,24,48,0.8) !important;
@@ -2022,7 +2051,27 @@
                              <div class="start-page-content">
                                 <div class="start-header d-flex justify-content-between align-items-center">
                                     <h1 style="font-family:'Orbitron',sans-serif;color:#87CEEB;text-shadow:0 0 18px #4169e1;letter-spacing:2px;">APUI <small style="font-size:0.45em;color:#00ffcc;letter-spacing:4px;display:inline-block;vertical-align:middle;">VIBE SYSTEM</small></h1>
-                                    <button id="start-page-settings-button" class="settings-button" title="API Settings">⚙️</button>
+                                    <!-- ⚙ Options dropdown -->
+                                    <div style="position:relative;" id="start-options-wrap">
+                                        <button id="start-page-settings-button" class="settings-button" title="Options" onclick="toggleStartOptionsMenu(event)">⚙️</button>
+                                        <div id="start-options-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:200px;background:#1a1f2e;border:1px solid rgba(65,105,225,0.5);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.6);z-index:9999;overflow:hidden;">
+                                            <div style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5c6370;border-bottom:1px solid rgba(65,105,225,0.2);">Import Project</div>
+                                            <!-- hidden file inputs -->
+                                            <input type="file" id="start-zip-input"  accept=".zip,application/zip" style="display:none" onchange="apuiHandleZipUpload(this);closeStartOptionsMenu()">
+                                            <input type="file" id="start-html-input" accept=".html,.htm"           style="display:none" onchange="apuiHandleHtmlImport(this);closeStartOptionsMenu()">
+                                            <button class="start-opt-btn" onclick="document.getElementById('start-zip-input').click()">
+                                                <i class="bi bi-file-earmark-zip" style="color:#e5c07b;"></i> Upload ZIP file
+                                            </button>
+                                            <button class="start-opt-btn" onclick="document.getElementById('start-html-input').click()">
+                                                <i class="bi bi-file-earmark-code" style="color:#61afef;"></i> Upload HTML file
+                                            </button>
+                                            <div style="padding:7px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5c6370;border-top:1px solid rgba(65,105,225,0.2);border-bottom:1px solid rgba(65,105,225,0.2);">Settings</div>
+                                            <button class="start-opt-btn" onclick="closeStartOptionsMenu();document.getElementById('start-page-settings-button').dispatchEvent(new CustomEvent('open-settings'));">
+                                                <i class="bi bi-gear" style="color:#abb2bf;"></i> API Settings
+                                            </button>
+                                            <div id="start-import-status" style="font-size:11px;min-height:0;color:#98c379;padding:0 12px 6px;display:none;"></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <div class="accordion" id="start-page-accordion">
@@ -2074,30 +2123,6 @@
                                                     </select>
                                                 </div>
                                                 <button id="load-from-github-button" class="action-button primary"><i class="bi bi-github me-2"></i>Load Project</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header" id="headingImport">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport">
-                                                <i class="bi bi-upload me-2"></i> Import / Upload Project
-                                            </button>
-                                        </h2>
-                                        <div id="collapseImport" class="accordion-collapse collapse" aria-labelledby="headingImport" data-bs-parent="#start-page-accordion">
-                                            <div class="accordion-body" style="display:flex;flex-direction:column;gap:10px;">
-                                                <div style="font-size:12px;color:var(--apui-text-dim);margin-bottom:4px;">Import a project from a ZIP file or a single HTML file. It will be saved locally.</div>
-                                                <!-- Upload ZIP -->
-                                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                                                    <input type="file" id="start-zip-input" accept=".zip,application/zip" style="display:none" onchange="apuiHandleZipUpload(this)">
-                                                    <button class="action-button" style="flex:1;min-width:140px;" onclick="document.getElementById('start-zip-input').click()">
-                                                        <i class="bi bi-file-earmark-zip"></i> Upload ZIP file
-                                                    </button>
-                                                    <input type="file" id="start-html-input" accept=".html,.htm" style="display:none" onchange="apuiHandleHtmlImport(this)">
-                                                    <button class="action-button" style="flex:1;min-width:140px;" onclick="document.getElementById('start-html-input').click()">
-                                                        <i class="bi bi-file-earmark-code"></i> Upload HTML file
-                                                    </button>
-                                                </div>
-                                                <div id="start-import-status" style="font-size:12px;min-height:18px;color:#98c379;"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -3565,32 +3590,96 @@ async function apuiDownloadProjectById(projectId, storageType) {
   try {
     if (!window.JSZip) throw new Error('JSZip not loaded.');
 
-    // Load the project from localApi or IDB
-    var tree = null;
-    if (storageType !== 'cloud' && window.localApi && typeof window.localApi.loadProject === 'function') {
-      tree = await window.localApi.loadProject(projectId);
-    } else if (typeof loadProjectById === 'function') {
-      tree = await loadProjectById(projectId, storageType || 'local');
+    // ── Load raw data ──────────────────────────────────────────
+    var rawData = null;
+
+    if (storageType === 'cloud') {
+      // Cloud: needs the api module — call through app3's handleLoadProject path
+      if (window.api && window._currentUser) {
+        rawData = await window.api.loadProject(window._currentUser.userId, projectId);
+      } else if (window.currentUser && window.api) {
+        rawData = await window.api.loadProject(window.currentUser.userId, projectId);
+      } else {
+        throw new Error('Not logged in — cannot download cloud project.');
+      }
+    } else {
+      // Local: read directly from IndexedDB (no version conflict — read-only, no upgradeneeded)
+      rawData = await _apuiIdbLoadProject(projectId);
     }
 
-    if (!tree) throw new Error('Could not load project "' + projectId + '".');
+    if (rawData === null || rawData === undefined) throw new Error('Project "' + projectId + '" not found.');
 
-    var zip = new JSZip();
+    // ── Decompress ────────────────────────────────────────────
+    // app3.js stores projects as base64-encoded JSON strings via compressProjectData.
+    // decompressProjectData handles: object passthrough, raw JSON string, and base64.
+    var tree;
+    if (typeof decompressProjectData === 'function') {
+      tree = decompressProjectData(rawData);
+    } else {
+      tree = _apuiDecompress(rawData);
+    }
+
+    if (!tree) throw new Error('Could not decompress project "' + projectId + '".');
+
+    // ── Build HTML ────────────────────────────────────────────
     var htmlContent;
     if (tree.type === 'raw-html-container') {
       htmlContent = tree.code || '';
     } else if (typeof generateFullCodeString === 'function') {
       htmlContent = generateFullCodeString(tree, null, projectId);
     } else {
-      htmlContent = JSON.stringify(tree, null, 2);
+      htmlContent = '<!-- Could not render tree -->\n' + JSON.stringify(tree, null, 2);
     }
+
+    // ── Package and download ──────────────────────────────────
+    var zip = new JSZip();
     zip.file('index.html', htmlContent);
     zip.file('project.json', JSON.stringify(tree, null, 2));
 
     var blob = await zip.generateAsync({ type: 'blob' });
     _apuiTriggerDownload(blob, projectId + '.zip');
+
   } catch(e) {
+    console.error('[APUI] Download failed:', e);
     alert('Download failed: ' + e.message);
+  }
+}
+
+// Read a project's raw data straight from IndexedDB (read-only, no version bump)
+function _apuiIdbLoadProject(projectId) {
+  return new Promise(function(resolve, reject) {
+    // Open without specifying a version — never triggers upgradeneeded
+    var req = indexedDB.open('VibeLocalDB');
+    req.onupgradeneeded = function(e) { e.target.transaction.abort(); reject(new Error('Unexpected IDB upgrade')); };
+    req.onerror = function() { reject(new Error('Could not open local database.')); };
+    req.onsuccess = function(e) {
+      var db = e.target.result;
+      if (!db.objectStoreNames.contains('projects')) { db.close(); reject(new Error('No projects store found.')); return; }
+      var tx  = db.transaction('projects', 'readonly');
+      var req2 = tx.objectStore('projects').get(projectId);
+      req2.onsuccess = function() {
+        db.close();
+        if (req2.result) resolve(req2.result.data);
+        else reject(new Error('Project "' + projectId + '" not found in local storage.'));
+      };
+      req2.onerror = function() { db.close(); reject(req2.error); };
+    };
+  });
+}
+
+// Inline decompress — mirrors app3.js decompressProjectData exactly
+function _apuiDecompress(dataString) {
+  if (!dataString) return null;
+  if (typeof dataString === 'object') return dataString;
+  if (typeof dataString === 'string' && (dataString.trim().startsWith('{') || dataString.trim().startsWith('['))) {
+    try { return JSON.parse(dataString); } catch(e) {}
+  }
+  try {
+    return JSON.parse(decodeURIComponent(atob(dataString).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join('')));
+  } catch(e) {
+    throw new Error('Failed to decode project data. It may be corrupt.');
   }
 }
 
@@ -3617,7 +3706,10 @@ async function apuiHandleZipUpload(inputEl) {
 
 async function _apuiProcessZipFile(file) {
   var statusEl = document.getElementById('start-import-status') || document.getElementById('code-upload-status');
-  if (statusEl) statusEl.textContent = '⏳ Processing ZIP…';
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = '⏳ Processing ZIP…';
+  }
 
   try {
     if (!window.JSZip) throw new Error('JSZip not loaded.');
@@ -3665,10 +3757,10 @@ async function _apuiProcessZipFile(file) {
     if (typeof populateProjectList === 'function') await populateProjectList('local');
     if (typeof switchToTab === 'function') switchToTab('preview');
 
-    if (statusEl) statusEl.textContent = '✅ Imported as "' + projectId + '"';
+    if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '✅ Imported as "' + projectId + '"'; setTimeout(function(){ if(statusEl) statusEl.style.display='none'; }, 3000); }
     console.log('[APUI] ZIP imported as', projectId);
   } catch(e) {
-    if (statusEl) statusEl.textContent = '❌ ' + e.message;
+    if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '❌ ' + e.message; }
     alert('ZIP import failed: ' + e.message);
   }
 }
@@ -3678,7 +3770,7 @@ async function apuiHandleHtmlImport(inputEl) {
   var file = inputEl && inputEl.files && inputEl.files[0];
   if (!file) return;
   var statusEl = document.getElementById('start-import-status');
-  if (statusEl) statusEl.textContent = '⏳ Processing HTML…';
+  if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '⏳ Processing HTML…'; }
 
   try {
     var htmlContent = await file.text();
@@ -3711,10 +3803,10 @@ async function apuiHandleHtmlImport(inputEl) {
     if (typeof populateProjectList === 'function') await populateProjectList('local');
     if (typeof switchToTab === 'function') switchToTab('preview');
 
-    if (statusEl) statusEl.textContent = '✅ Imported as "' + projectId + '"';
+    if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '✅ Imported as "' + projectId + '"'; setTimeout(function(){ if(statusEl) statusEl.style.display='none'; }, 3000); }
     if (inputEl) inputEl.value = '';
   } catch(e) {
-    if (statusEl) statusEl.textContent = '❌ ' + e.message;
+    if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '❌ ' + e.message; }
     alert('HTML import failed: ' + e.message);
   }
 }
@@ -3801,50 +3893,71 @@ function _apuiTriggerDownload(blob, filename) {
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 100);
 }
 
-// ── Inject ⬇ download button into each project list item ──────
-// app3.js renders project-list-item elements dynamically; we watch for them
-// and inject a download button that wasn't there before.
+// ── Inject ⋮ kebab menu into each project list item ──────────
+// Hides the original Load/Delete buttons and replaces them with a
+// ⋮ button that opens a dropdown: Load · Delete · Download ZIP
 (function() {
-  function injectDownloadBtn(item) {
-    if (item.dataset.dlBtnInjected) return;
-    item.dataset.dlBtnInjected = '1';
 
-    // Extract project ID and storage type
-    var idEl = item.querySelector('.project-id-text') || item.querySelector('[data-project-id]');
-    var projectId = (idEl ? idEl.textContent : item.textContent).replace(/[☁️💻✎🗑⚙️]/g,'').trim().split('\n')[0].trim();
-    var storageType = item.dataset.storage || (item.textContent.includes('☁') ? 'cloud' : 'local');
+  function injectKebab(item) {
+    if (item.dataset.kebabInjected) return;
+    item.dataset.kebabInjected = '1';
 
+    // Get project id and storage type from the existing buttons (most reliable source)
+    var loadBtn   = item.querySelector('.load-project-button');
+    var deleteBtn = item.querySelector('.delete-project-button');
+    var projectId   = (loadBtn   && loadBtn.dataset.id)      || (deleteBtn && deleteBtn.dataset.id)      || '';
+    var storageType = (loadBtn   && loadBtn.dataset.storage)  || (deleteBtn && deleteBtn.dataset.storage)  || 'local';
+
+    if (!projectId) {
+      // Fallback: extract from text
+      var idEl = item.querySelector('.project-id-text');
+      projectId = (idEl ? idEl.textContent : '').replace(/[☁️💻\s]/g,'').trim();
+      storageType = item.textContent.includes('☁') ? 'cloud' : 'local';
+    }
     if (!projectId) return;
 
-    var btn = document.createElement('button');
-    btn.className = 'action-button small';
-    btn.title = 'Download "' + projectId + '" as ZIP';
-    btn.innerHTML = '<i class="bi bi-download"></i>';
-    btn.style.cssText = 'padding:3px 7px;font-size:11px;margin-left:4px;flex-shrink:0;border-color:rgba(97,175,239,0.5);color:#61afef;';
-    btn.onclick = function(e) {
-      e.stopPropagation();
-      apuiDownloadProjectById(projectId, storageType);
-    };
+    // Hide original buttons div — we replace it with the kebab
+    var origBtns = item.querySelector('.project-item-buttons');
+    if (origBtns) origBtns.style.display = 'none';
 
-    // Insert into the action buttons area if it exists, otherwise append
-    var actions = item.querySelector('.project-actions, .project-item-actions');
-    if (actions) actions.appendChild(btn);
-    else item.appendChild(btn);
+    // Unique menu id to manage open/close
+    var menuId = 'pkm-' + projectId.replace(/[^a-z0-9]/gi, '-') + '-' + storageType;
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex-shrink:0;';
+
+    wrap.innerHTML =
+      '<button class="apui-kebab-btn" title="Options" onclick="apuiKebabToggle(event,\'' + menuId + '\')">' +
+        '<i class="bi bi-three-dots-vertical"></i>' +
+      '</button>' +
+      '<div id="' + menuId + '" class="apui-kebab-menu" style="display:none;">' +
+        '<button class="apui-kebab-item" onclick="apuiKebabAction(event,\'load\',\'' + _esc(projectId) + '\',\'' + storageType + '\')">' +
+          '<i class="bi bi-folder2-open" style="color:#98c379;"></i> Load' +
+        '</button>' +
+        '<button class="apui-kebab-item" onclick="apuiKebabAction(event,\'download\',\'' + _esc(projectId) + '\',\'' + storageType + '\')">' +
+          '<i class="bi bi-download" style="color:#61afef;"></i> Download ZIP' +
+        '</button>' +
+        '<div class="apui-kebab-divider"></div>' +
+        '<button class="apui-kebab-item apui-kebab-danger" onclick="apuiKebabAction(event,\'delete\',\'' + _esc(projectId) + '\',\'' + storageType + '\')">' +
+          '<i class="bi bi-trash3" style="color:#e06c75;"></i> Delete' +
+        '</button>' +
+      '</div>';
+
+    item.appendChild(wrap);
   }
 
   function scanProjectList() {
-    document.querySelectorAll('#project-list .project-list-item, #project-list .project-item').forEach(injectDownloadBtn);
+    document.querySelectorAll('#project-list .project-list-item, #project-list .project-item').forEach(injectKebab);
   }
 
-  // Watch for app3.js rendering items into #project-list
   var observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(m) {
       m.addedNodes.forEach(function(node) {
         if (node.nodeType !== 1) return;
         if (node.classList && (node.classList.contains('project-list-item') || node.classList.contains('project-item'))) {
-          injectDownloadBtn(node);
+          injectKebab(node);
         }
-        node.querySelectorAll && node.querySelectorAll('.project-list-item, .project-item').forEach(injectDownloadBtn);
+        node.querySelectorAll && node.querySelectorAll('.project-list-item, .project-item').forEach(injectKebab);
       });
     });
   });
@@ -3852,10 +3965,58 @@ function _apuiTriggerDownload(blob, filename) {
   document.addEventListener('DOMContentLoaded', function() {
     var list = document.getElementById('project-list');
     if (list) observer.observe(list, { childList: true, subtree: true });
-    // Scan once in case items already rendered
     scanProjectList();
   });
 })();
+
+// ── Kebab menu toggle ─────────────────────────────────────────
+function apuiKebabToggle(e, menuId) {
+  e.stopPropagation();
+  var menu = document.getElementById(menuId);
+  if (!menu) return;
+  // Close any other open kebab menus
+  document.querySelectorAll('.apui-kebab-menu').forEach(function(m) {
+    if (m.id !== menuId) m.style.display = 'none';
+  });
+  var isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    setTimeout(function() {
+      document.addEventListener('click', function closeKebab() {
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeKebab);
+      }, { once: true, capture: true });
+    }, 0);
+  }
+}
+
+// ── Kebab action dispatcher ───────────────────────────────────
+function apuiKebabAction(e, action, projectId, storageType) {
+  e.stopPropagation();
+  // Close the menu
+  var menu = e.target.closest('.apui-kebab-menu');
+  if (menu) menu.style.display = 'none';
+
+  if (action === 'load') {
+    // Trigger the original load button if it exists, else dispatch click
+    var item = e.target.closest('.project-list-item, .project-item');
+    var origLoad = item && item.querySelector('.load-project-button');
+    if (origLoad) { origLoad.click(); return; }
+    // Fallback: call app3's handleLoadProject directly
+    if (typeof handleLoadProject === 'function') {
+      handleLoadProject({ target: { dataset: { id: projectId, storage: storageType } } });
+    }
+  } else if (action === 'delete') {
+    var item = e.target.closest('.project-list-item, .project-item');
+    var origDel = item && item.querySelector('.delete-project-button');
+    if (origDel) { origDel.click(); return; }
+    if (typeof handleDeleteProject === 'function') {
+      handleDeleteProject({ target: { dataset: { id: projectId, storage: storageType } } });
+    }
+  } else if (action === 'download') {
+    apuiDownloadProjectById(projectId, storageType);
+  }
+}
 
 /* ── Handle multiple HTML files: show tabs in code tab ── */
 var _codeTabFiles = {};   // filename -> content
@@ -4137,6 +4298,28 @@ function agtSwitchTab(name, btn) {
   if (btn) btn.classList.add('agt-itab-active');
   // Re-init tracker when switching to it
   if (name === 'tracker') { _ttInit(); }
+}
+
+/* ── Start page ⚙ options dropdown ── */
+function toggleStartOptionsMenu(e) {
+  if (e) e.stopPropagation();
+  var menu = document.getElementById('start-options-menu');
+  if (!menu) return;
+  var open = menu.style.display !== 'none';
+  menu.style.display = open ? 'none' : 'block';
+  if (!open) {
+    setTimeout(function() {
+      document.addEventListener('click', _startOptionsOutside, { once: true, capture: true });
+    }, 0);
+  }
+}
+function closeStartOptionsMenu() {
+  var menu = document.getElementById('start-options-menu');
+  if (menu) menu.style.display = 'none';
+}
+function _startOptionsOutside(e) {
+  var wrap = document.getElementById('start-options-wrap');
+  if (wrap && !wrap.contains(e.target)) closeStartOptionsMenu();
 }
 
 /* ── Project Search (Home tab) ── */
@@ -6313,4 +6496,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+                                        </html>
