@@ -2078,6 +2078,30 @@
                                         </div>
                                     </div>
                                     <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingImport">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="false" aria-controls="collapseImport">
+                                                <i class="bi bi-upload me-2"></i> Import / Upload Project
+                                            </button>
+                                        </h2>
+                                        <div id="collapseImport" class="accordion-collapse collapse" aria-labelledby="headingImport" data-bs-parent="#start-page-accordion">
+                                            <div class="accordion-body" style="display:flex;flex-direction:column;gap:10px;">
+                                                <div style="font-size:12px;color:var(--apui-text-dim);margin-bottom:4px;">Import a project from a ZIP file or a single HTML file. It will be saved locally.</div>
+                                                <!-- Upload ZIP -->
+                                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                                    <input type="file" id="start-zip-input" accept=".zip,application/zip" style="display:none" onchange="apuiHandleZipUpload(this)">
+                                                    <button class="action-button" style="flex:1;min-width:140px;" onclick="document.getElementById('start-zip-input').click()">
+                                                        <i class="bi bi-file-earmark-zip"></i> Upload ZIP file
+                                                    </button>
+                                                    <input type="file" id="start-html-input" accept=".html,.htm" style="display:none" onchange="apuiHandleHtmlImport(this)">
+                                                    <button class="action-button" style="flex:1;min-width:140px;" onclick="document.getElementById('start-html-input').click()">
+                                                        <i class="bi bi-file-earmark-code"></i> Upload HTML file
+                                                    </button>
+                                                </div>
+                                                <div id="start-import-status" style="font-size:12px;min-height:18px;color:#98c379;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="accordion-item">
                                         <h2 class="accordion-header" id="headingNewProject">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNewProject" aria-expanded="false" aria-controls="collapseNewProject">
                                                 Create a New Project
@@ -2779,12 +2803,12 @@
                                             <i class="bi bi-file-earmark-arrow-up"></i> Upload HTML
                                         </button>
                                         <!-- Upload ZIP -->
-                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display:none">
-                                        <button id="upload-zip-button" class="action-button" title="Upload a ZIP of your project">
+                                        <input type="file" id="zip-file-input" accept=".zip,application/zip" style="display:none" onchange="apuiHandleZipUpload(this)">
+                                        <button id="upload-zip-button" class="action-button" title="Upload a ZIP of your project" onclick="document.getElementById('zip-file-input').click()">
                                             <i class="bi bi-file-earmark-zip"></i> Upload ZIP
                                         </button>
                                         <!-- Download ZIP -->
-                                        <button id="download-zip-button" class="action-button" title="Download project as ZIP">
+                                        <button id="download-zip-button" class="action-button" title="Download project as ZIP" onclick="apuiDownloadProjectZip()">
                                             <i class="bi bi-download"></i> Download ZIP
                                         </button>
                                     </div>
@@ -3479,6 +3503,359 @@ async function _loadHtmlFileIntoVibe(file, statusEl) {
     reader.readAsText(file);
   });
 }
+
+/* ════════════════════════════════════════════════════════════
+   APUI PROJECT DOWNLOAD / UPLOAD ENGINE
+   Self-contained: tries app3.js functions first, falls back
+   to its own implementation so it always works.
+   ════════════════════════════════════════════════════════════ */
+
+// ── Download current project as ZIP ──────────────────────────
+async function apuiDownloadProjectZip() {
+  // Try app3.js function first (has access to vibeTree, etc.)
+  if (typeof handleDownloadProjectZip === 'function') {
+    try { await handleDownloadProjectZip(); return; } catch(e) { console.warn('[APUI] handleDownloadProjectZip failed, using fallback:', e); }
+  }
+
+  // Fallback: build ZIP ourselves from what we can access
+  try {
+    if (!window.JSZip) throw new Error('JSZip not loaded. Ensure the JSZip script tag is present.');
+
+    // Get vibeTree and projectId from app3.js globals
+    var tree      = window.vibeTree;
+    var projectId = window.currentProjectId || 'vibe-project';
+
+    if (!tree && !projectId) throw new Error('No project is currently open.');
+
+    var zip = new JSZip();
+
+    if (tree) {
+      // Build HTML from vibeTree
+      var htmlContent;
+      if (tree.type === 'raw-html-container') {
+        htmlContent = tree.code || '';
+      } else if (typeof generateFullCodeString === 'function') {
+        htmlContent = generateFullCodeString(tree, null, projectId);
+      } else {
+        // Last resort: serialise from the preview iframe
+        try {
+          var doc = document.getElementById('preview-container') || document.querySelector('iframe');
+          htmlContent = doc ? doc.contentDocument.documentElement.outerHTML : JSON.stringify(tree, null, 2);
+        } catch(e2) { htmlContent = JSON.stringify(tree, null, 2); }
+      }
+      zip.file('index.html', htmlContent);
+      zip.file('project.json', JSON.stringify(tree, null, 2));
+    } else {
+      // No vibeTree — dump what we have from the code editor
+      var editorContent = (document.getElementById('full-code-editor') || {}).value || '';
+      if (!editorContent) throw new Error('No project content found to export.');
+      zip.file('index.html', editorContent);
+    }
+
+    var blob = await zip.generateAsync({ type: 'blob' });
+    _apuiTriggerDownload(blob, projectId + '.zip');
+  } catch(e) {
+    console.error('[APUI] ZIP download failed:', e);
+    alert('Download failed: ' + e.message);
+  }
+}
+
+// ── Download a specific project by ID as ZIP ─────────────────
+async function apuiDownloadProjectById(projectId, storageType) {
+  try {
+    if (!window.JSZip) throw new Error('JSZip not loaded.');
+
+    // Load the project from localApi or IDB
+    var tree = null;
+    if (storageType !== 'cloud' && window.localApi && typeof window.localApi.loadProject === 'function') {
+      tree = await window.localApi.loadProject(projectId);
+    } else if (typeof loadProjectById === 'function') {
+      tree = await loadProjectById(projectId, storageType || 'local');
+    }
+
+    if (!tree) throw new Error('Could not load project "' + projectId + '".');
+
+    var zip = new JSZip();
+    var htmlContent;
+    if (tree.type === 'raw-html-container') {
+      htmlContent = tree.code || '';
+    } else if (typeof generateFullCodeString === 'function') {
+      htmlContent = generateFullCodeString(tree, null, projectId);
+    } else {
+      htmlContent = JSON.stringify(tree, null, 2);
+    }
+    zip.file('index.html', htmlContent);
+    zip.file('project.json', JSON.stringify(tree, null, 2));
+
+    var blob = await zip.generateAsync({ type: 'blob' });
+    _apuiTriggerDownload(blob, projectId + '.zip');
+  } catch(e) {
+    alert('Download failed: ' + e.message);
+  }
+}
+
+// ── Upload ZIP file ────────────────────────────────────────────
+async function apuiHandleZipUpload(inputEl) {
+  var file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+
+  // Delegate to app3.js if available (it handles the full UI update flow)
+  if (typeof handleZipUpload === 'function') {
+    // app3.js reads from window['zip-file-input'] by ID — copy the file there
+    var nativeInput = document.getElementById('zip-file-input');
+    if (nativeInput && nativeInput !== inputEl) {
+      // Can't set files directly (read-only), so just call directly with the file
+      try { await _apuiProcessZipFile(file); return; } catch(e) { console.warn('[APUI] ZIP fallback failed:', e); }
+    } else {
+      try { await handleZipUpload(); return; } catch(e) { console.warn('[APUI] handleZipUpload failed, using fallback:', e); }
+    }
+  }
+
+  await _apuiProcessZipFile(file);
+  if (inputEl) inputEl.value = '';
+}
+
+async function _apuiProcessZipFile(file) {
+  var statusEl = document.getElementById('start-import-status') || document.getElementById('code-upload-status');
+  if (statusEl) statusEl.textContent = '⏳ Processing ZIP…';
+
+  try {
+    if (!window.JSZip) throw new Error('JSZip not loaded.');
+
+    var jszip = await JSZip.loadAsync(file);
+
+    // Use app3.js's bundler if available
+    var combinedHtml;
+    if (typeof buildCombinedHtmlFromZip === 'function') {
+      combinedHtml = await buildCombinedHtmlFromZip(jszip);
+    } else {
+      combinedHtml = await _apuiBuildHtmlFromZip(jszip);
+    }
+
+    var derivedId = file.name.replace(/\.zip$/i, '').toLowerCase().replace(/\s+/g,'‑').replace(/[^a-z0-9\-]/g,'');
+    var projectId = derivedId || ('zip-project-' + Date.now());
+
+    // Deduplicate
+    if (window.localApi && typeof window.localApi.listProjects === 'function') {
+      var existing = await window.localApi.listProjects();
+      var suffix = 1;
+      var base = projectId;
+      while (existing.includes(projectId)) projectId = base + '-' + (suffix++);
+    }
+
+    var tree = {
+      id: 'raw-' + projectId,
+      type: 'raw-html-container',
+      description: 'Uploaded from ZIP: ' + file.name,
+      code: combinedHtml,
+      children: []
+    };
+
+    if (window.localApi && typeof window.localApi.saveProject === 'function') {
+      await window.localApi.saveProject(projectId, tree);
+    }
+
+    // Update app3.js state if accessible
+    if (window.hasOwnProperty('currentProjectId'))    window.currentProjectId = projectId;
+    if (window.hasOwnProperty('vibeTree'))            window.vibeTree = tree;
+    if (window.hasOwnProperty('currentProjectStorageType')) window.currentProjectStorageType = 'local';
+
+    // Refresh UI
+    if (typeof refreshAllUI === 'function') refreshAllUI();
+    if (typeof populateProjectList === 'function') await populateProjectList('local');
+    if (typeof switchToTab === 'function') switchToTab('preview');
+
+    if (statusEl) statusEl.textContent = '✅ Imported as "' + projectId + '"';
+    console.log('[APUI] ZIP imported as', projectId);
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '❌ ' + e.message;
+    alert('ZIP import failed: ' + e.message);
+  }
+}
+
+// ── Upload single HTML file ─────────────────────────────────────
+async function apuiHandleHtmlImport(inputEl) {
+  var file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+  var statusEl = document.getElementById('start-import-status');
+  if (statusEl) statusEl.textContent = '⏳ Processing HTML…';
+
+  try {
+    var htmlContent = await file.text();
+    var derivedId = file.name.replace(/\.html?$/i,'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') || ('html-project-' + Date.now());
+    var projectId = derivedId;
+
+    if (window.localApi && typeof window.localApi.listProjects === 'function') {
+      var existing = await window.localApi.listProjects();
+      var suffix = 1; var base = projectId;
+      while (existing.includes(projectId)) projectId = base + '-' + (suffix++);
+    }
+
+    var tree = {
+      id: 'raw-' + projectId,
+      type: 'raw-html-container',
+      description: 'Uploaded HTML file: ' + file.name,
+      code: htmlContent,
+      children: []
+    };
+
+    if (window.localApi && typeof window.localApi.saveProject === 'function') {
+      await window.localApi.saveProject(projectId, tree);
+    }
+
+    if (window.hasOwnProperty('currentProjectId'))    window.currentProjectId = projectId;
+    if (window.hasOwnProperty('vibeTree'))            window.vibeTree = tree;
+    if (window.hasOwnProperty('currentProjectStorageType')) window.currentProjectStorageType = 'local';
+
+    if (typeof refreshAllUI === 'function') refreshAllUI();
+    if (typeof populateProjectList === 'function') await populateProjectList('local');
+    if (typeof switchToTab === 'function') switchToTab('preview');
+
+    if (statusEl) statusEl.textContent = '✅ Imported as "' + projectId + '"';
+    if (inputEl) inputEl.value = '';
+  } catch(e) {
+    if (statusEl) statusEl.textContent = '❌ ' + e.message;
+    alert('HTML import failed: ' + e.message);
+  }
+}
+
+// ── Fallback ZIP→HTML builder (subset of app3.js's version) ───
+async function _apuiBuildHtmlFromZip(jszip) {
+  var fileNames = Object.keys(jszip.files);
+  var htmlFile = fileNames.filter(function(n){ return !jszip.files[n].dir && n.toLowerCase().endsWith('.html'); })
+                          .sort(function(a,b){ return a.length - b.length; })[0];
+  if (!htmlFile) throw new Error('No HTML file found in ZIP.');
+
+  var htmlContent = await jszip.files[htmlFile].async('text');
+  var indexDir = htmlFile.includes('/') ? htmlFile.substring(0, htmlFile.lastIndexOf('/') + 1) : '';
+
+  // Build asset map
+  var assetMap = {};
+  for (var name of fileNames) {
+    var f = jszip.files[name];
+    if (f.dir || name === htmlFile) continue;
+    var mime = _apuiGuessMime(name);
+    var bytes = await f.async('uint8array');
+    var b64 = btoa(Array.from(bytes).map(function(b){ return String.fromCharCode(b); }).join(''));
+    assetMap[name] = 'data:' + mime + ';base64,' + b64;
+  }
+
+  // Inline CSS and JS, replace asset URLs
+  var parser = new DOMParser();
+  var doc = parser.parseFromString(htmlContent, 'text/html');
+
+  for (var link of Array.from(doc.querySelectorAll('link[rel="stylesheet"]'))) {
+    var href = link.getAttribute('href');
+    if (href && !href.startsWith('http') && !href.startsWith('data:')) {
+      var resolved = (indexDir + href).replace(/\/+/g,'/');
+      var zf = jszip.files[resolved] || jszip.files[href];
+      if (zf) {
+        var css = await zf.async('text');
+        var style = document.createElement('style');
+        style.textContent = css;
+        link.replaceWith(style);
+      }
+    }
+  }
+
+  for (var script of Array.from(doc.querySelectorAll('script[src]'))) {
+    var src = script.getAttribute('src');
+    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+      var resolved = (indexDir + src).replace(/\/+/g,'/');
+      var zf = jszip.files[resolved] || jszip.files[src];
+      if (zf) {
+        var js = await zf.async('text');
+        script.removeAttribute('src');
+        script.textContent = js;
+      }
+    }
+  }
+
+  var result = new XMLSerializer().serializeToString(doc);
+  // Replace remaining relative asset refs with data URIs
+  result = result.replace(/(src="|href=")([^"#][^"]*?)"/g, function(match, prefix, url) {
+    if (url.startsWith('data:') || url.startsWith('http') || url.startsWith('//')) return match;
+    var resolved = (indexDir + url).replace(/\/+/g,'/');
+    return assetMap[resolved] ? prefix + assetMap[resolved] + '"' : match;
+  });
+
+  return result;
+}
+
+function _apuiGuessMime(filename) {
+  var ext = filename.split('.').pop().toLowerCase();
+  var map = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif',
+              svg:'image/svg+xml', webp:'image/webp', ico:'image/x-icon',
+              css:'text/css', js:'application/javascript', json:'application/json',
+              woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf', eot:'application/vnd.ms-fontobject' };
+  return map[ext] || 'application/octet-stream';
+}
+
+// ── Generic blob download trigger ─────────────────────────────
+function _apuiTriggerDownload(blob, filename) {
+  if (typeof triggerBlobDownload === 'function') { triggerBlobDownload(blob, filename); return; }
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+// ── Inject ⬇ download button into each project list item ──────
+// app3.js renders project-list-item elements dynamically; we watch for them
+// and inject a download button that wasn't there before.
+(function() {
+  function injectDownloadBtn(item) {
+    if (item.dataset.dlBtnInjected) return;
+    item.dataset.dlBtnInjected = '1';
+
+    // Extract project ID and storage type
+    var idEl = item.querySelector('.project-id-text') || item.querySelector('[data-project-id]');
+    var projectId = (idEl ? idEl.textContent : item.textContent).replace(/[☁️💻✎🗑⚙️]/g,'').trim().split('\n')[0].trim();
+    var storageType = item.dataset.storage || (item.textContent.includes('☁') ? 'cloud' : 'local');
+
+    if (!projectId) return;
+
+    var btn = document.createElement('button');
+    btn.className = 'action-button small';
+    btn.title = 'Download "' + projectId + '" as ZIP';
+    btn.innerHTML = '<i class="bi bi-download"></i>';
+    btn.style.cssText = 'padding:3px 7px;font-size:11px;margin-left:4px;flex-shrink:0;border-color:rgba(97,175,239,0.5);color:#61afef;';
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      apuiDownloadProjectById(projectId, storageType);
+    };
+
+    // Insert into the action buttons area if it exists, otherwise append
+    var actions = item.querySelector('.project-actions, .project-item-actions');
+    if (actions) actions.appendChild(btn);
+    else item.appendChild(btn);
+  }
+
+  function scanProjectList() {
+    document.querySelectorAll('#project-list .project-list-item, #project-list .project-item').forEach(injectDownloadBtn);
+  }
+
+  // Watch for app3.js rendering items into #project-list
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType !== 1) return;
+        if (node.classList && (node.classList.contains('project-list-item') || node.classList.contains('project-item'))) {
+          injectDownloadBtn(node);
+        }
+        node.querySelectorAll && node.querySelectorAll('.project-list-item, .project-item').forEach(injectDownloadBtn);
+      });
+    });
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var list = document.getElementById('project-list');
+    if (list) observer.observe(list, { childList: true, subtree: true });
+    // Scan once in case items already rendered
+    scanProjectList();
+  });
+})();
 
 /* ── Handle multiple HTML files: show tabs in code tab ── */
 var _codeTabFiles = {};   // filename -> content
