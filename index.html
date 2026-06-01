@@ -5654,26 +5654,26 @@ function _jrvAutoOpenApuiTab() {
 
 // ── Save a completed vibeTree as a local project ───────────────────
 async function _jrvAutoSaveProject(projectId, title, treeData) {
+  // Always go through localApi — never open VibeLocalDB directly from Jarvis,
+  // as competing IDB version openers can corrupt or block the projects store.
   if (window.localApi && typeof window.localApi.saveProject === 'function') {
     await window.localApi.saveProject(projectId, treeData);
     return true;
   }
-  return new Promise(function(resolve, reject) {
-    var req = indexedDB.open('VibeLocalDB', 2);
-    req.onupgradeneeded = function(ev) {
-      var db = ev.target.result;
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'projectId' });
+  // localApi not ready yet — retry up to 3s then give up gracefully
+  return new Promise(function(resolve) {
+    var attempts = 0;
+    var interval = setInterval(function() {
+      attempts++;
+      if (window.localApi && typeof window.localApi.saveProject === 'function') {
+        clearInterval(interval);
+        window.localApi.saveProject(projectId, treeData).then(function() { resolve(true); }).catch(function() { resolve(false); });
+      } else if (attempts >= 30) { // 30 × 100ms = 3s
+        clearInterval(interval);
+        console.warn('[Jarvis] localApi not available after 3s — project not saved locally');
+        resolve(false);
       }
-    };
-    req.onsuccess = function(ev) {
-      var db = ev.target.result;
-      var tx = db.transaction('projects', 'readwrite');
-      tx.objectStore('projects').put({ projectId: projectId, data: treeData });
-      tx.oncomplete = function() { resolve(true); };
-      tx.onerror    = function(e) { reject(e.target.error); };
-    };
-    req.onerror = function(e) { reject(e.target.error); };
+    }, 100);
   });
 }
 
