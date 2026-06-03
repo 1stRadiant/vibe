@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Magic Select & Generative Fill</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #222; color: #fff; padding: 20px; }
+        .container { display: flex; gap: 20px; margin-top: 20px; }
+        .box { display: flex; flex-direction: column; align-items: center; }
+        canvas, img { border: 2px dashed #555; background: #111; max-width: 400px; height: auto; cursor: crosshair; }
+        .controls { margin-top: 20px; display: flex; gap: 10px; }
+        input, button { padding: 10px; font-size: 16px; border-radius: 4px; border: none; }
+        button { background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status { color: #ffc107; font-weight: bold; margin-top: 10px; }
+    </style>
+
+    <!-- 1. Load the Hugging Face Inference Library via CDN -->
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+    <h1>AI Magic Select & Generative Fill</h1>
+    <div id="status">Loading AI Selection Model... Please wait.</div>
+
+    <div class="container">
+        <!-- Input Canvas where the user clicks -->
+        <div class="box">
+            <h3>1. Click to Select Object</h3>
+            <canvas id="inputCanvas" width="400" height="400"></canvas>
+        </div>
+        <!-- Output image from Hugging Face -->
+        <div class="box">
+            <h3>3. Result</h3>
+            <img id="outputImage" src="https://placehold.co" alt="Result">
+        </div>
+    </div>
+
+    <!-- Controls for Generative Fill -->
+    <div class="controls">
+        <input type="text" id="promptInput" placeholder="What should go here? (e.g. 'a cute puppy')" size="35" disabled>
+        <button id="fillBtn" disabled>2. Run Generative Fill</button>
+    </div>
+
+    <!-- 2. Load Transformers.js as an ES Module -->
+    <script type="module">
+        import { pipeline, env } from 'https://jsdelivr.net';
+        
+        // Configure Transformers.js for client-side execution [2]
+        env.allowLocalModels = false;
+
+        // --- CONFIGURATION ---
+        // REPLACE THIS WITH YOUR FREE HUGGING FACE Hf_TOKEN
+        const HF_TOKEN = "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"; 
+        const hf = new HfInference(HF_TOKEN);
+
+        // Demo image to load on startup
+        const SAMPLE_IMAGE_URL = 'https://unsplash.com';
+        // ---------------------
+
+        let segmenter = null;
+        let lastMaskBlob = null;
+        let originalImageBlob = null;
+
+        const canvas = document.getElementById('inputCanvas');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const promptInput = document.getElementById('promptInput');
+        const fillBtn = document.getElementById('fillBtn');
+        const outputImage = document.getElementById('outputImage');
+
+        // Initialize Segment Anything Model (SAM) [2]
+        async function init() {
+            try {
+                segmenter = await pipeline('image-segmentation', 'Xenova/sam-b-quantized'); [2]
+                status.innerText = "AI Selection Ready! Click anywhere on the dog.";
+                loadDemoImage();
+            } catch (err) {
+                status.innerText = "Error loading AI model. Check developer console.";
+                console.error(err);
+            }
+        }
+
+        // Helper to pull the remote image into the browser as a usable Blob
+        async function loadDemoImage() {
+            const response = await fetch(SAMPLE_IMAGE_URL);
+            originalImageBlob = await response.blob();
+            
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = URL.createObjectURL(originalImageBlob);
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+        }
+
+        // Handle the "Magic Select" click event [2]
+        canvas.addEventListener('click', async (e) => {
+            if (!segmenter) return;
+
+            // Get exact X/Y click coordinates relative to the canvas bounding box
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            status.innerText = "Calculating Magic Selection mask...";
+
+            // Run SAM to extract the object boundary [2]
+            const results = await segmenter(SAMPLE_IMAGE_URL, {
+                points: [[x, y]] // Provide point coordinates to select the object [2]
+            });
+
+            // SAM returns a pixel mask array; draw it onto a temporary canvas to create a B&W mask image [2]
+            const maskData = results[0].mask; 
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw visual blue highlight over the user's canvas so they see what is selected
+            ctx.fillStyle = 'rgba(0, 123, 255, 0.4)';
+            ctx.fillRect(0,0, canvas.width, canvas.height); // (In a production app, you'd repaint the original image first)
+
+            // Convert the raw AI mask to a binary Black & White Blob for Hugging Face [2]
+            tempCanvas.toBlob((blob) => {
+                lastMaskBlob = blob;
+                status.innerText = "Object Selected! Enter a prompt and hit Generate.";
+                promptInput.disabled = false;
+                fillBtn.disabled = false;
+            }, 'image/png');
+        });
+
+        // Trigger the Hugging Face Generative Fill via API
+        fillBtn.addEventListener('click', async () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt || !lastMaskBlob || !originalImageBlob) {
+                alert("Please select an object first and write a prompt.");
+                return;
+            }
+
+            status.innerText = "Sending to Hugging Face AI... (May take a few seconds if model is sleeping)";
+            fillBtn.disabled = true;
+
+            try {
+                // Run Serverless Inpainting
+                const response = await hf.imageToImage({
+                    model: 'stabilityai/stable-diffusion-2-inpainting', // Free Hugging Face inpainting endpoint
+                    inputs: {
+                        image: originalImageBlob, // Base image
+                        mask: lastMaskBlob,       // B&W mask generated by Transformers.js [2]
+                        prompt: prompt,           // Text description
+                    }
+                });
+
+                // Display the newly modified image array
+                outputImage.src = URL.createObjectURL(response);
+                status.innerText = "Generation complete!";
+            } catch (error) {
+                status.innerText = "Generation failed. Did you update your HF_TOKEN?";
+                console.error(error);
+            } finally {
+                fillBtn.disabled = false;
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
