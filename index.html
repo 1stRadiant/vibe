@@ -909,6 +909,49 @@
         border-radius: 4px !important;
         font-family: 'Fira Code', monospace !important;
     }
+    /* Editable task queue items */
+    .task-queue-list { list-style:none !important; padding:0 !important; margin:0 0 8px !important; }
+    .task-queue-list li {
+        display:flex !important; align-items:flex-start !important; gap:6px !important;
+        background:rgba(16,24,48,0.8) !important; border:1px solid var(--apui-border) !important;
+        border-radius:6px !important; padding:7px 8px !important; margin-bottom:5px !important;
+    }
+    .task-queue-list li:first-child { border-color:rgba(0,255,204,0.4) !important; background:rgba(0,255,204,0.05) !important; }
+    .task-edit-ta {
+        flex:1 !important; background:transparent !important; border:none !important;
+        color:#abb2bf !important; font-family:'Rajdhani',sans-serif !important; font-size:13px !important;
+        line-height:1.5 !important; resize:none !important; outline:none !important;
+        min-height:20px !important; overflow:hidden !important;
+    }
+    .task-edit-ta:focus { color:#e6e6ff !important; }
+    .task-queue-list li:first-child .task-edit-ta { color:#00ffcc !important; font-weight:600 !important; }
+    .task-num { font-size:10px !important; color:#3e4451 !important; font-family:'Fira Code',monospace !important; padding-top:3px !important; min-width:16px !important; }
+    /* Live agent status bar */
+    #agent-live-status {
+        display:none; align-items:center; gap:8px; padding:7px 10px;
+        background:rgba(0,255,204,0.06); border:1px solid rgba(0,255,204,0.25);
+        border-radius:6px; margin-bottom:8px; font-size:12px; color:#00ffcc;
+        font-family:'Fira Code',monospace;
+    }
+    #agent-live-status.visible { display:flex; }
+    .agent-status-dot {
+        width:7px; height:7px; border-radius:50%; background:#00ffcc;
+        animation:statusPulse 1.2s ease-in-out infinite; flex-shrink:0;
+    }
+    @keyframes statusPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+    /* Nudge bar */
+    #agent-nudge-bar {
+        display:none; gap:6px; align-items:flex-end; padding:8px 10px;
+        background:rgba(229,192,123,0.06); border:1px solid rgba(229,192,123,0.3);
+        border-radius:6px; margin-bottom:8px;
+    }
+    #agent-nudge-bar.visible { display:flex; }
+    #agent-nudge-input {
+        flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(229,192,123,0.4);
+        color:#abb2bf; border-radius:5px; padding:6px 10px; font-size:12px;
+        font-family:'Rajdhani',sans-serif; resize:none; line-height:1.5;
+    }
+    #agent-nudge-input:focus { outline:none; border-color:#e5c07b; color:#e6e6ff; }
 
     /* ── Component modal code fields ── */
     .component-modal-code-fields { display: grid !important; grid-template-columns: 1fr 1fr 1fr !important; gap: 10px !important; margin: 10px 0 !important; }
@@ -2289,6 +2332,19 @@
                                             <button id="end-session-button" style="display:none;">Stop Queue</button>
                                         </div>
                                     </div>
+
+                                    <!-- Live agent status bar — shown while queue is running -->
+                                    <div id="agent-live-status">
+                                        <div class="agent-status-dot"></div>
+                                        <span id="agent-live-status-text">Agent is working…</span>
+                                    </div>
+
+                                    <!-- Nudge bar — shown while queue is running so you can steer mid-task -->
+                                    <div id="agent-nudge-bar">
+                                        <textarea id="agent-nudge-input" rows="2" placeholder="💬 Nudge the agent — type a correction or direction while it works…"></textarea>
+                                        <button class="action-button small" onclick="agentSendNudge()" style="border-color:#e5c07b;color:#e5c07b;white-space:nowrap;flex-shrink:0;">Send ↵</button>
+                                    </div>
+
                                     <div id="agent-output-container" style="flex:1;display:flex;flex-direction:column;min-height:0;">
                                         <h3 style="flex-shrink:0;margin:12px 0 6px;font-size:0.8rem;text-transform:uppercase;letter-spacing:.07em;color:var(--apui-text-dim);">Agent Log</h3>
                                         <div id="agent-output" style="flex:1;min-height:0;">
@@ -4371,6 +4427,189 @@ function _startOptionsOutside(e) {
   var wrap = document.getElementById('start-options-wrap');
   if (wrap && !wrap.contains(e.target)) closeStartOptionsMenu();
 }
+
+/* ════════════════════════════════════════════════════════════
+   AGENT ENHANCEMENTS: editable queue, live status, nudge
+   ════════════════════════════════════════════════════════════ */
+
+// ── Override renderTaskQueue to make items inline-editable ───
+// We hook in after app3.js loads by replacing the function reference on window,
+// then patching the task-queue-list via MutationObserver as a belt-and-suspenders.
+(function() {
+  function makeTaskEditable(li, index) {
+    if (li.dataset.editablePatched) return;
+    li.dataset.editablePatched = '1';
+
+    // Replace the static <span> with a textarea
+    var span = li.querySelector('span');
+    if (!span) return;
+    var text = span.textContent.trim();
+
+    var num = document.createElement('span');
+    num.className = 'task-num';
+    num.textContent = (index + 1) + '.';
+
+    var ta = document.createElement('textarea');
+    ta.className = 'task-edit-ta';
+    ta.value = text;
+    ta.rows = 1;
+    ta.title = 'Click to edit this task';
+
+    // Auto-grow
+    function autoGrow() {
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+    }
+    ta.addEventListener('input', function() {
+      autoGrow();
+      // Write back into the app3.js taskQueue array
+      try {
+        var tq = window.taskQueue;
+        if (tq && tq[index] !== undefined) {
+          if (typeof tq[index] === 'string') tq[index] = ta.value;
+          else tq[index].prompt = ta.value;
+        }
+      } catch(e) {}
+    });
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) e.preventDefault(); // prevent newline
+    });
+
+    span.replaceWith(num, ta);
+    setTimeout(autoGrow, 0);
+  }
+
+  function patchQueueList() {
+    var ul = document.getElementById('task-queue-list');
+    if (!ul) return;
+    Array.from(ul.children).forEach(function(li, i) { makeTaskEditable(li, i); });
+  }
+
+  // Watch the task-queue-list for new items rendered by app3.js
+  var queueObserver = new MutationObserver(function() { patchQueueList(); });
+  document.addEventListener('DOMContentLoaded', function() {
+    var ul = document.getElementById('task-queue-list');
+    if (ul) queueObserver.observe(ul, { childList: true, subtree: false });
+
+    // Also watch for the container being injected (app3 creates it lazily)
+    var agentOut = document.getElementById('agent-output') || document.getElementById('agent-controls');
+    if (agentOut) {
+      var containerObs = new MutationObserver(function() {
+        var ul2 = document.getElementById('task-queue-list');
+        if (ul2 && !ul2.dataset.observing) {
+          ul2.dataset.observing = '1';
+          queueObserver.observe(ul2, { childList: true });
+        }
+        patchQueueList();
+      });
+      containerObs.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+})();
+
+// ── Live agent status bar ─────────────────────────────────────
+// Listens to the AGENT_LOG vibeEventBus events that app3.js already dispatches
+// and shows the most recent message in the status bar.
+(function() {
+  var _statusEl, _statusTextEl, _nudgeBar;
+
+  function getEls() {
+    if (!_statusEl)   _statusEl    = document.getElementById('agent-live-status');
+    if (!_statusTextEl) _statusTextEl = document.getElementById('agent-live-status-text');
+    if (!_nudgeBar)   _nudgeBar    = document.getElementById('agent-nudge-bar');
+    return _statusEl && _statusTextEl;
+  }
+
+  function setRunning(running) {
+    if (!getEls()) return;
+    _statusEl.classList.toggle('visible', running);
+    if (_nudgeBar) _nudgeBar.classList.toggle('visible', running);
+    if (!running && _statusTextEl) _statusTextEl.textContent = 'Agent is working…';
+  }
+
+  function setStatus(text, type) {
+    if (!getEls()) return;
+    // Show a short human-readable summary of what the agent just did
+    var clean = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g,' ').trim();
+    if (!clean) return;
+    // Prefix by type
+    var prefix = { plan:'🗺 ', action:'⚙️ ', error:'❌ ', warn:'⚠️ ', info:'ℹ️ ' }[type] || '• ';
+    _statusTextEl.textContent = prefix + clean.slice(0, 120);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // app3.js dispatches AGENT_LOG on vibeEventBus — listen as soon as it exists
+    function hookEventBus() {
+      if (!window.vibeEventBus || !window.AUTO_PILOT_EVENTS) return false;
+      window.vibeEventBus.addEventListener(window.AUTO_PILOT_EVENTS.AGENT_LOG, function(e) {
+        if (!e.detail) return;
+        setStatus(e.detail.message || '', e.detail.type || 'info');
+      });
+      // Watch isTaskQueueRunning to toggle visibility
+      // (app3 doesn't dispatch a start/stop event, so we poll lightly)
+      setInterval(function() {
+        setRunning(!!window.isTaskQueueRunning || !!window.waitingForAgentConfirmation);
+      }, 400);
+      return true;
+    }
+
+    if (!hookEventBus()) {
+      // app3.js hasn't initialised yet — wait
+      var attempts = 0;
+      var iv = setInterval(function() {
+        if (hookEventBus() || ++attempts > 50) clearInterval(iv);
+      }, 200);
+    }
+  });
+})();
+
+// ── Nudge the running agent mid-task ─────────────────────────
+// Injects the nudge text into currentAgentTaskContext so the next
+// AI call picks it up as additional user direction.
+function agentSendNudge() {
+  var inp = document.getElementById('agent-nudge-input');
+  if (!inp || !inp.value.trim()) return;
+  var nudge = inp.value.trim();
+  inp.value = '';
+
+  // Log it to the agent output so it's visible
+  var agentOut = document.getElementById('agent-output');
+  if (agentOut) {
+    var d = document.createElement('div');
+    d.className = 'agent-message log-type-user';
+    d.innerHTML = '<strong>💬 Nudge:</strong> ' + _esc(nudge);
+    if (agentOut.firstChild) agentOut.insertBefore(d, agentOut.firstChild);
+    else agentOut.appendChild(d);
+    agentOut.scrollTop = 0;
+  }
+
+  // Append to the running task context (app3.js reads window.currentAgentTaskContext)
+  if (typeof window.currentAgentTaskContext !== 'undefined') {
+    window.currentAgentTaskContext += '\nUser (mid-task nudge): ' + nudge;
+  }
+
+  // If waiting for confirmation, treat it as a reply
+  if (window.waitingForAgentConfirmation) {
+    var agentInput = document.getElementById('agent-prompt-input');
+    if (agentInput) {
+      agentInput.value = nudge;
+      if (typeof handleAddTaskToQueue === 'function') handleAddTaskToQueue();
+    }
+  }
+}
+
+// Allow Enter (without Shift) in nudge input to send
+document.addEventListener('DOMContentLoaded', function() {
+  var nudgeInput = document.getElementById('agent-nudge-input');
+  if (nudgeInput) {
+    nudgeInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        agentSendNudge();
+      }
+    });
+  }
+});
 
 /* ── Project Search (Home tab) ── */
 function filterProjectList(query) {
@@ -6546,4 +6785,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-                    </html>
+    </html>
