@@ -6311,7 +6311,7 @@ async function jarvisGenerateSuggestions() {
 var _jrvAutoEnabled   = false;   // master switch (persisted in localStorage)
 var _jrvAutoRunning   = false;   // true while a self-project task is executing
 var _jrvAutoLastInput = Date.now();
-var _jrvAutoIdleMs    = 90000;   // wait 90 s of inactivity before kicking in
+var _jrvAutoIdleMs    = 30000;   // wait 30 s of inactivity before kicking in
 var _jrvAutoLoopTimer = null;
 var _jrvAutoProjects  = [];      // list of self-project tasks Jarvis has done
 
@@ -6422,10 +6422,9 @@ async function _jrvAutoPickGoal() {
   var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
   if (!apiKey) return null;
 
-  // Only suggest tasks for the currently loaded project — never invent side projects
-  var currentTree = (typeof window.vibeTree !== 'undefined' && window.vibeTree && window.vibeTree.children && window.vibeTree.children.length)
-    ? window.vibeTree : null;
-  if (!currentTree) return null;  // No project open — nothing to do
+  // Use the tree cached from APUI's apui-init message (vibeTree lives in the iframe, not here)
+  var currentTree = _jrvApuiCurrentTree;
+  if (!currentTree || !currentTree.children || !currentTree.children.length) return null;  // No project loaded in APUI
 
   var treeNodes = [];
   (function walk(node) {
@@ -6544,13 +6543,28 @@ async function _jrvAutoRefreshProjectList() {
   try { if (typeof populateProjectList === 'function') await populateProjectList('local'); } catch(e) {}
 }
 
+// ── Cache of the current APUI vibeTree (populated via apui-init messages) ──
+var _jrvApuiCurrentTree = null;
+var _jrvApuiProjectId   = null;
+
 // ── Listen for messages from the APUI iframe ───────────────────────
 (function() {
   window.addEventListener('message', async function(e) {
     var d = e.data;
     if (!d || d.source !== 'apui-vibe') return;
 
-    // Jarvis inside APUI finished a self-project
+    // Cache tree sent from APUI iframe (apui-current-tree is sent after receiveVibeTree)
+    if (d.type === 'apui-current-tree' && d.vibeTree) {
+      _jrvApuiCurrentTree = d.vibeTree;
+      console.log('[Jarvis] Cached APUI tree:', d.vibeTree.description || d.vibeTree.id, '(' + (d.vibeTree.children||[]).length + ' children)');
+    }
+
+    // Also cache the tree from apui-init direction (app3 → APUI; APUI echoes it back)
+    if (d.type === 'apui-bulk-update' && d.vibeTree) {
+      _jrvApuiCurrentTree = d.vibeTree;
+    }
+
+    // Legacy: Jarvis inside APUI finished a self-project
     if (d.type === 'apui-jarvis-done' && window._jrvAutoCurrentTask) {
       var task = window._jrvAutoCurrentTask;
       try {
@@ -6561,12 +6575,6 @@ async function _jrvAutoRefreshProjectList() {
         task.reject(err);
       }
       window._jrvAutoCurrentTask = null;
-    }
-
-    // Jarvis bulk-update — keep latest snapshot for fallback save
-    if (d.type === 'apui-bulk-update' && window._jrvAutoCurrentTask) {
-      // Store last known good tree state (heartbeat snapshot)
-      window._jrvAutoCurrentTask.lastTree = d.vibeTree || window._jrvAutoCurrentTask.lastTree;
     }
   });
 })();
@@ -6676,8 +6684,8 @@ function _jrvAutoStartLoop() {
     jrvRenderBg();
     _jrvAutoRunning = false;
 
-    // Long cool-down: only suggest one task per idle session (3 min minimum)
-    await new Promise(function(r){ setTimeout(r, 180000); });
+    // Cool-down: wait at least 60s before suggesting another task in the same idle session
+    await new Promise(function(r){ setTimeout(r, 60000); });
 
   }, 15000);
 }
