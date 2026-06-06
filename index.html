@@ -2467,7 +2467,7 @@
                                         <button class="jrv-stab" onclick="jrvTab('memory',this)">🧠 Memory</button>
                                         <button class="jrv-stab" onclick="jrvTab('skills',this)">⚡ Skills</button>
                                         <button class="jrv-stab" onclick="jrvTab('bg',this)">🌙 Background</button>
-                                        <button class="jrv-stab" id="jrv-auto-toggle-btn" onclick="jrvAutoToggle()" style="margin-left:auto;color:#5c6370;" title="Autonomous Mode — Jarvis works on its own projects when you are idle">🛸 Auto</button>
+                                        <button class="jrv-stab" id="jrv-auto-toggle-btn" onclick="jrvAutoToggle()" style="margin-left:auto;color:#5c6370;" title="Auto Mode — when idle, Jarvis suggests one improvement task for your current project and queues it as a PR for your review">🛸 Auto</button>
                                         <button class="jrv-stab" onclick="jarvisToggleSettings()" style="color:#5c6370;">⚙</button>
                                     </div>
 
@@ -6422,29 +6422,42 @@ async function _jrvAutoPickGoal() {
   var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
   if (!apiKey) return null;
 
-  var mem = (typeof _jrvMemorySummaryAsync === 'function')
-    ? await _jrvMemorySummaryAsync().catch(function(){ return _jrvMemorySummary(); })
-    : _jrvMemorySummary();
-  var pastTitles = _jrvAutoProjects.slice(-8).map(function(p){ return p.title; }).join(', ') || 'none';
+  // Only suggest tasks for the currently loaded project — never invent side projects
+  var currentTree = (typeof window.vibeTree !== 'undefined' && window.vibeTree && window.vibeTree.children && window.vibeTree.children.length)
+    ? window.vibeTree : null;
+  if (!currentTree) return null;  // No project open — nothing to do
+
+  var treeNodes = [];
+  (function walk(node) {
+    if (!node) return;
+    treeNodes.push(node.type + ':' + node.id + (node.description ? ' (' + node.description + ')' : ''));
+    (node.children || []).forEach(walk);
+  })(currentTree);
+  var treeSummary = treeNodes.slice(0, 20).join(', ');
+  var projectName = currentTree.description || window.currentProjectId || 'current project';
+  var pastTasks = _jrvAutoProjects.slice(-6).map(function(p){ return p.title; }).join(', ') || 'none';
 
   var prompt = [
-    'You are Jarvis. The developer is away. Invent ONE new self-contained interactive web project inspired by their past work.',
+    'You are Jarvis, an AI assistant helping a developer improve their active project.',
+    'The developer is idle. Suggest ONE small, focused improvement task for their loaded project.',
     '',
-    'Respond with EXACTLY this format (no extra lines, no markdown, no quotes):',
-    'TITLE: <short 2–5 word project name, e.g. "Pixel Rain Sim">',
-    'DESC: <one sentence description of what to build>',
+    'Current project: "' + projectName + '"',
+    'Project nodes: ' + treeSummary,
+    '',
+    'Recent tasks already done (do not repeat): ' + pastTasks,
+    '',
+    'Respond with EXACTLY this format (no extra lines, no markdown):',
+    'TITLE: <2-6 word task name>',
+    'DESC: <one sentence: what specific improvement to make to this project>',
     '',
     'Rules:',
-    '- Must be a complete, self-contained HTML/CSS/JS page (game, tool, visualiser, art, utility).',
-    '- Inspired by the developer\'s existing projects below.',
-    '- Must be DIFFERENT from these already built: ' + pastTitles,
-    '- TITLE must be 2–5 words, Title Case, no punctuation.',
-    '',
-    'Developer project memories:',
-    mem,
+    '- Must be a small, targeted improvement to the EXISTING project nodes listed above.',
+    '- Do NOT invent a new unrelated project.',
+    '- Examples: "Improve button hover animations", "Add keyboard shortcuts", "Fix mobile layout"',
+    '- TITLE must be 2-6 words, Title Case, no punctuation.',
   ].join('\n');
 
-  var raw = await _jrvCall(apiKey, model, prompt, 150);
+  var raw = await _jrvCall(apiKey, model, prompt, 100);
   if (!raw) return null;
   var titleMatch = raw.match(/TITLE:\s*(.+)/i);
   var descMatch  = raw.match(/DESC:\s*(.+)/i);
@@ -6590,13 +6603,13 @@ function _jrvAutoLaunchApuiJarvis(goal, skeleton, heartbeatMs) {
     window._jrvAutoCurrentTask.resolve = function(v) { clearTimeout(timeout); origResolve(v); };
     window._jrvAutoCurrentTask.reject  = function(e) { clearTimeout(timeout); origReject(e); };
 
+    // Send task to APUI's Jarvis PR system — no vibeTree override so APUI keeps its current project
     frame.contentWindow.postMessage({
-      type:        'apui-jarvis-start',
-      goal:        goal,
-      vibeTree:    skeleton,
-      apiKey:      apiKey,
-      model:       model,
-      heartbeatMs: heartbeatMs,
+      type:   'apui-jarvis-start',
+      goal:   goal,
+      apiKey: apiKey,
+      model:  model,
+      // NOTE: vibeTree intentionally omitted — APUI uses its own currently-loaded project
     }, '*');
   });
 }
@@ -6618,21 +6631,8 @@ function _jrvAutoStartLoop() {
 
     _jrvAutoRunning = true;
 
-    // 2 — Build project ID with -jarvis suffix
-    var projectId = goal.slug + '-jarvis';
-    if (window.localApi && typeof window.localApi.listProjects === 'function') {
-      try {
-        var existing = await window.localApi.listProjects();
-        if (existing.includes(projectId)) projectId = goal.slug + '-jarvis-' + Date.now();
-      } catch(e) {}
-    }
-
-    // 3 — Heartbeat from settings
-    var heartbeatMs = parseInt((document.getElementById('jarvis-heartbeat') || {}).value || '8000', 10);
-    if (heartbeatMs < 5000) heartbeatMs = 5000;
-
     _jrvAutoShowBadge('🤖 ' + goal.title + '…');
-    _jrvLog('🛸 Auto: building "' + goal.title + '" (' + projectId + ')', 'jrv-msg-think');
+    _jrvLog('🤖 Auto: queueing task "' + goal.title + '" for current project', 'jrv-msg-think');
 
     // Register in BG pane
     if (!Array.isArray(window._jrvBgTasks)) window._jrvBgTasks = [];
@@ -6640,50 +6640,44 @@ function _jrvAutoStartLoop() {
     _jrvBgTasks.push(task);
     jrvRenderBg();
 
-    _jrvAutoProjects.push({ title: goal.title, id: projectId, ts: Date.now() });
-    jarvisAddMemory('Jarvis self-project started: ' + goal.title + ' (' + projectId + ')', 'auto');
+    _jrvAutoProjects.push({ title: goal.title, ts: Date.now() });
+    jarvisAddMemory('Jarvis auto task queued: ' + goal.title, 'auto');
 
-    // 4 — Navigate to APUI tab so user can watch
+    // Navigate to APUI tab so user can review the resulting PR
     _jrvAutoOpenApuiTab();
 
-    // 5 — Build skeleton tree and launch Jarvis inside APUI
-    var skeleton = _jrvAutoBuildSkeleton(goal.title, goal.description);
-    // Tag the current task with project info so the message listener can save it
-    window._jrvAutoCurrentTask = window._jrvAutoCurrentTask || {};
-    window._jrvAutoCurrentTask.projectId = projectId;
-    window._jrvAutoCurrentTask.title     = goal.title;
-
     try {
-      var result = await _jrvAutoLaunchApuiJarvis(goal.description, skeleton, heartbeatMs);
-
-      // 6 — Save final tree (from done signal or last heartbeat snapshot)
-      var finalTree = (result && result.vibeTree) || (window._jrvAutoCurrentTask && window._jrvAutoCurrentTask.lastTree) || skeleton;
-      await _jrvAutoSaveProject(projectId, goal.title, finalTree);
-      await _jrvAutoRefreshProjectList();
+      // Send a single task to APUI's Jarvis PR queue — one task, one PR, user reviews before anything merges
+      var frame = document.getElementById('apui-frame');
+      if (!frame || !frame.contentWindow) throw new Error('APUI frame not found');
+      var apiKey = _jrvGet('jarvis-api-key');
+      var model  = _jrvGet('jarvis-model') || 'gemini-2.0-flash';
+      frame.contentWindow.postMessage({
+        type:   'apui-jarvis-start',
+        goal:   goal.description,
+        apiKey: apiKey,
+        model:  model,
+        // No vibeTree — APUI uses the currently-loaded project
+      }, '*');
 
       task.status = 'done';
-      task.result = projectId;
-      jarvisAddMemory('Jarvis self-project done: ' + goal.title + ' → "' + projectId + '" (' + (result.beats || '?') + ' beats)', 'auto');
-      _jrvLog('🛸 Auto: "' + goal.title + '" saved as "' + projectId + '"', 'jrv-msg-ok');
+      task.result = 'PR queued in APUI';
+      _jrvLog('🤖 Auto: PR queued for "' + goal.title + '" — check APUI to review', 'jrv-msg-ok');
       _jrvAutoShowBadge('✓ ' + goal.title);
       setTimeout(_jrvAutoStopBadge, 8000);
 
     } catch(e) {
       task.status = 'error';
       task.result = e && e.message ? e.message : String(e);
-      _jrvLog('🛸 Auto error: ' + (e && e.message ? e.message : e), 'jrv-msg-err');
+      _jrvLog('🤖 Auto error: ' + (e && e.message ? e.message : e), 'jrv-msg-err');
       _jrvAutoStopBadge();
     }
 
-    window._jrvAutoCurrentTask = null;
     jrvRenderBg();
-    var bgBtn = document.querySelector('.jrv-stab[onclick*="bg"]');
-    if (bgBtn && !bgBtn.textContent.includes('✓')) bgBtn.textContent = '🌙 Background ✓';
-
     _jrvAutoRunning = false;
 
-    // Cool-down before next project
-    await new Promise(function(r){ setTimeout(r, 180000 + heartbeatMs); });
+    // Long cool-down: only suggest one task per idle session (3 min minimum)
+    await new Promise(function(r){ setTimeout(r, 180000); });
 
   }, 15000);
 }
