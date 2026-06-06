@@ -1050,8 +1050,10 @@ window.addEventListener('message', e => {
         if (!goal) { logToChat('system', '⚠ apui-jarvis-start: no goal provided'); return; }
         logToChat('system', `🤖 Jarvis: task queued from parent — "${goal}"`);
         JarvisPR.addTask(goal);
-        JarvisPR.openPanel();
+        // Don't force-open the panel — run silently, PR will be waiting when user checks
         JarvisPR.runNext();
+        // Update badge so user notices a PR is ready
+        JarvisPR._updateBadges();
         return;
     }
 
@@ -1084,6 +1086,8 @@ function receiveVibeTree(incoming, incomingPins) {
     setSyncDirty(false);
     toast('Vibe Tree loaded ✓');
     updatePreview();
+    // Echo tree to parent so index.html Jarvis auto-loop can read the active project
+    postToParent('apui-current-tree', { vibeTree: JSON.parse(JSON.stringify(vibeTree)) });
 }
 
 /* ════════════════════════════════════════════════════════════════
