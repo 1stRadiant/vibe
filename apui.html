@@ -554,6 +554,163 @@
     }
     .note-composer-save:hover { background: #5577ff; }
 
+    /* ─── Jarvis PR Panel ──────────────────────────────────── */
+    #jarvis-pr-panel {
+        position: fixed; top: var(--nb-h, 52px); right: 0;
+        bottom: 72px; width: 420px;
+        background: rgba(6,9,20,0.99);
+        border-left: 1px solid rgba(255,0,255,0.25);
+        z-index: 19500; transform: translateX(100%);
+        transition: transform 0.35s cubic-bezier(0.2,0.8,0.2,1);
+        display: flex; flex-direction: column;
+        box-shadow: -8px 0 40px rgba(0,0,0,0.7);
+    }
+    #jarvis-pr-panel.open { transform: translateX(0); }
+    @media (max-width: 600px) {
+        #jarvis-pr-panel { width: 100%; border-left: none; border-top: 1px solid rgba(255,0,255,0.25); top: auto; height: 70vh; bottom: 72px; transform: translateY(100%); }
+        #jarvis-pr-panel.open { transform: translateY(0); }
+    }
+
+    .jpr-header {
+        padding: 11px 14px; border-bottom: 1px solid rgba(255,0,255,0.18);
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+        background: rgba(10,4,20,0.9);
+    }
+    .jpr-title { font-family: 'Orbitron', sans-serif; font-size: 0.72rem; color: var(--ai-glow); letter-spacing: 1px; flex: 1; }
+    .jpr-close-btn { background: transparent; border: none; color: rgba(255,255,255,0.3); font-size: 1rem; cursor: pointer; padding: 2px 6px; transition: color 0.15s; }
+    .jpr-close-btn:hover { color: #ff4444; }
+
+    /* Tabs: Tasks | PRs | Log */
+    .jpr-tabs {
+        display: flex; border-bottom: 1px solid rgba(255,0,255,0.12); flex-shrink: 0;
+    }
+    .jpr-tab {
+        flex: 1; padding: 8px 0; text-align: center;
+        font-family: 'Fira Code', monospace; font-size: 0.62rem;
+        color: #444; cursor: pointer; border-bottom: 2px solid transparent;
+        transition: color 0.15s, border-color 0.15s; text-transform: uppercase; letter-spacing: 0.5px;
+        position: relative;
+    }
+    .jpr-tab:hover { color: #888; }
+    .jpr-tab.active { color: var(--ai-glow); border-bottom-color: var(--ai-glow); }
+    .jpr-tab .jpr-badge {
+        position: absolute; top: 4px; right: 8px;
+        background: var(--ai-glow); color: #000; font-size: 0.52rem;
+        border-radius: 8px; padding: 1px 5px; font-weight: 700;
+        min-width: 14px; text-align: center;
+    }
+    .jpr-tab-pane { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+    .jpr-tab-pane.active { display: flex; }
+
+    /* Task queue */
+    .jpr-task-composer {
+        padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
+    }
+    .jpr-task-input {
+        width: 100%; background: rgba(16,24,48,0.8); border: 1px solid rgba(255,0,255,0.2);
+        border-radius: 5px; color: var(--text); font-size: 0.78rem;
+        padding: 7px 9px; resize: none; font-family: inherit; line-height: 1.4;
+        transition: border-color 0.15s; box-sizing: border-box;
+    }
+    .jpr-task-input:focus { outline: none; border-color: rgba(255,0,255,0.5); }
+    .jpr-task-actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+    .jpr-btn {
+        background: transparent; border: 1px solid rgba(255,0,255,0.3);
+        border-radius: 4px; color: var(--ai-glow); font-size: 0.7rem; font-weight: 700;
+        padding: 5px 12px; cursor: pointer; font-family: 'Rajdhani', sans-serif;
+        text-transform: uppercase; transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+    }
+    .jpr-btn:hover { background: rgba(255,0,255,0.12); border-color: var(--ai-glow); }
+    .jpr-btn.primary { background: rgba(255,0,255,0.15); border-color: var(--ai-glow); }
+    .jpr-btn.primary:hover { background: rgba(255,0,255,0.3); }
+    .jpr-btn.danger { border-color: rgba(255,68,68,0.4); color: #ff8888; }
+    .jpr-btn.danger:hover { background: rgba(255,68,68,0.15); border-color: #ff4444; }
+    .jpr-btn.success { border-color: rgba(0,255,150,0.4); color: #00ff96; }
+    .jpr-btn.success:hover { background: rgba(0,255,150,0.15); border-color: #00ff96; }
+    .jpr-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .jpr-task-list { flex: 1; overflow-y: auto; }
+    .jpr-task-item {
+        padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        display: flex; align-items: flex-start; gap: 8px;
+        cursor: default; transition: background 0.12s;
+    }
+    .jpr-task-item:hover { background: rgba(255,0,255,0.04); }
+    .jpr-task-status {
+        width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+    }
+    .jpr-task-status.pending  { background: #ffb74d; }
+    .jpr-task-status.working  { background: var(--ai-glow); animation: pulse-sync 0.7s infinite; }
+    .jpr-task-status.done     { background: #66bb6a; }
+    .jpr-task-status.rejected { background: #ef5350; }
+    .jpr-task-body { flex: 1; min-width: 0; }
+    .jpr-task-text { font-size: 0.75rem; color: rgba(255,255,255,0.75); line-height: 1.4; word-break: break-word; }
+    .jpr-task-meta { font-family: 'Fira Code', monospace; font-size: 0.55rem; color: #444; margin-top: 3px; }
+    .jpr-task-del { background: transparent; border: none; color: #333; font-size: 0.7rem; cursor: pointer; padding: 2px 5px; border-radius: 3px; transition: color 0.12s; flex-shrink: 0; }
+    .jpr-task-del:hover { color: #ff4444; }
+
+    /* PR cards */
+    .jpr-pr-card {
+        border-bottom: 1px solid rgba(255,0,255,0.08);
+        background: rgba(10,4,20,0.5);
+        transition: background 0.15s;
+    }
+    .jpr-pr-card:hover { background: rgba(20,8,36,0.7); }
+    .jpr-pr-header {
+        padding: 10px 12px 8px; display: flex; align-items: flex-start; gap: 8px;
+        cursor: pointer; user-select: none;
+    }
+    .jpr-pr-num { font-family: 'Fira Code', monospace; font-size: 0.6rem; color: rgba(255,0,255,0.5); flex-shrink: 0; margin-top: 2px; }
+    .jpr-pr-info { flex: 1; min-width: 0; }
+    .jpr-pr-title { font-size: 0.75rem; color: var(--text); font-weight: 600; line-height: 1.4; }
+    .jpr-pr-meta { font-family: 'Fira Code', monospace; font-size: 0.55rem; color: #555; margin-top: 3px; }
+    .jpr-pr-chevron { color: #444; font-size: 0.7rem; flex-shrink: 0; transition: transform 0.2s; margin-top: 2px; }
+    .jpr-pr-card.expanded .jpr-pr-chevron { transform: rotate(90deg); }
+    .jpr-pr-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .jpr-pr-status-dot.open    { background: var(--ai-glow); }
+    .jpr-pr-status-dot.merged  { background: #66bb6a; }
+    .jpr-pr-status-dot.closed  { background: #ef5350; }
+
+    .jpr-pr-body { display: none; padding: 0 12px 10px; }
+    .jpr-pr-card.expanded .jpr-pr-body { display: block; }
+
+    /* Diff viewer */
+    .jpr-diff-block { margin-bottom: 8px; border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); }
+    .jpr-diff-filename { padding: 4px 8px; background: rgba(0,0,0,0.5); font-family: 'Fira Code', monospace; font-size: 0.58rem; color: #777; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .jpr-diff-scroll { max-height: 200px; overflow-y: auto; background: #07090f; }
+    .jpr-diff-line { font-family: 'Fira Code', monospace; font-size: 0.62rem; padding: 1px 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.55; }
+    .jpr-diff-line.add { background: rgba(0,255,100,0.07); color: #88ee99; }
+    .jpr-diff-line.add::before { content: '+'; margin-right: 6px; color: #55cc77; opacity: 0.8; }
+    .jpr-diff-line.rem { background: rgba(255,60,60,0.07); color: #ee8888; }
+    .jpr-diff-line.rem::before { content: '-'; margin-right: 6px; color: #cc5555; opacity: 0.8; }
+    .jpr-diff-line.ctx { color: rgba(255,255,255,0.25); }
+    .jpr-diff-line.ctx::before { content: ' '; margin-right: 6px; }
+
+    .jpr-pr-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+    /* Log */
+    .jpr-log-list { flex: 1; overflow-y: auto; padding: 6px; }
+    .jpr-log-entry {
+        padding: 5px 8px; border-radius: 3px; margin-bottom: 3px;
+        font-family: 'Fira Code', monospace; font-size: 0.6rem; line-height: 1.5;
+        border-left: 2px solid transparent;
+    }
+    .jpr-log-entry.merge  { border-left-color: #66bb6a; color: #88cc88; background: rgba(102,187,106,0.05); }
+    .jpr-log-entry.reject { border-left-color: #ef5350; color: #cc8888; background: rgba(239,83,80,0.05); }
+    .jpr-log-entry.info   { border-left-color: #4169e1; color: #7799cc; background: rgba(65,105,225,0.05); }
+    .jpr-log-entry.task   { border-left-color: var(--ai-glow); color: rgba(255,0,255,0.7); background: rgba(255,0,255,0.04); }
+    .jpr-log-time { color: #333; }
+
+    /* Run bar at bottom of panel */
+    .jpr-run-bar {
+        padding: 8px 12px; border-top: 1px solid rgba(255,0,255,0.15);
+        display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+        background: rgba(6,3,12,0.95);
+    }
+    .jpr-run-status { font-family: 'Fira Code', monospace; font-size: 0.6rem; color: #555; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .jpr-run-status.active { color: var(--ai-glow); }
+
     /* Fullscreen: truly full viewport */
     .node.fullscreen-mode {
         resize: none !important; z-index: 9999 !important;
@@ -743,7 +900,67 @@
     </div>
 </div>
 
-<!-- Draggable OS Menu -->
+<!-- Jarvis PR Panel -->
+<div id="jarvis-pr-panel">
+    <div class="jpr-header">
+        <span style="font-size:1.1rem;">🤖</span>
+        <span class="jpr-title">JARVIS / PR REVIEW</span>
+        <button class="jpr-close-btn" onclick="jarvisPRPanelClose()" title="Close panel">✕</button>
+    </div>
+
+    <div class="jpr-tabs">
+        <div class="jpr-tab active" data-tab="tasks" onclick="jarvisPRTab('tasks')">Tasks<span class="jpr-badge" id="jpr-badge-tasks" style="display:none"></span></div>
+        <div class="jpr-tab" data-tab="prs" onclick="jarvisPRTab('prs')">PRs<span class="jpr-badge" id="jpr-badge-prs" style="display:none"></span></div>
+        <div class="jpr-tab" data-tab="log" onclick="jarvisPRTab('log')">Log</div>
+    </div>
+
+    <!-- Tasks Tab -->
+    <div class="jpr-tab-pane active" id="jpr-pane-tasks">
+        <div class="jpr-task-composer">
+            <textarea id="jpr-task-input" class="jpr-task-input" rows="2" placeholder="Describe a task for Jarvis… (e.g. 'Add smooth scroll to nav links')"></textarea>
+            <div class="jpr-task-actions">
+                <button class="jpr-btn primary" onclick="jarvisAddTask()">＋ Queue Task</button>
+                <button class="jpr-btn" id="jpr-run-btn" onclick="jarvisRunNext()">▶ Run Next</button>
+                <button class="jpr-btn" id="jpr-run-all-btn" onclick="jarvisRunAll()">▶▶ Run All</button>
+                <button class="jpr-btn danger" onclick="jarvisClearDoneTasks()" style="margin-left:auto;">Clear Done</button>
+            </div>
+        </div>
+        <div class="jpr-task-list" id="jpr-task-list">
+            <div style="padding:24px 16px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#333;line-height:1.9;" id="jpr-task-empty">
+                No tasks queued.<br>Add a task above for Jarvis to work on.
+            </div>
+        </div>
+    </div>
+
+    <!-- PRs Tab -->
+    <div class="jpr-tab-pane" id="jpr-pane-prs">
+        <div style="padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <span style="font-family:'Fira Code',monospace;font-size:0.58rem;color:#555;flex:1;" id="jpr-pr-summary">No open PRs</span>
+            <button class="jpr-btn success" onclick="jarvisMergeAll()" id="jpr-merge-all-btn" style="display:none">✓ Merge All</button>
+            <button class="jpr-btn danger" onclick="jarvisRejectAll()" id="jpr-reject-all-btn" style="display:none">✗ Reject All</button>
+        </div>
+        <div id="jpr-pr-list" style="flex:1;overflow-y:auto;"></div>
+    </div>
+
+    <!-- Log Tab -->
+    <div class="jpr-tab-pane" id="jpr-pane-log">
+        <div style="padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px;flex-shrink:0;align-items:center;">
+            <span style="font-family:'Fira Code',monospace;font-size:0.58rem;color:#555;flex:1;">Activity log</span>
+            <button class="jpr-btn" onclick="jarvisClearLog()" style="font-size:0.58rem;padding:3px 8px;">Clear</button>
+        </div>
+        <div class="jpr-log-list" id="jpr-log-list">
+            <div style="padding:20px 12px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#333;" id="jpr-log-empty">No activity yet.</div>
+        </div>
+    </div>
+
+    <!-- Run bar -->
+    <div class="jpr-run-bar">
+        <div class="jpr-run-status" id="jpr-run-status">Idle</div>
+        <button class="jpr-btn danger" onclick="jarvisStop()" id="jpr-stop-btn" style="display:none">■ Stop</button>
+    </div>
+</div>
+
+
 <div id="os-menu-container">
     <div class="os-logo-container">
         <img src="/1737295468100.png" alt="APUI" class="center-image" onerror="this.style.display='none'; this.parentNode.querySelector('.logo-text').style.display='block'">
@@ -757,11 +974,11 @@
             </g>
         </svg>
     </div>
-    <button class="os-menu-btn btn-1" onclick="jarvisToggle()">🤖 Jarvis</button>
-    <button class="os-menu-btn btn-2" onclick="jarvisShowRoadmap()">🗺 Roadmap</button>
-    <button class="os-menu-btn btn-3" onclick="jarvisReturnFocus()">🔭 Focus</button>
-    <button class="os-menu-btn btn-4" onclick="jarvisSetGoal()">🎯 Goal</button>
-    <button class="os-menu-btn btn-5" onclick="openJarvisSettings()">⚡ Interval</button>
+    <button class="os-menu-btn btn-1" onclick="jarvisPRPanelOpen()">🤖 Jarvis PRs</button>
+    <button class="os-menu-btn btn-2" onclick="jarvisAddTaskFromMenu()">＋ Add Task</button>
+    <button class="os-menu-btn btn-3" onclick="jarvisRunAllFromMenu()">▶ Run All Tasks</button>
+    <button class="os-menu-btn btn-4" onclick="jarvisMergeAll()">✓ Merge All PRs</button>
+    <button class="os-menu-btn btn-5" onclick="jarvisStop()">■ Stop Jarvis</button>
     <button class="os-menu-btn btn-6" onclick="pushAllToVibeTree()">⬆ Push</button>
 </div>
 
@@ -824,32 +1041,24 @@ window.addEventListener('message', e => {
         return;
     }
 
-    // ── Autonomous Mode: parent asks Jarvis to start on a self-project ──
+    // ── Jarvis start via postMessage: route to PR system ──
     if (d.type === 'apui-jarvis-start') {
-        // Apply credentials if provided
         if (d.apiKey)  { AppState.settings.apiKey = d.apiKey;  localStorage.setItem('apui_gemini_key', d.apiKey); }
         if (d.model)   { AppState.settings.model  = d.model;   localStorage.setItem('apui_model', d.model); }
-        // Apply heartbeat
-        if (d.heartbeatMs && d.heartbeatMs >= 5000) Jarvis.heartbeatMs = d.heartbeatMs;
-        // Load the provided skeleton vibeTree (if given), otherwise keep current
-        if (d.vibeTree) {
-            receiveVibeTree(d.vibeTree, []);
-        }
-        // Stop any existing Jarvis run cleanly
-        if (Jarvis.running) Jarvis.stop();
-        // Start with the given goal
+        if (d.vibeTree) receiveVibeTree(d.vibeTree, []);
         const goal = (d.goal || '').trim();
         if (!goal) { logToChat('system', '⚠ apui-jarvis-start: no goal provided'); return; }
-        logToChat('system', `🛸 Autonomous Mode: Jarvis waking up for "${goal}"`);
-        Jarvis.goal = goal;
-        Jarvis.start(goal);
+        logToChat('system', `🤖 Jarvis: task queued from parent — "${goal}"`);
+        JarvisPR.addTask(goal);
+        JarvisPR.openPanel();
+        JarvisPR.runNext();
         return;
     }
 
-    // ── Autonomous Mode: parent asks Jarvis to stop ──
+    // ── Jarvis stop via postMessage ──
     if (d.type === 'apui-jarvis-stop') {
-        if (Jarvis.running) Jarvis.stop();
-        logToChat('system', '🛸 Autonomous Mode: Jarvis paused by parent');
+        JarvisPR.stop();
+        logToChat('system', '🤖 Jarvis paused by parent');
         return;
     }
 });
@@ -1951,15 +2160,594 @@ function clearExplainPane(nodeId) {
     const pane = document.getElementById(`explain-${nodeId}`);
     if (pane) { pane.textContent = ''; pane.classList.remove('active'); }
 }
-/* ==============================================================
-   Jarvis runs on a heartbeat interval. Each beat it:
-     1. Reviews its goal + memory of past actions
-     2. Plans the next incremental edit
-     3. Applies changes (nodes float to front, user can still pan)
-     4. Logs to memory and chat
-     5. Sleeps until next heartbeat
-   ============================================================== */
+/* ════════════════════════════════════════════════════════════════
+   JARVIS PR SYSTEM
+   Jarvis works on tasks from a queue, generates PR proposals,
+   and waits for the user to merge or reject each change.
+   ════════════════════════════════════════════════════════════════ */
+
+const JarvisPR = {
+    // Task queue: { id, text, status: 'pending'|'working'|'done'|'rejected', prIds: [], addedAt }
+    tasks: [],
+    // PR list: { id, taskId, title, category, actions: [{nodeId,oldCode,newCode,isNew,newNode,narration}], status: 'open'|'merged'|'closed', createdAt }
+    prs: [],
+    // Activity log: { type, msg, time }
+    log: [],
+    running: false,
+    _runAllMode: false,
+    _stopRequested: false,
+    _prCounter: 0,
+    _taskIdCounter: 0,
+
+    /* ── Public: Panel UI ─────────────────────────────────── */
+
+    openPanel() {
+        document.getElementById('jarvis-pr-panel')?.classList.add('open');
+        // If rsidebar is open, close it to avoid overlap
+        document.getElementById('rsidebar')?.classList.remove('open');
+        this._renderTasks();
+        this._renderPRs();
+    },
+
+    closePanel() {
+        document.getElementById('jarvis-pr-panel')?.classList.remove('open');
+    },
+
+    switchTab(tab) {
+        document.querySelectorAll('.jpr-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+        document.querySelectorAll('.jpr-tab-pane').forEach(p => p.classList.toggle('active', p.id === `jpr-pane-${tab}`));
+        if (tab === 'prs') this._renderPRs();
+        if (tab === 'tasks') this._renderTasks();
+        if (tab === 'log') this._renderLog();
+    },
+
+    /* ── Task management ─────────────────────────────────── */
+
+    addTask(text) {
+        if (!text?.trim()) return;
+        const task = {
+            id: ++this._taskIdCounter,
+            text: text.trim(),
+            status: 'pending',
+            prIds: [],
+            addedAt: new Date()
+        };
+        this.tasks.push(task);
+        this._logEntry('task', `Task queued: "${text.trim().slice(0,60)}"`);
+        this._renderTasks();
+        this._updateBadges();
+        return task;
+    },
+
+    removeTask(id) {
+        this.tasks = this.tasks.filter(t => t.id !== id);
+        this._renderTasks();
+        this._updateBadges();
+    },
+
+    clearDoneTasks() {
+        this.tasks = this.tasks.filter(t => t.status === 'pending' || t.status === 'working');
+        this._renderTasks();
+        this._updateBadges();
+    },
+
+    /* ── Run ─────────────────────────────────────────────── */
+
+    async runNext() {
+        if (this.running) { toast('Jarvis is already working on a task'); return; }
+        const task = this.tasks.find(t => t.status === 'pending');
+        if (!task) { toast('No pending tasks — add a task first'); return; }
+        await this._runTask(task);
+    },
+
+    async runAll() {
+        if (this.running) { toast('Jarvis is already working'); return; }
+        this._runAllMode = true;
+        this._stopRequested = false;
+        document.getElementById('jpr-stop-btn').style.display = 'inline-flex';
+        const pending = this.tasks.filter(t => t.status === 'pending');
+        if (!pending.length) { toast('No pending tasks'); this._runAllMode = false; return; }
+        for (const task of pending) {
+            if (this._stopRequested) break;
+            await this._runTask(task);
+            // small pause between tasks
+            await delay(500);
+        }
+        this._runAllMode = false;
+        this._stopRequested = false;
+        document.getElementById('jpr-stop-btn').style.display = 'none';
+        this._setStatus('All tasks processed — review PRs');
+    },
+
+    stop() {
+        this._stopRequested = true;
+        this.running = false;
+        document.getElementById('jpr-stop-btn').style.display = 'none';
+        document.getElementById('taskbar')?.classList.remove('jarvis-active');
+        document.getElementById('jarvis-status-pill')?.classList.remove('active');
+        this._setStatus('Stopped');
+        this._logEntry('info', 'Jarvis stopped by user');
+        logToChat('system', '🤖 Jarvis stopped');
+    },
+
+    /* ── Core: run one task ──────────────────────────────── */
+
+    async _runTask(task) {
+        if (!AppState.settings.apiKey) {
+            toast('⚠ No API key — open Settings'); return;
+        }
+        this.running = true;
+        task.status = 'working';
+        document.getElementById('taskbar')?.classList.add('jarvis-active');
+        document.getElementById('jpr-stop-btn').style.display = 'inline-flex';
+        this._renderTasks();
+        this._setStatus(`Working: "${task.text.slice(0,40)}…"`);
+        logToChat('system', `🤖 Jarvis working on: "${task.text.slice(0,60)}"`);
+
+        // Show status pill
+        const pill = document.getElementById('jarvis-status-pill');
+        const pillTxt = document.getElementById('jarvis-status-text');
+        if (pill) pill.classList.add('active');
+        if (pillTxt) pillTxt.textContent = task.text.slice(0,30) + '…';
+
+        try {
+            const plan = await this._callJarvis(task.text);
+            if (!plan) throw new Error('Jarvis returned empty plan');
+
+            // Build PR object with actions (capture old code for diff)
+            const prActions = [];
+            for (const action of (plan.actions || [])) {
+                if (action.actionType === 'update') {
+                    const treeNode = findNodeInTree(action.nodeId);
+                    if (!treeNode) continue;
+                    prActions.push({
+                        actionType: 'update',
+                        nodeId: action.nodeId,
+                        oldCode: treeNode.code || '',
+                        newCode: action.newCode,
+                        narration: action.narration || ''
+                    });
+                } else if (action.actionType === 'create') {
+                    prActions.push({
+                        actionType: 'create',
+                        nodeId: action.newNode?.id || 'new-node',
+                        oldCode: '',
+                        newCode: action.newNode?.code || '',
+                        newNode: action.newNode,
+                        parentId: action.parentId,
+                        narration: action.narration || '',
+                        isNew: true
+                    });
+                }
+            }
+
+            if (!prActions.length) {
+                task.status = 'done';
+                this._logEntry('info', `Task "${task.text.slice(0,40)}" — Jarvis had no changes to propose`);
+                logToChat('ai', `[Jarvis] No changes needed for: "${task.text.slice(0,50)}"`);
+            } else {
+                const pr = {
+                    id: ++this._prCounter,
+                    taskId: task.id,
+                    title: plan.plan || task.text,
+                    category: plan.category || 'edit',
+                    actions: prActions,
+                    status: 'open',
+                    createdAt: new Date()
+                };
+                this.prs.push(pr);
+                task.prIds.push(pr.id);
+                task.status = 'done';
+                this._logEntry('task', `PR #${pr.id} opened: "${pr.title.slice(0,50)}"`);
+                logToChat('ai', `🔀 PR #${pr.id} ready for review: ${pr.title}`);
+                // Auto-switch to PRs tab and highlight
+                this.switchTab('prs');
+                this._renderPRs();
+            }
+
+        } catch(e) {
+            task.status = 'pending'; // allow retry
+            this._logEntry('info', `Error on task "${task.text.slice(0,30)}": ${e.message}`);
+            logToChat('system', `⚠ Jarvis error: ${e.message}`);
+            toast('⚠ Jarvis error: ' + e.message);
+        } finally {
+            this.running = false;
+            document.getElementById('taskbar')?.classList.remove('jarvis-active');
+            if (!this._runAllMode) {
+                document.getElementById('jpr-stop-btn').style.display = 'none';
+            }
+            if (pill) pill.classList.remove('active');
+            this._renderTasks();
+            this._updateBadges();
+            this._setStatus(this.prs.filter(p => p.status==='open').length > 0
+                ? `${this.prs.filter(p => p.status==='open').length} PR(s) awaiting review`
+                : 'Idle');
+        }
+    },
+
+    /* ── Call Gemini to plan changes ────────────────────────── */
+
+    async _callJarvis(taskText) {
+        const context = getVibeContext();
+        const sys = `You are Jarvis, a senior full-stack assistant embedded in APUI Vibe Editor.
+Your job is to propose SMALL, FOCUSED improvements to the user's CURRENT active project.
+You make careful, targeted edits — never rewrite things that don't need changing.
+You are NOT building a new project from scratch. You are helping the user improve THEIR existing project.
+
+CURRENT PROJECT TREE (what the user is working on):
+${JSON.stringify(context, null, 2)}
+
+Return ONLY valid JSON in this format:
+{
+  "plan": "One sentence describing what you're changing and why",
+  "category": "layout|style|logic|animation|component|config|bugfix|improvement",
+  "actions": [
+    {
+      "actionType": "update",
+      "nodeId": "EXISTING_NODE_ID_FROM_TREE_ABOVE",
+      "newCode": "COMPLETE replacement code — never truncate, no ellipsis, no TODO",
+      "narration": "2-3 sentences: what specifically changed and the rationale"
+    },
+    {
+      "actionType": "create",
+      "parentId": "PARENT_NODE_ID",
+      "newNode": {
+        "id": "unique-kebab-id",
+        "type": "html|css|javascript|js-function|declaration",
+        "description": "What this node does",
+        "code": "Complete self-contained code"
+      },
+      "narration": "Why this new node helps"
+    }
+  ]
+}
+
+RULES:
+1. Only reference nodeIds that exist in the tree above.
+2. Write COMPLETE code — never truncate with ... or TODO.
+3. Make SMALL focused changes — 1-3 nodes max.
+4. If the task asks for something the tree doesn't support, create a new node.
+5. Do not add AI attribution comments to the code.
+6. Keep changes coherent with the existing code style.`;
+
+        const user = `TASK: "${taskText}"
+
+ROOT ID: ${vibeTree.id}
+
+Plan your changes carefully, then return the JSON now.`;
+
+        const raw = await callGemini(sys, user, true, []);
+        return JSON.parse(raw);
+    },
+
+    /* ── PR actions: merge / reject ─────────────────────────── */
+
+    mergePR(prId) {
+        const pr = this.prs.find(p => p.id === prId);
+        if (!pr || pr.status !== 'open') return;
+
+        const pushUpdates = [];
+
+        for (const action of pr.actions) {
+            if (action.actionType === 'update') {
+                const treeNode = findNodeInTree(action.nodeId);
+                if (!treeNode) continue;
+                treeNode.code = action.newCode;
+                const editor = document.getElementById(`ed-${action.nodeId}`);
+                if (editor) { editor.value = action.newCode; syncHighlight(action.nodeId); }
+                dirtyNodes.delete(action.nodeId);
+                updateDirtyDot(action.nodeId);
+                pushUpdates.push({ nodeId: action.nodeId, newCode: action.newCode });
+
+                // Visual flash
+                const domNode = AppState.nodes.get(action.nodeId);
+                if (domNode) {
+                    domNode.classList.add('ai-updating');
+                    setTimeout(() => domNode.classList.remove('ai-updating'), 1200);
+                    centerOnNode(action.nodeId, 350);
+                }
+
+            } else if (action.actionType === 'create' && action.newNode) {
+                const newNode = action.newNode;
+                if (findNodeInTree(newNode.id)) newNode.id += '-' + Date.now().toString(36);
+                addChildToTree(action.parentId || vibeTree.id, newNode);
+                const cx = (-AppState.pan.x + window.innerWidth / 2) / AppState.scale - 180;
+                const cy = (-AppState.pan.y + (window.innerHeight - 120) / 2) / AppState.scale - 130;
+                const newEl = createVibeNode(newNode, cx + (Math.random()*160)-80, cy + (Math.random()*80)-40);
+                buildConnections(); drawConnections();
+                if (newEl) { newEl.classList.add('ai-updating'); setTimeout(() => newEl.classList.remove('ai-updating'), 1200); }
+                pushUpdates.push({ nodeId: newNode.id, newCode: newNode.code, isNew: true, newNode });
+            }
+        }
+
+        pr.status = 'merged';
+        if (pushUpdates.length) {
+            postToParent('apui-bulk-update', { updates: pushUpdates });
+        }
+        renderSidebar();
+        updatePreview();
+
+        this._logEntry('merge', `PR #${pr.id} merged — "${pr.title.slice(0,50)}"`);
+        logToChat('ai', `✅ PR #${pr.id} merged: ${pr.title}`);
+        toast(`✅ PR #${pr.id} merged`);
+        trackerLog('push', null, `Jarvis PR #${pr.id} merged · ${pushUpdates.length} change(s)`);
+        this._renderPRs();
+        this._updateBadges();
+        this._setStatus(this.prs.filter(p=>p.status==='open').length > 0
+            ? `${this.prs.filter(p=>p.status==='open').length} PR(s) awaiting review`
+            : 'Idle');
+    },
+
+    rejectPR(prId) {
+        const pr = this.prs.find(p => p.id === prId);
+        if (!pr || pr.status !== 'open') return;
+        pr.status = 'closed';
+        this._logEntry('reject', `PR #${pr.id} rejected — "${pr.title.slice(0,50)}"`);
+        logToChat('system', `❌ PR #${pr.id} rejected`);
+        toast(`❌ PR #${pr.id} rejected`);
+        this._renderPRs();
+        this._updateBadges();
+        this._setStatus(this.prs.filter(p=>p.status==='open').length > 0
+            ? `${this.prs.filter(p=>p.status==='open').length} PR(s) awaiting review`
+            : 'Idle');
+    },
+
+    mergeAll() {
+        const open = this.prs.filter(p => p.status === 'open');
+        if (!open.length) { toast('No open PRs to merge'); return; }
+        open.forEach(pr => this.mergePR(pr.id));
+        toast(`✅ Merged ${open.length} PR(s)`);
+    },
+
+    rejectAll() {
+        const open = this.prs.filter(p => p.status === 'open');
+        if (!open.length) { toast('No open PRs'); return; }
+        open.forEach(pr => this.rejectPR(pr.id));
+    },
+
+    /* ── Render helpers ──────────────────────────────────────── */
+
+    _renderTasks() {
+        const list = document.getElementById('jpr-task-list');
+        const empty = document.getElementById('jpr-task-empty');
+        if (!list) return;
+        list.querySelectorAll('.jpr-task-item').forEach(e => e.remove());
+        if (!this.tasks.length) {
+            if (empty) empty.style.display = 'block';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        [...this.tasks].reverse().forEach(task => {
+            const item = document.createElement('div');
+            item.className = 'jpr-task-item';
+            const statusClass = task.status;
+            const prLinks = task.prIds.map(id => `<span style="color:rgba(255,0,255,0.5);cursor:pointer;" onclick="JarvisPR.switchTab('prs');JarvisPR._focusPR(${id})">PR #${id}</span>`).join(', ');
+            item.innerHTML = `
+                <span class="jpr-task-status ${statusClass}"></span>
+                <div class="jpr-task-body">
+                    <div class="jpr-task-text">${escapeHTML(task.text)}</div>
+                    <div class="jpr-task-meta">${task.status.toUpperCase()}${prLinks ? ' · ' + prLinks : ''} · ${_relTime(task.addedAt)}</div>
+                </div>
+                ${task.status === 'pending' ? `<button class="jpr-task-del" onclick="JarvisPR.removeTask(${task.id})" title="Remove">✕</button>` : ''}
+            `;
+            list.appendChild(item);
+        });
+    },
+
+    _renderPRs() {
+        const list = document.getElementById('jpr-pr-list');
+        const summary = document.getElementById('jpr-pr-summary');
+        const mergeAllBtn = document.getElementById('jpr-merge-all-btn');
+        const rejectAllBtn = document.getElementById('jpr-reject-all-btn');
+        if (!list) return;
+        list.innerHTML = '';
+        const open = this.prs.filter(p => p.status === 'open');
+        if (summary) summary.textContent = open.length ? `${open.length} open PR${open.length>1?'s':''} · ${this.prs.filter(p=>p.status==='merged').length} merged · ${this.prs.filter(p=>p.status==='closed').length} rejected` : 'No open PRs';
+        if (mergeAllBtn) mergeAllBtn.style.display = open.length ? 'inline-flex' : 'none';
+        if (rejectAllBtn) rejectAllBtn.style.display = open.length ? 'inline-flex' : 'none';
+
+        if (!this.prs.length) {
+            list.innerHTML = '<div style="padding:24px 16px;text-align:center;font-family:\'Fira Code\',monospace;font-size:0.65rem;color:#333;line-height:1.9;">No PRs yet.<br>Run a task to generate proposals.</div>';
+            return;
+        }
+
+        [...this.prs].reverse().forEach(pr => {
+            const card = document.createElement('div');
+            card.className = 'jpr-pr-card';
+            card.id = `jpr-pr-${pr.id}`;
+
+            const diffHtml = pr.actions.map(a => {
+                const diff = _buildDiff(a.oldCode, a.newCode);
+                const label = a.isNew ? `➕ NEW: ${a.nodeId}` : `✏ ${a.nodeId}`;
+                return `<div class="jpr-diff-block">
+                    <div class="jpr-diff-filename">${label}${a.narration ? '<br><span style="color:#4169e1;font-style:italic;">' + escapeHTML(a.narration) + '</span>' : ''}</div>
+                    <div class="jpr-diff-scroll">${diff}</div>
+                </div>`;
+            }).join('');
+
+            const actionHtml = pr.status === 'open' ? `
+                <div class="jpr-pr-actions">
+                    <button class="jpr-btn success" onclick="JarvisPR.mergePR(${pr.id})">✓ Merge</button>
+                    <button class="jpr-btn danger" onclick="JarvisPR.rejectPR(${pr.id})">✗ Reject</button>
+                    <span style="font-family:'Fira Code',monospace;font-size:0.55rem;color:#444;margin-left:auto;">${pr.actions.length} file${pr.actions.length>1?'s':''} changed</span>
+                </div>` : `<div style="font-family:'Fira Code',monospace;font-size:0.58rem;color:${pr.status==='merged'?'#66bb6a':'#ef5350'};padding:6px 0;">${pr.status === 'merged' ? '✅ Merged' : '❌ Rejected'}</div>`;
+
+            card.innerHTML = `
+                <div class="jpr-pr-header" onclick="this.closest('.jpr-pr-card').classList.toggle('expanded')">
+                    <span class="jpr-pr-status-dot ${pr.status}"></span>
+                    <div class="jpr-pr-info">
+                        <div class="jpr-pr-title">${escapeHTML(pr.title)}</div>
+                        <div class="jpr-pr-meta">PR #${pr.id} · ${pr.category} · ${_relTime(pr.createdAt)}</div>
+                    </div>
+                    <span class="jpr-pr-chevron">›</span>
+                </div>
+                <div class="jpr-pr-body">
+                    ${diffHtml}
+                    ${actionHtml}
+                </div>`;
+            list.appendChild(card);
+        });
+    },
+
+    _focusPR(prId) {
+        const card = document.getElementById(`jpr-pr-${prId}`);
+        if (card) { card.classList.add('expanded'); card.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+    },
+
+    _renderLog() {
+        const list = document.getElementById('jpr-log-list');
+        const empty = document.getElementById('jpr-log-empty');
+        if (!list) return;
+        list.querySelectorAll('.jpr-log-entry').forEach(e => e.remove());
+        if (!this.log.length) { if (empty) empty.style.display = 'block'; return; }
+        if (empty) empty.style.display = 'none';
+        [...this.log].reverse().forEach(entry => {
+            const el = document.createElement('div');
+            el.className = `jpr-log-entry ${entry.type}`;
+            el.innerHTML = `<span class="jpr-log-time">${_timeStr(entry.time)} </span>${escapeHTML(entry.msg)}`;
+            list.appendChild(el);
+        });
+    },
+
+    _logEntry(type, msg) {
+        this.log.push({ type, msg, time: new Date() });
+        if (this.log.length > 200) this.log.splice(0, this.log.length - 200);
+        // Re-render log if it's active
+        const logPane = document.getElementById('jpr-pane-log');
+        if (logPane?.classList.contains('active')) this._renderLog();
+    },
+
+    clearLog() {
+        this.log = [];
+        this._renderLog();
+    },
+
+    _updateBadges() {
+        const pendingCount = this.tasks.filter(t => t.status === 'pending').length;
+        const openPRCount  = this.prs.filter(p => p.status === 'open').length;
+        const taskBadge = document.getElementById('jpr-badge-tasks');
+        const prBadge   = document.getElementById('jpr-badge-prs');
+        if (taskBadge) { taskBadge.textContent = pendingCount; taskBadge.style.display = pendingCount ? 'inline-block' : 'none'; }
+        if (prBadge)   { prBadge.textContent   = openPRCount;  prBadge.style.display   = openPRCount  ? 'inline-block' : 'none'; }
+    },
+
+    _setStatus(msg) {
+        const el = document.getElementById('jpr-run-status');
+        if (el) { el.textContent = msg; el.className = 'jpr-run-status' + (this.running ? ' active' : ''); }
+    }
+};
+
+/* ── Diff generator ─────────────────────────────────────────── */
+function _buildDiff(oldCode, newCode) {
+    if (!oldCode && newCode) {
+        // Entirely new file
+        return newCode.split('\n').map(line => `<div class="jpr-diff-line add">${escapeHTML(line)}</div>`).join('');
+    }
+    const oldLines = (oldCode || '').split('\n');
+    const newLines = (newCode || '').split('\n');
+
+    // Simple unified diff: show context lines around changes
+    const result = [];
+    const maxLines = Math.max(oldLines.length, newLines.length);
+    const CONTEXT = 2;
+    let lastShown = -1;
+
+    for (let i = 0; i < maxLines; i++) {
+        const o = oldLines[i] ?? null;
+        const n = newLines[i] ?? null;
+        if (o !== n) {
+            // Show context before
+            const start = Math.max(0, i - CONTEXT);
+            for (let j = Math.max(start, lastShown + 1); j < i; j++) {
+                result.push(`<div class="jpr-diff-line ctx">${escapeHTML(oldLines[j] ?? '')}</div>`);
+            }
+            if (o !== null) result.push(`<div class="jpr-diff-line rem">${escapeHTML(o)}</div>`);
+            if (n !== null) result.push(`<div class="jpr-diff-line add">${escapeHTML(n)}</div>`);
+            lastShown = i;
+        }
+    }
+
+    if (!result.length) {
+        return '<div class="jpr-diff-line ctx" style="color:#555;font-style:italic;">No line-level differences detected</div>';
+    }
+    return result.join('');
+}
+
+function _relTime(date) {
+    const s = Math.round((Date.now() - date) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    return `${Math.floor(s/3600)}h ago`;
+}
+
+function _timeStr(date) {
+    return date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+/* ── Global shim: map old Jarvis calls to new system ────────── */
 const Jarvis = {
+    running: false,
+    goal: '',
+    heartbeatMs: 8000,
+    beat: 0,
+    memory: [],
+    roadmap: [],
+    awayLog: [],
+    _timeoutHandle: null,
+    _userPanning: false,
+    _inBeat: false,
+    _snapHintTimer: null,
+    _roadmapHideTimer: null,
+    _awayMode: false,
+    _awayStartBeat: 0,
+    _visibilityHandler: null,
+    start(goal) { JarvisPR.addTask(goal); JarvisPR.openPanel(); JarvisPR.runNext(); },
+    stop() { JarvisPR.stop(); }
+};
+
+/* ── UI wiring ──────────────────────────────────────────────── */
+function jarvisPRPanelOpen()  { JarvisPR.openPanel(); document.getElementById('os-menu-container')?.classList.remove('open'); }
+function jarvisPRPanelClose() { JarvisPR.closePanel(); }
+function jarvisPRTab(tab)     { JarvisPR.switchTab(tab); }
+function jarvisAddTask()      { const inp = document.getElementById('jpr-task-input'); if (!inp?.value.trim()) { inp?.focus(); return; } JarvisPR.addTask(inp.value); inp.value = ''; }
+function jarvisRunNext()      { JarvisPR.runNext(); }
+function jarvisRunAll()       { JarvisPR.runAll(); }
+function jarvisMergeAll()     { JarvisPR.mergeAll(); document.getElementById('os-menu-container')?.classList.remove('open'); }
+function jarvisRejectAll()    { JarvisPR.rejectAll(); }
+function jarvisStop()         { JarvisPR.stop(); document.getElementById('os-menu-container')?.classList.remove('open'); }
+function jarvisClearDoneTasks(){ JarvisPR.clearDoneTasks(); }
+function jarvisClearLog()     { JarvisPR.clearLog(); }
+
+function jarvisAddTaskFromMenu() {
+    JarvisPR.openPanel();
+    JarvisPR.switchTab('tasks');
+    document.getElementById('os-menu-container')?.classList.remove('open');
+    setTimeout(() => document.getElementById('jpr-task-input')?.focus(), 400);
+}
+function jarvisRunAllFromMenu() {
+    JarvisPR.openPanel();
+    JarvisPR.runAll();
+    document.getElementById('os-menu-container')?.classList.remove('open');
+}
+
+/* keyboard shortcut: Enter in task input */
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('jpr-task-input')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); jarvisAddTask(); }
+    });
+});
+
+/* ── Keep old helper stubs so no broken refs exist ──────────── */
+function jarvisToggle() { jarvisPRPanelOpen(); }
+function jarvisShowRoadmap() { JarvisPR.openPanel(); }
+function jarvisReturnFocus() { JarvisPR.openPanel(); }
+function jarvisSetGoal() { jarvisAddTaskFromMenu(); }
+function openJarvisSettings() { jarvisAddTaskFromMenu(); }
+
+/* ==============================================================
+   LEGACY Jarvis _runBeat (kept for apui-jarvis-start postMessage compat)
+   ============================================================== */
+const _JarvisLegacy = {
     running:        false,
     goal:           '',
     heartbeatMs:    8000,
@@ -2292,59 +3080,9 @@ Return the JSON object now.`;
     }
 };
 
-/* UI helpers for Jarvis */
-function jarvisToggle() {
-    if (Jarvis.running) {
-        Jarvis.stop();
-    } else {
-        const goal = Jarvis.goal || prompt('🎯 Jarvis Goal\n\nDescribe what you want built. Jarvis keeps working even when you\'re away, creating plugins, utilities, and assets.\n\nExample: "Build a polished task manager with animations, themes, and a plugin system"');
-        if (!goal?.trim()) return;
-        Jarvis.goal = goal.trim();
-        Jarvis.start(Jarvis.goal);
-    }
-    document.getElementById('os-menu-container')?.classList.remove('open');
-}
+/* UI helpers for Jarvis (legacy stubs — functionality moved to JarvisPR) */
+function _noop() {}
 
-function jarvisShowRoadmap() {
-    if (!Jarvis.roadmap.length) {
-        toast('🗺 No roadmap yet — start Jarvis first');
-        document.getElementById('os-menu-container')?.classList.remove('open');
-        return;
-    }
-    Jarvis._renderRoadmap();
-    document.getElementById('os-menu-container')?.classList.remove('open');
-}
-
-function jarvisSetGoal() {
-    const g = prompt('🎯 Set Jarvis goal:', Jarvis.goal || '');
-    if (g?.trim()) { Jarvis.goal = g.trim(); toast(`Goal set: "${Jarvis.goal.slice(0,40)}"`); }
-    document.getElementById('os-menu-container')?.classList.remove('open');
-}
-
-function openJarvisSettings() {
-    const cur = Jarvis.heartbeatMs / 1000;
-    const v = prompt(`⚡ Jarvis heartbeat interval (seconds)\n\nCurrent: ${cur}s\nMin: 5s · Recommended: 8–30s`, String(cur));
-    if (!v) return;
-    const n = parseFloat(v);
-    if (isNaN(n) || n < 5) { toast('Minimum interval is 5 seconds'); return; }
-    Jarvis.heartbeatMs = n * 1000;
-    toast(`⚡ Jarvis heartbeat set to ${n}s`);
-    document.getElementById('os-menu-container')?.classList.remove('open');
-}
-function jarvisReturnFocus() {
-    // Re-centre the camera on the most recently changed node, or chat node
-    const lastBeat = Jarvis.memory[Jarvis.memory.length - 1];
-    const targetId = lastBeat?.nodeIds?.[0] || 'chat';
-    if (AppState.nodes.has(targetId)) {
-        centerOnNode(targetId, 450);
-        toast(`🔭 Returned to [${targetId}]`);
-    } else {
-        // Spawn chat and fly to it
-        handleCommand('chat');
-        toast('🔭 Returned to AI Activity');
-    }
-    document.getElementById('os-menu-container')?.classList.remove('open');
-}
 
 /* ════════════════════════════════════════════════════════════════
    OVERVIEW MODE — pinch-out on preview shows all nodes minimised
@@ -3273,7 +4011,7 @@ document.addEventListener('DOMContentLoaded', () => {
     logToChat('system', 'APUI connected. Waiting for Vibe Tree from parent system…');
     logToChat('system', 'Tip: Edit any node and hit ⬆ PUSH to sync changes back.');
     logToChat('system', 'Tip: Tap 📌 on a node to pin it to the taskbar.');
-    logToChat('system', 'Tip: Open the ◎ menu → 🤖 Jarvis to set a goal and run continuously.');
+    logToChat('system', 'Tip: Open the ◎ menu → 🤖 Jarvis PRs to queue tasks and review proposed changes.');
 
     trackerInit();
     renderTaskbar();
