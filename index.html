@@ -2241,12 +2241,12 @@
                                                     ondragover="event.preventDefault();this.style.borderColor='#61afef';this.style.background='rgba(97,175,239,.09)'"
                                                     ondragleave="this.style.borderColor='#3e4451';this.style.background='rgba(97,175,239,.04)'"
                                                     ondrop="handleStartDrop(event)"
-                                                    onclick="document.getElementById('start-html-input').click()">
+                                                    onclick="document.getElementById('start-html-input-2').click()">
                                                     <i class="bi bi-file-earmark-code" style="font-size:2rem;color:#61afef;display:block;margin-bottom:8px"></i>
                                                     <div style="font-weight:600;color:#abb2bf;margin-bottom:4px">Drop an HTML file here</div>
                                                     <div style="font-size:0.82rem;color:#5c6370">or click to browse &middot; supports multiple files</div>
                                                 </div>
-                                                <input type="file" id="start-html-input" accept=".html,.htm,text/html" style="display:none" multiple>
+                                                <input type="file" id="start-html-input-2" accept=".html,.htm,text/html" style="display:none" multiple>
                                                 <div id="start-upload-status" style="font-size:0.85rem;color:#98c379;min-height:20px;margin-bottom:6px"></div>
                                                 <div style="font-size:0.8rem;color:#5c6370">Loads the HTML directly into the editor. Multi-file projects: use the <b>Files</b> tab.</div>
                                             </div>
@@ -3524,74 +3524,66 @@ async function _loadHtmlFileIntoVibe(file, statusEl) {
   if (!file) return;
   if (statusEl) statusEl.textContent = 'Reading ' + file.name + '…';
 
-  return new Promise(function(resolve) {
+  // Path A: app3.js handleFileUpload is available — delegate entirely to it.
+  // handleFileUpload reads the file itself via its own FileReader; we just
+  // inject the File object into the hidden input and fire it.
+  // We then wait (by polling) for vibeTree to reflect the new project.
+  var htmlInput = document.getElementById('html-file-input');
+  if (typeof handleFileUpload === 'function' && htmlInput) {
+    try {
+      var dt = new DataTransfer();
+      dt.items.add(file);
+      htmlInput.files = dt.files;
+    } catch(e) {
+      // DataTransfer not supported — fall through to Path B
+      htmlInput = null;
+    }
+    if (htmlInput) {
+      handleFileUpload(); // app3 reads the file and calls refreshAllUI + switchToTab
+      // Wait up to 6 s for the tree to update, then report status
+      await new Promise(function(resolve) {
+        var waited = 0;
+        var poll = setInterval(function() {
+          waited += 150;
+          var ready = typeof vibeTree !== 'undefined' && vibeTree &&
+                      (vibeTree.type === 'raw-html-container' || (vibeTree.children && vibeTree.children.length > 0));
+          if (ready || waited >= 6000) {
+            clearInterval(poll);
+            if (statusEl) statusEl.textContent = ready ? '✓ ' + file.name + ' loaded!' : '⚠ Still loading — check the Editor tab.';
+            resolve();
+          }
+        }, 150);
+      });
+      return;
+    }
+  }
+
+  // Path B: fallback — read the file ourselves and populate the editor directly.
+  await new Promise(function(resolve) {
     var reader = new FileReader();
-    reader.onload = async function(e) {
+    reader.onload = function(e) {
       try {
         var content = e.target.result;
-
-        // Re-use the existing handleFileUpload logic from app3.js by
-        // temporarily injecting the file into the hidden html-file-input
-        // OR call the same logic directly if accessible
-        if (typeof handleFileUpload === 'function' && document.getElementById('html-file-input')) {
-          // Inject file into the existing input, then call the handler.
-          // handleFileUpload uses an internal FileReader callback so it is NOT
-          // truly awaitable — calling await on it resolves before the file is
-          // read. Instead we call it fire-and-forget and wait for the tree to
-          // arrive via the apui-current-tree echo that APUI sends us.
-          var dt = new DataTransfer();
-          dt.items.add(file);
-          document.getElementById('html-file-input').files = dt.files;
-          handleFileUpload(); // intentionally NOT awaited
-          // Poll for tree arrival (max 8s) then report done
-          var _waited = 0;
-          var _poll = setInterval(function() {
-            _waited += 200;
-            var hasTree = (typeof vibeTree !== 'undefined' && vibeTree && (vibeTree.children && vibeTree.children.length || vibeTree.type === 'raw-html-container'));
-            if (hasTree || _waited >= 8000) {
-              clearInterval(_poll);
-              if (statusEl) statusEl.textContent = hasTree ? '✓ ' + file.name + ' loaded!' : '⚠ File may still be loading…';
-              resolve(hasTree);
-            }
-          }, 200);
-          return;
-        }
-
-        // Fallback: build vibeTree directly (mirrors app3.js handleFileUpload)
-        var baseId = file.name.replace(/\.(html|htm)$/i,'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
-        var projectId = baseId || ('html-project-' + Date.now());
-
-        if (typeof vibeTree !== 'undefined') {
-          vibeTree = { id:'raw-'+projectId, type:'raw-html-container', description:'Uploaded: '+file.name, code:content, children:[] };
-        }
-
-        // Populate full-code-editor directly
         var editor = document.getElementById('full-code-editor');
         if (editor) {
           editor.value = content;
           editor.dispatchEvent(new Event('input'));
         }
-
-        if (statusEl) statusEl.textContent = '✓ ' + file.name + ' loaded!';
-
-        // Switch to code tab so user sees the content
+        if (statusEl) statusEl.textContent = '✓ ' + file.name + ' loaded (basic mode).';
         if (typeof switchToTab === 'function') switchToTab('code');
         else {
-          // manual tab switch fallback
           document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
-          var codeTab = document.getElementById('code');
-          if (codeTab) codeTab.classList.add('active');
+          var c = document.getElementById('code');
+          if (c) c.classList.add('active');
         }
-
-        resolve(true);
       } catch(err) {
         if (statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
-        resolve(false);
       }
+      resolve();
     };
     reader.onerror = function() {
       if (statusEl) statusEl.textContent = '⚠ Could not read file.';
-      resolve(false);
+      resolve();
     };
     reader.readAsText(file);
   });
@@ -3888,44 +3880,53 @@ async function apuiHandleHtmlImport(inputEl) {
   var file = inputEl && inputEl.files && inputEl.files[0];
   if (!file) return;
   var statusEl = document.getElementById('start-import-status');
-  if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '⏳ Processing HTML…'; }
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = '⏳ Importing ' + file.name + '…'; }
 
   try {
+    // Prefer app3's handleFileUpload — it manages all state + UI in one shot.
+    var htmlInput = document.getElementById('html-file-input');
+    if (typeof handleFileUpload === 'function' && htmlInput) {
+      var dt = new DataTransfer();
+      dt.items.add(file);
+      htmlInput.files = dt.files;
+      handleFileUpload(); // app3 does everything: refreshAllUI + switchToTab('preview')
+      // Wait for tree to populate
+      await new Promise(function(res) {
+        var w = 0;
+        var t = setInterval(function() {
+          w += 150;
+          var ok = typeof vibeTree !== 'undefined' && vibeTree &&
+                   (vibeTree.type === 'raw-html-container' || (vibeTree.children && vibeTree.children.length));
+          if (ok || w >= 6000) { clearInterval(t); res(); }
+        }, 150);
+      });
+      if (statusEl) { statusEl.textContent = '✅ ' + file.name + ' imported'; setTimeout(function(){ statusEl.style.display='none'; }, 3000); }
+      if (inputEl) inputEl.value = '';
+      return;
+    }
+
+    // Fallback: manual import (app3 not available)
     var htmlContent = await file.text();
     var derivedId = file.name.replace(/\.html?$/i,'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'') || ('html-project-' + Date.now());
     var projectId = derivedId;
-
     if (window.localApi && typeof window.localApi.listProjects === 'function') {
       var existing = await window.localApi.listProjects();
       var suffix = 1; var base = projectId;
       while (existing.includes(projectId)) projectId = base + '-' + (suffix++);
     }
-
-    var tree = {
-      id: 'raw-' + projectId,
-      type: 'raw-html-container',
-      description: 'Uploaded HTML file: ' + file.name,
-      code: htmlContent,
-      children: []
-    };
-
-    if (window.localApi && typeof window.localApi.saveProject === 'function') {
-      await window.localApi.saveProject(projectId, tree);
-    }
-
-    if (window.hasOwnProperty('currentProjectId'))    window.currentProjectId = projectId;
-    if (window.hasOwnProperty('vibeTree'))            window.vibeTree = tree;
+    var tree = { id: 'raw-' + projectId, type: 'raw-html-container', description: 'Uploaded: ' + file.name, code: htmlContent, children: [] };
+    if (window.localApi && typeof window.localApi.saveProject === 'function') await window.localApi.saveProject(projectId, tree);
+    if (window.hasOwnProperty('currentProjectId')) window.currentProjectId = projectId;
+    if (window.hasOwnProperty('vibeTree')) window.vibeTree = tree;
     if (window.hasOwnProperty('currentProjectStorageType')) window.currentProjectStorageType = 'local';
-
     if (typeof refreshAllUI === 'function') refreshAllUI();
     if (typeof populateProjectList === 'function') await populateProjectList('local');
     if (typeof switchToTab === 'function') switchToTab('preview');
-
-    if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '✅ Imported as "' + projectId + '"'; setTimeout(function(){ if(statusEl) statusEl.style.display='none'; }, 3000); }
+    if (statusEl) { statusEl.textContent = '✅ Imported as "' + projectId + '"'; setTimeout(function(){ statusEl.style.display='none'; }, 3000); }
     if (inputEl) inputEl.value = '';
   } catch(e) {
     if (statusEl) { statusEl.style.display='block'; statusEl.textContent = '❌ ' + e.message; }
-    alert('HTML import failed: ' + e.message);
+    console.error('HTML import failed:', e);
   }
 }
 
@@ -4263,116 +4264,49 @@ async function handleStartHtmlUpload(files) {
   }
 }
 
-/* Wire up the start-html-input */
+/* Wire up the start-html-input-2 (accordion drop zone — separate from the ⚙ menu input) */
 document.addEventListener('DOMContentLoaded', function() {
-  var startInput = document.getElementById('start-html-input');
-  if (startInput) {
-    startInput.addEventListener('change', function() {
+  // start-html-input (line 2104) is handled by its inline onchange="apuiHandleHtmlImport"
+  // start-html-input-2 (accordion drop zone) needs its own listener
+  var startInput2 = document.getElementById('start-html-input-2');
+  if (startInput2) {
+    startInput2.addEventListener('change', function() {
       handleStartHtmlUpload(this.files);
     });
   }
 
-  /* ── Patch switchToTab: strip the "already active = bail" guard
-     app3.js has:  if (newContent.classList.contains('active')) return;
-     This means clicking Context or Full Code a second time does nothing.
-     We remove the guard by de-activating the target tab BEFORE calling
-     the original, forcing it to re-run the tab's init logic.         */
-  var _origSwitchToTab = window.switchToTab;
-  if (typeof _origSwitchToTab === 'function') {
-    window.switchToTab = function(tabId) {
-      // Strip active from target tab so app3's guard doesn't fire
-      var tabContentArea = document.querySelector('.tab-content-area');
-      if (tabContentArea) {
-        var targetPane = tabContentArea.querySelector('#' + tabId);
-        if (targetPane) targetPane.classList.remove('active');
-      }
-      _origSwitchToTab(tabId);
-      if (tabId === 'code') {
-        // Ensure editor is populated even if showFullCode was called before DOM ready
-        setTimeout(function() {
-          var editor = document.getElementById('full-code-editor');
-          if (!editor) return;
+  /* ── Patch switchToTab (runs after app3.js module has loaded) ──────────────
+     app3.js bails early if the target tab pane already has 'active', which
+     means clicking Full Code or Context a second time renders nothing.
+     We intercept ONLY tab-button clicks and, if the target is already the
+     active pane, force-call the tab's render function directly.
+     We do NOT touch switchToTab itself — previous attempts at patching it
+     caused wider button-breakage.                                            */
+  window.addEventListener('load', function() {
+    // Use event delegation on document.body (bubble phase — safe, no interference)
+    document.body.addEventListener('click', function(e) {
+      var btn = e.target.closest('.tab-button');
+      if (!btn) return;
+      var tabId = btn.dataset.tab;
+      if (!tabId) return;
 
-          // Show drop zone if editor is empty AND no project loaded
-          var isEmpty = !editor.value || editor.value.trim() === '';
-          _showCodeDropZone(isEmpty);
+      var pane = document.getElementById(tabId);
+      var alreadyActive = pane && pane.classList.contains('active');
 
-          // If editor empty but vibeTree exists, populate it
-          if (isEmpty && typeof vibeTree !== 'undefined' && vibeTree) {
-            if (typeof showFullCode === 'function') {
-              showFullCode();
-            } else if (vibeTree.code) {
-              editor.value = vibeTree.code;
-            } else if (typeof generateFullCodeString === 'function') {
-              try { editor.value = generateFullCodeString(vibeTree); } catch(e) {}
-            }
-            _showCodeDropZone(!editor.value);
-          }
-        }, 50);
-      }
-    };
-  } else {
-    // app3.js not yet loaded — retry after it loads
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        var _origSWT = window.switchToTab;
-        if (typeof _origSWT === 'function') {
-          window.switchToTab = function(tabId) {
-            // Strip active guard (same fix as above)
-            var tca = document.querySelector('.tab-content-area');
-            if (tca) { var tp = tca.querySelector('#' + tabId); if (tp) tp.classList.remove('active'); }
-            _origSWT(tabId);
-            if (tabId === 'code') {
-              setTimeout(function() {
-                var editor = document.getElementById('full-code-editor');
-                if (!editor) return;
-                _showCodeDropZone(!editor.value || !editor.value.trim());
-                if ((!editor.value || !editor.value.trim()) && typeof vibeTree !== 'undefined' && vibeTree) {
-                  if (typeof showFullCode === 'function') showFullCode();
-                  else if (vibeTree.code) editor.value = vibeTree.code;
-                }
-              }, 50);
-            }
-          };
+      // If it's already active, switchToTab will return early without re-rendering.
+      // Force the relevant render ourselves.
+      if (alreadyActive) {
+        if (tabId === 'code') {
+          if (typeof showFullCode === 'function') { try { showFullCode(); } catch(e){} }
+          var ed = document.getElementById('full-code-editor');
+          _showCodeDropZone(ed && !ed.value);
         }
-      }, 500);
+        if (tabId === 'context') {
+          if (typeof renderComponentList === 'function') { try { renderComponentList(); } catch(e){} }
+        }
+      }
     });
-  }
-
-  /* ── Tab button click handler: force-render content on every click ── */
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.tab-button');
-    if (!btn) return;
-    var tab = btn.dataset.tab;
-    if (!tab) return;
-
-    // Always run these even if the tab was already active
-    setTimeout(function() {
-      if (tab === 'code') {
-        var editor = document.getElementById('full-code-editor');
-        if (!editor) return;
-        _showCodeDropZone(!editor.value || !editor.value.trim());
-        if ((!editor.value || !editor.value.trim()) && typeof vibeTree !== 'undefined' && vibeTree) {
-          if (typeof showFullCode === 'function') showFullCode();
-          else if (vibeTree && vibeTree.code) editor.value = vibeTree.code;
-        } else if (editor.value && typeof showFullCode === 'function') {
-          // Re-run showFullCode to make sure it reflects latest tree
-          showFullCode();
-        }
-      }
-      if (tab === 'context') {
-        if (typeof renderComponentList === 'function') {
-          // Force contextComponentList to be fresh (it may be null if grabbed too early)
-          var listEl = document.getElementById('context-component-list');
-          var viewEl = document.getElementById('context-component-viewer');
-          if (listEl && (!window._contextComponentListEl || window._contextComponentListEl !== listEl)) {
-            window._contextComponentListEl = listEl;
-          }
-          renderComponentList();
-        }
-      }
-    }, 80);
-  }, true); // capture phase so it fires before app3's own handler
+  });
 });
 
 /* ── HTML escape helper ── */
@@ -6734,24 +6668,6 @@ function _jrvAutoStartLoop() {
 
 /* ── Boot: migrate localStorage → IDB, init IDB ── */
 document.addEventListener('DOMContentLoaded', function() {
-  // Ensure app3 element references are refreshed after full DOM + script load.
-  // app3.js grabs contextComponentList etc. at parse time; if any are null,
-  // patch them here so the Context and Full Code tabs work.
-  window.addEventListener('load', function() {
-    setTimeout(function() {
-      // Re-seed any null app3 element refs
-      if (typeof window.contextComponentList === 'undefined' || !window.contextComponentList) {
-        window.contextComponentList = document.getElementById('context-component-list');
-      }
-      if (typeof window.contextComponentViewer === 'undefined' || !window.contextComponentViewer) {
-        window.contextComponentViewer = document.getElementById('context-component-viewer');
-      }
-      if (typeof window.fullCodeEditor === 'undefined' || !window.fullCodeEditor) {
-        window.fullCodeEditor = document.getElementById('full-code-editor');
-      }
-    }, 500);
-  });
-
   jarvisLoadSettings();
 
   // Migrate old localStorage memories → IDB
