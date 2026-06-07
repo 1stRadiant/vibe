@@ -5207,22 +5207,21 @@ function switchToTab(tabId) {
     idbKV.set(SESSION_KEYS.TAB, tabId).catch(err => console.error("Failed to save tab state", err));
 
     const newContent = tabContents.querySelector(`#${tabId}`);
-    if (!newContent || newContent.classList.contains('active')) {
-        return;
-    }
+    if (!newContent) return;
 
-    if (tabId === 'console') {
-        consoleErrorIndicator.classList.remove('active');
-    }
+    const alreadyActive = newContent.classList.contains('active');
 
-    document.querySelectorAll('.tab-button.active').forEach(btn => btn.classList.remove('active'));
-    const currentContent = tabContents.querySelector('.tab-content.active');
-    if (currentContent) {
-        currentContent.classList.remove('active');
+    if (!alreadyActive) {
+        // Only swap DOM classes when actually changing tabs
+        if (tabId === 'console') {
+            consoleErrorIndicator.classList.remove('active');
+        }
+        document.querySelectorAll('.tab-button.active').forEach(btn => btn.classList.remove('active'));
+        const currentContent = tabContents.querySelector('.tab-content.active');
+        if (currentContent) currentContent.classList.remove('active');
+        document.querySelectorAll(`.tab-button[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
+        newContent.classList.add('active');
     }
-
-    document.querySelectorAll(`.tab-button[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
-    newContent.classList.add('active');
 
     if (tabId === 'code') {
         showFullCode();
