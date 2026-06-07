@@ -3534,14 +3534,26 @@ async function _loadHtmlFileIntoVibe(file, statusEl) {
         // temporarily injecting the file into the hidden html-file-input
         // OR call the same logic directly if accessible
         if (typeof handleFileUpload === 'function' && document.getElementById('html-file-input')) {
-          // Inject file into the existing input and dispatch change
+          // Inject file into the existing input, then call the handler.
+          // handleFileUpload uses an internal FileReader callback so it is NOT
+          // truly awaitable — calling await on it resolves before the file is
+          // read. Instead we call it fire-and-forget and wait for the tree to
+          // arrive via the apui-current-tree echo that APUI sends us.
           var dt = new DataTransfer();
           dt.items.add(file);
           document.getElementById('html-file-input').files = dt.files;
-          // Call the existing handler
-          await handleFileUpload();
-          if (statusEl) statusEl.textContent = '✓ ' + file.name + ' loaded!';
-          resolve(true);
+          handleFileUpload(); // intentionally NOT awaited
+          // Poll for tree arrival (max 8s) then report done
+          var _waited = 0;
+          var _poll = setInterval(function() {
+            _waited += 200;
+            var hasTree = (typeof vibeTree !== 'undefined' && vibeTree && (vibeTree.children && vibeTree.children.length || vibeTree.type === 'raw-html-container'));
+            if (hasTree || _waited >= 8000) {
+              clearInterval(_poll);
+              if (statusEl) statusEl.textContent = hasTree ? '✓ ' + file.name + ' loaded!' : '⚠ File may still be loading…';
+              resolve(hasTree);
+            }
+          }, 200);
           return;
         }
 
@@ -4260,12 +4272,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  /* ── Fix showFullCode not populating textarea ──
-     Patch switchToTab to ensure fullCodeEditor is always populated
-     when the code tab is activated                               */
+  /* ── Patch switchToTab: strip the "already active = bail" guard
+     app3.js has:  if (newContent.classList.contains('active')) return;
+     This means clicking Context or Full Code a second time does nothing.
+     We remove the guard by de-activating the target tab BEFORE calling
+     the original, forcing it to re-run the tab's init logic.         */
   var _origSwitchToTab = window.switchToTab;
   if (typeof _origSwitchToTab === 'function') {
     window.switchToTab = function(tabId) {
+      // Strip active from target tab so app3's guard doesn't fire
+      var tabContentArea = document.querySelector('.tab-content-area');
+      if (tabContentArea) {
+        var targetPane = tabContentArea.querySelector('#' + tabId);
+        if (targetPane) targetPane.classList.remove('active');
+      }
       _origSwitchToTab(tabId);
       if (tabId === 'code') {
         // Ensure editor is populated even if showFullCode was called before DOM ready
@@ -4298,6 +4318,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var _origSWT = window.switchToTab;
         if (typeof _origSWT === 'function') {
           window.switchToTab = function(tabId) {
+            // Strip active guard (same fix as above)
+            var tca = document.querySelector('.tab-content-area');
+            if (tca) { var tp = tca.querySelector('#' + tabId); if (tp) tp.classList.remove('active'); }
             _origSWT(tabId);
             if (tabId === 'code') {
               setTimeout(function() {
@@ -4316,21 +4339,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  /* ── Also handle clicks on the tab nav buttons directly ── */
-  document.querySelectorAll('.tab-button[data-tab="code"]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      setTimeout(function() {
+  /* ── Tab button click handler: force-render content on every click ── */
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.tab-button');
+    if (!btn) return;
+    var tab = btn.dataset.tab;
+    if (!tab) return;
+
+    // Always run these even if the tab was already active
+    setTimeout(function() {
+      if (tab === 'code') {
         var editor = document.getElementById('full-code-editor');
         if (!editor) return;
-        var isEmpty = !editor.value || !editor.value.trim();
-        _showCodeDropZone(isEmpty);
-        if (isEmpty && typeof vibeTree !== 'undefined' && vibeTree) {
+        _showCodeDropZone(!editor.value || !editor.value.trim());
+        if ((!editor.value || !editor.value.trim()) && typeof vibeTree !== 'undefined' && vibeTree) {
           if (typeof showFullCode === 'function') showFullCode();
-          else if (vibeTree.code) editor.value = vibeTree.code;
+          else if (vibeTree && vibeTree.code) editor.value = vibeTree.code;
+        } else if (editor.value && typeof showFullCode === 'function') {
+          // Re-run showFullCode to make sure it reflects latest tree
+          showFullCode();
         }
-      }, 80);
-    });
-  });
+      }
+      if (tab === 'context') {
+        if (typeof renderComponentList === 'function') {
+          // Force contextComponentList to be fresh (it may be null if grabbed too early)
+          var listEl = document.getElementById('context-component-list');
+          var viewEl = document.getElementById('context-component-viewer');
+          if (listEl && (!window._contextComponentListEl || window._contextComponentListEl !== listEl)) {
+            window._contextComponentListEl = listEl;
+          }
+          renderComponentList();
+        }
+      }
+    }, 80);
+  }, true); // capture phase so it fires before app3's own handler
 });
 
 /* ── HTML escape helper ── */
@@ -6692,6 +6734,24 @@ function _jrvAutoStartLoop() {
 
 /* ── Boot: migrate localStorage → IDB, init IDB ── */
 document.addEventListener('DOMContentLoaded', function() {
+  // Ensure app3 element references are refreshed after full DOM + script load.
+  // app3.js grabs contextComponentList etc. at parse time; if any are null,
+  // patch them here so the Context and Full Code tabs work.
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      // Re-seed any null app3 element refs
+      if (typeof window.contextComponentList === 'undefined' || !window.contextComponentList) {
+        window.contextComponentList = document.getElementById('context-component-list');
+      }
+      if (typeof window.contextComponentViewer === 'undefined' || !window.contextComponentViewer) {
+        window.contextComponentViewer = document.getElementById('context-component-viewer');
+      }
+      if (typeof window.fullCodeEditor === 'undefined' || !window.fullCodeEditor) {
+        window.fullCodeEditor = document.getElementById('full-code-editor');
+      }
+    }, 500);
+  });
+
   jarvisLoadSettings();
 
   // Migrate old localStorage memories → IDB
