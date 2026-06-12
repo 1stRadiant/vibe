@@ -4328,6 +4328,25 @@ function executeAgentPlan(agentDecision, agentLogger) {
     }
     
     refreshAllUI();
+
+    // Push changed nodes to APUI so its canvas reflects the agent's edits instantly.
+    // We send apui-node-updates (partial) so APUI doesn't rebuild the whole canvas.
+    const apuiFrame = document.getElementById('apui-frame');
+    if (apuiFrame?.contentWindow) {
+        // Collect all nodes that the agent touched
+        const updates = [];
+        for (const action of agentDecision.actions) {
+            if (action.actionType === 'update') {
+                const n = findNodeById(action.nodeId);
+                if (n) updates.push({ nodeId: n.id, newCode: n.code });
+            } else if (action.actionType === 'create') {
+                updates.push({ nodeId: action.newNode?.id, newCode: action.newNode?.code, isNew: true, newNode: action.newNode });
+            }
+        }
+        if (updates.length) {
+            apuiFrame.contentWindow.postMessage({ type: 'apui-init', vibeTree: JSON.parse(JSON.stringify(vibeTree)), projectId: currentProjectId, pinnedNodes: [..._apuiPinnedNodes] }, '*');
+        }
+    }
 }
 
 // --- Chat Logic ---
@@ -5212,13 +5231,14 @@ function switchToTab(tabId) {
     const alreadyActive = newContent.classList.contains('active');
 
     if (!alreadyActive) {
-        // Only swap DOM classes when actually changing tabs
         if (tabId === 'console') {
             consoleErrorIndicator.classList.remove('active');
         }
         document.querySelectorAll('.tab-button.active').forEach(btn => btn.classList.remove('active'));
         const currentContent = tabContents.querySelector('.tab-content.active');
-        if (currentContent) currentContent.classList.remove('active');
+        if (currentContent) {
+            currentContent.classList.remove('active');
+        }
         document.querySelectorAll(`.tab-button[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
         newContent.classList.add('active');
     }
@@ -9356,17 +9376,18 @@ function handleApuiMessage(e) {
             let changed = false;
             for (const { nodeId, newCode, isNew, newNode: nn } of d.updates) {
                 if (isNew && nn) {
-                    // New node created inside APUI — add to tree
                     const parent = findNodeById(nn.parentId || vibeTree.id) || vibeTree;
                     if (!parent.children) parent.children = [];
-                    // Avoid duplicate IDs
                     if (!findNodeById(nn.id)) { parent.children.push(nn); changed = true; }
                 } else {
                     const node = findNodeById(nodeId);
                     if (node && newCode !== undefined) { node.code = String(newCode); changed = true; }
                 }
             }
-            if (changed) refreshAllUI();
+            if (changed) {
+                refreshAllUI();
+                autoSaveProject();
+            }
             break;
         }
 
@@ -9547,6 +9568,113 @@ function handleApuiMessage(e) {
 
 
 
+
+// ══════════════════════════════════════════════════════════════════
+// JARVIS IDLE AUTO-TASK
+// When the user has been idle for 30 s and a project is loaded,
+// Jarvis picks one small improvement task, sends it to the APUI
+// PR queue, and waits at least 90 s before doing it again.
+// ══════════════════════════════════════════════════════════════════
+
+(function _jarvisIdleLoop() {
+    let _lastActivity    = Date.now();
+    let _loopRunning     = false;
+    let _lastTaskAt      = 0;
+    const IDLE_MS        = 30_000;   // idle threshold
+    const COOLDOWN_MS    = 90_000;   // minimum gap between tasks
+    const POLL_MS        = 5_000;    // how often to check
+
+    // Track user activity
+    ['mousemove','keydown','mousedown','touchstart','scroll'].forEach(evt => {
+        window.addEventListener(evt, () => { _lastActivity = Date.now(); }, { passive: true });
+    });
+
+    function _isIdle() {
+        return Date.now() - _lastActivity >= IDLE_MS;
+    }
+
+    function _hasProject() {
+        return vibeTree && (vibeTree.type === 'raw-html-container' || (vibeTree.children && vibeTree.children.length > 0));
+    }
+
+    function _apiKey() {
+        try { return localStorage.getItem('apui_gemini_key') || localStorage.getItem('gemini_api_key') || (typeof AppState !== 'undefined' && AppState?.settings?.apiKey) || ''; }
+        catch(e) { return ''; }
+    }
+
+    async function _pickTask() {
+        const key = _apiKey();
+        if (!key) return null;
+
+        const nodes = [];
+        (function walk(n) {
+            if (!n) return;
+            nodes.push(n.type + ':' + n.id + (n.description ? ' (' + n.description + ')' : ''));
+            (n.children || []).forEach(walk);
+        })(vibeTree);
+
+        const projectName = vibeTree.description || currentProjectId || 'current project';
+        const prompt = `You are Jarvis. Suggest ONE small improvement for this project.
+Project: "${projectName}"
+Nodes: ${nodes.slice(0, 20).join(', ')}
+
+Reply with exactly:
+TASK: <one sentence describing a specific small improvement to make>
+
+Rules: must improve the existing project, not create a new one. Be concrete and small.`;
+
+        try {
+            const raw = await callAI(
+                'You are Jarvis, a concise AI coding assistant. Reply only with the TASK line, nothing else.',
+                prompt,
+                false
+            );
+            const m = raw && raw.match(/TASK:\s*(.+)/i);
+            return m ? m[1].trim() : null;
+        } catch(e) {
+            console.warn('[Jarvis idle] AI call failed:', e.message);
+            return null;
+        }
+    }
+
+    async function _runOnce() {
+        if (_loopRunning) return;
+        if (!_isIdle()) return;
+        if (!_hasProject()) return;
+        if (Date.now() - _lastTaskAt < COOLDOWN_MS) return;
+        if (!_apiKey()) return;
+
+        _loopRunning = true;
+        try {
+            const task = await _pickTask();
+            if (!task) return;
+
+            // Send to APUI's Jarvis PR queue via postMessage
+            const frame = document.getElementById('apui-frame');
+            if (frame?.contentWindow) {
+                const key = _apiKey();
+                frame.contentWindow.postMessage({
+                    type:   'apui-jarvis-start',
+                    goal:   task,
+                    apiKey: key,
+                }, '*');
+                _lastTaskAt = Date.now();
+                console.log('[Jarvis idle] Task queued:', task);
+            }
+        } catch(e) {
+            console.warn('[Jarvis idle] error:', e.message);
+        } finally {
+            _loopRunning = false;
+        }
+    }
+
+    // Poll loop
+    setInterval(_runOnce, POLL_MS);
+
+    // Expose for debugging
+    window._jarvisIdle = { getLastActivity: () => _lastActivity, isIdle: _isIdle, forceRun: _runOnce };
+})();
+
 // ══════════════════════════════════════════════════════════════════
 // NERVOUS SYSTEM — Glue Code
 // ══════════════════════════════════════════════════════════════════
@@ -9571,4 +9699,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-}
+  }
