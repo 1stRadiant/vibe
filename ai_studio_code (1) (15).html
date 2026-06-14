@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Retro Demolition Derby - Pro Edition</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #d19a66;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(30, 30, 30, 0.95);
+            border: 4px double #888;
+            border-radius: 4px;
+            padding: 8px 20px;
+            color: #dcdcdc;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            gap: 30px;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+            letter-spacing: 1px;
+        }
+
+        .hud-segment {
+            display: flex;
+            align-items: center;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            z-index: 20;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px #900;
+            letter-spacing: 2px;
+        }
+
+        p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        button {
+            background: #a33;
+            color: white;
+            border: 3px solid #fff;
+            padding: 12px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 5px 0 #500;
+        }
+
+        button:hover {
+            background: #c44;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #500;
+        }
+
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            justify-content: space-between;
+            padding: 0 35px;
+            box-sizing: border-box;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 20px;
+            pointer-events: auto;
+        }
+
+        .mobile-btn {
+            width: 76px;
+            height: 76px;
+            background: rgba(30, 30, 30, 0.65);
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: transform 0.05s;
+        }
+
+        .mobile-btn:active {
+            background: rgba(163, 51, 51, 0.9);
+            border-color: #ffffff;
+            transform: scale(0.92);
+        }
+
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: flex;
+            }
+            #hud {
+                font-size: 13px;
+                padding: 6px 12px;
+                gap: 15px;
+            }
+            h1 {
+                font-size: 36px;
+            }
+            p {
+                font-size: 15px;
+            }
+            .mobile-btn {
+                width: 68px;
+                height: 68px;
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud">
+        <div class="hud-segment">HEALTH: <span id="health-bar">[==========]</span></div>
+        <div class="hud-segment">OPPONENTS: <span id="opponents-count">3</span></div>
+    </div>
+
+    <!-- Start Menu -->
+    <div id="start-overlay" class="overlay">
+        <h1>DIRT DERBY PRO</h1>
+        <p>Dynamic metal crumpling. Real tire physics obstacles.<br>Dual-synth V8 engines. Real-time metal crunches.<br>Drive with WASD / Arrows or Touch Controls.</p>
+        <button id="start-btn">START MATCH</button>
+    </div>
+
+    <!-- Victory/Loss -->
+    <div id="gameover-overlay" class="overlay" style="display: none;">
+        <h1 id="gameover-title">WASTED</h1>
+        <p id="gameover-sub">Engine block destroyed.</p>
+        <button id="restart-btn">TRY AGAIN</button>
+    </div>
+
+    <!-- Multi-Touch Interface -->
+    <div id="mobile-controls">
+        <div class="control-group">
+            <div class="mobile-btn" id="btn-left">◀</div>
+            <div class="mobile-btn" id="btn-right">▶</div>
+        </div>
+        <div class="control-group">
+            <div class="mobile-btn" id="btn-up">▲</div>
+            <div class="mobile-btn" id="btn-down">▼</div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- UPGRADED PROCEDURAL AUDIO SYSTEM ---
+        class ProceduralAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.engineOsc1 = null;
+                this.engineOsc2 = null;
+                this.engineGain = null;
+                this.screechOsc = null;
+                this.screechGain = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                try {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.setupEngineSynth();
+                    this.setupScreechSynth();
+                } catch (e) {
+                    console.error("Audio Context Init Failed", e);
+                }
+            }
+
+            setupEngineSynth() {
+                this.engineOsc1 = this.ctx.createOscillator();
+                this.engineOsc2 = this.ctx.createOscillator();
+                this.engineGain = this.ctx.createGain();
+                
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(140, this.ctx.currentTime);
+
+                this.engineOsc1.type = 'sawtooth';
+                this.engineOsc2.type = 'triangle';
+
+                this.engineOsc1.frequency.setValueAtTime(35, this.ctx.currentTime);
+                this.engineOsc2.frequency.setValueAtTime(17.5, this.ctx.currentTime);
+
+                this.engineGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+
+                this.engineOsc1.connect(filter);
+                this.engineOsc2.connect(filter);
+                filter.connect(this.engineGain);
+                this.engineGain.connect(this.ctx.destination);
+
+                this.engineOsc1.start();
+                this.engineOsc2.start();
+            }
+
+            updateEngineSound(speedRatio, isPlayerActive) {
+                if (!this.ctx || !this.engineGain) return;
+                const targetFreq1 = 30 + (speedRatio * 85);
+                const targetFreq2 = 15 + (speedRatio * 42.5);
+                
+                this.engineOsc1.frequency.setTargetAtTime(targetFreq1, this.ctx.currentTime, 0.1);
+                this.engineOsc2.frequency.setTargetAtTime(targetFreq2, this.ctx.currentTime, 0.1);
+                
+                const targetGain = isPlayerActive ? 0.08 + (speedRatio * 0.05) : 0.0;
+                this.engineGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.1);
+            }
+
+            setupScreechSynth() {
+                // High bandpassed noise simulation for drifting
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                this.screechOsc = this.ctx.createBufferSource();
+                this.screechOsc.buffer = buffer;
+                this.screechOsc.loop = true;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1200, this.ctx.currentTime);
+                filter.Q.setValueAtTime(1.5, this.ctx.currentTime);
+
+                this.screechGain = this.ctx.createGain();
+                this.screechGain.gain.setValueAtTime(0, this.ctx.currentTime);
+
+                this.screechOsc.connect(filter);
+                filter.connect(this.screechGain);
+                this.screechGain.connect(this.ctx.destination);
+                this.screechOsc.start();
+            }
+
+            setScreechIntensity(intensity) {
+                if (!this.screechGain) return;
+                this.screechGain.gain.setTargetAtTime(intensity * 0.08, this.ctx.currentTime, 0.1);
+            }
+
+            playCrash(intensity = 1.0) {
+                if (!this.ctx) return;
+                try {
+                    const duration = 0.35 * intensity;
+                    const bufferSize = this.ctx.sampleRate * duration;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(350 * intensity, this.ctx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + duration);
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0.5 * intensity, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start();
+                } catch(e){}
+            }
+        }
+        const sfx = new ProceduralAudioEngine();
+
+        // --- CONSTANTS & CONFIG ---
+        const ARENA_WIDTH = 55;
+        const ARENA_HEIGHT = 30;
+        const CAR_WIDTH = 2.2;
+        const CAR_LENGTH = 4.2;
+        const CAR_HEIGHT = 1.3;
+
+        // --- GAME SYSTEM GLOBAL ARRAYS ---
+        let scene, camera, renderer;
+        let cars = [];
+        let player = null;
+        let arenaWalls = [];
+        let tires = []; // Interactive physical obstacles
+        let staticPillars = []; // Heavy obstacles
+        let particles = [];
+        let keys = {};
+        let gameActive = false;
+
+        // Concrete texture generation
+        function createConcreteTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#9e9e9e';
+            ctx.fillRect(0,0,256,256);
+            for(let i=0; i<800; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#7c7c7c' : '#bcbcbc';
+                ctx.fillRect(Math.random()*256, Math.random()*256, Math.random()*3+1, Math.random()*3+1);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // Dirt ground builder
+        function createDirtTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#b07a50';
+            ctx.fillRect(0, 0, 512, 512);
+            for(let i=0; i<2000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#8e5b32' : '#ca9569';
+                ctx.beginPath();
+                ctx.arc(Math.random()*512, Math.random()*512, Math.random()*3+1, 0, Math.PI*2);
+                ctx.fill();
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(6, 4);
+            return texture;
+        }
+
+        // --- PHYSICAL TIRE OBSTACLE ---
+        class DynamicTire {
+            constructor(x, z) {
+                const tireGeo = new THREE.TorusGeometry(0.5, 0.25, 6, 12);
+                tireGeo.rotateX(Math.PI / 2);
+                const tireMat = new THREE.MeshStandardMaterial({ color: 0x1d1d1d, roughness: 0.9 });
+                
+                this.mesh = new THREE.Mesh(tireGeo, tireMat);
+                this.mesh.position.set(x, 0.25, z);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                scene.add(this.mesh);
+
+                this.position = new THREE.Vector3(x, 0.25, z);
+                this.velocity = new THREE.Vector3();
+                this.radius = 0.75;
+                this.mass = 0.25;
+            }
+
+            update(dt) {
+                // Decay velocity with heavy dirt friction
+                this.velocity.multiplyScalar(0.92);
+                this.position.addScaledVector(this.velocity, dt);
+                this.mesh.position.copy(this.position);
+                
+                // Roll visual orientation matching slide direction
+                if (this.velocity.length() > 0.1) {
+                    this.mesh.rotation.y += this.velocity.length() * dt * 0.5;
+                }
+
+                // Wall bounds bounce calculations
+                const boundX = ARENA_WIDTH / 2 - this.radius;
+                const boundZ = ARENA_HEIGHT / 2 - this.radius;
+
+                if (Math.abs(this.position.x) > boundX) {
+                    this.position.x = Math.sign(this.position.x) * boundX;
+                    this.velocity.x *= -0.6;
+                }
+                if (Math.abs(this.position.z) > boundZ) {
+                    this.position.z = Math.sign(this.position.z) * boundZ;
+                    this.velocity.z *= -0.6;
+                }
+            }
+        }
+
+        // --- VEHICLE ENTITY CLASS ---
+        class Vehicle {
+            constructor(x, z, angle, color, isPlayer = false) {
+                this.isPlayer = isPlayer;
+                this.color = color;
+                
+                // Procedural group assembler
+                this.mesh = createCarMesh(color, isPlayer);
+                this.mesh.position.set(x, 0, z);
+                this.mesh.rotation.y = angle;
+                scene.add(this.mesh);
+
+                this.position = new THREE.Vector3(x, 0, z);
+                this.velocity = new THREE.Vector3();
+                this.speed = 0;
+                this.angle = angle;
+                this.health = 100;
+                this.isDead = false;
+
+                this.maxSpeed = isPlayer ? 19.5 : 13.0;
+                this.maxReverseSpeed = -6.5;
+                this.accel = 12.5;
+                this.decel = 8.5;
+                this.friction = 4.5;
+                this.steerSpeed = 2.45;
+                this.driftFactor = 0.85;
+
+                // AI state controllers
+                this.aiState = 'WANDER';
+                this.aiTarget = null;
+                this.stuckTimer = 0;
+                this.lastPos = this.position.clone();
+            }
+
+            // Get three longitudinal collision spheres (Sphere-Chain OBB approximation)
+            getCollisionSpheres() {
+                const spheres = [];
+                const radius = 1.1; // Extent matching vehicle width
+                const offsets = [1.3, 0.0, -1.3]; // Front, Center, Rear offsets
+                
+                offsets.forEach(zOffset => {
+                    const center = new THREE.Vector3(0, 0.45, zOffset);
+                    center.applyMatrix4(this.mesh.matrixWorld);
+                    spheres.push({ center, radius });
+                });
+                return spheres;
+            }
+
+            update(dt) {
+                if (this.isDead) {
+                    this.speed = 0;
+                    this.velocity.set(0, 0, 0);
+                    if (Math.random() < 0.12) {
+                        spawnImpactParticles(
+                            this.position.clone().add(new THREE.Vector3(0, 0.8, 1.0).applyAxisAngle(new THREE.Vector3(0,1,0), this.angle)), 
+                            0x333333, 1, true
+                        );
+                    }
+                    return;
+                }
+
+                if (!this.isPlayer) {
+                    this.handleAI(dt);
+                } else {
+                    this.handleInput(dt);
+                }
+
+                // Decay speed with friction
+                if (Math.abs(this.speed) > 0) {
+                    const drag = (this.speed > 0 ? -this.friction : this.friction) * dt;
+                    if (Math.abs(drag) > Math.abs(this.speed)) {
+                        this.speed = 0;
+                    } else {
+                        this.speed += drag;
+                    }
+                }
+
+                this.speed = Math.max(this.maxReverseSpeed, Math.min(this.maxSpeed, this.speed));
+
+                const forwardVec = new THREE.Vector3(Math.sin(this.angle), 0, Math.cos(this.angle));
+                const targetVelocity = forwardVec.clone().multiplyScalar(this.speed);
+                
+                // Slide/drift vector interpolation
+                this.velocity.lerp(targetVelocity, this.driftFactor * dt * 8.0);
+
+                this.position.addScaledVector(this.velocity, dt);
+                this.mesh.position.copy(this.position);
+                this.mesh.rotation.y = this.angle;
+
+                // Handle wheel rotation visuals
+                const wRot = (this.speed * dt) / 0.42;
+                this.mesh.userData.wheels.forEach((w, index) => {
+                    w.children[0].rotation.x += wRot;
+                    if (index < 2) {
+                        if (this.isPlayer) {
+                            let turnAng = 0;
+                            if (keys['a'] || keys['arrowleft']) turnAng = 0.4;
+                            if (keys['d'] || keys['arrowright']) turnAng = -0.4;
+                            w.rotation.y = THREE.MathUtils.lerp(w.rotation.y, turnAng, 0.2);
+                        }
+                    }
+                });
+
+                // Spark / Smoke engine warnings
+                if (this.health < 40 && Math.random() < 0.15) {
+                    spawnImpactParticles(
+                        this.position.clone().add(new THREE.Vector3(0, 0.8, 1.4).applyAxisAngle(new THREE.Vector3(0,1,0), this.angle)), 
+                        0x666666, 1, true
+                    );
+                }
+            }
+
+            handleInput(dt) {
+                if (keys['w'] || keys['arrowup']) {
+                    this.speed += this.accel * dt;
+                } else if (keys['s'] || keys['arrowdown']) {
+                    this.speed -= this.accel * dt;
+                }
+
+                if (Math.abs(this.speed) > 0.5) {
+                    const directionMult = this.speed > 0 ? 1 : -1;
+                    if (keys['a'] || keys['arrowleft']) {
+                        this.angle += this.steerSpeed * directionMult * dt;
+                    }
+                    if (keys['d'] || keys['arrowright']) {
+                        this.angle -= this.steerSpeed * directionMult * dt;
+                    }
+                }
+            }
+
+            handleAI(dt) {
+                const distMoved = this.position.distanceTo(this.lastPos);
+                this.lastPos.copy(this.position);
+
+                if (distMoved < 0.05 && !this.isDead) {
+                    this.stuckTimer += dt;
+                } else {
+                    this.stuckTimer = Math.max(0, this.stuckTimer - dt);
+                }
+
+                if (this.stuckTimer > 1.2) {
+                    this.aiState = 'RECOVERY';
+                    this.recoveryTimer = 1.4;
+                    this.stuckTimer = 0;
+                }
+
+                if (this.aiState === 'RECOVERY') {
+                    this.speed -= this.accel * dt;
+                    this.angle += this.steerSpeed * 0.4 * dt;
+                    this.recoveryTimer -= dt;
+                    if (this.recoveryTimer <= 0) {
+                        this.aiState = 'WANDER';
+                    }
+                    return;
+                }
+
+                let nearestRival = null;
+                let minDist = Infinity;
+                cars.forEach(car => {
+                    if (car !== this && !car.isDead) {
+                        const d = this.position.distanceTo(car.position);
+                        if (d < minDist) {
+                            minDist = d;
+                            nearestRival = car;
+                        }
+                    }
+                });
+
+                if (nearestRival) {
+                    this.aiTarget = nearestRival.position;
+                    this.aiState = 'CHASE';
+                } else {
+                    this.aiState = 'WANDER';
+                }
+
+                if (this.aiState === 'CHASE' && this.aiTarget) {
+                    const toTarget = new THREE.Vector3().subVectors(this.aiTarget, this.position);
+                    let targetAngle = Math.atan2(toTarget.x, toTarget.z);
+                    
+                    let angleDiff = targetAngle - this.angle;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+                    if (angleDiff > 0.1) {
+                        this.angle += this.steerSpeed * 0.8 * dt;
+                    } else if (angleDiff < -0.1) {
+                        this.angle -= this.steerSpeed * 0.8 * dt;
+                    }
+
+                    this.speed += this.accel * 0.8 * dt;
+                } else {
+                    this.speed += this.accel * 0.5 * dt;
+                    this.angle += Math.sin(Date.now() * 0.002) * dt;
+                }
+            }
+
+            inflictDamage(amount, impactPoint, normal) {
+                if (this.isDead) return;
+                this.health = Math.max(0, this.health - amount);
+                
+                // Actual Procedural Vertex Denting Mechanics
+                const chassisMesh = this.mesh.userData.chassisMesh;
+                if (chassisMesh && impactPoint) {
+                    const localPoint = chassisMesh.worldToLocal(impactPoint.clone());
+                    const posAttr = chassisMesh.geometry.attributes.position;
+                    
+                    for (let i = 0; i < posAttr.count; i++) {
+                        let vx = posAttr.getX(i);
+                        let vy = posAttr.getY(i);
+                        let vz = posAttr.getZ(i);
+                        
+                        let vertexPos = new THREE.Vector3(vx, vy, vz);
+                        let dist = vertexPos.distanceTo(localPoint);
+                        
+                        // Localized crumpling
+                        if (dist < 1.6) {
+                            let factor = (1.6 - dist) * 0.28 * (amount / 30);
+                            
+                            // Transform global normal direction to local space
+                            const localNormal = normal.clone().transformDirection(chassisMesh.matrixWorld.clone().invert());
+                            
+                            // Push vertices inward along normal, with structural noise disruption
+                            const noise = (Math.random() - 0.5) * 0.1;
+                            posAttr.setXYZ(
+                                i, 
+                                vx - (localNormal.x * factor) + noise, 
+                                vy - (localNormal.y * factor * 0.3), 
+                                vz - (localNormal.z * factor) + noise
+                            );
+                        }
+                    }
+                    posAttr.needsUpdate = true;
+                    chassisMesh.geometry.computeVertexNormals();
+                }
+
+                if (this.health <= 0) {
+                    this.isDead = true;
+                    spawnImpactParticles(this.position, 0x111111, 35, true);
+                    sfx.playCrash(1.6);
+                }
+            }
+        }
+
+        // --- PROCEDURAL VEHICLE MODELLER ---
+        function createCarMesh(colorHex, isPlayer = false) {
+            const group = new THREE.Group();
+
+            const bodyMat = new THREE.MeshStandardMaterial({ 
+                color: colorHex, 
+                roughness: 0.8, 
+                metalness: 0.15,
+                flatShading: true 
+            });
+            const cabMat = new THREE.MeshStandardMaterial({ 
+                color: isPlayer ? 0xffffff : 0x222222, 
+                roughness: 0.5, 
+                flatShading: true 
+            });
+            const windowMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.1 });
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
+            const hubMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8 });
+            const bumperMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.7 });
+
+            // Segmented box representing body panels
+            const chassisGeo = new THREE.BoxGeometry(CAR_WIDTH, CAR_HEIGHT * 0.5, CAR_LENGTH, 8, 4, 8);
+            const chassis = new THREE.Mesh(chassisGeo, bodyMat);
+            chassis.position.y = 0.45;
+            chassis.castShadow = true;
+            chassis.receiveShadow = true;
+            group.add(chassis);
+            group.userData.chassisMesh = chassis;
+
+            const cabinGeo = new THREE.BoxGeometry(CAR_WIDTH * 0.9, CAR_HEIGHT * 0.55, CAR_LENGTH * 0.5);
+            const cabin = new THREE.Mesh(cabinGeo, cabMat);
+            cabin.position.set(0, 0.85, -0.2);
+            cabin.castShadow = true;
+            group.add(cabin);
+
+            const windshieldGeo = new THREE.BoxGeometry(CAR_WIDTH * 0.82, CAR_HEIGHT * 0.45, 0.1);
+            const windshield = new THREE.Mesh(windshieldGeo, windowMat);
+            windshield.position.set(0, 0.85, 0.8);
+            windshield.rotation.x = 0.3;
+            group.add(windshield);
+
+            const rearWindowGeo = new THREE.BoxGeometry(CAR_WIDTH * 0.82, CAR_HEIGHT * 0.45, 0.1);
+            const rearWin = new THREE.Mesh(rearWindowGeo, windowMat);
+            rearWin.position.set(0, 0.85, -1.2);
+            rearWin.rotation.x = -0.3;
+            group.add(rearWin);
+
+            const bumperGeo = new THREE.BoxGeometry(CAR_WIDTH * 1.05, 0.25, 0.25);
+            const fBumper = new THREE.Mesh(bumperGeo, bumperMat);
+            fBumper.position.set(0, 0.3, CAR_LENGTH/2);
+            fBumper.castShadow = true;
+            group.add(fBumper);
+
+            const rBumper = fBumper.clone();
+            rBumper.position.z = -CAR_LENGTH/2;
+            group.add(rBumper);
+
+            const lightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.1, 8);
+            lightGeo.rotateX(Math.PI / 2);
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+            
+            const leftLight = new THREE.Mesh(lightGeo, lightMat);
+            leftLight.position.set(0.7, 0.4, CAR_LENGTH/2 + 0.05);
+            group.add(leftLight);
+
+            const rightLight = leftLight.clone();
+            rightLight.position.x = -0.7;
+            group.add(rightLight);
+
+            const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.35, 12);
+            wheelGeo.rotateZ(Math.PI / 2);
+            const hubGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.38, 8);
+            hubGeo.rotateZ(Math.PI / 2);
+
+            const wheels = [];
+            const wheelPositions = [
+                [-CAR_WIDTH/2 - 0.05, 0.35, CAR_LENGTH/2 - 0.8],
+                [CAR_WIDTH/2 + 0.05, 0.35, CAR_LENGTH/2 - 0.8],
+                [-CAR_WIDTH/2 - 0.05, 0.35, -CAR_LENGTH/2 + 0.8],
+                [CAR_WIDTH/2 + 0.05, 0.35, -CAR_LENGTH/2 + 0.8]
+            ];
+
+            wheelPositions.forEach(pos => {
+                const wGrp = new THREE.Group();
+                wGrp.position.set(pos[0], pos[1], pos[2]);
+                
+                const tire = new THREE.Mesh(wheelGeo, wheelMat);
+                tire.castShadow = true;
+                const hub = new THREE.Mesh(hubGeo, hubMat);
+                
+                wGrp.add(tire);
+                wGrp.add(hub);
+                group.add(wGrp);
+                wheels.push(wGrp);
+            });
+
+            group.userData.wheels = wheels;
+            return group;
+        }
+
+        // --- ENVIRONMENT BUILDER ---
+        function createArena() {
+            // Dirt Ground
+            const floorGeo = new THREE.PlaneGeometry(ARENA_WIDTH, ARENA_HEIGHT);
+            const floorMat = new THREE.MeshStandardMaterial({ 
+                map: createDirtTexture(),
+                roughness: 0.9, 
+                metalness: 0.0 
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Perimeter Concrete Fencing
+            const concreteTex = createConcreteTexture();
+            const wallMat = new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.8 });
+            const wallHeight = 2.2;
+            const wallThick = 1.2;
+
+            function buildWall(w, h, d, x, z) {
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const wall = new THREE.Mesh(geo, wallMat);
+                wall.position.set(x, h/2, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+                arenaWalls.push({ box: new THREE.Box3().setFromObject(wall), mesh: wall });
+            }
+
+            buildWall(ARENA_WIDTH + wallThick, wallHeight, wallThick, 0, ARENA_HEIGHT/2 + wallThick/2);
+            buildWall(ARENA_WIDTH + wallThick, wallHeight, wallThick, 0, -ARENA_HEIGHT/2 - wallThick/2);
+            buildWall(wallThick, wallHeight, ARENA_HEIGHT, -ARENA_WIDTH/2 - wallThick/2, 0);
+            buildWall(wallThick, wallHeight, ARENA_HEIGHT, ARENA_WIDTH/2 + wallThick/2, 0);
+
+            // Static Concrete Pillars (Obstacles)
+            const pillarGeo = new THREE.BoxGeometry(3, 2.5, 3);
+            const pillar1 = new THREE.Mesh(pillarGeo, wallMat);
+            pillar1.position.set(-10, 1.25, 0);
+            pillar1.castShadow = true;
+            pillar1.receiveShadow = true;
+            scene.add(pillar1);
+            staticPillars.push({ box: new THREE.Box3().setFromObject(pillar1), mesh: pillar1 });
+
+            const pillar2 = pillar1.clone();
+            pillar2.position.set(10, 1.25, 0);
+            scene.add(pillar2);
+            staticPillars.push({ box: new THREE.Box3().setFromObject(pillar2), mesh: pillar2 });
+
+            // Scattered Physicalized Tires
+            const cornerDistX = ARENA_WIDTH / 2 - 5;
+            const cornerDistZ = ARENA_HEIGHT / 2 - 5;
+            
+            // Build groups of interactive tires in corners
+            const positions = [
+                [-cornerDistX, -cornerDistZ], [-cornerDistX+1, -cornerDistZ], [-cornerDistX, -cornerDistZ+1],
+                [cornerDistX, -cornerDistZ], [cornerDistX-1, -cornerDistZ], [cornerDistX, -cornerDistZ+1],
+                [-cornerDistX, cornerDistZ], [-cornerDistX+1, cornerDistZ], [-cornerDistX, cornerDistZ-1],
+                [cornerDistX, cornerDistZ], [cornerDistX-1, cornerDistZ], [cornerDistX, cornerDistZ-1],
+                [0, -7], [0, 7]
+            ];
+
+            positions.forEach(pos => {
+                tires.push(new DynamicTire(pos[0], pos[1]));
+            });
+        }
+
+        // --- PARTICLE GENERATION ENGINE ---
+        function spawnImpactParticles(position, color, count = 15, isSmoke = false) {
+            for (let i = 0; i < count; i++) {
+                let geo, mat;
+                if (isSmoke) {
+                    geo = new THREE.SphereGeometry(0.1 + Math.random() * 0.3, 5, 5);
+                    mat = new THREE.MeshBasicMaterial({
+                        color: 0x888888,
+                        transparent: true,
+                        opacity: 0.6
+                    });
+                } else {
+                    geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+                    mat = new THREE.MeshBasicMaterial({
+                        color: color || 0xffaa00,
+                        transparent: true,
+                        opacity: 1
+                    });
+                }
+
+                const particle = new THREE.Mesh(geo, mat);
+                particle.position.copy(position);
+                
+                particle.position.x += (Math.random() - 0.5) * 0.5;
+                particle.position.y += (Math.random() - 0.5) * 0.5;
+                particle.position.z += (Math.random() - 0.5) * 0.5;
+
+                scene.add(particle);
+
+                particles.push({
+                    mesh: particle,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        Math.random() * 6 + 2,
+                        (Math.random() - 0.5) * 10
+                    ),
+                    life: 1.0,
+                    decay: isSmoke ? 1.5 : 2.5,
+                    isSmoke: isSmoke
+                });
+            }
+        }
+
+        // --- CORE COLLISIONS HANDLING ENGINE ---
+        function checkCollisions() {
+            // 1. CAR vs CAR (Sphere-Chain OBB)
+            for (let i = 0; i < cars.length; i++) {
+                for (let j = i + 1; j < cars.length; j++) {
+                    const c1 = cars[i];
+                    const c2 = cars[j];
+
+                    if (c1.isDead || c2.isDead) continue;
+
+                    const spheres1 = c1.getCollisionSpheres();
+                    const spheres2 = c2.getCollisionSpheres();
+
+                    spheres1.forEach(s1 => {
+                        spheres2.forEach(s2 => {
+                            const dist = s1.center.distanceTo(s2.center);
+                            const minDist = s1.radius + s2.radius;
+
+                            if (dist < minDist) {
+                                const collisionNormal = new THREE.Vector3().subVectors(s2.center, s1.center).normalize();
+                                const relVel = new THREE.Vector3().subVectors(c1.velocity, c2.velocity);
+                                const speedImpact = relVel.dot(collisionNormal);
+
+                                // Position Correction Pass
+                                const overlap = minDist - dist;
+                                c1.position.addScaledVector(collisionNormal, -overlap * 0.5);
+                                c2.position.addScaledVector(collisionNormal, overlap * 0.5);
+
+                                if (speedImpact > 1.2) {
+                                    const crashPoint = new THREE.Vector3().addVectors(s1.center, s2.center).multiplyScalar(0.5);
+                                    
+                                    const impulse = speedImpact * 0.65;
+                                    c1.speed = -c1.speed * 0.45;
+                                    c2.speed = -c2.speed * 0.45;
+                                    c1.velocity.addScaledVector(collisionNormal, -impulse);
+                                    c2.velocity.addScaledVector(collisionNormal, impulse);
+
+                                    // Dynamic Damage Distribution
+                                    const damageForce = Math.floor(speedImpact * 4.5);
+                                    c1.inflictDamage(damageForce, crashPoint, collisionNormal);
+                                    c2.inflictDamage(damageForce, crashPoint, collisionNormal.clone().negate());
+
+                                    spawnImpactParticles(crashPoint, 0xffaa00, 20);
+                                    sfx.playCrash(Math.min(1.0, speedImpact / 14.0));
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+
+            // 2. CAR vs STATIC OBSTACLES (Pillars & Wall Meshes)
+            cars.forEach(car => {
+                if (car.isDead) return;
+
+                const spheres = car.getCollisionSpheres();
+
+                // Check static concrete pillars
+                staticPillars.forEach(pillar => {
+                    spheres.forEach(s => {
+                        const closestPoint = new THREE.Vector3();
+                        pillar.box.clampPoint(s.center, closestPoint);
+                        const dist = s.center.distanceTo(closestPoint);
+
+                        if (dist < s.radius) {
+                            const collisionNormal = new THREE.Vector3().subVectors(s.center, closestPoint).normalize();
+                            const overlap = s.radius - dist;
+                            
+                            car.position.addScaledVector(collisionNormal, overlap);
+                            car.velocity.reflect(collisionNormal).multiplyScalar(0.3);
+                            car.speed = -car.speed * 0.45;
+
+                            const hitForce = Math.abs(car.speed);
+                            if (hitForce > 1.0) {
+                                car.inflictDamage(Math.floor(hitForce * 3.5), closestPoint, collisionNormal);
+                                spawnImpactParticles(closestPoint, 0xbbbbbb, 10);
+                                sfx.playCrash(0.35);
+                            }
+                        }
+                    });
+                });
+
+                // Check boundary concrete walls
+                const halfW = ARENA_WIDTH / 2;
+                const halfH = ARENA_HEIGHT / 2;
+                const limitX = halfW - CAR_WIDTH/2;
+                const limitZ = halfH - CAR_WIDTH/2;
+                let collided = false;
+                let wallImpactPoint = car.position.clone();
+                let wallNormal = new THREE.Vector3();
+
+                if (car.position.x > limitX) {
+                    car.position.x = limitX;
+                    car.velocity.x = -car.velocity.x * 0.3;
+                    car.speed = -car.speed * 0.4;
+                    collided = true;
+                    wallImpactPoint.x = halfW;
+                    wallNormal.set(-1, 0, 0);
+                } else if (car.position.x < -limitX) {
+                    car.position.x = -limitX;
+                    car.velocity.x = -car.velocity.x * 0.3;
+                    car.speed = -car.speed * 0.4;
+                    collided = true;
+                    wallImpactPoint.x = -halfW;
+                    wallNormal.set(1, 0, 0);
+                }
+
+                if (car.position.z > limitZ) {
+                    car.position.z = limitZ;
+                    car.velocity.z = -car.velocity.z * 0.3;
+                    car.speed = -car.speed * 0.4;
+                    collided = true;
+                    wallImpactPoint.z = halfH;
+                    wallNormal.set(0, 0, -1);
+                } else if (car.position.z < -limitZ) {
+                    car.position.z = -limitZ;
+                    car.velocity.z = -car.velocity.z * 0.3;
+                    car.speed = -car.speed * 0.4;
+                    collided = true;
+                    wallImpactPoint.z = -halfH;
+                    wallNormal.set(0, 0, 1);
+                }
+
+                if (collided) {
+                    const hitForce = Math.abs(car.speed);
+                    if (hitForce > 1.2) {
+                        car.inflictDamage(Math.floor(hitForce * 2.0), wallImpactPoint, wallNormal);
+                        spawnImpactParticles(wallImpactPoint, 0xbbbbbb, 8);
+                        sfx.playCrash(0.25);
+                    }
+                }
+            });
+
+            // 3. CAR vs PHYSICAL TIRES
+            cars.forEach(car => {
+                if (car.isDead) return;
+                const spheres = car.getCollisionSpheres();
+
+                tires.forEach(tire => {
+                    spheres.forEach(s => {
+                        const dist = s.center.distanceTo(tire.position);
+                        const minDist = s.radius + tire.radius;
+
+                        if (dist < minDist) {
+                            const collisionNormal = new THREE.Vector3().subVectors(tire.position, s.center).normalize();
+                            const overlap = minDist - dist;
+
+                            // Push tire away with momentum
+                            tire.position.addScaledVector(collisionNormal, overlap);
+                            const speedTransfer = Math.max(2.0, Math.abs(car.speed) * 1.2);
+                            tire.velocity.addScaledVector(collisionNormal, speedTransfer);
+
+                            // Minor momentum correction back to car
+                            car.speed *= 0.85;
+
+                            spawnImpactParticles(tire.position, 0x1d1d1d, 5);
+                        }
+                    });
+                });
+            });
+
+            // 4. PHYSICAL TIRE vs PHYSICAL TIRE (Scattering dynamics)
+            for (let i = 0; i < tires.length; i++) {
+                for (let j = i + 1; j < tires.length; j++) {
+                    const t1 = tires[i];
+                    const t2 = tires[j];
+
+                    const dist = t1.position.distanceTo(t2.position);
+                    const minDist = t1.radius + t2.radius;
+
+                    if (dist < minDist) {
+                        const collisionNormal = new THREE.Vector3().subVectors(t2.position, t1.position).normalize();
+                        const overlap = minDist - dist;
+
+                        t1.position.addScaledVector(collisionNormal, -overlap * 0.5);
+                        t2.position.addScaledVector(collisionNormal, overlap * 0.5);
+
+                        // Elastic mass-energy distribution mapping
+                        const v1 = t1.velocity.dot(collisionNormal);
+                        const v2 = t2.velocity.dot(collisionNormal);
+                        const speedImpact = v1 - v2;
+
+                        if (speedImpact > 0.1) {
+                            t1.velocity.addScaledVector(collisionNormal, -speedImpact * 0.5);
+                            t2.velocity.addScaledVector(collisionNormal, speedImpact * 0.5);
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- CORE ENGINE INITIALIZATION ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#d19a66');
+            scene.fog = new THREE.FogExp2(0xd19a66, 0.012);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(28, 38, 32);
+            camera.lookAt(0, 0, 0);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff3e0, 0.8);
+            dirLight.position.set(20, 40, 15);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 100;
+            const d = 40;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            createArena();
+
+            window.addEventListener('resize', onWindowResize);
+
+            // Desktop Inputs
+            window.addEventListener('keydown', (e) => { 
+                keys[e.key.toLowerCase()] = true; 
+                sfx.init();
+            });
+            window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+            // Mobile Inputs
+            setupMobileInputs();
+        }
+
+        function setupMobileInputs() {
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            if (isTouchDevice) {
+                document.getElementById('mobile-controls').style.display = 'flex';
+            }
+
+            const mobileButtons = [
+                { id: 'btn-left', key: 'arrowleft' },
+                { id: 'btn-right', key: 'arrowright' },
+                { id: 'btn-up', key: 'arrowup' },
+                { id: 'btn-down', key: 'arrowdown' }
+            ];
+
+            mobileButtons.forEach(btnConfig => {
+                const el = document.getElementById(btnConfig.id);
+                if (!el) return;
+
+                const press = (e) => {
+                    e.preventDefault();
+                    sfx.init();
+                    keys[btnConfig.key] = true;
+                };
+
+                const release = (e) => {
+                    e.preventDefault();
+                    keys[btnConfig.key] = false;
+                };
+
+                el.addEventListener('touchstart', press, { passive: false });
+                el.addEventListener('touchend', release, { passive: false });
+                el.addEventListener('touchcancel', release, { passive: false });
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- CORE GAME LOOP ---
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            let dt = (now - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1;
+            lastTime = now;
+
+            if (gameActive) {
+                // Cars update
+                cars.forEach(car => car.update(dt));
+
+                // Dynamic tires update
+                tires.forEach(tire => tire.update(dt));
+
+                // Precise physical engine pass
+                checkCollisions();
+
+                // Upgraded Audio Synthesis state modulation
+                if (player && !player.isDead) {
+                    const speedRatio = Math.abs(player.speed) / player.maxSpeed;
+                    sfx.updateEngineSound(speedRatio, true);
+
+                    // Compute lateral slip velocity for screech synthesis
+                    const forwardDir = new THREE.Vector3(Math.sin(player.angle), 0, Math.cos(player.angle));
+                    const lateralSlip = player.velocity.clone().projectOnPlane(forwardDir).length();
+                    if (lateralSlip > 1.8 && Math.abs(player.speed) > 4.0) {
+                        sfx.setScreechIntensity(Math.min(1.0, lateralSlip / 6.0));
+                    } else {
+                        sfx.setScreechIntensity(0);
+                    }
+                } else {
+                    sfx.updateEngineSound(0.0, false);
+                    sfx.setScreechIntensity(0);
+                }
+
+                // Particle systems tick
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.mesh.position.addScaledVector(p.velocity, dt);
+                    p.velocity.y -= 9.8 * dt;
+                    p.life -= p.decay * dt;
+                    p.mesh.material.opacity = p.life;
+                    
+                    if (p.isSmoke) {
+                        p.mesh.scale.addScalar(dt * 0.8);
+                    }
+
+                    if (p.life <= 0) {
+                        scene.remove(p.mesh);
+                        p.mesh.geometry.dispose();
+                        p.mesh.material.dispose();
+                        particles.splice(i, 1);
+                    }
+                }
+
+                // Lag-compensated Isometric camera tracking
+                if (player && !player.isDead) {
+                    const targetCamPos = new THREE.Vector3(
+                        player.position.x + 25,
+                        32,
+                        player.position.z + 28
+                    );
+                    camera.position.lerp(targetCamPos, 3.5 * dt);
+                    camera.lookAt(player.position.x, player.position.y, player.position.z);
+                }
+
+                updateHUD();
+                checkMatchStatus();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- HUD MANAGEMENT ---
+        function updateHUD() {
+            if (!player) return;
+
+            const totalSegments = 10;
+            const filledCount = Math.ceil((player.health / 100) * totalSegments);
+            let barString = "[";
+            for (let i = 0; i < totalSegments; i++) {
+                if (i < filledCount) {
+                    barString += "=";
+                } else {
+                    barString += " ";
+                }
+            }
+            barString += "]";
+            
+            document.getElementById('health-bar').innerText = barString;
+
+            const opponentsLeft = cars.filter(c => !c.isPlayer && !c.isDead).length;
+            document.getElementById('opponents-count').innerText = opponentsLeft;
+        }
+
+        function checkMatchStatus() {
+            if (player.isDead) {
+                endGame(false, "YOUR ENGINE BLOCK IS WASTED!");
+            } else {
+                const opponentsLeft = cars.filter(c => !c.isPlayer && !c.isDead).length;
+                if (opponentsLeft === 0) {
+                    endGame(true, "VICTORY! ALL OPPONENTS DESTROYED");
+                }
+            }
+        }
+
+        function resetGame() {
+            // Remove previous cars
+            cars.forEach(c => scene.remove(c.mesh));
+            cars = [];
+
+            // Remove residual particles
+            particles.forEach(p => scene.remove(p.mesh));
+            particles = [];
+
+            // Reset dynamic tires back to start coordinates
+            tires.forEach(t => {
+                scene.remove(t.mesh);
+            });
+            tires = [];
+
+            createArena();
+
+            // Spawn Player Blue
+            player = new Vehicle(0, 5, Math.PI, 0x1d4ed8, true);
+            cars.push(player);
+
+            // Spawn AI Opponents
+            cars.push(new Vehicle(-16, -6, 0.5, 0xc2410c)); // Orange Rusted
+            cars.push(new Vehicle(16, -6, -0.5, 0x15803d)); // Green
+            cars.push(new Vehicle(0, -10, 0, 0x991b1b));    // Red
+
+            camera.position.set(28, 38, 32);
+            camera.lookAt(0, 0, 0);
+
+            gameActive = true;
+        }
+
+        function endGame(isVictory, message) {
+            gameActive = false;
+            document.getElementById('gameover-overlay').style.display = 'flex';
+            document.getElementById('gameover-title').innerText = isVictory ? "VICTORY" : "WASTED";
+            document.getElementById('gameover-sub').innerText = message;
+        }
+
+        // --- INTERFACE LISTENERS ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            sfx.init();
+            document.getElementById('start-overlay').style.display = 'none';
+            resetGame();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('gameover-overlay').style.display = 'none';
+            resetGame();
+        });
+
+        // Initialize engine setup
+        init();
+        requestAnimationFrame(animate);
+
+    </script>
+</body>
+</html>
