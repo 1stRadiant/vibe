@@ -3,9 +3,17 @@
 // IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGGYs1MZgFAvHBU9XSu-OjBKgQc8ttgCBvwA5Il7fbeW9ubSMCZLNpUOT2w2H0JwyPEg/exec';
 
+// How many times to retry a failed save before giving up
+const SAVE_RETRY_LIMIT = 3;
+const SAVE_RETRY_DELAY_MS = 2000;
+
 // State variables for the save queue to prevent rapid-fire saving spam
 let isSaveInProgress = false;
-let pendingSaveData = null; 
+let pendingSaveData = null;
+
+// Optional: set this to a function(errorMessage) to show UI feedback on save failure
+export let onSaveError = (msg) => console.error('[Save Error]', msg);
+export let onSaveSuccess = () => console.log('[Save] Project saved successfully.');
 
 /**
  * Performs a standard POST request to the Google Apps Script backend.
@@ -15,30 +23,32 @@ async function postRequest(action, payload = {}) {
     throw new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.');
   }
 
-  // Combine action with the payload
   const requestData = { action, ...payload };
 
+  // Sending as 'text/plain' bypasses CORS preflight which Apps Script struggles with.
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify(requestData),
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+  }
+
+  let result;
   try {
-    // Sending as 'text/plain' completely bypasses CORS preflight (OPTIONS) requests
-    // which Apps Script notoriously struggles with. Apps Script will parse the text back into JSON.
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
-      },
-      body: JSON.stringify(requestData),
-    });
+    result = await response.json();
+  } catch {
+    throw new Error('Server returned a non-JSON response. The Apps Script may have crashed.');
+  }
 
-    const result = await response.json();
-
-    if (result.status === 'success') {
-      // Some endpoints return 'data', some just return a success message
-      return result.data !== undefined ? result.data : result;
-    } else {
-      throw new Error(result.message || 'An unknown API error occurred.');
-    }
-  } catch (error) {
-    throw new Error(`API Request failed: ${error.message}`);
+  if (result.status === 'success') {
+    return result.data !== undefined ? result.data : result;
+  } else {
+    throw new Error(result.message || 'An unknown API error occurred.');
   }
 }
 
@@ -66,21 +76,40 @@ export function deleteProject(userId, projectId) {
 }
 
 
-// --- Vastly Simplified Save Logic ---
+// --- Save Logic with Retry + Error Surfacing ---
+
+/**
+ * Attempts to save with up to SAVE_RETRY_LIMIT retries on failure.
+ * Throws on final failure so the caller knows something went wrong.
+ */
+async function _saveWithRetry(userId, projectId, projectData, attempt = 1) {
+  try {
+    await postRequest('saveProject', { userId, projectId, projectData });
+  } catch (error) {
+    if (attempt < SAVE_RETRY_LIMIT) {
+      console.warn(`[Save] Attempt ${attempt} failed, retrying in ${SAVE_RETRY_DELAY_MS}ms...`, error.message);
+      await new Promise(resolve => setTimeout(resolve, SAVE_RETRY_DELAY_MS));
+      return _saveWithRetry(userId, projectId, projectData, attempt + 1);
+    }
+    // All retries exhausted — re-throw so _runSave can report it
+    throw error;
+  }
+}
 
 async function _runSave(userId, projectId, projectData) {
   try {
-    // Just send the whole thing! POST has a ~50MB limit, so chunking is gone.
-    await postRequest('saveProject', { userId, projectId, projectData });
-    console.log('Project saved successfully.');
+    await _saveWithRetry(userId, projectId, projectData);
+    onSaveSuccess();
   } catch (error) {
-    console.error('Save operation failed:', error);
+    // Surface the error — don't silently swallow it
+    onSaveError(`Save failed after ${SAVE_RETRY_LIMIT} attempts: ${error.message}`);
   } finally {
-    // Process queue if the user kept typing/working during the save
+    // If more data came in while we were saving, process it now
     if (pendingSaveData) {
-      const { userId, projectId, projectData } = pendingSaveData;
+      const next = pendingSaveData;
       pendingSaveData = null;
-      setTimeout(() => _runSave(userId, projectId, projectData), 0);
+      // Use setTimeout to avoid deep call stacks on rapid saves
+      setTimeout(() => _runSave(next.userId, next.projectId, next.projectData), 0);
     } else {
       isSaveInProgress = false;
     }
@@ -88,17 +117,19 @@ async function _runSave(userId, projectId, projectData) {
 }
 
 /**
- * Saves project data. Keeps the queue so you don't spam the server if
- * it's auto-saving on every keystroke/mouse move.
+ * Saves project data. Queues the latest save if one is already in progress,
+ * so rapid auto-saves don't spam the server.
  */
 export function saveProject(userId, projectId, projectData) {
+  // Deep-clone at the point of call so mutations after this don't affect the saved data
   const dataToSave = JSON.parse(JSON.stringify(projectData));
 
   if (isSaveInProgress) {
-    console.log('Save in progress. Queuing latest data.');
+    console.log('[Save] Save in progress — queuing latest data.');
+    // Always overwrite the pending slot with the newest data
     pendingSaveData = { userId, projectId, projectData: dataToSave };
   } else {
-    console.log('Starting a new save operation.');
+    console.log('[Save] Starting save operation.');
     isSaveInProgress = true;
     _runSave(userId, projectId, dataToSave);
   }
@@ -108,11 +139,11 @@ export function saveProject(userId, projectId, projectData) {
 // --- Form Data Functions ---
 
 export function saveFormData(userId, projectId, formId, formData) {
-  return postRequest('saveFormData', { 
-    userId, 
-    projectId, 
-    formId, 
-    data: formData // Passed directly, backend handles stringifying
+  return postRequest('saveFormData', {
+    userId,
+    projectId,
+    formId,
+    data: formData,
   });
 }
 
