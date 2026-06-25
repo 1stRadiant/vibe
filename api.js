@@ -123,7 +123,18 @@ export function deleteProject(userId, projectId)   { return postRequest('deleteP
 
 async function _saveWithRetry(userId, projectId, projectData, attempt = 1) {
   try {
-    await postRequest('saveProject', { userId, projectId, projectData }, { attempt });
+    // Pre-stringify projectData into a plain string BEFORE it enters the JSON envelope.
+    // This means Apps Script receives it as a string value and can call setValue() directly
+    // without re-serialising a nested object — which is where GAS silently corrupts large trees.
+    const projectDataString = typeof projectData === 'string'
+      ? projectData
+      : JSON.stringify(projectData);
+    _diag('info', `_saveWithRetry: pre-stringified projectData`, {
+      type: typeof projectDataString,
+      chars: projectDataString.length,
+      attempt,
+    });
+    await postRequest('saveProject', { userId, projectId, projectData: projectDataString }, { attempt });
   } catch (error) {
     if (attempt < SAVE_RETRY_LIMIT) {
       _diag('warn', `Save attempt ${attempt} failed, retrying...`, { error: error.message });
