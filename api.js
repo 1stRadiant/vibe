@@ -1,97 +1,135 @@
 // api.js
 
-// IMPORTANT: Replace this with the Web App URL you got from deploying your Google Apps Script.
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGGYs1MZgFAvHBU9XSu-OjBKgQc8ttgCBvwA5Il7fbeW9ubSMCZLNpUOT2w2H0JwyPEg/exec';
 
-// How many times to retry a failed save before giving up
 const SAVE_RETRY_LIMIT = 3;
 const SAVE_RETRY_DELAY_MS = 2000;
 
-// State variables for the save queue to prevent rapid-fire saving spam
 let isSaveInProgress = false;
 let pendingSaveData = null;
 
-// Optional: set this to a function(errorMessage) to show UI feedback on save failure
-export let onSaveError = (msg) => console.error('[Save Error]', msg);
-export let onSaveSuccess = () => console.log('[Save] Project saved successfully.');
+export let onSaveError   = (msg) => console.error('[Save Error]', msg);
+export let onSaveSuccess = (info) => console.log('[Save] OK', info);
 
-/**
- * Performs a standard POST request to the Google Apps Script backend.
- */
-async function postRequest(action, payload = {}) {
+// ─────────────────────────────────────────────
+// Diagnostics
+// ─────────────────────────────────────────────
+
+/** Central diagnostic log – stored in memory and printed to console */
+const _diagLog = [];
+function _diag(level, msg, data) {
+  const entry = { ts: new Date().toISOString(), level, msg, ...(data || {}) };
+  _diagLog.push(entry);
+  const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+  fn(`[api.js][${level.toUpperCase()}] ${msg}`, data || '');
+}
+
+/** Expose the log so you can inspect it from the console: import { getDiagLog } ... */
+export function getDiagLog() { return [..._diagLog]; }
+
+/** Print a formatted summary to the console */
+export function printDiagSummary() {
+  console.group('[api.js] Diagnostic Summary');
+  _diagLog.forEach(e => {
+    const prefix = `${e.ts} [${e.level.toUpperCase()}]`;
+    if (e.payloadBytes) {
+      console.log(`${prefix} ${e.msg} | size=${_fmt(e.payloadBytes)} | attempt=${e.attempt ?? '-'} | durationMs=${e.durationMs ?? '-'}`);
+    } else {
+      console.log(`${prefix} ${e.msg}`, e);
+    }
+  });
+  console.groupEnd();
+}
+
+function _fmt(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1048576).toFixed(2)} MB`;
+}
+
+// ─────────────────────────────────────────────
+// Core POST
+// ─────────────────────────────────────────────
+
+async function postRequest(action, payload = {}, { attempt = 1 } = {}) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
-    throw new Error('API URL is not configured. Please set APPS_SCRIPT_URL in api.js.');
+    throw new Error('API URL is not configured.');
   }
 
   const requestData = { action, ...payload };
+  const body = JSON.stringify(requestData);
+  const payloadBytes = new TextEncoder().encode(body).length;
 
-  // Sending as 'text/plain' bypasses CORS preflight which Apps Script struggles with.
-  const response = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
-    body: JSON.stringify(requestData),
-  });
+  _diag('info', `POST → ${action}`, { payloadBytes, sizeFormatted: _fmt(payloadBytes), attempt });
+
+  const t0 = performance.now();
+
+  let response;
+  try {
+    response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+    });
+  } catch (networkErr) {
+    const durationMs = Math.round(performance.now() - t0);
+    _diag('error', `Network error on ${action}`, { payloadBytes, durationMs, attempt, error: networkErr.message });
+    throw new Error(`Network error: ${networkErr.message}`);
+  }
+
+  const durationMs = Math.round(performance.now() - t0);
 
   if (!response.ok) {
+    _diag('error', `HTTP ${response.status} on ${action}`, { payloadBytes, durationMs, attempt, status: response.status });
     throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
   }
 
+  // Capture raw text first so we can log it if JSON parse fails
+  const rawText = await response.text();
+
   let result;
   try {
-    result = await response.json();
+    result = JSON.parse(rawText);
   } catch {
-    throw new Error('Server returned a non-JSON response. The Apps Script may have crashed.');
+    _diag('error', `Non-JSON response on ${action}`, {
+      payloadBytes, durationMs, attempt,
+      responsePreview: rawText.slice(0, 300),
+    });
+    throw new Error(`Server returned non-JSON. Preview: ${rawText.slice(0, 200)}`);
   }
 
   if (result.status === 'success') {
+    _diag('info', `POST ← ${action} OK`, { payloadBytes, durationMs, attempt });
     return result.data !== undefined ? result.data : result;
   } else {
+    _diag('error', `API error on ${action}`, { payloadBytes, durationMs, attempt, serverMessage: result.message });
     throw new Error(result.message || 'An unknown API error occurred.');
   }
 }
 
+// ─────────────────────────────────────────────
+// Standard API functions
+// ─────────────────────────────────────────────
 
-// --- API Functions ---
+export function signup(username, password)         { return postRequest('signup',       { username, password }); }
+export function login(username, password)          { return postRequest('login',        { username, password }); }
+export function listProjects(userId)               { return postRequest('listProjects', { userId }); }
+export function loadProject(userId, projectId)     { return postRequest('loadProject',  { userId, projectId }); }
+export function deleteProject(userId, projectId)   { return postRequest('deleteProject',{ userId, projectId }); }
 
-export function signup(username, password) {
-  return postRequest('signup', { username, password });
-}
+// ─────────────────────────────────────────────
+// Save with retry
+// ─────────────────────────────────────────────
 
-export function login(username, password) {
-  return postRequest('login', { username, password });
-}
-
-export function listProjects(userId) {
-  return postRequest('listProjects', { userId });
-}
-
-export function loadProject(userId, projectId) {
-  return postRequest('loadProject', { userId, projectId });
-}
-
-export function deleteProject(userId, projectId) {
-  return postRequest('deleteProject', { userId, projectId });
-}
-
-
-// --- Save Logic with Retry + Error Surfacing ---
-
-/**
- * Attempts to save with up to SAVE_RETRY_LIMIT retries on failure.
- * Throws on final failure so the caller knows something went wrong.
- */
 async function _saveWithRetry(userId, projectId, projectData, attempt = 1) {
   try {
-    await postRequest('saveProject', { userId, projectId, projectData });
+    await postRequest('saveProject', { userId, projectId, projectData }, { attempt });
   } catch (error) {
     if (attempt < SAVE_RETRY_LIMIT) {
-      console.warn(`[Save] Attempt ${attempt} failed, retrying in ${SAVE_RETRY_DELAY_MS}ms...`, error.message);
-      await new Promise(resolve => setTimeout(resolve, SAVE_RETRY_DELAY_MS));
+      _diag('warn', `Save attempt ${attempt} failed, retrying...`, { error: error.message });
+      await new Promise(r => setTimeout(r, SAVE_RETRY_DELAY_MS));
       return _saveWithRetry(userId, projectId, projectData, attempt + 1);
     }
-    // All retries exhausted — re-throw so _runSave can report it
     throw error;
   }
 }
@@ -99,16 +137,14 @@ async function _saveWithRetry(userId, projectId, projectData, attempt = 1) {
 async function _runSave(userId, projectId, projectData) {
   try {
     await _saveWithRetry(userId, projectId, projectData);
-    onSaveSuccess();
+    const sizeBytes = new TextEncoder().encode(JSON.stringify(projectData)).length;
+    onSaveSuccess({ sizeFormatted: _fmt(sizeBytes) });
   } catch (error) {
-    // Surface the error — don't silently swallow it
     onSaveError(`Save failed after ${SAVE_RETRY_LIMIT} attempts: ${error.message}`);
   } finally {
-    // If more data came in while we were saving, process it now
     if (pendingSaveData) {
       const next = pendingSaveData;
       pendingSaveData = null;
-      // Use setTimeout to avoid deep call stacks on rapid saves
       setTimeout(() => _runSave(next.userId, next.projectId, next.projectData), 0);
     } else {
       isSaveInProgress = false;
@@ -116,37 +152,68 @@ async function _runSave(userId, projectId, projectData) {
   }
 }
 
-/**
- * Saves project data. Queues the latest save if one is already in progress,
- * so rapid auto-saves don't spam the server.
- */
 export function saveProject(userId, projectId, projectData) {
-  // Deep-clone at the point of call so mutations after this don't affect the saved data
   const dataToSave = JSON.parse(JSON.stringify(projectData));
+  const sizeBytes  = new TextEncoder().encode(JSON.stringify(dataToSave)).length;
+  _diag('info', `saveProject called`, { sizeFormatted: _fmt(sizeBytes), projectId });
 
   if (isSaveInProgress) {
-    console.log('[Save] Save in progress — queuing latest data.');
-    // Always overwrite the pending slot with the newest data
+    _diag('info', 'Save in progress — queuing latest data');
     pendingSaveData = { userId, projectId, projectData: dataToSave };
   } else {
-    console.log('[Save] Starting save operation.');
     isSaveInProgress = true;
     _runSave(userId, projectId, dataToSave);
   }
 }
 
+// ─────────────────────────────────────────────
+// Size probe — call this from the browser console
+// to find where saves start failing.
+//
+// Usage:
+//   import('/your/path/api.js').then(m => m.probePayloadSizes('user-xxx', 'test-project'))
+//
+// Or if already imported:
+//   probePayloadSizes('user-xxx', 'test-project')
+// ─────────────────────────────────────────────
 
-// --- Form Data Functions ---
+export async function probePayloadSizes(userId, projectId) {
+  // Test payload sizes in KB steps
+  const sizes = [10, 50, 100, 200, 500, 800, 1000];
+  console.group('[api.js] Payload size probe');
+
+  for (const kb of sizes) {
+    // Generate a dummy string of exactly ~kb kilobytes
+    const filler = 'x'.repeat(kb * 1024);
+    const fakeData = { _probe: true, size: `${kb}KB`, content: filler };
+
+    const body = JSON.stringify({ action: 'saveProject', userId, projectId, projectData: fakeData });
+    const actualBytes = new TextEncoder().encode(body).length;
+
+    console.log(`Testing ~${kb} KB payload (actual: ${_fmt(actualBytes)})...`);
+    const t0 = performance.now();
+    try {
+      await postRequest('saveProject', { userId, projectId, projectData: fakeData });
+      console.log(`  ✅ ${_fmt(actualBytes)} — OK in ${Math.round(performance.now()-t0)}ms`);
+    } catch (err) {
+      console.error(`  ❌ ${_fmt(actualBytes)} — FAILED in ${Math.round(performance.now()-t0)}ms: ${err.message}`);
+      console.warn('  Stopping probe here — this is likely your size ceiling.');
+      break;
+    }
+  }
+
+  console.groupEnd();
+  console.log('Full diag log available via getDiagLog()');
+}
+
+// ─────────────────────────────────────────────
+// Form data
+// ─────────────────────────────────────────────
 
 export function saveFormData(userId, projectId, formId, formData) {
-  return postRequest('saveFormData', {
-    userId,
-    projectId,
-    formId,
-    data: formData,
-  });
+  return postRequest('saveFormData', { userId, projectId, formId, data: formData });
 }
 
 export function loadFormData(userId, projectId, formId) {
   return postRequest('loadFormData', { userId, projectId, formId });
-}
+    }
