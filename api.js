@@ -41,6 +41,47 @@ export function printDiagSummary() {
   console.groupEnd();
 }
 
+/**
+ * Quick console-callable check for whether the Apps Script deployment is
+ * reachable at all. Run `checkApiReachability()` from the browser devtools
+ * (after importing this module) when you see "Network error" / "Failed to
+ * fetch" and want to know if it's a deployment/access problem vs. something
+ * else. Doesn't require login — just probes the endpoint.
+ */
+export async function checkApiReachability() {
+  console.group('[api.js] Reachability check');
+  console.log('Target URL:', APPS_SCRIPT_URL);
+  console.log('navigator.onLine:', navigator.onLine);
+
+  try {
+    const t0 = performance.now();
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: '__ping__' }),
+    });
+    const ms = Math.round(performance.now() - t0);
+    const text = await res.text();
+    console.log(`Got an HTTP response in ${ms}ms — status ${res.status} ${res.statusText}`);
+    console.log('Response preview:', text.slice(0, 300));
+    if (text.trim().startsWith('<')) {
+      console.warn('Response looks like HTML, not JSON — this is the classic sign that the '
+        + 'deployment is redirecting to a Google sign-in / consent page instead of running your '
+        + 'script. Check Deploy → Manage deployments → "Who has access" is set to "Anyone", '
+        + 'then click "New version".');
+    }
+    console.groupEnd();
+    return { reachable: true, status: res.status, preview: text.slice(0, 300) };
+  } catch (err) {
+    console.error('fetch() itself threw — the request never reached a server (or the response was '
+      + 'blocked before JS could read it). Common causes: deployment access not set to "Anyone", '
+      + 'a stale deployment URL, being offline, or a browser extension blocking the domain.');
+    console.error('Raw error:', err.message);
+    console.groupEnd();
+    return { reachable: false, error: err.message };
+  }
+}
+
 function _fmt(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`;
@@ -74,7 +115,18 @@ async function postRequest(action, payload = {}, { attempt = 1 } = {}) {
   } catch (networkErr) {
     const durationMs = Math.round(performance.now() - t0);
     _diag('error', `Network error on ${action}`, { payloadBytes, durationMs, attempt, error: networkErr.message });
-    throw new Error(`Network error: ${networkErr.message}`);
+
+    // The browser's raw "Failed to fetch" means the request never got a usable
+    // response at all — it's almost never a code bug at this point. Give a
+    // message that points at the actual likely cause instead of the opaque
+    // browser text, since that saves a lot of debugging time.
+    const hint = navigator.onLine === false
+      ? 'You appear to be offline — check your internet connection.'
+      : 'This usually means the Apps Script deployment is unreachable: check that '
+        + '"Who has access" is set to "Anyone" in Deploy → Manage deployments (and that you '
+        + 'clicked "New version" after changing it), that the deployment URL in api.js is still '
+        + 'the active one, and that no browser extension/ad-blocker is blocking script.google.com.';
+    throw new Error(`Network error: could not reach the API (${networkErr.message}). ${hint}`);
   }
 
   const durationMs = Math.round(performance.now() - t0);
