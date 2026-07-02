@@ -1882,6 +1882,71 @@
         .anc-pseudo-s { color: #98c379; }
         .anc-pseudo-c { color: #3c4552; font-style: italic; }
     </style>
+    <style>
+        /* ── Live "Notebook Cell" code runner ── */
+        .run-node-button {
+            background: rgba(255, 183, 77, 0.12);
+            border: 1px solid rgba(255, 183, 77, 0.5);
+            color: var(--c-js, #ffb74d);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .15s ease, box-shadow .15s ease;
+        }
+        .run-node-button:hover:not(:disabled) {
+            background: rgba(255, 183, 77, 0.22);
+            box-shadow: 0 0 10px rgba(255, 183, 77, 0.35);
+        }
+        .run-node-button:disabled { opacity: .6; cursor: default; }
+
+        .run-output-panel {
+            margin-top: 8px;
+            border: 1px solid rgba(255, 183, 77, 0.3);
+            border-left: 3px solid var(--c-js, #ffb74d);
+            border-radius: 6px;
+            background: rgba(10, 14, 24, 0.55);
+            padding: 10px 12px;
+            font-family: 'Fira Code', 'Roboto Mono', monospace;
+            font-size: 12px;
+            color: #dfe4ff;
+        }
+        .run-output-status { opacity: .6; font-size: 11px; margin-bottom: 6px; }
+        .run-output-logs { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+        .run-log-line { white-space: pre-wrap; word-break: break-word; opacity: .85; }
+        .run-output-error {
+            color: var(--c-error, #ef5350);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .run-output-value { margin-top: 2px; }
+        .run-output-label {
+            color: var(--c-js, #ffb74d);
+            font-weight: 600;
+            margin-right: 6px;
+        }
+        .run-output-value pre {
+            margin: 4px 0 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #dfe4ff;
+        }
+        .run-output-empty { opacity: .55; font-style: italic; }
+        .run-output-empty code {
+            background: rgba(255,255,255,0.08);
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-style: normal;
+        }
+        .run-output-iframe {
+            width: 100%;
+            min-height: 120px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            background: #12182c;
+        }
+    </style>
     <!-- Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
