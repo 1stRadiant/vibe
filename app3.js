@@ -1914,6 +1914,7 @@ function renderEditor(node) {
     const isHeadNode = node.type === 'head';
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const isSaveable = ['html', 'css', 'js-function'].includes(node.type);
+    const isRunnable = ['html', 'css', 'javascript', 'js-function'].includes(node.type);
 
     nodeEl.innerHTML = `
         <div class="vibe-node-header">
@@ -1934,9 +1935,11 @@ function renderEditor(node) {
                 ${isSaveable ? `<button class="save-as-component-button ai-powered-button" data-id="${node.id}" title="Save as reusable component">⊕ Save</button>` : ''}
                 ${(showCodeButton || isHeadNode) ? `<button class="toggle-code-button" data-id="${node.id}">View Code</button>` : ''}
                 ${(showCodeButton || isHeadNode) ? `<button class="save-code-button" data-id="${node.id}" style="display: none;">Save Code</button>` : ''}
+                ${isRunnable ? `<button class="run-node-button" data-id="${node.id}" title="Run this node's code as a standalone notebook cell">▶ Run</button>` : ''}
             </div>
             <div class="vibe-node-controls" id="controls-for-${node.id}"></div>
             ${(showCodeButton || isHeadNode) ? `<textarea class="code-editor-display" id="editor-${node.id}" style="display: none;"></textarea>` : ''}
+            ${isRunnable ? `<div class="run-output-panel" id="run-output-${node.id}" style="display:none;"></div>` : ''}
         </div>
     `;
     
@@ -2028,6 +2031,158 @@ async function handleSaveCode(event) {
         if (toggleButton) toggleButton.click();
     }, 1500);
     autoSaveProject();
+}
+
+// --- Live "Notebook Cell" Code Runner ---
+// Lets a user run a single node's code in isolation to test it, much like a
+// notebook cell. JS-type nodes execute in a throwaway sandboxed iframe; the
+// user's code can assign a value to a special `run.output` variable (or
+// simply `return` a value / call console.log) to see results inline.
+// HTML/CSS nodes instead render a live isolated preview of just that node.
+
+/**
+ * Executes a snippet of JavaScript inside a fresh, sandboxed (scriptable but
+ * otherwise isolated) iframe, capturing console output, any thrown error,
+ * and whatever the user assigned to `run.output` (or returned).
+ * Resolves with { output, hadOutput, logs, error }.
+ */
+function runJsInSandbox(code, timeoutMs = 5000) {
+    return new Promise((resolve) => {
+        const frame = document.createElement('iframe');
+        frame.setAttribute('sandbox', 'allow-scripts');
+        frame.style.display = 'none';
+
+        let settled = false;
+        const cleanup = () => {
+            window.removeEventListener('message', onMessage);
+            clearTimeout(timeoutId);
+            if (frame.parentNode) frame.parentNode.removeChild(frame);
+        };
+        const onMessage = (e) => {
+            if (settled || !e.data || e.data.__vibeRunResult !== true) return;
+            settled = true;
+            cleanup();
+            resolve(e.data);
+        };
+        window.addEventListener('message', onMessage);
+
+        const timeoutId = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve({ error: `Execution timed out after ${Math.round(timeoutMs / 1000)}s. Check for infinite loops or unresolved async code.`, logs: [], output: undefined, hadOutput: false });
+        }, timeoutMs);
+
+        const encodedCode = JSON.stringify(code);
+        frame.srcdoc = `<!DOCTYPE html><html><body><script>
+(function(){
+    var logs = [];
+    function fmt(a){
+        try { return (typeof a === 'object' && a !== null) ? JSON.stringify(a, null, 2) : String(a); }
+        catch(_) { return String(a); }
+    }
+    var origLog = console.log, origErr = console.error, origWarn = console.warn;
+    console.log = function(){ logs.push(Array.prototype.map.call(arguments, fmt).join(' ')); };
+    console.error = function(){ logs.push('ERR: ' + Array.prototype.map.call(arguments, fmt).join(' ')); };
+    console.warn = function(){ logs.push('WARN: ' + Array.prototype.map.call(arguments, fmt).join(' ')); };
+
+    var run = { output: undefined };
+    var output, error = null, hadOutput = false;
+    try {
+        var userCode = ${encodedCode};
+        var fn = new Function('run', 'console', userCode);
+        var ret = fn(run, console);
+        if (run.output !== undefined) { output = run.output; hadOutput = true; }
+        else if (ret !== undefined) { output = ret; hadOutput = true; }
+    } catch (e) {
+        error = (e && e.message) ? e.message : String(e);
+    }
+
+    var serialized;
+    try { serialized = (output === undefined) ? undefined : JSON.stringify(output, null, 2); }
+    catch(_) { serialized = String(output); }
+
+    parent.postMessage({ __vibeRunResult: true, output: serialized, hadOutput: hadOutput, logs: logs, error: error }, '*');
+})();
+<\/script></body></html>`;
+
+        document.body.appendChild(frame);
+    });
+}
+
+/** Builds a minimal standalone HTML doc to preview a single html/css node in isolation. */
+function buildRunPreviewDoc(node) {
+    if (node.type === 'css') {
+        return `<!DOCTYPE html><html><head><style>${node.code || ''}</style></head>
+<body style="margin:0;background:#12182c;color:#dfe4ff;padding:16px;font-family:'Rajdhani',sans-serif;">
+<p style="opacity:.5;font-size:11px;margin:0 0 10px;">CSS preview — sample elements below use these styles</p>
+<div class="ws-sample-target" style="padding:10px;border:1px dashed rgba(255,255,255,.15);border-radius:6px;margin-bottom:8px;">Sample element</div>
+<button>Sample button</button>&nbsp;<input placeholder="Sample input">
+</body></html>`;
+    }
+    // html node: render its markup standalone so it can be visually spot-checked.
+    return `<!DOCTYPE html><html><head><style>body{margin:0;padding:12px;background:#12182c;color:#dfe4ff;font-family:'Rajdhani',sans-serif;box-sizing:border-box;}*{box-sizing:border-box;}</style></head>
+<body>${node.code || ''}</body></html>`;
+}
+
+/** Renders the { output, logs, error } result of a JS sandbox run into the output panel. */
+function renderJsRunResult(panel, result) {
+    const { output, hadOutput, logs, error } = result || {};
+    let html = '';
+
+    if (Array.isArray(logs) && logs.length) {
+        html += `<div class="run-output-logs">${logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>`;
+    }
+
+    if (error) {
+        html += `<div class="run-output-error">⚠ ${escapeHtml(error)}</div>`;
+    } else if (hadOutput) {
+        html += `<div class="run-output-value"><span class="run-output-label">run.output →</span><pre>${escapeHtml(output)}</pre></div>`;
+    } else if (!logs || !logs.length) {
+        html += `<div class="run-output-empty">No output yet. Assign a value to <code>run.output</code> (or <code>console.log(...)</code>) in your code to see results here.</div>`;
+    }
+
+    panel.innerHTML = html;
+}
+
+/** Click handler for a node's "▶ Run" button. Runs that node's code as an isolated notebook cell. */
+async function handleRunNodeCode(event) {
+    const button = event.target.closest('.run-node-button');
+    if (!button) return;
+    const nodeId = button.dataset.id;
+    const node = findNodeById(nodeId);
+    const outputPanel = document.getElementById(`run-output-${nodeId}`);
+    if (!node || !outputPanel) return;
+
+    // Prefer whatever is currently in the open code editor (unsaved edits included).
+    const codeTextarea = document.getElementById(`editor-${nodeId}`);
+    const liveCode = (codeTextarea && codeTextarea.style.display === 'block') ? codeTextarea.value : (node.code || '');
+
+    outputPanel.style.display = 'block';
+    outputPanel.innerHTML = `<div class="run-output-status">▶ Running…</div>`;
+
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = '⏳ Running';
+
+    try {
+        if (node.type === 'html' || node.type === 'css') {
+            const doc = buildRunPreviewDoc({ ...node, code: liveCode });
+            outputPanel.innerHTML = `
+                <div class="run-output-status">Live preview:</div>
+                <iframe class="run-output-iframe" sandbox="allow-scripts" srcdoc="${doc.replace(/"/g, '&quot;')}"></iframe>
+            `;
+        } else {
+            // javascript / js-function
+            const result = await runJsInSandbox(liveCode);
+            renderJsRunResult(outputPanel, result);
+        }
+    } catch (e) {
+        outputPanel.innerHTML = `<div class="run-output-error">⚠ ${escapeHtml(e.message || String(e))}</div>`;
+    } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+    }
 }
 
 async function handleUpdate(event) {
@@ -2741,61 +2896,15 @@ async function screenshotAndEditWorkshop() {
     }
 }
 
-async function generateCompleteSubtree(parentNode, streamCallback = null, refImages = []) {
-    console.log(`Generating subtree for parent: ${parentNode.id}`);
-
-    const systemPrompt = `You are an expert UI/UX designer and frontend architect with a focus on creating beautifully structured, self-documenting code.
-
-    **YOUR GOAL:** Create a visually stunning, modern website component hierarchy that is also easy to understand through the Code Wiki.
-    
-    **SEGMENTATION RULES — MANDATORY:**
-    1.  **One node per concern.** Each logical section of the UI gets its OWN html node. Never bundle multiple sections into one giant html node. For example: a page with a hero, features, and footer MUST produce three separate html nodes: hero-section, features-section, footer-section.
-    2.  **Every html node gets its own css node.** Create a dedicated css node (e.g., "hero-styles") for each html node you create. NEVER use inline styles. NEVER bundle all CSS into one node.
-    3.  **JavaScript gets its own node.** Any interactivity (event listeners, animations, logic) goes in a separate javascript or js-function node — never embedded in an html node's <script> tag.
-    4.  **Descriptive descriptions are REQUIRED.** Every node MUST have a clear, specific description (2-3 sentences) explaining: what it does, what it looks like, and any key interactions. These descriptions power the Code Wiki.
-    5.  **Unique, semantic IDs.** Use descriptive kebab-case IDs like "hero-section", "nav-styles", "carousel-logic" — not generic names like "section-1".
-
-    **DESIGN GUIDELINES:**
-    1.  **Visuals:** Use modern trends (Glassmorphism, Bento grids, gradients, clean typography). Avoid "browser default" looks.
-    2.  **Responsive:** Use Flexbox/Grid and media queries for mobile responsiveness.
-    3.  **Content:** Use realistic text and images (via Pollinations AI), not Lorem Ipsum.
-    4.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked.
-
-    **TASK:** Generate a valid JSON array of "vibe nodes" that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
-
-${getVibeDbInstructionsForAI()}
-${getImageGenerationInstructions()}
-
-**JSON SCHEMA for the array:**
-[
-  {
-    "id": "unique-section-id",
-    "type": "html",
-    "description": "The HTML structure.",
-    "code": "<section id='unique-section-id' class='modern-section'>...</section>",
-    "selector": "#parent-id",
-    "position": "beforeend"
-  },
-  {
-    "id": "section-styles",
-    "type": "css",
-    "description": "Styles for the section.",
-    "code": "#unique-section-id { ... } .modern-section { ... }"
-  }
-]
-`;
-
-    const userPrompt = `Generate the child components for the following parent container:
-{
-    "parentId": "${parentNode.id}",
-    "newDescription": "${parentNode.description}"
-}`;
-
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
-    
+/**
+ * Parses a raw AI text response into a JSON array of "vibe nodes".
+ * Shared by the Design Agent and the Backend/Logic Agent so both stages
+ * of the pipeline handle fenced code blocks / stray text the same way.
+ */
+function parseVibeNodeArrayResponse(rawResponse, agentLabel = 'agent') {
     try {
         let jsonResponse = rawResponse.trim();
-        
+
         const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
         if (jsonMatch && jsonMatch[2]) {
             jsonResponse = jsonMatch[2].trim();
@@ -2808,17 +2917,197 @@ ${getImageGenerationInstructions()}
             jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
         }
 
-        const childrenArray = JSON.parse(jsonResponse);
-        if (!Array.isArray(childrenArray)) {
-            throw new Error("AI did not return a valid JSON array.");
+        const nodesArray = JSON.parse(jsonResponse);
+        if (!Array.isArray(nodesArray)) {
+            throw new Error(`AI (${agentLabel}) did not return a valid JSON array.`);
         }
-        console.log("Successfully parsed generated subtree from AI.");
-        
-        return childrenArray;
+        console.log(`Successfully parsed response from ${agentLabel}.`);
+
+        return nodesArray;
     } catch (e) {
-        console.error("Failed to parse subtree JSON from AI:", rawResponse);
-        throw new Error(`AI returned invalid JSON for the component structure. Original response logged in console. Error: ${e.message}`);
+        console.error(`Failed to parse JSON from ${agentLabel}:`, rawResponse);
+        throw new Error(`AI (${agentLabel}) returned invalid JSON. Original response logged in console. Error: ${e.message}`);
     }
+}
+
+/**
+ * System prompt for the Design Agent. This agent runs FIRST and is
+ * responsible only for the visual structure (HTML) and styling (CSS) of
+ * the app — no JavaScript / logic. The Backend/Logic Agent runs afterward
+ * and wires up interactivity on top of this approved design.
+ */
+function getDesignAgentSystemPrompt() {
+    return `# System Prompt: Mobile App UI/UX Generation Framework
+You are an expert mobile UI/UX design assistant and front-end architect. Your task is to design or generate code for a mobile application interface based on the user's specific app concept.
+To ensure the generated interface is modern, scalable, and highly intuitive, you must structure the layout, aesthetics, and user flow around the two core design paradigms and the strict structural execution rules detailed below.
+## 1. Core Visual Archetypes (Choose One or Blend)
+Depending on the app category requested by the user, apply or blend these two structural paradigms:
+### Archetype A: High-Contrast, Utility & Transactional (Best for FinTech, Booking, E-commerce, Logistics)
+ * **Color Palette:** Clean white or light-gray canvas, utilizing a single, highly saturated, high-contrast primary color (e.g., vivid blue, emerald green) exclusively for key action points.
+ * **Visual Hierarchy:** High typographic contrast. Headers use heavy, bold sans-serif fonts to command instant attention, while body metadata is rendered in lighter, scannable weights.
+ * **Interface Structure:**
+   * **Immersive Hero Section:** Large media components or data visualization modules at the top, transitioning smoothly into a card-based detail layout below.
+   * **Segmented Workspaces:** Horizontal scrolling filter tabs to switch contexts rapidly without reloading the page.
+   * **Fixed Utilities:** Sticky, persistent action strips at the bottom of the screen housing primary metrics and high-contrast call-to-action (CTA) buttons.
+### Archetype B: Content-Driven, Community & Engagement (Best for Social, Media, Lifestyle, Productivity)
+ * **Color Palette:** Soft, welcoming pastel tones, muted gradient backdrops, or clean monochrome dark/light themes. Uses energetic accent colors (like gold, coral, or neon highlights) strictly around user profiles, notifications, or interaction states.
+ * **Visual Hierarchy:** Soft, rounded, friendly sans-serif headlines paired with hyper-efficient, compact body text to maximize data density without causing clutter.
+ * **Interface Structure:**
+   * **Ephemeral Content Trackers:** A top-mounted, horizontally scrollable capsule or circle carousel dedicated to chronological or quick-glance status updates.
+   * **Modular Feed Blocks:** Vertical stacks of distinct, rounded content containers (cards) separating individual entries. Each block encapsulates user metadata, core asset content (images/charts/text), and an identical cluster of engagement icons (save, share, act).
+   * **Grid Assemblies:** Profile or inventory screens that cleanly divide content into tight, multi-column media grids with explicit tab filters.
+## 2. Global Component Standards
+No matter the app type, synthesize every screen using these modular building blocks:
+ * **The Global Navigation Array:** A persistent, clean bottom navigation tab bar featuring 3 to 5 minimal wireframe icons indicating the core operational pillars of the app.
+ * **The Global Form Factor:** Input fields must use explicit placeholder text, clear bounding boxes (outlined or softly shaded), and display clear helper text or inline badges for user verification.
+ * **The Content Card:** Group related pieces of information into a single rounded container (8px - 16px corner radius) with a subtle drop shadow or fine border to chunk information visually.
+## 3. Strict UI Execution Rules
+When generating screens, workflows, or front-end code, you must strictly adhere to these 4 UX guardrails:
+ * **Rule 1: Optimize for the "Thumb-Zone".** Anchor primary interactive targets—such as submission buttons, checkout triggers, navigation bars, and primary menus—to the bottom third of the display interface to ensure effortless one-handed ergonomics.
+ * **Rule 2: Enforce Sticky, High-Contrast Call-to-Actions (CTAs).** A user should never have to search for the "next step." Core action buttons must freeze on scroll where appropriate, utilizing a striking fill color that separates them immediately from surrounding content.
+ * **Rule 3: Establish a Flawless Typographic Hierarchy.** Apply a strict scale: Large/Bold for primary titles, Medium/Regular for operational subtitles and metrics, and Small/Muted Gray for non-critical secondary metadata, timestamps, or helper strings.
+ * **Rule 4: Prevent Information Density Overload.** Never present a raw, unformatted wall of data. Fragment dense user data, product catalogs, or social posts into modular card blocks. Ensure generous white space between blocks to give elements room to breathe.
+
+## 4. Your Deliverable in This System
+You are the **Design Agent** in a two-agent pipeline. A separate **Backend/Logic Agent** will run after you and add all JavaScript interactivity — you are NOT responsible for logic, and must NOT write any <script> tags or JavaScript.
+
+**SEGMENTATION RULES — MANDATORY:**
+1.  **One node per concern.** Each logical section/screen of the UI gets its OWN html node. Never bundle multiple sections into one giant html node. For example: a screen with a header, a content feed, and a bottom nav MUST produce separate html nodes: screen-header, content-feed, bottom-nav.
+2.  **Every html node gets its own css node.** Create a dedicated css node (e.g., "hero-styles") for each html node you create. NEVER use inline styles. NEVER bundle all CSS into one node.
+3.  **No JavaScript.** Do not create javascript or js-function nodes, and do not embed <script> tags or inline event handlers (onclick, etc.) — only markup and styling. Where interactivity will later be needed, mark the element with a clear, semantic id/class/data-attribute so the Backend Agent can hook into it (e.g., id="submit-order-btn", data-role="like-button").
+4.  **Descriptive descriptions are REQUIRED.** Every node MUST have a clear, specific description (2-3 sentences) explaining: what it does, what it looks like, and which archetype/rules it follows.
+5.  **Unique, semantic IDs.** Use descriptive kebab-case IDs like "hero-section", "nav-styles", "bottom-nav-bar" — not generic names like "section-1".
+6.  **Content:** Use realistic text and images (via Pollinations AI), not Lorem Ipsum.
+7.  **Responsive:** Use Flexbox/Grid and media queries; design mobile-first per the framework above even for non-mobile apps.
+
+**TASK:** Generate a valid JSON array of "vibe nodes" (html and css types ONLY) that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
+
+${getImageGenerationInstructions()}
+
+**JSON SCHEMA for the array:**
+[
+  {
+    "id": "unique-section-id",
+    "type": "html",
+    "description": "The HTML structure, which archetype it follows, and any hooks left for the Backend Agent.",
+    "code": "<section id='unique-section-id' class='modern-section'>...</section>",
+    "selector": "#parent-id",
+    "position": "beforeend"
+  },
+  {
+    "id": "section-styles",
+    "type": "css",
+    "description": "Styles for the section.",
+    "code": "#unique-section-id { ... } .modern-section { ... }"
+  }
+]
+`;
+}
+
+/**
+ * System prompt for the Backend/Logic Agent. This agent runs SECOND,
+ * after the Design Agent has produced an approved UI, and is responsible
+ * only for making that UI functional (state, events, data, API calls).
+ */
+function getBackendLogicAgentSystemPrompt() {
+    return `You are an expert backend/frontend logic engineer. A Design Agent has already produced the visual structure (HTML) and styling (CSS) for this app and it has been APPROVED. Your ONLY job is to take that approved design and make it fully functional by adding the JavaScript logic layer — you do not redesign the UI.
+
+**RULES — MANDATORY:**
+1.  **Preserve the design.** Return every provided html and css node as-is. You may make small, surgical edits to the html (e.g. adding an id, class, or data-attribute) ONLY when required so your JavaScript can hook into an element. Never redesign layout, colors, typography, or copy.
+2.  **Add interactivity as separate nodes.** Any event listeners, state management, animations, API calls, or logic goes into new "javascript" or "js-function" nodes — never inline <script> tags inside html nodes, never inline onclick handlers.
+3.  **One concern per JS node.** Give each JS node a clear, descriptive kebab-case id (e.g. "cart-add-item-logic", "form-validation-logic", "like-button-logic").
+4.  **Descriptive descriptions are REQUIRED.** Every new node needs a clear, specific description (2-3 sentences): what it does, what it hooks into, and any key behavior. These descriptions power the Code Wiki.
+5.  **Return everything.** Your output must include ALL of the original design nodes (html/css, unmodified except for allowed surgical hooks) PLUS your new javascript/js-function nodes, as a single flat JSON array.
+
+**TASK:** Generate a valid JSON array of "vibe nodes" — the finished, fully-functional children of the given parent container. The output MUST be a JSON array [] and nothing else.
+
+${getVibeDbInstructionsForAI()}
+
+**JSON SCHEMA for the array:**
+[
+  { "id": "unique-section-id", "type": "html", "description": "...", "code": "<section id='unique-section-id'>...</section>", "selector": "#parent-id", "position": "beforeend" },
+  { "id": "section-styles", "type": "css", "description": "...", "code": "#unique-section-id { ... }" },
+  { "id": "section-logic", "type": "js-function", "description": "...", "code": "function initSection() { ... }" }
+]
+`;
+}
+
+/** STAGE 1 of the pipeline — designs the UI only (html/css, no logic). */
+async function runDesignAgent(parentNode, streamCallback = null, refImages = []) {
+    console.log(`[Design Agent] Designing UI for parent: ${parentNode.id}`);
+    if (typeof streamCallback === 'function') streamCallback('🎨 Design Agent is laying out the UI...');
+
+    const systemPrompt = getDesignAgentSystemPrompt();
+    const userPrompt = `Design the UI for the following container. Pick the best-fitting archetype (or a blend of both) for the app/section described, and lay it out per the framework rules.
+{
+    "parentId": "${parentNode.id}",
+    "appDescription": "${(parentNode.description || '').replace(/`/g, "'")}"
+}`;
+
+    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
+    return parseVibeNodeArrayResponse(rawResponse, 'Design Agent');
+}
+
+/** STAGE 2 of the pipeline — adds JS logic on top of the approved design. */
+async function runBackendLogicAgent(parentNode, designNodes, streamCallback = null, refImages = []) {
+    console.log(`[Backend Agent] Wiring up logic for parent: ${parentNode.id}`);
+    if (typeof streamCallback === 'function') streamCallback('🛠️ Backend Agent is wiring up the logic...');
+
+    const systemPrompt = getBackendLogicAgentSystemPrompt();
+    const userPrompt = `Add the JavaScript logic layer to the following approved UI design.
+{
+    "parentId": "${parentNode.id}",
+    "appDescription": "${(parentNode.description || '').replace(/`/g, "'")}"
+}
+
+Approved Design Nodes (HTML/CSS) — JSON:
+\`\`\`json
+${JSON.stringify(designNodes, null, 2)}
+\`\`\``;
+
+    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
+    return parseVibeNodeArrayResponse(rawResponse, 'Backend Agent');
+}
+
+/**
+ * Generates the complete children for a container using a two-agent pipeline:
+ * the Design Agent designs the UI (HTML/CSS) first, then the Backend/Logic
+ * Agent adds the JavaScript on top of that approved design. Set
+ * `useDesignAgent = false` to fall back to a single combined generation pass.
+ */
+async function generateCompleteSubtree(parentNode, streamCallback = null, refImages = [], useDesignAgent = true) {
+    console.log(`Generating subtree for parent: ${parentNode.id}`);
+
+    if (!useDesignAgent) {
+        // Legacy single-pass path: one agent produces HTML/CSS/JS together.
+        const systemPrompt = `You are an expert UI/UX designer and frontend architect with a focus on creating beautifully structured, self-documenting code.
+
+    **YOUR GOAL:** Create a visually stunning, modern website component hierarchy that is also easy to understand through the Code Wiki.
+
+    **SEGMENTATION RULES — MANDATORY:**
+    1.  **One node per concern.** Each logical section of the UI gets its OWN html node.
+    2.  **Every html node gets its own css node.** NEVER use inline styles.
+    3.  **JavaScript gets its own node.** Never embedded in an html node's <script> tag.
+    4.  **Descriptive descriptions are REQUIRED.**
+    5.  **Unique, semantic IDs.**
+
+    **TASK:** Generate a valid JSON array of "vibe nodes" that represent the children of a given container. The output MUST be a JSON array [] and nothing else.
+
+${getVibeDbInstructionsForAI()}
+${getImageGenerationInstructions()}
+`;
+        const userPrompt = `Generate the child components for the following parent container:
+{
+    "parentId": "${parentNode.id}",
+    "newDescription": "${parentNode.description}"
+}`;
+        const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
+        return parseVibeNodeArrayResponse(rawResponse, 'Combined Agent');
+    }
+
+    const designNodes = await runDesignAgent(parentNode, streamCallback, refImages);
+    const finalNodes = await runBackendLogicAgent(parentNode, designNodes, streamCallback, refImages);
+    return finalNodes;
 }
 
 async function callNscaleAI(systemPrompt, userPrompt, forJson = false) {
@@ -3815,6 +4104,9 @@ function addEventListeners() {
     });
     document.querySelectorAll('.save-code-button').forEach(button => {
         button.addEventListener('click', handleSaveCode);
+    });
+    document.querySelectorAll('.run-node-button').forEach(button => {
+        button.addEventListener('click', handleRunNodeCode);
     });
     document.querySelectorAll('.save-as-component-button').forEach(button => {
         button.addEventListener('click', handleSaveNodeAsComponentFromEditor);
@@ -8388,7 +8680,9 @@ async function handleGenerateProject() {
         liveCodeOutput.textContent = '';
 
         vibeTree = { id: 'whole-page', type: 'container', description: prompt, children: [] };
-        vibeTree.children = await generateCompleteSubtree(vibeTree, null, refImages);
+        vibeTree.children = await generateCompleteSubtree(vibeTree, (statusMsg) => {
+            if (generationStatusText) generationStatusText.textContent = statusMsg;
+        }, refImages);
 
         currentProjectId = projectId;
         currentProjectStorageType = storageType;
@@ -9833,4 +10127,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+               }
