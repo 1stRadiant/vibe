@@ -8646,6 +8646,7 @@ async function handleGenerateFlowchart() {
 
 
 async function handleGenerateProject() {
+    const storageType = document.querySelector('input[name="projectStorage"]:checked')?.value || 'cloud';
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
         if (!keyIsAvailable) {
@@ -8662,7 +8663,6 @@ async function handleGenerateProject() {
         // Collect reference images from the project creation form
         const refImages = (window._getProjectImages && window._getProjectImages()) || [];
 
-        const storageType = document.querySelector('input[name="projectStorage"]:checked').value;
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
         
@@ -8710,13 +8710,28 @@ async function handleGenerateProject() {
     } catch (e) {
         console.error('Project generation failed:', e);
         generationStatusText.textContent = 'Generation failed.';
-        alert(`Failed to generate project: ${e.message}`);
+        alert(`Failed to generate project: ${formatProjectCreationError(e, storageType)}`);
         newProjectContainer.style.display = 'block';
     }
 }
 
 
+/**
+ * Builds a clearer alert message for project-creation failures. Specifically
+ * calls out the common case where a Cloud-storage network error means the
+ * user can unblock themselves right now by switching to Local storage,
+ * instead of just surfacing the raw fetch error.
+ */
+function formatProjectCreationError(e, storageType) {
+    const isNetworkError = /Network error/i.test(e.message || '');
+    if (isNetworkError && storageType === 'cloud') {
+        return `${e.message}\n\nQuick workaround: switch "Save Location" to Local and try again — this bypasses the cloud backend entirely. If you want cloud storage working, check your Apps Script deployment's "Who has access" setting (see console for details).`;
+    }
+    return e.message;
+}
+
 async function handleStartIterativeProjectBuild() {
+    const storageType = document.querySelector('input[name="projectStorage"]:checked')?.value || 'cloud';
     try {
         const keyIsAvailable = (currentAIProvider === 'gemini' && !!geminiApiKey) || (currentAIProvider === 'nscale' && !!nscaleApiKey);
         if (!keyIsAvailable) {
@@ -8730,7 +8745,6 @@ async function handleStartIterativeProjectBuild() {
             return;
         }
 
-        const storageType = document.querySelector('input[name="projectStorage"]:checked').value;
         let desiredId = (newProjectIdInput.value || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
         if (!desiredId) desiredId = `project-${Date.now()}`;
 
@@ -8767,7 +8781,7 @@ async function handleStartIterativeProjectBuild() {
 
     } catch (e) {
         console.error('Iterative project build failed:', e);
-        alert(`Failed to start iterative build: ${e.message}`);
+        alert(`Failed to start iterative build: ${formatProjectCreationError(e, storageType)}`);
     }
 }
 
@@ -10127,4 +10141,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-               }
+  }
