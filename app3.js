@@ -2971,6 +2971,8 @@ When generating screens, workflows, or front-end code, you must strictly adhere 
 ## 4. Your Deliverable in This System
 You are the **Design Agent** in a two-agent pipeline. A separate **Backend/Logic Agent** will run after you and add all JavaScript interactivity — you are NOT responsible for logic, and must NOT write any <script> tags or JavaScript.
 
+**REFERENCE IMAGES:** You will typically be shown one or more reference mobile UI kit images alongside the task. Study them closely — they define the visual quality bar (spacing rhythm, card density, typographic weight, icon style, shadow/elevation, corner radii, overall polish) that your output must match. Do not copy their specific branding, screens, or content verbatim; design original screens for the requested app concept that reach the same level of craft.
+
 **SEGMENTATION RULES — MANDATORY:**
 1.  **One node per concern.** Each logical section/screen of the UI gets its OWN html node. Never bundle multiple sections into one giant html node. For example: a screen with a header, a content feed, and a bottom nav MUST produce separate html nodes: screen-header, content-feed, bottom-nav.
 2.  **Every html node gets its own css node.** Create a dedicated css node (e.g., "hero-styles") for each html node you create. NEVER use inline styles. NEVER bundle all CSS into one node.
@@ -3032,9 +3034,62 @@ ${getVibeDbInstructionsForAI()}
 `;
 }
 
+// --- Design Agent reference images ---
+// These are baseline reference mobile UI kits that ground the Design Agent's
+// sense of what "modern, polished mobile UI" actually looks like, on top of
+// the text framework rules. They're fetched once, converted to base64, and
+// cached, then attached to every Design Agent call (ahead of any per-project
+// reference images the user supplies).
+const DESIGN_AGENT_REFERENCE_IMAGE_URLS = [
+    'https://1stradiant.github.io/vibe/30.Booking%20App%20UI%20Kit.png',
+    'https://1stradiant.github.io/vibe/39a13f128413397.69d5940ab78cc.jpg'
+];
+
+let _designAgentReferenceImageCache = null;
+
+/**
+ * Fetches (once) and base64-encodes the Design Agent's default reference
+ * images so they can be sent as inline image parts to Gemini. Failures on
+ * individual images are logged and skipped rather than blocking generation —
+ * the framework's text rules alone are still enough to proceed.
+ */
+async function getDesignAgentReferenceImages() {
+    if (_designAgentReferenceImageCache) return _designAgentReferenceImageCache;
+
+    const loaded = await Promise.all(DESIGN_AGENT_REFERENCE_IMAGE_URLS.map(async (url) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const mimeType = blob.type || (url.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+            const data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
+                reader.onerror = () => reject(new Error('FileReader failed'));
+                reader.readAsDataURL(blob);
+            });
+            return { mimeType, data };
+        } catch (err) {
+            console.warn(`[Design Agent] Could not load reference image ${url}:`, err.message);
+            return null;
+        }
+    }));
+
+    _designAgentReferenceImageCache = loaded.filter(Boolean);
+    if (_designAgentReferenceImageCache.length === 0) {
+        console.warn('[Design Agent] No reference UI-kit images could be loaded — proceeding with text guidance only.');
+    }
+    return _designAgentReferenceImageCache;
+}
+
 /** STAGE 1 of the pipeline — designs the UI only (html/css, no logic). */
 async function runDesignAgent(parentNode, streamCallback = null, refImages = []) {
     console.log(`[Design Agent] Designing UI for parent: ${parentNode.id}`);
+    if (typeof streamCallback === 'function') streamCallback('🎨 Design Agent is studying reference UI kits...');
+
+    const referenceImages = await getDesignAgentReferenceImages();
+    const combinedImages = [...referenceImages, ...(Array.isArray(refImages) ? refImages : [])];
+
     if (typeof streamCallback === 'function') streamCallback('🎨 Design Agent is laying out the UI...');
 
     const systemPrompt = getDesignAgentSystemPrompt();
@@ -3042,9 +3097,11 @@ async function runDesignAgent(parentNode, streamCallback = null, refImages = [])
 {
     "parentId": "${parentNode.id}",
     "appDescription": "${(parentNode.description || '').replace(/`/g, "'")}"
-}`;
+}
 
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
+${referenceImages.length > 0 ? `The first ${referenceImages.length} attached image(s) are reference mobile UI kits. Use them to calibrate the visual quality bar you should hit — spacing rhythm, card styling, typographic weight, icon style, and overall polish — NOT to copy their specific branding, content, or exact layout. Design original screens for THIS app's concept that reach the same level of visual craft.` : ''}`;
+
+    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, combinedImages);
     return parseVibeNodeArrayResponse(rawResponse, 'Design Agent');
 }
 
@@ -10141,4 +10198,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-  }
+    }
