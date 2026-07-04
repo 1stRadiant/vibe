@@ -511,9 +511,26 @@ const vibeEventBus = new EventTarget();
 const AUTO_PILOT_EVENTS = {
     QUEUE_COMPLETE: 'queue-complete',
     RUNTIME_ERROR: 'runtime-error',
-    AGENT_LOG: 'agent-log'
+    AGENT_LOG: 'agent-log',
+    TASK_FAILED: 'task-failed',
+    TASK_COMPLETE: 'task-complete'
 };
-let activeAutoPilotListeners = []; 
+let activeAutoPilotListeners = []; // legacy — kept only so old references don't break; no longer populated
+
+// --- Trigger system ("Jarvis Auto-Pilot") ---
+// Structured WHEN <condition> DO <action> rules the user can arm from the
+// Agent tab — e.g. retry a task automatically if it errors, jump to the
+// Preview tab once the queue finishes, or kick off a UI review pass.
+const TRIGGER_ACTIONS = {
+    RUN_PROMPT: 'run-prompt',   // push a new prompt onto the agent task queue
+    RETRY_TASK: 'retry-task',   // re-attempt the task that just failed, verbatim
+    GOTO_TAB:   'goto-tab'      // switch the app UI to a given tab (e.g. "preview")
+};
+const TRIGGER_RETRY_LIMIT = 3;
+
+let triggers = []; // { id, condition, actionType, actionValue, enabled, fireCount }
+let _triggerIdCounter = 0;
+const _triggerRetryCounts = new Map(); // task text -> consecutive retry count
 
 let currentProjectId = null;
 let currentProjectStorageType = 'cloud';
@@ -4302,38 +4319,18 @@ function renderTaskQueue() {
     });
 }
 
+/**
+ * Legacy entry point — kept so any existing "WHEN x DO y" callers keep
+ * working, but now routes through the managed trigger engine so the rule
+ * shows up in the Triggers panel and is retryable/removable like any other.
+ */
 function registerAutoPilotListener(eventName, taskDescription) {
     const validEvents = Object.values(AUTO_PILOT_EVENTS);
     if (!validEvents.includes(eventName)) {
-        logToAgent(`<strong>Auto Pilot Error:</strong> Invalid event '${eventName}'. Valid events: ${validEvents.join(', ')}`, 'error');
+        logToAgent(`<strong>Trigger Error:</strong> Invalid event '${eventName}'. Valid events: ${validEvents.join(', ')}`, 'error');
         return;
     }
-
-    const listener = (e) => {
-        if (eventName === AUTO_PILOT_EVENTS.QUEUE_COMPLETE && isTaskQueueRunning) return;
-
-        let finalTask = taskDescription;
-        
-        if (eventName === AUTO_PILOT_EVENTS.RUNTIME_ERROR && e.detail && e.detail.message) {
-            finalTask += ` (Context: ${e.detail.message})`;
-        }
-
-        logToAgent(`<strong>Auto Pilot Triggered:</strong> Event '${eventName}' detected. Adding task: "${finalTask}"`, 'plan');
-        
-        taskQueue.push(finalTask);
-        renderTaskQueue();
-        updateTaskQueueUI();
-        
-        if (!isTaskQueueRunning && !waitingForAgentConfirmation) {
-            handleStartTaskQueue();
-        }
-    };
-
-    vibeEventBus.addEventListener(eventName, listener);
-    
-    activeAutoPilotListeners.push({ event: eventName, fn: listener });
-
-    logToAgent(`<strong>Auto Pilot Armed:</strong> Watching for <code>${eventName}</code> to execute: "${taskDescription}"`, 'info');
+    addTrigger(eventName, TRIGGER_ACTIONS.RUN_PROMPT, taskDescription);
 }
 
 function insertAtCursor(textarea, text) {
@@ -4363,13 +4360,13 @@ function renderAutoPilotTriggers() {
 
     triggerBar.innerHTML = '';
 
-    const triggers = [
+    const quickInsertTriggers = [
         { label: '⚡ On Queue Complete', event: AUTO_PILOT_EVENTS.QUEUE_COMPLETE, defaultAction: 'Check the page for visual consistency' },
         { label: '🐞 On Runtime Error', event: AUTO_PILOT_EVENTS.RUNTIME_ERROR, defaultAction: 'Analyze and fix the error' },
         { label: '📝 On Agent Log', event: AUTO_PILOT_EVENTS.AGENT_LOG, defaultAction: 'Review the last action' }
     ];
 
-    triggers.forEach(t => {
+    quickInsertTriggers.forEach(t => {
         const btn = document.createElement('button');
         btn.className = 'action-button small secondary';
         btn.textContent = t.label;
@@ -4380,6 +4377,187 @@ function renderAutoPilotTriggers() {
         };
         triggerBar.appendChild(btn);
     });
+}
+
+// ── Trigger engine ──────────────────────────────────────────────────────
+
+/** Wires one delegated listener per condition type — call once at startup. */
+function initTriggerEngine() {
+    Object.values(AUTO_PILOT_EVENTS).forEach(conditionName => {
+        vibeEventBus.addEventListener(conditionName, (e) => fireTriggersFor(conditionName, e));
+    });
+}
+
+function fireTriggersFor(conditionName, event) {
+    // Don't let a queue-complete trigger re-fire while a trigger-spawned task is still running.
+    if (conditionName === AUTO_PILOT_EVENTS.QUEUE_COMPLETE && isTaskQueueRunning) return;
+
+    const matching = triggers.filter(t => t.enabled && t.condition === conditionName);
+    matching.forEach(trigger => runTriggerAction(trigger, event));
+}
+
+function runTriggerAction(trigger, event) {
+    trigger.fireCount++;
+    renderTriggersPanel();
+
+    const detail = (event && event.detail) || {};
+
+    switch (trigger.actionType) {
+        case TRIGGER_ACTIONS.RUN_PROMPT: {
+            let prompt = trigger.actionValue;
+            if ((trigger.condition === AUTO_PILOT_EVENTS.RUNTIME_ERROR || trigger.condition === AUTO_PILOT_EVENTS.TASK_FAILED) && detail.message) {
+                prompt += ` (Context: ${detail.message})`;
+            }
+            logToAgent(`<strong>Trigger Fired:</strong> "${trigger.condition}" → queuing: "${prompt}"`, 'plan');
+            taskQueue.push({ prompt, images: [] });
+            renderTaskQueue();
+            updateTaskQueueUI();
+            if (!isTaskQueueRunning && !waitingForAgentConfirmation) handleStartTaskQueue();
+            break;
+        }
+        case TRIGGER_ACTIONS.RETRY_TASK: {
+            if (taskQueue.length === 0) {
+                logToAgent(`<strong>Trigger Skipped:</strong> No task left in the queue to retry.`, 'warn');
+                break;
+            }
+            const retryKey = detail.task || (typeof taskQueue[0] === 'string' ? taskQueue[0] : taskQueue[0].prompt) || 'unknown-task';
+            const retryCount = (_triggerRetryCounts.get(retryKey) || 0) + 1;
+            if (retryCount > TRIGGER_RETRY_LIMIT) {
+                logToAgent(`<strong>Trigger Gave Up:</strong> This task failed ${TRIGGER_RETRY_LIMIT} times in a row — not retrying again. Fix it manually or remove it from the queue.`, 'error');
+                break;
+            }
+            _triggerRetryCounts.set(retryKey, retryCount);
+            logToAgent(`<strong>Trigger Fired:</strong> Retrying failed task (attempt ${retryCount}/${TRIGGER_RETRY_LIMIT}).`, 'plan');
+            handleStartTaskQueue();
+            break;
+        }
+        case TRIGGER_ACTIONS.GOTO_TAB: {
+            const tab = trigger.actionValue || 'preview';
+            logToAgent(`<strong>Trigger Fired:</strong> Switching to the "${tab}" tab.`, 'info');
+            switchToTab(tab);
+            break;
+        }
+    }
+}
+
+function describeTriggerAction(t) {
+    switch (t.actionType) {
+        case TRIGGER_ACTIONS.RUN_PROMPT: return `run prompt: "${t.actionValue}"`;
+        case TRIGGER_ACTIONS.RETRY_TASK: return `retry the failed task (up to ${TRIGGER_RETRY_LIMIT}×)`;
+        case TRIGGER_ACTIONS.GOTO_TAB:   return `switch to the "${t.actionValue || 'preview'}" tab`;
+        default: return t.actionType;
+    }
+}
+
+const TRIGGER_CONDITION_LABELS = {
+    [AUTO_PILOT_EVENTS.TASK_FAILED]:    'a task fails (error)',
+    [AUTO_PILOT_EVENTS.TASK_COMPLETE]:  'a task finishes',
+    [AUTO_PILOT_EVENTS.QUEUE_COMPLETE]: 'the whole queue finishes',
+    [AUTO_PILOT_EVENTS.RUNTIME_ERROR]:  'the live preview throws a runtime error',
+    [AUTO_PILOT_EVENTS.AGENT_LOG]:      'the agent logs anything'
+};
+
+/** Adds a new trigger to the managed list and re-renders the panel. */
+function addTrigger(condition, actionType, actionValue = '') {
+    const validConditions = Object.values(AUTO_PILOT_EVENTS);
+    const validActions = Object.values(TRIGGER_ACTIONS);
+    if (!validConditions.includes(condition)) {
+        logToAgent(`<strong>Trigger Error:</strong> Invalid condition '${condition}'. Valid: ${validConditions.join(', ')}`, 'error');
+        return null;
+    }
+    if (!validActions.includes(actionType)) {
+        logToAgent(`<strong>Trigger Error:</strong> Invalid action '${actionType}'. Valid: ${validActions.join(', ')}`, 'error');
+        return null;
+    }
+    if (actionType === TRIGGER_ACTIONS.RUN_PROMPT && !actionValue.trim()) {
+        logToAgent(`<strong>Trigger Error:</strong> A "run prompt" trigger needs prompt text.`, 'error');
+        return null;
+    }
+
+    const trigger = { id: `trigger-${++_triggerIdCounter}`, condition, actionType, actionValue: actionValue.trim(), enabled: true, fireCount: 0 };
+    triggers.push(trigger);
+    renderTriggersPanel();
+    logToAgent(`<strong>Trigger Armed:</strong> WHEN ${TRIGGER_CONDITION_LABELS[condition] || condition} → ${describeTriggerAction(trigger)}`, 'info');
+    return trigger;
+}
+
+function removeTrigger(id) {
+    triggers = triggers.filter(t => t.id !== id);
+    renderTriggersPanel();
+}
+
+function toggleTrigger(id) {
+    const t = triggers.find(t => t.id === id);
+    if (t) { t.enabled = !t.enabled; renderTriggersPanel(); }
+}
+
+/** Renders (or re-renders) the Triggers management panel in the Agent tab. */
+function renderTriggersPanel() {
+    const panel = document.getElementById('trigger-panel-container');
+    if (!panel) return;
+
+    const conditionOptions = Object.entries(TRIGGER_CONDITION_LABELS)
+        .map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    const actionOptions = `
+        <option value="${TRIGGER_ACTIONS.RUN_PROMPT}">Run a prompt</option>
+        <option value="${TRIGGER_ACTIONS.RETRY_TASK}">Retry the failed task</option>
+        <option value="${TRIGGER_ACTIONS.GOTO_TAB}">Switch tab</option>
+    `;
+
+    const listHtml = triggers.length === 0
+        ? `<div style="opacity:.6; font-size:0.85em; padding:4px 0;">No triggers armed yet.</div>`
+        : triggers.map(t => `
+            <div class="trigger-row" data-id="${t.id}" style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid rgba(255,255,255,0.08); border-radius:6px; margin-bottom:6px; ${t.enabled ? '' : 'opacity:.5;'}">
+                <label style="display:flex; align-items:center; gap:6px; flex:1; font-size:0.85em; cursor:pointer;">
+                    <input type="checkbox" class="trigger-toggle" data-id="${t.id}" ${t.enabled ? 'checked' : ''}>
+                    <span><strong>WHEN</strong> ${escapeHtml(TRIGGER_CONDITION_LABELS[t.condition] || t.condition)} <strong>DO</strong> ${escapeHtml(describeTriggerAction(t))}</span>
+                </label>
+                <span title="Times fired" style="font-size:0.75em; opacity:.6;">🔥 ${t.fireCount}</span>
+                <button class="trigger-remove-btn action-button small" data-id="${t.id}" title="Remove trigger">×</button>
+            </div>
+        `).join('');
+
+    panel.innerHTML = `
+        <h4 style="margin-bottom:6px;">⚡ Triggers</h4>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <button class="action-button small secondary" id="quick-trigger-retry">🔁 Retry task on error</button>
+            <button class="action-button small secondary" id="quick-trigger-goto-preview">👁️ Preview when finished</button>
+            <button class="action-button small secondary" id="quick-trigger-review-ui">🎨 Review UI when finished</button>
+        </div>
+        <div id="trigger-list">${listHtml}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+            <select id="trigger-condition-select" style="flex:1; min-width:140px;">${conditionOptions}</select>
+            <select id="trigger-action-select" style="flex:1; min-width:120px;">${actionOptions}</select>
+            <input type="text" id="trigger-value-input" placeholder="Prompt text or tab name..." style="flex:2; min-width:160px;">
+            <button class="action-button small" id="trigger-add-btn">+ Add</button>
+        </div>
+    `;
+
+    if (!panel.dataset.listenerAttached) {
+        panel.addEventListener('click', (e) => {
+            if (e.target.id === 'quick-trigger-retry') {
+                addTrigger(AUTO_PILOT_EVENTS.TASK_FAILED, TRIGGER_ACTIONS.RETRY_TASK, '');
+            } else if (e.target.id === 'quick-trigger-goto-preview') {
+                addTrigger(AUTO_PILOT_EVENTS.QUEUE_COMPLETE, TRIGGER_ACTIONS.GOTO_TAB, 'preview');
+            } else if (e.target.id === 'quick-trigger-review-ui') {
+                addTrigger(AUTO_PILOT_EVENTS.QUEUE_COMPLETE, TRIGGER_ACTIONS.RUN_PROMPT, 'Review the UI for visual consistency, accessibility, and polish, then update anything that needs improving.');
+            } else if (e.target.classList.contains('trigger-remove-btn')) {
+                removeTrigger(e.target.dataset.id);
+            } else if (e.target.id === 'trigger-add-btn') {
+                const condition = document.getElementById('trigger-condition-select').value;
+                const actionType = document.getElementById('trigger-action-select').value;
+                const valueInput = document.getElementById('trigger-value-input');
+                addTrigger(condition, actionType, valueInput.value);
+                valueInput.value = '';
+            }
+        });
+        panel.addEventListener('change', (e) => {
+            if (e.target.classList.contains('trigger-toggle')) {
+                toggleTrigger(e.target.dataset.id);
+            }
+        });
+        panel.dataset.listenerAttached = 'true';
+    }
 }
 
 function handleAddTaskToQueue() {
@@ -4488,6 +4666,8 @@ async function processNextTaskInQueue() {
         }
 
         logToAgent(`<strong>Task completed successfully:</strong> ${currentTask}`, 'info');
+        _triggerRetryCounts.delete(currentTask);
+        vibeEventBus.dispatchEvent(new CustomEvent(AUTO_PILOT_EVENTS.TASK_COMPLETE, { detail: { task: currentTask } }));
         taskQueue.shift(); 
         currentAgentTaskContext = ""; 
         renderTaskQueue();
@@ -4502,6 +4682,17 @@ async function processNextTaskInQueue() {
 
         isTaskQueueRunning = false;
         logToAgent(`<strong>Task Failed:</strong> ${currentTask}<br><strong>Error:</strong> <pre>${error.message}</pre>`, 'error');
+
+        // Give any armed triggers (e.g. "retry on error") a chance to react
+        // before deciding the queue is fully halted. isTaskQueueRunning is
+        // already false here, so a RETRY_TASK trigger calling
+        // handleStartTaskQueue() during this dispatch will actually restart it.
+        vibeEventBus.dispatchEvent(new CustomEvent(AUTO_PILOT_EVENTS.TASK_FAILED, { detail: { task: currentTask, message: error.message } }));
+
+        if (isTaskQueueRunning) {
+            return; // a trigger already resumed processing — don't also report "halted"
+        }
+
         logToAgent('<strong>Queue processing halted due to error.</strong> You can address the issue, remove the failed task, and start the queue again.', 'error');
         updateTaskQueueUI();
         renderTaskQueue();
@@ -5715,9 +5906,11 @@ function switchToTab(tabId) {
                     <h4>Task Queue</h4>
                     <ul id="task-queue-list" class="task-queue-list"></ul>
                 </div>
+                <div id="trigger-panel-container" style="margin-bottom: 20px; padding: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;"></div>
             `);
         }
         updateTaskQueueUI();
+        renderTriggersPanel();
         refreshShorthandDropdowns();
     }
 
@@ -7156,6 +7349,9 @@ function resetToStartPage() {
 
     activeAutoPilotListeners.forEach(l => vibeEventBus.removeEventListener(l.event, l.fn));
     activeAutoPilotListeners = [];
+    triggers = [];
+    _triggerRetryCounts.clear();
+    renderTriggersPanel();
 
     console.log("Ready for new project.");
 }
@@ -8988,6 +9184,7 @@ function initMainApp() {
     initializeMermaid();
     initializeShorthandSystem(); 
     SuggestionEngine.init();
+    initTriggerEngine();
 
     // ── Fix: ensure toolbar dropdowns/menus sit above the preview iframe ──
     (function injectToolbarZIndexFix() {
@@ -10198,4 +10395,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+}
