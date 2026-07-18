@@ -2804,16 +2804,16 @@
 
                                         <!-- Right: canvas -->
                                         <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:rgba(10,14,28,0.5);overflow:auto;padding:14px;">
-                                            <div id="ds-canvas" style="position:relative;width:760px;height:460px;flex-shrink:0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;"></div>
+                                            <div id="ds-canvas" style="position:relative;width:760px;height:460px;flex-shrink:0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
                                         </div>
 
                                     </div>
 
-                                    <!-- Export / merge bar -->
+                                    <!-- Export / sync bar -->
                                     <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.9);flex-shrink:0;">
-                                        <span style="font-size:11px;color:var(--apui-text-dim);flex:1;">Produces absolute-positioned HTML/CSS.</span>
+                                        <span id="ds-sync-status" style="font-size:11px;color:var(--apui-text-dim);flex:1;">Not synced yet — edits will sync to the project automatically.</span>
                                         <button class="action-button small" onclick="dsCopyCode()" style="border-color:#00ffcc;color:#00ffcc;" title="Copy generated HTML/CSS"><i class="bi bi-clipboard"></i> Copy HTML</button>
-                                        <button class="action-button small" id="ds-merge-btn" onclick="dsMergeToProject()" style="border-color:#98c379;color:#98c379;" title="Merge this scene into the main project"><i class="bi bi-arrow-up-circle"></i> Merge to Project</button>
+                                        <button class="action-button small" id="ds-merge-btn" onclick="dsForceSync()" style="border-color:#98c379;color:#98c379;" title="Force an immediate sync to the project"><i class="bi bi-arrow-repeat"></i> Sync Now</button>
                                     </div>
 
                                 </div>
@@ -3856,7 +3856,7 @@ function _dsWrapperCss(el, forExport) {
         + 'width:' + Math.round(el.w) + 'px;height:' + Math.round(el.h) + 'px;'
         + visual + 'opacity:' + el.opacity + ';'
         + 'transform:rotate(' + Math.round(el.rotation) + 'deg);transform-origin:center center;'
-        + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:' + (_dsMode === 'rotate' ? 'grab' : (_dsMode === 'move' ? 'move' : 'default')) + ';');
+        + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:' + (_dsMode === 'rotate' ? 'grab' : (_dsMode === 'move' ? 'move' : 'default')) + ';touch-action:none;user-select:none;-webkit-user-select:none;');
 }
 
 /* ── Rendering ── */
@@ -3893,7 +3893,8 @@ function _dsRenderSelectionUI(el, canvas) {
             hd.style.cssText = 'position:absolute;left:' + (world.x - 5) + 'px;top:' + (world.y - 5) + 'px;'
                 + 'width:10px;height:10px;background:#0a0e18;border:2px solid #ff8a65;border-radius:2px;'
                 + 'cursor:' + HANDLE_CURSOR[h.name] + ';z-index:9999;';
-            hd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartResize(e, el.id, h); });
+            hd.style.touchAction = 'none';
+            hd.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); _dsStartResize(e, el.id, h); });
             canvas.appendChild(hd);
         });
     } else if (_dsMode === 'rotate') {
@@ -3902,7 +3903,8 @@ function _dsRenderSelectionUI(el, canvas) {
         var rd = document.createElement('div');
         rd.style.cssText = 'position:absolute;left:' + (rotWorld.x - 6) + 'px;top:' + (rotWorld.y - 6) + 'px;'
             + 'width:12px;height:12px;background:#ff8a65;border-radius:50%;cursor:grab;z-index:9999;box-shadow:0 0 6px rgba(255,138,101,0.7);';
-        rd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartRotate(e, el.id); });
+        rd.style.touchAction = 'none';
+        rd.addEventListener('pointerdown', function(e) { e.preventDefault(); e.stopPropagation(); _dsStartRotate(e, el.id); });
         canvas.appendChild(rd);
     }
 }
@@ -4007,6 +4009,7 @@ window.dsApplyProps = function() {
     el.checked = document.getElementById('ds-p-checked').checked;
     dsRenderCanvas();
     dsRenderLayerList();
+    _dsSyncToProject();
 };
 
 /* ── Mode switching (Draw / Move / Resize / Rotate) ── */
@@ -4031,6 +4034,7 @@ window.dsNewShapeAtCenter = function() {
     _dsShapes.push(el);
     dsSelectShape(el.id);
     dsRenderLayerList();
+    _dsSyncToProject();
 };
 
 window.dsDuplicateShape = function() {
@@ -4039,6 +4043,7 @@ window.dsDuplicateShape = function() {
     var copy = Object.assign({}, src, { id: _dsGenId(), name: src.name + '-copy', x: src.x + 16, y: src.y + 16 });
     _dsShapes.push(copy);
     dsSelectShape(copy.id);
+    _dsSyncToProject();
 };
 
 window.dsDeleteShape = function() {
@@ -4048,6 +4053,7 @@ window.dsDeleteShape = function() {
     dsRenderCanvas();
     dsRenderLayerList();
     _dsSyncPropsBar();
+    _dsSyncToProject();
 };
 
 window.dsClearAll = function() {
@@ -4057,6 +4063,7 @@ window.dsClearAll = function() {
     dsRenderCanvas();
     dsRenderLayerList();
     _dsSyncPropsBar();
+    _dsSyncToProject();
 };
 
 window.dsNudgeZ = function(dir) {
@@ -4067,11 +4074,13 @@ window.dsNudgeZ = function(dir) {
     var tmp = _dsShapes[idx]; _dsShapes[idx] = _dsShapes[swapIdx]; _dsShapes[swapIdx] = tmp;
     dsRenderCanvas();
     dsRenderLayerList();
+    _dsSyncToProject();
 };
 
 /* ── Pointer interactions: draw / move / resize / rotate ── */
 function _dsOnShapePointerDown(e, id) {
     if (_dsMode === 'draw') return; // in draw mode, canvas-level listener starts a new element instead
+    e.preventDefault();
     e.stopPropagation();
     dsSelectShape(id);
     if (_dsMode === 'move') {
@@ -4108,6 +4117,7 @@ function _dsStartRotate(e, id) {
 
 function _dsOnPointerMove(e) {
     if (!_dsDrag) return;
+    e.preventDefault();
     var mouse = _dsCanvasPoint(e);
     var el = _dsFind(_dsDrag.id);
 
@@ -4148,10 +4158,12 @@ function _dsOnPointerUp() {
         dsSelectShape(_dsDrag.id);
         dsSetMode('move');
     }
+    var hadDrag = !!_dsDrag;
     _dsDrag = null;
     dsRenderLayerList();
     window.removeEventListener('pointermove', _dsOnPointerMove);
     window.removeEventListener('pointerup', _dsOnPointerUp);
+    if (hadDrag) _dsSyncToProject();
 }
 
 function _dsInitCanvasEvents() {
@@ -4161,6 +4173,7 @@ function _dsInitCanvasEvents() {
     canvas.addEventListener('pointerdown', function(e) {
         if (e.target !== canvas) return; // clicks on elements/handles are handled separately
         if (_dsMode !== 'draw') { _dsActiveId = null; dsRenderCanvas(); dsRenderLayerList(); _dsSyncPropsBar(); return; }
+        e.preventDefault();
         var type = document.getElementById('ds-shape-type').value;
         var meta = DS_TYPES[type] || DS_TYPES.rectangle;
         var p0 = _dsCanvasPoint(e);
@@ -4190,33 +4203,85 @@ window.dsCopyCode = function() {
     else { window.prompt('Copy the HTML/CSS below:', code); }
 };
 
-window.dsMergeToProject = function() {
-    if (!_dsShapes.length) return;
+/* ── Live project sync — keeps one stable node in the project always
+   up to date with the current canvas, instead of a one-shot merge ── */
+var DS_NODE_ID = 'designer-live-scene';
+var DS_STORAGE_KEY = 'ds_shapes_backup_v1';
+var _dsSyncTimer = null;
+
+function _dsUpdateSyncStatus(text, color) {
+    var el = document.getElementById('ds-sync-status');
+    if (!el) return;
+    var now = new Date();
+    var stamp = now.toLocaleTimeString();
+    el.textContent = text || ('✓ synced to project — ' + stamp);
+    el.style.color = color || '#98c379';
+}
+
+function _dsRunSync() {
     var code = _dsBuildCode();
-    var nodeId = 'designer-scene-' + Date.now().toString(36);
-    var newNode = { id: nodeId, type: 'html', description: '[Designer] Scene (' + _dsShapes.length + ' elements)', code: code, children: [] };
-    var merged = false;
-    if (typeof vibeTree !== 'undefined' && typeof refreshAllUI === 'function') {
+    var dataJSON = JSON.stringify(_dsShapes);
+    var wroteToProject = false;
+    if (typeof vibeTree !== 'undefined') {
         if (!vibeTree.children) vibeTree.children = [];
-        if (typeof recordHistory === 'function') recordHistory('Designer merge: ' + nodeId);
-        vibeTree.children.push(newNode);
+        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID; });
+        if (!node) {
+            node = { id: DS_NODE_ID, type:'html', description:'[Designer] Live scene (' + _dsShapes.length + ' elements)', code: code, designerData: dataJSON, children: [] };
+            vibeTree.children.push(node);
+        } else {
+            node.code = code;
+            node.designerData = dataJSON;
+            node.description = '[Designer] Live scene (' + _dsShapes.length + ' elements)';
+        }
         if (typeof autoSaveProject === 'function') autoSaveProject();
-        refreshAllUI();
-        merged = true;
+        if (typeof refreshAllUI === 'function') refreshAllUI();
+        wroteToProject = true;
     }
-    if (!merged) { document.dispatchEvent(new CustomEvent('ws-merge-node', { detail: { newNode: newNode } })); }
+    try { localStorage.setItem(DS_STORAGE_KEY, dataJSON); } catch (e) {}
+    _dsUpdateSyncStatus(wroteToProject ? undefined : '✓ saved locally (project not loaded yet)', wroteToProject ? undefined : '#e5c07b');
+}
+
+/* Debounced — call after every edit so the project is always close to live
+   without hammering autoSaveProject on every pixel of a drag. */
+function _dsSyncToProject() {
+    if (!_dsShapes.length && typeof vibeTree === 'undefined') return;
+    _dsUpdateSyncStatus('● syncing…', '#e5c07b');
+    clearTimeout(_dsSyncTimer);
+    _dsSyncTimer = setTimeout(_dsRunSync, 350);
+}
+
+/* Immediate flush, used by the "Sync Now" button */
+window.dsForceSync = function() {
+    clearTimeout(_dsSyncTimer);
+    _dsRunSync();
     var mergeBtn = document.getElementById('ds-merge-btn');
     if (mergeBtn) {
         var orig = mergeBtn.innerHTML;
-        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Merged!';
+        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Synced!';
         mergeBtn.disabled = true;
-        setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 2200);
+        setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 1400);
     }
-    setTimeout(function() {
-        if (typeof switchToTab === 'function') { switchToTab('editor'); }
-        else { document.querySelectorAll('.tab-button').forEach(function(b){ if (b.dataset.tab === 'editor') b.click(); }); }
-    }, 600);
 };
+
+/* Restore the canvas from whatever the project (or local backup) already
+   holds, so re-opening the Designer or reloading the project continues
+   exactly where you left off instead of starting blank. */
+function _dsLoadFromProject() {
+    var data = null;
+    if (typeof vibeTree !== 'undefined' && vibeTree.children) {
+        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID; });
+        if (node && node.designerData) {
+            try { data = JSON.parse(node.designerData); } catch (e) {}
+        }
+    }
+    if (!data) {
+        try { var raw = localStorage.getItem(DS_STORAGE_KEY); if (raw) data = JSON.parse(raw); } catch (e) {}
+    }
+    if (data && Array.isArray(data) && data.length) {
+        _dsShapes = data;
+        _dsUpdateSyncStatus('✓ restored from project', '#87CEEB');
+    }
+}
 
 /* ── Keyboard delete when Designer tab is focused ── */
 document.addEventListener('keydown', function(e) {
@@ -4228,6 +4293,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
+    _dsLoadFromProject();
     _dsInitCanvasEvents();
     dsRenderCanvas();
     dsRenderLayerList();
@@ -7489,4 +7555,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-                                            </html>
+        </html>
