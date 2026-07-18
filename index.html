@@ -2723,20 +2723,56 @@
                                     <div id="ds-toolbar" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.25);flex-shrink:0;flex-wrap:wrap;">
                                         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#ff8a65;display:flex;align-items:center;gap:5px;"><i class="bi bi-bounding-box-circles"></i> Designer</span>
                                         <select id="ds-shape-type" style="padding:5px 8px;font-size:12px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
-                                            <option value="rect">Rectangle</option>
-                                            <option value="ellipse">Ellipse</option>
-                                            <option value="line">Line / Bar</option>
+                                            <optgroup label="Shapes">
+                                                <option value="rectangle">Rectangle</option>
+                                                <option value="oval">Oval</option>
+                                                <option value="line">Line</option>
+                                                <option value="triangle">Triangle</option>
+                                                <option value="star">Star</option>
+                                                <option value="progressbar">Progress Bar</option>
+                                            </optgroup>
+                                            <optgroup label="Text">
+                                                <option value="text">Text</option>
+                                                <option value="link">Link</option>
+                                                <option value="x">X (Icon)</option>
+                                            </optgroup>
+                                            <optgroup label="Tasker-style controls">
+                                                <option value="button">Button</option>
+                                                <option value="checkbox">Checkbox</option>
+                                                <option value="switch">Switch</option>
+                                                <option value="toggle">Toggle</option>
+                                                <option value="slider">Slider</option>
+                                                <option value="spinner">Spinner</option>
+                                                <option value="numberpicker">Number Picker</option>
+                                                <option value="menu">Menu</option>
+                                                <option value="textedit">TextEdit</option>
+                                            </optgroup>
+                                            <optgroup label="Media">
+                                                <option value="image">Image</option>
+                                                <option value="video">Video</option>
+                                                <option value="webview">WebView</option>
+                                                <option value="map">Map</option>
+                                                <option value="doodle">Doodle</option>
+                                            </optgroup>
                                         </select>
-                                        <button id="ds-draw-toggle" class="action-button small" onclick="dsToggleDraw()" title="Toggle draw mode — click &amp; drag on the canvas to create a shape" style="border-color:#ff8a65;color:#ff8a65;"><i class="bi bi-pencil-square"></i> Draw</button>
-                                        <button class="action-button small" onclick="dsNewShapeAtCenter()" title="Add a default-size shape"><i class="bi bi-plus-circle"></i> New</button>
-                                        <button class="action-button small" onclick="dsDuplicateShape()" title="Duplicate selected shape"><i class="bi bi-copy"></i></button>
+
+                                        <!-- Mode switch: Draw / Move / Resize / Rotate -->
+                                        <div id="ds-mode-group" style="display:flex;gap:2px;background:rgba(0,0,0,0.3);border-radius:6px;padding:2px;">
+                                            <button class="action-button small ds-mode-btn" data-mode="draw" onclick="dsSetMode('draw')" title="Draw — click &amp; drag on the canvas to create a new element"><i class="bi bi-pencil-square"></i></button>
+                                            <button class="action-button small ds-mode-btn" data-mode="move" onclick="dsSetMode('move')" title="Move — drag elements to reposition them"><i class="bi bi-arrows-move"></i></button>
+                                            <button class="action-button small ds-mode-btn" data-mode="resize" onclick="dsSetMode('resize')" title="Resize — drag the handles on a selected element"><i class="bi bi-arrows-angle-expand"></i></button>
+                                            <button class="action-button small ds-mode-btn" data-mode="rotate" onclick="dsSetMode('rotate')" title="Rotate — drag a selected element to spin it"><i class="bi bi-arrow-clockwise"></i></button>
+                                        </div>
+
+                                        <button class="action-button small" onclick="dsNewShapeAtCenter()" title="Add a default-size element"><i class="bi bi-plus-circle"></i> New</button>
+                                        <button class="action-button small" onclick="dsDuplicateShape()" title="Duplicate selected element"><i class="bi bi-copy"></i></button>
                                         <button class="action-button small" onclick="dsNudgeZ(1)" title="Bring forward"><i class="bi bi-arrow-up"></i></button>
                                         <button class="action-button small" onclick="dsNudgeZ(-1)" title="Send backward"><i class="bi bi-arrow-down"></i></button>
-                                        <button class="action-button small danger" onclick="dsDeleteShape()" title="Delete selected shape"><i class="bi bi-trash"></i></button>
+                                        <button class="action-button small danger" onclick="dsDeleteShape()" title="Delete selected element"><i class="bi bi-trash"></i></button>
                                         <button class="action-button small danger" onclick="dsClearAll()" title="Clear the whole canvas" style="margin-left:auto;">Clear</button>
                                     </div>
 
-                                    <!-- Properties bar (shown when a shape is selected) -->
+                                    <!-- Properties bar (shown when an element is selected) -->
                                     <div id="ds-props-bar" style="display:none;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.18);flex-shrink:0;flex-wrap:wrap;font-size:11px;color:var(--apui-text-dim);">
                                         <input type="text" id="ds-p-name" placeholder="name" style="width:90px;padding:4px 7px;font-size:11px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:4px;font-family:'Fira Code',monospace;" oninput="dsApplyProps()">
                                         <label>X <input type="number" id="ds-p-x" style="width:56px;" oninput="dsApplyProps()"></label>
@@ -2745,10 +2781,17 @@
                                         <label>H <input type="number" id="ds-p-h" style="width:56px;" oninput="dsApplyProps()"></label>
                                         <label>Rot° <input type="number" id="ds-p-rot" style="width:52px;" oninput="dsApplyProps()"></label>
                                         <label id="ds-p-radius-wrap">Radius <input type="number" id="ds-p-radius" style="width:52px;" oninput="dsApplyProps()"></label>
-                                        <label>Fill <input type="color" id="ds-p-fill" oninput="dsApplyProps()"></label>
-                                        <label>Stroke <input type="color" id="ds-p-stroke" oninput="dsApplyProps()"></label>
-                                        <label>Stroke W <input type="number" id="ds-p-strokew" style="width:46px;" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-fill-wrap">Fill <input type="color" id="ds-p-fill" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-stroke-wrap">Stroke <input type="color" id="ds-p-stroke" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-strokew-wrap">Stroke W <input type="number" id="ds-p-strokew" style="width:46px;" oninput="dsApplyProps()"></label>
                                         <label>Opacity <input type="range" id="ds-p-opacity" min="0" max="1" step="0.05" style="width:70px;" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-content-wrap" style="display:flex;align-items:center;gap:4px;">
+                                            <span id="ds-p-content-label">Text</span>
+                                            <textarea id="ds-p-content" rows="1" style="width:130px;resize:vertical;font-size:11px;padding:4px 6px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:4px;font-family:'Fira Code',monospace;" oninput="dsApplyProps()"></textarea>
+                                        </label>
+                                        <label id="ds-p-src-wrap">URL <input type="text" id="ds-p-src" placeholder="https://…" style="width:140px;" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-minmax-wrap">Min <input type="number" id="ds-p-min" style="width:48px;" oninput="dsApplyProps()"> Max <input type="number" id="ds-p-max" style="width:48px;" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-checked-wrap">On <input type="checkbox" id="ds-p-checked" onchange="dsApplyProps()"></label>
                                     </div>
 
                                     <!-- Designer body: layer list + canvas -->
@@ -2756,7 +2799,7 @@
 
                                         <!-- Left: layer list -->
                                         <div id="ds-layer-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;">
-                                            <div id="ds-layer-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No shapes yet.<br>Toggle <b style="color:#ff8a65">Draw</b> and drag on the canvas, or click <b style="color:#ff8a65">+ New</b>.</div>
+                                            <div id="ds-layer-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No elements yet.<br>Pick a type, switch to <b style="color:#ff8a65">Draw</b> mode and drag on the canvas, or click <b style="color:#ff8a65">+ New</b>.</div>
                                         </div>
 
                                         <!-- Right: canvas -->
@@ -3640,18 +3683,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <script>
 /* ══════════════════════════════════════════════════════════════
-   DESIGNER — Tasker-scene-style graphic canvas: draw, drag, resize
-   shapes and export them as absolute-positioned HTML/CSS.
+   DESIGNER — Tasker-scene-style graphic canvas: draw, move, resize
+   and rotate a wide set of shape/UI elements, exported as
+   absolute-positioned HTML/CSS.
    ══════════════════════════════════════════════════════════════ */
 (function() {
 
 var CANVAS_W = 760, CANVAS_H = 460, MIN_SIZE = 8;
-var _dsShapes = [];      // { id, name, type, x,y,w,h, rotation, fill, stroke, strokeWidth, radius, opacity }
+var _dsShapes = [];      // { id, name, type, x,y,w,h, rotation, fill, stroke, strokeWidth, radius, opacity, content, src, checked, min, max }
 var _dsActiveId = null;
-var _dsDrawMode = false;
+var _dsMode = 'move';    // 'draw' | 'move' | 'resize' | 'rotate'
 var _dsDrag = null;      // active pointer interaction state
 
-var DS_DEFAULTS = { fill:'#4169e1', stroke:'#87CEEB', strokeWidth:0, radius:6, opacity:1, rotation:0 };
+/* ── Type registry: default size + which family renders it + starting content ── */
+var DS_TYPES = {
+    rectangle:    { group:'shape', w:100, h:100 },
+    oval:         { group:'shape', w:100, h:100 },
+    line:         { group:'shape', w:160, h:6 },
+    triangle:     { group:'shape', w:100, h:90 },
+    star:         { group:'shape', w:100, h:100 },
+    progressbar:  { group:'shape', w:160, h:16, content:'60' },
+    text:         { group:'text',  w:140, h:32, content:'Text' },
+    link:         { group:'text',  w:120, h:24, content:'Link text' },
+    x:            { group:'text',  w:40,  h:40, content:'✕' },
+    button:       { group:'form',  w:120, h:40, content:'Button' },
+    checkbox:     { group:'form',  w:150, h:28, content:'Checkbox' },
+    switch:       { group:'form',  w:56,  h:28 },
+    toggle:       { group:'form',  w:100, h:36, content:'Toggle' },
+    slider:       { group:'form',  w:180, h:32, content:'50', min:0, max:100 },
+    spinner:      { group:'form',  w:160, h:34, content:'Option A\nOption B\nOption C' },
+    numberpicker: { group:'form',  w:90,  h:34, content:'0', min:0, max:100 },
+    menu:         { group:'form',  w:130, h:36, content:'Menu\nItem 1\nItem 2\nItem 3' },
+    textedit:     { group:'form',  w:180, h:34, content:'Placeholder…' },
+    image:        { group:'media', w:160, h:120 },
+    video:        { group:'media', w:200, h:120 },
+    webview:      { group:'media', w:260, h:160 },
+    map:          { group:'media', w:240, h:160, content:'' },
+    doodle:       { group:'media', w:220, h:160 }
+};
+
 var DS_HANDLES = [
     { name:'nw', sx:-1, sy:-1 }, { name:'n', sx:0, sy:-1 }, { name:'ne', sx:1, sy:-1 },
     { name:'e',  sx:1,  sy:0  },
@@ -3663,6 +3733,7 @@ var HANDLE_CURSOR = { nw:'nwse-resize', n:'ns-resize', ne:'nesw-resize', e:'ew-r
 function _dsGenId() { return 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
 function _dsFind(id) { return _dsShapes.find(function(s){ return s.id === id; }); }
 function _dsCanvasEl() { return document.getElementById('ds-canvas'); }
+function _dsEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function _dsCanvasPoint(evt) {
     var rect = _dsCanvasEl().getBoundingClientRect();
@@ -3677,32 +3748,118 @@ function _subV(a,b){ return { x:a.x-b.x, y:a.y-b.y }; }
 
 /* ── Shape factory ── */
 function _dsMakeShape(type, x, y, w, h) {
+    var meta = DS_TYPES[type] || DS_TYPES.rectangle;
     var n = _dsShapes.length + 1;
     return {
         id: _dsGenId(), name: type + '-' + n, type: type,
-        x: x, y: y, w: w, h: h, rotation: DS_DEFAULTS.rotation,
-        fill: DS_DEFAULTS.fill, stroke: DS_DEFAULTS.stroke,
-        strokeWidth: DS_DEFAULTS.strokeWidth, radius: type === 'ellipse' ? 0 : DS_DEFAULTS.radius,
-        opacity: DS_DEFAULTS.opacity
+        x: x, y: y, w: w, h: h, rotation: 0,
+        fill: '#4169e1', stroke: '#87CEEB', strokeWidth: 0,
+        radius: type === 'rectangle' ? 6 : 0, opacity: 1,
+        content: meta.content !== undefined ? meta.content : '',
+        src: '', checked: false,
+        min: meta.min !== undefined ? meta.min : 0,
+        max: meta.max !== undefined ? meta.max : 100
     };
 }
 
-/* ── Rendering ── */
-function _dsShapeCss(el, forExport) {
-    var bg, border = '', radius;
-    if (el.type === 'ellipse') { bg = el.fill; radius = '50%'; }
-    else if (el.type === 'line') { bg = el.stroke; radius = (el.h/2) + 'px'; }
-    else { bg = el.fill; radius = el.radius + 'px'; }
-    if (el.type !== 'line' && el.strokeWidth > 0) border = 'border:' + el.strokeWidth + 'px solid ' + el.stroke + ';box-sizing:border-box;';
+/* ── Inner content per element type (editor preview vs. exported code) ── */
+function _dsInnerHtml(el, forExport) {
+    var pe = forExport ? '' : 'pointer-events:none;'; // keep drag/resize reliable while editing
+    var lines = String(el.content || '').split('\n');
+    switch (el.type) {
+        case 'rectangle': case 'oval': case 'line': case 'triangle': case 'star':
+            return '';
+        case 'progressbar': {
+            var pct = Math.max(0, Math.min(100, parseFloat(el.content) || 0));
+            return '<div style="width:100%;height:100%;background:' + el.fill + ';border-radius:inherit;overflow:hidden;">'
+                 + '<div style="width:' + pct + '%;height:100%;background:' + el.stroke + ';"></div></div>';
+        }
+        case 'text':
+            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:14px;text-align:center;overflow:hidden;' + pe + '">' + _dsEsc(el.content) + '</div>';
+        case 'link':
+            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:14px;text-decoration:underline;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
+        case 'x':
+            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:' + Math.round(Math.min(el.w, el.h) * 0.6) + 'px;line-height:1;' + pe + '">' + _dsEsc(el.content || '✕') + '</div>';
+        case 'button':
+            return '<div style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + el.fill + ';color:' + el.stroke + ';font-family:sans-serif;font-size:13px;font-weight:600;border-radius:' + el.radius + 'px;' + pe + '">' + _dsEsc(el.content) + '</div>';
+        case 'checkbox':
+            return '<label style="width:100%;height:100%;display:flex;align-items:center;gap:6px;font-family:sans-serif;font-size:13px;color:' + el.fill + ';' + pe + '"><input type="checkbox" ' + (el.checked ? 'checked' : '') + '> <span>' + _dsEsc(el.content) + '</span></label>';
+        case 'switch':
+            return '<div style="width:100%;height:100%;background:' + (el.checked ? el.fill : '#555') + ';border-radius:999px;display:flex;align-items:center;justify-content:' + (el.checked ? 'flex-end' : 'flex-start') + ';padding:2px;box-sizing:border-box;' + pe + '"><div style="width:' + Math.max(4, el.h - 4) + 'px;height:' + Math.max(4, el.h - 4) + 'px;border-radius:50%;background:' + el.stroke + ';"></div></div>';
+        case 'toggle':
+            return '<div onclick="this.style.background=(this.style.background.indexOf(\'' + el.stroke.replace(/'/g,'') + '\')>-1)?\'#555\':\'' + el.fill + '\'" style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + (el.checked ? el.fill : '#555') + ';color:#fff;font-family:sans-serif;font-size:13px;border-radius:' + Math.min(el.radius || 6, 20) + 'px;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
+        case 'slider':
+            return '<input type="range" min="' + el.min + '" max="' + el.max + '" value="' + (el.content || 50) + '" style="width:100%;height:100%;accent-color:' + el.fill + ';' + pe + '">';
+        case 'spinner':
+            return '<select style="width:100%;height:100%;font-family:sans-serif;font-size:13px;' + pe + '">' + lines.map(function(l){ return '<option>' + _dsEsc(l) + '</option>'; }).join('') + '</select>';
+        case 'numberpicker':
+            return '<input type="number" value="' + _dsEsc(el.content || 0) + '" min="' + el.min + '" max="' + el.max + '" style="width:100%;height:100%;text-align:center;font-family:sans-serif;font-size:13px;box-sizing:border-box;' + pe + '">';
+        case 'menu': {
+            var label = lines[0] || 'Menu';
+            var items = lines.slice(1);
+            return '<div style="position:relative;width:100%;height:100%;font-family:sans-serif;">'
+                 + '<button onclick="var m=this.nextElementSibling;m.style.display=(m.style.display===\'block\')?\'none\':\'block\';" style="width:100%;height:100%;background:' + el.fill + ';color:' + el.stroke + ';border:none;border-radius:' + el.radius + 'px;font-size:13px;cursor:pointer;' + pe + '">☰ ' + _dsEsc(label) + '</button>'
+                 + '<div style="display:none;position:absolute;top:100%;left:0;background:#222;border:1px solid #555;min-width:100%;z-index:10000;">'
+                 + items.map(function(l){ return '<div style="padding:6px 10px;color:#eee;font-size:12px;white-space:nowrap;">' + _dsEsc(l) + '</div>'; }).join('')
+                 + '</div></div>';
+        }
+        case 'textedit':
+            return '<input type="text" placeholder="' + _dsEsc(el.content) + '" style="width:100%;height:100%;box-sizing:border-box;font-family:sans-serif;font-size:13px;padding:0 8px;' + pe + '">';
+        case 'image':
+            return el.src
+                ? '<img src="' + _dsEsc(el.src) + '" style="width:100%;height:100%;object-fit:cover;' + pe + '">'
+                : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#2a2f3d;color:#7a8aaa;font-family:sans-serif;font-size:12px;border:1px dashed #556;box-sizing:border-box;' + pe + '">🖼 Image</div>';
+        case 'video':
+            return el.src
+                ? '<video src="' + _dsEsc(el.src) + '" controls style="width:100%;height:100%;' + pe + '"></video>'
+                : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#2a2f3d;color:#7a8aaa;font-family:sans-serif;font-size:12px;border:1px dashed #556;box-sizing:border-box;' + pe + '">🎬 Video</div>';
+        case 'webview':
+            return '<iframe src="' + _dsEsc(el.src || 'about:blank') + '" style="width:100%;height:100%;border:0;' + pe + '"></iframe>';
+        case 'map': {
+            var q = el.content || el.src;
+            return q
+                ? '<iframe src="https://www.google.com/maps?q=' + encodeURIComponent(q) + '&output=embed" style="width:100%;height:100%;border:0;' + pe + '"></iframe>'
+                : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#2a2f3d;color:#7a8aaa;font-family:sans-serif;font-size:12px;border:1px dashed #556;box-sizing:border-box;' + pe + '">🗺 Map</div>';
+        }
+        case 'doodle':
+            return '<canvas class="ds-doodle-canvas" width="' + Math.round(el.w) + '" height="' + Math.round(el.h) + '" style="width:100%;height:100%;background:#fff;touch-action:none;display:block;' + pe + '"></canvas>'
+                 + (forExport ? '<script>(function(){var c=document.currentScript.previousElementSibling;var ctx=c.getContext("2d");var d=false;c.addEventListener("pointerdown",function(e){d=true;ctx.beginPath();ctx.moveTo(e.offsetX,e.offsetY);});c.addEventListener("pointermove",function(e){if(!d)return;ctx.lineTo(e.offsetX,e.offsetY);ctx.stroke();});window.addEventListener("pointerup",function(){d=false;});})();<\/script>' : '');
+        default:
+            return '';
+    }
+}
+
+/* ── Wrapper style (position/size/rotation) + visual style for shape-family elements ── */
+function _dsWrapperCss(el, forExport) {
+    var visual = '';
+    switch (el.type) {
+        case 'rectangle':
+            visual = 'background:' + el.fill + ';border-radius:' + el.radius + 'px;' + (el.strokeWidth > 0 ? 'border:' + el.strokeWidth + 'px solid ' + el.stroke + ';box-sizing:border-box;' : '');
+            break;
+        case 'oval':
+            visual = 'background:' + el.fill + ';border-radius:50%;' + (el.strokeWidth > 0 ? 'border:' + el.strokeWidth + 'px solid ' + el.stroke + ';box-sizing:border-box;' : '');
+            break;
+        case 'line':
+            visual = 'background:' + el.stroke + ';border-radius:' + (el.h / 2) + 'px;';
+            break;
+        case 'triangle':
+            visual = 'background:' + el.fill + ';clip-path:polygon(50% 0%, 0% 100%, 100% 100%);';
+            break;
+        case 'star':
+            visual = 'background:' + el.fill + ';clip-path:polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);';
+            break;
+        default:
+            visual = '';
+    }
     var z = _dsShapes.indexOf(el) + 1;
     return 'position:absolute;left:' + Math.round(el.x) + 'px;top:' + Math.round(el.y) + 'px;'
         + 'width:' + Math.round(el.w) + 'px;height:' + Math.round(el.h) + 'px;'
-        + 'background:' + bg + ';border-radius:' + radius + ';' + border
-        + 'opacity:' + el.opacity + ';'
+        + visual + 'opacity:' + el.opacity + ';'
         + 'transform:rotate(' + Math.round(el.rotation) + 'deg);transform-origin:center center;'
-        + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:move;');
+        + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:' + (_dsMode === 'rotate' ? 'grab' : (_dsMode === 'move' ? 'move' : 'default')) + ';');
 }
 
+/* ── Rendering ── */
 function dsRenderCanvas() {
     var canvas = _dsCanvasEl();
     if (!canvas) return;
@@ -3711,14 +3868,15 @@ function dsRenderCanvas() {
         var node = document.createElement('div');
         node.className = 'ds-shape';
         node.dataset.id = el.id;
-        node.style.cssText = _dsShapeCss(el, false);
-        node.addEventListener('pointerdown', function(e) { _dsStartMove(e, el.id); });
+        node.style.cssText = _dsWrapperCss(el, false);
+        node.innerHTML = _dsInnerHtml(el, false);
+        node.addEventListener('pointerdown', function(e) { _dsOnShapePointerDown(e, el.id); });
         canvas.appendChild(node);
-        if (el.id === _dsActiveId) _dsRenderHandles(el, canvas);
+        if (el.id === _dsActiveId) _dsRenderSelectionUI(el, canvas);
     });
 }
 
-function _dsRenderHandles(el, canvas) {
+function _dsRenderSelectionUI(el, canvas) {
     var theta = el.rotation * Math.PI / 180;
     var center = { x: el.x + el.w/2, y: el.y + el.h/2 };
     // Selection outline (rotates with shape)
@@ -3726,25 +3884,27 @@ function _dsRenderHandles(el, canvas) {
     outline.style.cssText = 'position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;'
         + 'border:1px dashed #ff8a65;pointer-events:none;transform:rotate(' + el.rotation + 'deg);transform-origin:center center;z-index:9998;';
     canvas.appendChild(outline);
-    // Resize handles
-    DS_HANDLES.forEach(function(h) {
-        var local = { x: h.sx * el.w/2, y: h.sy * el.h/2 };
-        var world = _addV(center, _rotV(local, theta));
-        var hd = document.createElement('div');
-        hd.style.cssText = 'position:absolute;left:' + (world.x - 5) + 'px;top:' + (world.y - 5) + 'px;'
-            + 'width:10px;height:10px;background:#0a0e18;border:2px solid #ff8a65;border-radius:2px;'
-            + 'cursor:' + HANDLE_CURSOR[h.name] + ';z-index:9999;';
-        hd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartResize(e, el.id, h); });
-        canvas.appendChild(hd);
-    });
-    // Rotate handle
-    var rotLocal = { x: 0, y: -el.h/2 - 24 };
-    var rotWorld = _addV(center, _rotV(rotLocal, theta));
-    var rd = document.createElement('div');
-    rd.style.cssText = 'position:absolute;left:' + (rotWorld.x - 6) + 'px;top:' + (rotWorld.y - 6) + 'px;'
-        + 'width:12px;height:12px;background:#ff8a65;border-radius:50%;cursor:grab;z-index:9999;box-shadow:0 0 6px rgba(255,138,101,0.7);';
-    rd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartRotate(e, el.id); });
-    canvas.appendChild(rd);
+
+    if (_dsMode === 'resize') {
+        DS_HANDLES.forEach(function(h) {
+            var local = { x: h.sx * el.w/2, y: h.sy * el.h/2 };
+            var world = _addV(center, _rotV(local, theta));
+            var hd = document.createElement('div');
+            hd.style.cssText = 'position:absolute;left:' + (world.x - 5) + 'px;top:' + (world.y - 5) + 'px;'
+                + 'width:10px;height:10px;background:#0a0e18;border:2px solid #ff8a65;border-radius:2px;'
+                + 'cursor:' + HANDLE_CURSOR[h.name] + ';z-index:9999;';
+            hd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartResize(e, el.id, h); });
+            canvas.appendChild(hd);
+        });
+    } else if (_dsMode === 'rotate') {
+        var rotLocal = { x: 0, y: -el.h/2 - 24 };
+        var rotWorld = _addV(center, _rotV(rotLocal, theta));
+        var rd = document.createElement('div');
+        rd.style.cssText = 'position:absolute;left:' + (rotWorld.x - 6) + 'px;top:' + (rotWorld.y - 6) + 'px;'
+            + 'width:12px;height:12px;background:#ff8a65;border-radius:50%;cursor:grab;z-index:9999;box-shadow:0 0 6px rgba(255,138,101,0.7);';
+        rd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartRotate(e, el.id); });
+        canvas.appendChild(rd);
+    }
 }
 
 /* ── Layer list ── */
@@ -3762,11 +3922,14 @@ function dsRenderLayerList() {
             btn.className = 'ds-layer-item action-button small';
             btn.style.cssText = 'display:flex;align-items:center;gap:5px;width:100%;padding:6px 8px;background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;text-align:left;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
             var dot = document.createElement('span');
-            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (el.type === 'line' ? el.stroke : el.fill) + ';';
+            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + ((el.type === 'line') ? el.stroke : el.fill) + ';';
             var label = document.createElement('span');
             label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
             label.textContent = el.name;
-            btn.appendChild(dot); btn.appendChild(label);
+            var typeBadge = document.createElement('span');
+            typeBadge.style.cssText = 'font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.4);color:#7a8aaa;flex-shrink:0;';
+            typeBadge.textContent = el.type;
+            btn.appendChild(dot); btn.appendChild(label); btn.appendChild(typeBadge);
             btn.onclick = function() { dsSelectShape(el.id); };
             list.appendChild(btn);
         })(_dsShapes[i]);
@@ -3781,12 +3944,19 @@ window.dsSelectShape = function(id) {
     _dsSyncPropsBar();
 };
 
+var DS_CONTENT_LABEL = {
+    text:'Text', link:'Link text', x:'Glyph', button:'Label', checkbox:'Label', toggle:'Label',
+    slider:'Value', spinner:'Options (one per line)', numberpicker:'Value', menu:'Label + items (one per line)',
+    textedit:'Placeholder', progressbar:'Percent (0-100)', map:'Location / query'
+};
+
 function _dsSyncPropsBar() {
     var bar = document.getElementById('ds-props-bar');
     var el = _dsFind(_dsActiveId);
     if (!bar) return;
     if (!el) { bar.style.display = 'none'; return; }
     bar.style.display = 'flex';
+    var meta = DS_TYPES[el.type] || {};
     document.getElementById('ds-p-name').value = el.name;
     document.getElementById('ds-p-x').value = Math.round(el.x);
     document.getElementById('ds-p-y').value = Math.round(el.y);
@@ -3798,12 +3968,22 @@ function _dsSyncPropsBar() {
     document.getElementById('ds-p-strokew').value = el.strokeWidth;
     document.getElementById('ds-p-opacity').value = el.opacity;
     document.getElementById('ds-p-radius').value = el.radius;
-    var radiusWrap = document.getElementById('ds-p-radius-wrap');
-    if (radiusWrap) radiusWrap.style.display = el.type === 'rect' ? '' : 'none';
-    var fillWrap = document.getElementById('ds-p-fill').closest('label');
-    if (fillWrap) fillWrap.style.display = el.type === 'line' ? 'none' : '';
-    var strokeWWrap = document.getElementById('ds-p-strokew').closest('label');
-    if (strokeWWrap) strokeWWrap.style.display = el.type === 'line' ? 'none' : '';
+    document.getElementById('ds-p-content').value = el.content || '';
+    document.getElementById('ds-p-src').value = el.src || '';
+    document.getElementById('ds-p-min').value = el.min;
+    document.getElementById('ds-p-max').value = el.max;
+    document.getElementById('ds-p-checked').checked = !!el.checked;
+
+    var show = function(id, on) { var n = document.getElementById(id); if (n) n.style.display = on ? '' : 'none'; };
+    show('ds-p-radius-wrap', el.type === 'rectangle' || el.type === 'button' || el.type === 'menu' || el.type === 'toggle');
+    show('ds-p-fill-wrap', el.type !== 'line' && el.type !== 'webview' && el.type !== 'doodle' && el.type !== 'image' && el.type !== 'video');
+    show('ds-p-stroke-wrap', ['rectangle','oval','line','button','switch','menu','progressbar','toggle'].indexOf(el.type) > -1);
+    show('ds-p-strokew-wrap', el.type === 'rectangle' || el.type === 'oval');
+    show('ds-p-content-wrap', DS_CONTENT_LABEL.hasOwnProperty(el.type));
+    document.getElementById('ds-p-content-label').textContent = DS_CONTENT_LABEL[el.type] || 'Text';
+    show('ds-p-src-wrap', ['image','video','webview'].indexOf(el.type) > -1);
+    show('ds-p-minmax-wrap', el.type === 'slider' || el.type === 'numberpicker');
+    show('ds-p-checked-wrap', ['checkbox','switch','toggle'].indexOf(el.type) > -1);
 }
 
 window.dsApplyProps = function() {
@@ -3820,23 +4000,34 @@ window.dsApplyProps = function() {
     el.strokeWidth = Math.max(0, parseFloat(document.getElementById('ds-p-strokew').value) || 0);
     el.opacity = parseFloat(document.getElementById('ds-p-opacity').value);
     el.radius = Math.max(0, parseFloat(document.getElementById('ds-p-radius').value) || 0);
+    el.content = document.getElementById('ds-p-content').value;
+    el.src = document.getElementById('ds-p-src').value;
+    el.min = parseFloat(document.getElementById('ds-p-min').value) || 0;
+    el.max = parseFloat(document.getElementById('ds-p-max').value) || 100;
+    el.checked = document.getElementById('ds-p-checked').checked;
     dsRenderCanvas();
     dsRenderLayerList();
 };
 
-/* ── Toolbar actions ── */
-window.dsToggleDraw = function() {
-    _dsDrawMode = !_dsDrawMode;
-    var btn = document.getElementById('ds-draw-toggle');
+/* ── Mode switching (Draw / Move / Resize / Rotate) ── */
+window.dsSetMode = function(mode) {
+    _dsMode = mode;
+    document.querySelectorAll('.ds-mode-btn').forEach(function(b) {
+        var active = b.dataset.mode === mode;
+        b.style.background = active ? 'rgba(255,138,101,0.28)' : '';
+        b.style.borderColor = active ? '#ff8a65' : '';
+        b.style.color = active ? '#ff8a65' : '';
+    });
     var canvas = _dsCanvasEl();
-    if (btn) { btn.style.background = _dsDrawMode ? 'rgba(255,138,101,0.25)' : ''; }
-    if (canvas) canvas.style.cursor = _dsDrawMode ? 'crosshair' : 'default';
+    if (canvas) canvas.style.cursor = mode === 'draw' ? 'crosshair' : (mode === 'rotate' ? 'grab' : (mode === 'move' ? 'move' : 'default'));
+    dsRenderCanvas();
 };
 
+/* ── Toolbar actions ── */
 window.dsNewShapeAtCenter = function() {
     var type = document.getElementById('ds-shape-type').value;
-    var w = type === 'line' ? 160 : 100, h = type === 'line' ? 6 : 100;
-    var el = _dsMakeShape(type, (CANVAS_W - w)/2, (CANVAS_H - h)/2, w, h);
+    var meta = DS_TYPES[type] || DS_TYPES.rectangle;
+    var el = _dsMakeShape(type, (CANVAS_W - meta.w) / 2, (CANVAS_H - meta.h) / 2, meta.w, meta.h);
     _dsShapes.push(el);
     dsSelectShape(el.id);
     dsRenderLayerList();
@@ -3860,7 +4051,7 @@ window.dsDeleteShape = function() {
 };
 
 window.dsClearAll = function() {
-    if (_dsShapes.length && !confirm('Clear all shapes from the canvas?')) return;
+    if (_dsShapes.length && !confirm('Clear all elements from the canvas?')) return;
     _dsShapes = [];
     _dsActiveId = null;
     dsRenderCanvas();
@@ -3879,15 +4070,20 @@ window.dsNudgeZ = function(dir) {
 };
 
 /* ── Pointer interactions: draw / move / resize / rotate ── */
-function _dsStartMove(e, id) {
-    if (_dsDrawMode) return; // in draw mode, clicks on canvas start a new shape instead
+function _dsOnShapePointerDown(e, id) {
+    if (_dsMode === 'draw') return; // in draw mode, canvas-level listener starts a new element instead
     e.stopPropagation();
     dsSelectShape(id);
-    var el = _dsFind(id);
-    var p0 = _dsCanvasPoint(e);
-    _dsDrag = { mode:'move', id:id, startX:el.x, startY:el.y, p0:p0 };
-    window.addEventListener('pointermove', _dsOnPointerMove);
-    window.addEventListener('pointerup', _dsOnPointerUp);
+    if (_dsMode === 'move') {
+        var el = _dsFind(id);
+        var p0 = _dsCanvasPoint(e);
+        _dsDrag = { mode:'move', id:id, startX:el.x, startY:el.y, p0:p0 };
+        window.addEventListener('pointermove', _dsOnPointerMove);
+        window.addEventListener('pointerup', _dsOnPointerUp);
+    } else if (_dsMode === 'rotate') {
+        _dsStartRotate(e, id);
+    }
+    // In 'resize' mode, body clicks just select — the handles do the resizing.
 }
 
 function _dsStartResize(e, id, handle) {
@@ -3947,13 +4143,10 @@ function _dsOnPointerMove(e) {
 function _dsOnPointerUp() {
     if (_dsDrag && _dsDrag.mode === 'draw') {
         var el = _dsFind(_dsDrag.id);
-        if (el && el.w < 5 && el.h < 5) { el.w = el.type === 'line' ? 160 : 80; el.h = el.type === 'line' ? el.h : 80; }
+        var meta = DS_TYPES[_dsDrag.type] || DS_TYPES.rectangle;
+        if (el && el.w < 5 && el.h < 5) { el.w = meta.w; el.h = meta.h; }
         dsSelectShape(_dsDrag.id);
-        _dsDrawMode = false;
-        var btn = document.getElementById('ds-draw-toggle');
-        if (btn) btn.style.background = '';
-        var canvas = _dsCanvasEl();
-        if (canvas) canvas.style.cursor = 'default';
+        dsSetMode('move');
     }
     _dsDrag = null;
     dsRenderLayerList();
@@ -3966,23 +4159,25 @@ function _dsInitCanvasEvents() {
     if (!canvas || canvas._dsInit) return;
     canvas._dsInit = true;
     canvas.addEventListener('pointerdown', function(e) {
-        if (e.target !== canvas) return; // clicks on shapes/handles are handled separately
-        if (!_dsDrawMode) { _dsActiveId = null; dsRenderCanvas(); dsRenderLayerList(); _dsSyncPropsBar(); return; }
+        if (e.target !== canvas) return; // clicks on elements/handles are handled separately
+        if (_dsMode !== 'draw') { _dsActiveId = null; dsRenderCanvas(); dsRenderLayerList(); _dsSyncPropsBar(); return; }
         var type = document.getElementById('ds-shape-type').value;
+        var meta = DS_TYPES[type] || DS_TYPES.rectangle;
         var p0 = _dsCanvasPoint(e);
-        var el = _dsMakeShape(type, p0.x, p0.y, 1, type === 'line' ? 6 : 1);
+        var el = _dsMakeShape(type, p0.x, p0.y, 1, type === 'line' ? meta.h : 1);
         _dsShapes.push(el);
         _dsActiveId = el.id;
         _dsDrag = { mode:'draw', id: el.id, p0: p0, type: type };
         window.addEventListener('pointermove', _dsOnPointerMove);
         window.addEventListener('pointerup', _dsOnPointerUp);
     });
+    dsSetMode('move');
 }
 
 /* ── Export ── */
 function _dsBuildCode() {
     var inner = _dsShapes.map(function(el) {
-        return '  <div class="' + el.name.replace(/\s+/g,'-') + '" style="' + _dsShapeCss(el, true) + '"></div>';
+        return '  <div class="' + el.name.replace(/\s+/g,'-') + '" style="' + _dsWrapperCss(el, true) + '">' + _dsInnerHtml(el, true) + '</div>';
     }).join('\n');
     return '<div class="ds-scene" style="position:relative;width:' + CANVAS_W + 'px;height:' + CANVAS_H + 'px;">\n' + inner + '\n</div>';
 }
@@ -3999,7 +4194,7 @@ window.dsMergeToProject = function() {
     if (!_dsShapes.length) return;
     var code = _dsBuildCode();
     var nodeId = 'designer-scene-' + Date.now().toString(36);
-    var newNode = { id: nodeId, type: 'html', description: '[Designer] Scene (' + _dsShapes.length + ' shapes)', code: code, children: [] };
+    var newNode = { id: nodeId, type: 'html', description: '[Designer] Scene (' + _dsShapes.length + ' elements)', code: code, children: [] };
     var merged = false;
     if (typeof vibeTree !== 'undefined' && typeof refreshAllUI === 'function') {
         if (!vibeTree.children) vibeTree.children = [];
@@ -4040,6 +4235,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 })();
 </script>
+
 
 
 
@@ -7293,4 +7489,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+                                            </html>
