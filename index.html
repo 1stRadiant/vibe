@@ -2374,6 +2374,9 @@
                                     <button class="agt-itab" onclick="agtSwitchTab('workshop',this)" title="Element Workshop — build &amp; merge" style="color:#ffd54f;">
                                         <i class="bi bi-tools"></i> Workshop
                                     </button>
+                                    <button class="agt-itab" onclick="agtSwitchTab('designer',this)" title="Graphic Designer — draw, drag &amp; resize shapes" style="color:#ff8a65;">
+                                        <i class="bi bi-bounding-box-circles"></i> Designer
+                                    </button>
                                     <button class="agt-itab" onclick="agtSwitchTab('jarvis',this)" title="Jarvis Autopilot" style="color:#c678dd;margin-left:auto;">
                                         <i class="bi bi-robot"></i> Jarvis
                                     </button>
@@ -2709,6 +2712,65 @@
                                             <button class="action-button small secondary" onclick="wsCloseAIBar()">Cancel</button>
                                         </div>
                                         <div id="ws-ai-status" style="font-size:11px;color:var(--apui-text-dim);margin-top:5px;display:none;"></div>
+                                    </div>
+
+                                </div>
+
+                                <!-- ══ DESIGNER pane ══ -->
+                                <div id="agt-pane-designer" class="agt-pane" style="flex-direction:column;gap:0;padding:0;">
+
+                                    <!-- Designer toolbar -->
+                                    <div id="ds-toolbar" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.25);flex-shrink:0;flex-wrap:wrap;">
+                                        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#ff8a65;display:flex;align-items:center;gap:5px;"><i class="bi bi-bounding-box-circles"></i> Designer</span>
+                                        <select id="ds-shape-type" style="padding:5px 8px;font-size:12px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:5px;font-family:'Fira Code',monospace;">
+                                            <option value="rect">Rectangle</option>
+                                            <option value="ellipse">Ellipse</option>
+                                            <option value="line">Line / Bar</option>
+                                        </select>
+                                        <button id="ds-draw-toggle" class="action-button small" onclick="dsToggleDraw()" title="Toggle draw mode — click &amp; drag on the canvas to create a shape" style="border-color:#ff8a65;color:#ff8a65;"><i class="bi bi-pencil-square"></i> Draw</button>
+                                        <button class="action-button small" onclick="dsNewShapeAtCenter()" title="Add a default-size shape"><i class="bi bi-plus-circle"></i> New</button>
+                                        <button class="action-button small" onclick="dsDuplicateShape()" title="Duplicate selected shape"><i class="bi bi-copy"></i></button>
+                                        <button class="action-button small" onclick="dsNudgeZ(1)" title="Bring forward"><i class="bi bi-arrow-up"></i></button>
+                                        <button class="action-button small" onclick="dsNudgeZ(-1)" title="Send backward"><i class="bi bi-arrow-down"></i></button>
+                                        <button class="action-button small danger" onclick="dsDeleteShape()" title="Delete selected shape"><i class="bi bi-trash"></i></button>
+                                        <button class="action-button small danger" onclick="dsClearAll()" title="Clear the whole canvas" style="margin-left:auto;">Clear</button>
+                                    </div>
+
+                                    <!-- Properties bar (shown when a shape is selected) -->
+                                    <div id="ds-props-bar" style="display:none;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.18);flex-shrink:0;flex-wrap:wrap;font-size:11px;color:var(--apui-text-dim);">
+                                        <input type="text" id="ds-p-name" placeholder="name" style="width:90px;padding:4px 7px;font-size:11px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:4px;font-family:'Fira Code',monospace;" oninput="dsApplyProps()">
+                                        <label>X <input type="number" id="ds-p-x" style="width:56px;" oninput="dsApplyProps()"></label>
+                                        <label>Y <input type="number" id="ds-p-y" style="width:56px;" oninput="dsApplyProps()"></label>
+                                        <label>W <input type="number" id="ds-p-w" style="width:56px;" oninput="dsApplyProps()"></label>
+                                        <label>H <input type="number" id="ds-p-h" style="width:56px;" oninput="dsApplyProps()"></label>
+                                        <label>Rot° <input type="number" id="ds-p-rot" style="width:52px;" oninput="dsApplyProps()"></label>
+                                        <label id="ds-p-radius-wrap">Radius <input type="number" id="ds-p-radius" style="width:52px;" oninput="dsApplyProps()"></label>
+                                        <label>Fill <input type="color" id="ds-p-fill" oninput="dsApplyProps()"></label>
+                                        <label>Stroke <input type="color" id="ds-p-stroke" oninput="dsApplyProps()"></label>
+                                        <label>Stroke W <input type="number" id="ds-p-strokew" style="width:46px;" oninput="dsApplyProps()"></label>
+                                        <label>Opacity <input type="range" id="ds-p-opacity" min="0" max="1" step="0.05" style="width:70px;" oninput="dsApplyProps()"></label>
+                                    </div>
+
+                                    <!-- Designer body: layer list + canvas -->
+                                    <div style="display:flex;min-height:520px;">
+
+                                        <!-- Left: layer list -->
+                                        <div id="ds-layer-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;">
+                                            <div id="ds-layer-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No shapes yet.<br>Toggle <b style="color:#ff8a65">Draw</b> and drag on the canvas, or click <b style="color:#ff8a65">+ New</b>.</div>
+                                        </div>
+
+                                        <!-- Right: canvas -->
+                                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:rgba(10,14,28,0.5);overflow:auto;padding:14px;">
+                                            <div id="ds-canvas" style="position:relative;width:760px;height:460px;flex-shrink:0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;"></div>
+                                        </div>
+
+                                    </div>
+
+                                    <!-- Export / merge bar -->
+                                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.9);flex-shrink:0;">
+                                        <span style="font-size:11px;color:var(--apui-text-dim);flex:1;">Produces absolute-positioned HTML/CSS.</span>
+                                        <button class="action-button small" onclick="dsCopyCode()" style="border-color:#00ffcc;color:#00ffcc;" title="Copy generated HTML/CSS"><i class="bi bi-clipboard"></i> Copy HTML</button>
+                                        <button class="action-button small" id="ds-merge-btn" onclick="dsMergeToProject()" style="border-color:#98c379;color:#98c379;" title="Merge this scene into the main project"><i class="bi bi-arrow-up-circle"></i> Merge to Project</button>
                                     </div>
 
                                 </div>
@@ -3571,6 +3633,409 @@ document.addEventListener('ws-merge-node', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
     var ed = document.getElementById('ws-code-editor');
     if (ed) ed.disabled = true;
+});
+
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   DESIGNER — Tasker-scene-style graphic canvas: draw, drag, resize
+   shapes and export them as absolute-positioned HTML/CSS.
+   ══════════════════════════════════════════════════════════════ */
+(function() {
+
+var CANVAS_W = 760, CANVAS_H = 460, MIN_SIZE = 8;
+var _dsShapes = [];      // { id, name, type, x,y,w,h, rotation, fill, stroke, strokeWidth, radius, opacity }
+var _dsActiveId = null;
+var _dsDrawMode = false;
+var _dsDrag = null;      // active pointer interaction state
+
+var DS_DEFAULTS = { fill:'#4169e1', stroke:'#87CEEB', strokeWidth:0, radius:6, opacity:1, rotation:0 };
+var DS_HANDLES = [
+    { name:'nw', sx:-1, sy:-1 }, { name:'n', sx:0, sy:-1 }, { name:'ne', sx:1, sy:-1 },
+    { name:'e',  sx:1,  sy:0  },
+    { name:'se', sx:1,  sy:1  }, { name:'s', sx:0, sy:1  }, { name:'sw', sx:-1, sy:1 },
+    { name:'w',  sx:-1, sy:0  }
+];
+var HANDLE_CURSOR = { nw:'nwse-resize', n:'ns-resize', ne:'nesw-resize', e:'ew-resize', se:'nwse-resize', s:'ns-resize', sw:'nesw-resize', w:'ew-resize' };
+
+function _dsGenId() { return 'ds_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+function _dsFind(id) { return _dsShapes.find(function(s){ return s.id === id; }); }
+function _dsCanvasEl() { return document.getElementById('ds-canvas'); }
+
+function _dsCanvasPoint(evt) {
+    var rect = _dsCanvasEl().getBoundingClientRect();
+    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+}
+function _rotV(v, theta) {
+    var c = Math.cos(theta), s = Math.sin(theta);
+    return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
+}
+function _addV(a,b){ return { x:a.x+b.x, y:a.y+b.y }; }
+function _subV(a,b){ return { x:a.x-b.x, y:a.y-b.y }; }
+
+/* ── Shape factory ── */
+function _dsMakeShape(type, x, y, w, h) {
+    var n = _dsShapes.length + 1;
+    return {
+        id: _dsGenId(), name: type + '-' + n, type: type,
+        x: x, y: y, w: w, h: h, rotation: DS_DEFAULTS.rotation,
+        fill: DS_DEFAULTS.fill, stroke: DS_DEFAULTS.stroke,
+        strokeWidth: DS_DEFAULTS.strokeWidth, radius: type === 'ellipse' ? 0 : DS_DEFAULTS.radius,
+        opacity: DS_DEFAULTS.opacity
+    };
+}
+
+/* ── Rendering ── */
+function _dsShapeCss(el, forExport) {
+    var bg, border = '', radius;
+    if (el.type === 'ellipse') { bg = el.fill; radius = '50%'; }
+    else if (el.type === 'line') { bg = el.stroke; radius = (el.h/2) + 'px'; }
+    else { bg = el.fill; radius = el.radius + 'px'; }
+    if (el.type !== 'line' && el.strokeWidth > 0) border = 'border:' + el.strokeWidth + 'px solid ' + el.stroke + ';box-sizing:border-box;';
+    var z = _dsShapes.indexOf(el) + 1;
+    return 'position:absolute;left:' + Math.round(el.x) + 'px;top:' + Math.round(el.y) + 'px;'
+        + 'width:' + Math.round(el.w) + 'px;height:' + Math.round(el.h) + 'px;'
+        + 'background:' + bg + ';border-radius:' + radius + ';' + border
+        + 'opacity:' + el.opacity + ';'
+        + 'transform:rotate(' + Math.round(el.rotation) + 'deg);transform-origin:center center;'
+        + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:move;');
+}
+
+function dsRenderCanvas() {
+    var canvas = _dsCanvasEl();
+    if (!canvas) return;
+    canvas.innerHTML = '';
+    _dsShapes.forEach(function(el) {
+        var node = document.createElement('div');
+        node.className = 'ds-shape';
+        node.dataset.id = el.id;
+        node.style.cssText = _dsShapeCss(el, false);
+        node.addEventListener('pointerdown', function(e) { _dsStartMove(e, el.id); });
+        canvas.appendChild(node);
+        if (el.id === _dsActiveId) _dsRenderHandles(el, canvas);
+    });
+}
+
+function _dsRenderHandles(el, canvas) {
+    var theta = el.rotation * Math.PI / 180;
+    var center = { x: el.x + el.w/2, y: el.y + el.h/2 };
+    // Selection outline (rotates with shape)
+    var outline = document.createElement('div');
+    outline.style.cssText = 'position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;'
+        + 'border:1px dashed #ff8a65;pointer-events:none;transform:rotate(' + el.rotation + 'deg);transform-origin:center center;z-index:9998;';
+    canvas.appendChild(outline);
+    // Resize handles
+    DS_HANDLES.forEach(function(h) {
+        var local = { x: h.sx * el.w/2, y: h.sy * el.h/2 };
+        var world = _addV(center, _rotV(local, theta));
+        var hd = document.createElement('div');
+        hd.style.cssText = 'position:absolute;left:' + (world.x - 5) + 'px;top:' + (world.y - 5) + 'px;'
+            + 'width:10px;height:10px;background:#0a0e18;border:2px solid #ff8a65;border-radius:2px;'
+            + 'cursor:' + HANDLE_CURSOR[h.name] + ';z-index:9999;';
+        hd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartResize(e, el.id, h); });
+        canvas.appendChild(hd);
+    });
+    // Rotate handle
+    var rotLocal = { x: 0, y: -el.h/2 - 24 };
+    var rotWorld = _addV(center, _rotV(rotLocal, theta));
+    var rd = document.createElement('div');
+    rd.style.cssText = 'position:absolute;left:' + (rotWorld.x - 6) + 'px;top:' + (rotWorld.y - 6) + 'px;'
+        + 'width:12px;height:12px;background:#ff8a65;border-radius:50%;cursor:grab;z-index:9999;box-shadow:0 0 6px rgba(255,138,101,0.7);';
+    rd.addEventListener('pointerdown', function(e) { e.stopPropagation(); _dsStartRotate(e, el.id); });
+    canvas.appendChild(rd);
+}
+
+/* ── Layer list ── */
+function dsRenderLayerList() {
+    var list = document.getElementById('ds-layer-list');
+    if (!list) return;
+    var empty = document.getElementById('ds-layer-empty');
+    Array.from(list.querySelectorAll('.ds-layer-item')).forEach(function(n){ n.remove(); });
+    if (_dsShapes.length === 0) { if (empty) empty.style.display = ''; return; }
+    if (empty) empty.style.display = 'none';
+    for (var i = _dsShapes.length - 1; i >= 0; i--) {
+        (function(el) {
+            var isActive = el.id === _dsActiveId;
+            var btn = document.createElement('button');
+            btn.className = 'ds-layer-item action-button small';
+            btn.style.cssText = 'display:flex;align-items:center;gap:5px;width:100%;padding:6px 8px;background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;text-align:left;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
+            var dot = document.createElement('span');
+            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + (el.type === 'line' ? el.stroke : el.fill) + ';';
+            var label = document.createElement('span');
+            label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            label.textContent = el.name;
+            btn.appendChild(dot); btn.appendChild(label);
+            btn.onclick = function() { dsSelectShape(el.id); };
+            list.appendChild(btn);
+        })(_dsShapes[i]);
+    }
+}
+
+/* ── Selection & properties ── */
+window.dsSelectShape = function(id) {
+    _dsActiveId = id;
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+};
+
+function _dsSyncPropsBar() {
+    var bar = document.getElementById('ds-props-bar');
+    var el = _dsFind(_dsActiveId);
+    if (!bar) return;
+    if (!el) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    document.getElementById('ds-p-name').value = el.name;
+    document.getElementById('ds-p-x').value = Math.round(el.x);
+    document.getElementById('ds-p-y').value = Math.round(el.y);
+    document.getElementById('ds-p-w').value = Math.round(el.w);
+    document.getElementById('ds-p-h').value = Math.round(el.h);
+    document.getElementById('ds-p-rot').value = Math.round(el.rotation);
+    document.getElementById('ds-p-fill').value = el.fill;
+    document.getElementById('ds-p-stroke').value = el.stroke;
+    document.getElementById('ds-p-strokew').value = el.strokeWidth;
+    document.getElementById('ds-p-opacity').value = el.opacity;
+    document.getElementById('ds-p-radius').value = el.radius;
+    var radiusWrap = document.getElementById('ds-p-radius-wrap');
+    if (radiusWrap) radiusWrap.style.display = el.type === 'rect' ? '' : 'none';
+    var fillWrap = document.getElementById('ds-p-fill').closest('label');
+    if (fillWrap) fillWrap.style.display = el.type === 'line' ? 'none' : '';
+    var strokeWWrap = document.getElementById('ds-p-strokew').closest('label');
+    if (strokeWWrap) strokeWWrap.style.display = el.type === 'line' ? 'none' : '';
+}
+
+window.dsApplyProps = function() {
+    var el = _dsFind(_dsActiveId);
+    if (!el) return;
+    el.name = document.getElementById('ds-p-name').value || el.name;
+    el.x = parseFloat(document.getElementById('ds-p-x').value) || 0;
+    el.y = parseFloat(document.getElementById('ds-p-y').value) || 0;
+    el.w = Math.max(MIN_SIZE, parseFloat(document.getElementById('ds-p-w').value) || MIN_SIZE);
+    el.h = Math.max(MIN_SIZE, parseFloat(document.getElementById('ds-p-h').value) || MIN_SIZE);
+    el.rotation = parseFloat(document.getElementById('ds-p-rot').value) || 0;
+    el.fill = document.getElementById('ds-p-fill').value;
+    el.stroke = document.getElementById('ds-p-stroke').value;
+    el.strokeWidth = Math.max(0, parseFloat(document.getElementById('ds-p-strokew').value) || 0);
+    el.opacity = parseFloat(document.getElementById('ds-p-opacity').value);
+    el.radius = Math.max(0, parseFloat(document.getElementById('ds-p-radius').value) || 0);
+    dsRenderCanvas();
+    dsRenderLayerList();
+};
+
+/* ── Toolbar actions ── */
+window.dsToggleDraw = function() {
+    _dsDrawMode = !_dsDrawMode;
+    var btn = document.getElementById('ds-draw-toggle');
+    var canvas = _dsCanvasEl();
+    if (btn) { btn.style.background = _dsDrawMode ? 'rgba(255,138,101,0.25)' : ''; }
+    if (canvas) canvas.style.cursor = _dsDrawMode ? 'crosshair' : 'default';
+};
+
+window.dsNewShapeAtCenter = function() {
+    var type = document.getElementById('ds-shape-type').value;
+    var w = type === 'line' ? 160 : 100, h = type === 'line' ? 6 : 100;
+    var el = _dsMakeShape(type, (CANVAS_W - w)/2, (CANVAS_H - h)/2, w, h);
+    _dsShapes.push(el);
+    dsSelectShape(el.id);
+    dsRenderLayerList();
+};
+
+window.dsDuplicateShape = function() {
+    var src = _dsFind(_dsActiveId);
+    if (!src) return;
+    var copy = Object.assign({}, src, { id: _dsGenId(), name: src.name + '-copy', x: src.x + 16, y: src.y + 16 });
+    _dsShapes.push(copy);
+    dsSelectShape(copy.id);
+};
+
+window.dsDeleteShape = function() {
+    if (!_dsActiveId) return;
+    _dsShapes = _dsShapes.filter(function(s){ return s.id !== _dsActiveId; });
+    _dsActiveId = null;
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+};
+
+window.dsClearAll = function() {
+    if (_dsShapes.length && !confirm('Clear all shapes from the canvas?')) return;
+    _dsShapes = [];
+    _dsActiveId = null;
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+};
+
+window.dsNudgeZ = function(dir) {
+    var idx = _dsShapes.findIndex(function(s){ return s.id === _dsActiveId; });
+    if (idx < 0) return;
+    var swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= _dsShapes.length) return;
+    var tmp = _dsShapes[idx]; _dsShapes[idx] = _dsShapes[swapIdx]; _dsShapes[swapIdx] = tmp;
+    dsRenderCanvas();
+    dsRenderLayerList();
+};
+
+/* ── Pointer interactions: draw / move / resize / rotate ── */
+function _dsStartMove(e, id) {
+    if (_dsDrawMode) return; // in draw mode, clicks on canvas start a new shape instead
+    e.stopPropagation();
+    dsSelectShape(id);
+    var el = _dsFind(id);
+    var p0 = _dsCanvasPoint(e);
+    _dsDrag = { mode:'move', id:id, startX:el.x, startY:el.y, p0:p0 };
+    window.addEventListener('pointermove', _dsOnPointerMove);
+    window.addEventListener('pointerup', _dsOnPointerUp);
+}
+
+function _dsStartResize(e, id, handle) {
+    var el = _dsFind(id);
+    if (!el) return;
+    var theta = el.rotation * Math.PI / 180;
+    var center0 = { x: el.x + el.w/2, y: el.y + el.h/2 };
+    var anchorLocal0 = { x: handle.sx ? -handle.sx * el.w/2 : 0, y: handle.sy ? -handle.sy * el.h/2 : 0 };
+    var anchorWorld = _addV(center0, _rotV(anchorLocal0, theta));
+    _dsDrag = { mode:'resize', id:id, handle:handle, theta:theta, anchorWorld:anchorWorld };
+    window.addEventListener('pointermove', _dsOnPointerMove);
+    window.addEventListener('pointerup', _dsOnPointerUp);
+}
+
+function _dsStartRotate(e, id) {
+    var el = _dsFind(id);
+    if (!el) return;
+    _dsDrag = { mode:'rotate', id:id };
+    window.addEventListener('pointermove', _dsOnPointerMove);
+    window.addEventListener('pointerup', _dsOnPointerUp);
+}
+
+function _dsOnPointerMove(e) {
+    if (!_dsDrag) return;
+    var mouse = _dsCanvasPoint(e);
+    var el = _dsFind(_dsDrag.id);
+
+    if (_dsDrag.mode === 'draw') {
+        var w = Math.abs(mouse.x - _dsDrag.p0.x), h = Math.abs(mouse.y - _dsDrag.p0.y);
+        el.x = Math.min(mouse.x, _dsDrag.p0.x);
+        el.y = Math.min(mouse.y, _dsDrag.p0.y);
+        el.w = Math.max(1, w);
+        el.h = el.type === 'line' ? el.h : Math.max(1, h);
+    } else if (_dsDrag.mode === 'move' && el) {
+        el.x = _dsDrag.startX + (mouse.x - _dsDrag.p0.x);
+        el.y = _dsDrag.startY + (mouse.y - _dsDrag.p0.y);
+    } else if (_dsDrag.mode === 'resize' && el) {
+        var delta = _subV(mouse, _dsDrag.anchorWorld);
+        var localDelta = _rotV(delta, -_dsDrag.theta);
+        var sx = _dsDrag.handle.sx, sy = _dsDrag.handle.sy;
+        var w2 = sx ? Math.max(MIN_SIZE, sx * localDelta.x) : el.w;
+        var h2 = sy ? Math.max(MIN_SIZE, sy * localDelta.y) : el.h;
+        var anchorLocalNew = { x: sx ? -sx * w2/2 : 0, y: sy ? -sy * h2/2 : 0 };
+        var centerNew = _subV(_dsDrag.anchorWorld, _rotV(anchorLocalNew, _dsDrag.theta));
+        el.w = w2; el.h = h2;
+        el.x = centerNew.x - w2/2;
+        el.y = centerNew.y - h2/2;
+    } else if (_dsDrag.mode === 'rotate' && el) {
+        var center = { x: el.x + el.w/2, y: el.y + el.h/2 };
+        var ang = Math.atan2(mouse.y - center.y, mouse.x - center.x) * 180 / Math.PI + 90;
+        el.rotation = Math.round(ang);
+    }
+    dsRenderCanvas();
+    if (_dsDrag.mode !== 'draw') _dsSyncPropsBar();
+}
+
+function _dsOnPointerUp() {
+    if (_dsDrag && _dsDrag.mode === 'draw') {
+        var el = _dsFind(_dsDrag.id);
+        if (el && el.w < 5 && el.h < 5) { el.w = el.type === 'line' ? 160 : 80; el.h = el.type === 'line' ? el.h : 80; }
+        dsSelectShape(_dsDrag.id);
+        _dsDrawMode = false;
+        var btn = document.getElementById('ds-draw-toggle');
+        if (btn) btn.style.background = '';
+        var canvas = _dsCanvasEl();
+        if (canvas) canvas.style.cursor = 'default';
+    }
+    _dsDrag = null;
+    dsRenderLayerList();
+    window.removeEventListener('pointermove', _dsOnPointerMove);
+    window.removeEventListener('pointerup', _dsOnPointerUp);
+}
+
+function _dsInitCanvasEvents() {
+    var canvas = _dsCanvasEl();
+    if (!canvas || canvas._dsInit) return;
+    canvas._dsInit = true;
+    canvas.addEventListener('pointerdown', function(e) {
+        if (e.target !== canvas) return; // clicks on shapes/handles are handled separately
+        if (!_dsDrawMode) { _dsActiveId = null; dsRenderCanvas(); dsRenderLayerList(); _dsSyncPropsBar(); return; }
+        var type = document.getElementById('ds-shape-type').value;
+        var p0 = _dsCanvasPoint(e);
+        var el = _dsMakeShape(type, p0.x, p0.y, 1, type === 'line' ? 6 : 1);
+        _dsShapes.push(el);
+        _dsActiveId = el.id;
+        _dsDrag = { mode:'draw', id: el.id, p0: p0, type: type };
+        window.addEventListener('pointermove', _dsOnPointerMove);
+        window.addEventListener('pointerup', _dsOnPointerUp);
+    });
+}
+
+/* ── Export ── */
+function _dsBuildCode() {
+    var inner = _dsShapes.map(function(el) {
+        return '  <div class="' + el.name.replace(/\s+/g,'-') + '" style="' + _dsShapeCss(el, true) + '"></div>';
+    }).join('\n');
+    return '<div class="ds-scene" style="position:relative;width:' + CANVAS_W + 'px;height:' + CANVAS_H + 'px;">\n' + inner + '\n</div>';
+}
+
+window.dsCopyCode = function() {
+    var code = _dsBuildCode();
+    var btn = document.querySelector('[onclick="dsCopyCode()"]');
+    var done = function() { if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<i class="bi bi-check2"></i> Copied!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(code).then(done); }
+    else { window.prompt('Copy the HTML/CSS below:', code); }
+};
+
+window.dsMergeToProject = function() {
+    if (!_dsShapes.length) return;
+    var code = _dsBuildCode();
+    var nodeId = 'designer-scene-' + Date.now().toString(36);
+    var newNode = { id: nodeId, type: 'html', description: '[Designer] Scene (' + _dsShapes.length + ' shapes)', code: code, children: [] };
+    var merged = false;
+    if (typeof vibeTree !== 'undefined' && typeof refreshAllUI === 'function') {
+        if (!vibeTree.children) vibeTree.children = [];
+        if (typeof recordHistory === 'function') recordHistory('Designer merge: ' + nodeId);
+        vibeTree.children.push(newNode);
+        if (typeof autoSaveProject === 'function') autoSaveProject();
+        refreshAllUI();
+        merged = true;
+    }
+    if (!merged) { document.dispatchEvent(new CustomEvent('ws-merge-node', { detail: { newNode: newNode } })); }
+    var mergeBtn = document.getElementById('ds-merge-btn');
+    if (mergeBtn) {
+        var orig = mergeBtn.innerHTML;
+        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Merged!';
+        mergeBtn.disabled = true;
+        setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 2200);
+    }
+    setTimeout(function() {
+        if (typeof switchToTab === 'function') { switchToTab('editor'); }
+        else { document.querySelectorAll('.tab-button').forEach(function(b){ if (b.dataset.tab === 'editor') b.click(); }); }
+    }, 600);
+};
+
+/* ── Keyboard delete when Designer tab is focused ── */
+document.addEventListener('keydown', function(e) {
+    var pane = document.getElementById('agt-pane-designer');
+    if (!pane || !pane.classList.contains('agt-pane-active')) return;
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && _dsActiveId) { e.preventDefault(); dsDeleteShape(); }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    _dsInitCanvasEvents();
+    dsRenderCanvas();
+    dsRenderLayerList();
 });
 
 })();
