@@ -2797,9 +2797,15 @@
                                     <!-- Designer body: layer list + canvas -->
                                     <div style="display:flex;min-height:520px;">
 
-                                        <!-- Left: layer list -->
-                                        <div id="ds-layer-list" style="width:150px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);padding:6px 4px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;">
-                                            <div id="ds-layer-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No elements yet.<br>Pick a type, switch to <b style="color:#ff8a65">Draw</b> mode and drag on the canvas, or click <b style="color:#ff8a65">+ New</b>.</div>
+                                        <!-- Left: collapsible layer panel (collapsed by default) -->
+                                        <div id="ds-layer-panel" style="width:28px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);display:flex;flex-direction:column;transition:width .15s;overflow:hidden;">
+                                            <button id="ds-layer-toggle" onclick="dsToggleLayerPanel()" title="Show/hide layers" style="background:transparent;border:none;color:#ff8a65;padding:8px 0;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;border-bottom:1px solid var(--apui-border);">
+                                                <i class="bi bi-chevron-right" id="ds-layer-toggle-icon"></i>
+                                                <span id="ds-layer-toggle-label" style="display:none;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Layers</span>
+                                            </button>
+                                            <div id="ds-layer-list" style="flex:1;padding:6px 4px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;">
+                                                <div id="ds-layer-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:12px 4px;line-height:1.6;">No elements yet.<br>Pick a type, switch to <b style="color:#ff8a65">Draw</b> mode and drag on the canvas, or click <b style="color:#ff8a65">+ New</b>.</div>
+                                            </div>
                                         </div>
 
                                         <!-- Right: canvas -->
@@ -3918,11 +3924,28 @@ function dsRenderLayerList() {
     if (_dsShapes.length === 0) { if (empty) empty.style.display = ''; return; }
     if (empty) empty.style.display = 'none';
     for (var i = _dsShapes.length - 1; i >= 0; i--) {
-        (function(el) {
+        (function(el, idx) {
             var isActive = el.id === _dsActiveId;
-            var btn = document.createElement('button');
-            btn.className = 'ds-layer-item action-button small';
-            btn.style.cssText = 'display:flex;align-items:center;gap:5px;width:100%;padding:6px 8px;background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;text-align:left;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
+            var row = document.createElement('div');
+            row.className = 'ds-layer-item';
+            row.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;padding:5px 6px;background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
+
+            var arrows = document.createElement('span');
+            arrows.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;line-height:0;';
+            var upBtn = document.createElement('button');
+            upBtn.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
+            upBtn.title = 'Move up (bring forward)';
+            upBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (idx === _dsShapes.length - 1 ? '0.25' : '0.8') + ';';
+            upBtn.disabled = idx === _dsShapes.length - 1;
+            upBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(1, el.id); };
+            var downBtn = document.createElement('button');
+            downBtn.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
+            downBtn.title = 'Move down (send backward)';
+            downBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (idx === 0 ? '0.25' : '0.8') + ';';
+            downBtn.disabled = idx === 0;
+            downBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(-1, el.id); };
+            arrows.appendChild(upBtn); arrows.appendChild(downBtn);
+
             var dot = document.createElement('span');
             dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + ((el.type === 'line') ? el.stroke : el.fill) + ';';
             var label = document.createElement('span');
@@ -3931,12 +3954,24 @@ function dsRenderLayerList() {
             var typeBadge = document.createElement('span');
             typeBadge.style.cssText = 'font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.4);color:#7a8aaa;flex-shrink:0;';
             typeBadge.textContent = el.type;
-            btn.appendChild(dot); btn.appendChild(label); btn.appendChild(typeBadge);
-            btn.onclick = function() { dsSelectShape(el.id); };
-            list.appendChild(btn);
-        })(_dsShapes[i]);
+            row.appendChild(arrows); row.appendChild(dot); row.appendChild(label); row.appendChild(typeBadge);
+            row.onclick = function() { dsSelectShape(el.id); };
+            list.appendChild(row);
+        })(_dsShapes[i], i);
     }
 }
+
+/* ── Collapsible layer panel (collapsed by default) ── */
+var _dsLayerPanelOpen = false;
+window.dsToggleLayerPanel = function() {
+    _dsLayerPanelOpen = !_dsLayerPanelOpen;
+    var panel = document.getElementById('ds-layer-panel');
+    var icon = document.getElementById('ds-layer-toggle-icon');
+    var label = document.getElementById('ds-layer-toggle-label');
+    if (panel) panel.style.width = _dsLayerPanelOpen ? '190px' : '28px';
+    if (icon) icon.className = 'bi ' + (_dsLayerPanelOpen ? 'bi-chevron-left' : 'bi-chevron-right');
+    if (label) label.style.display = _dsLayerPanelOpen ? '' : 'none';
+};
 
 /* ── Selection & properties ── */
 window.dsSelectShape = function(id) {
@@ -4066,8 +4101,9 @@ window.dsClearAll = function() {
     _dsSyncToProject();
 };
 
-window.dsNudgeZ = function(dir) {
-    var idx = _dsShapes.findIndex(function(s){ return s.id === _dsActiveId; });
+window.dsNudgeZ = function(dir, id) {
+    var targetId = id || _dsActiveId;
+    var idx = _dsShapes.findIndex(function(s){ return s.id === targetId; });
     if (idx < 0) return;
     var swapIdx = idx + dir;
     if (swapIdx < 0 || swapIdx >= _dsShapes.length) return;
@@ -4279,7 +4315,36 @@ function _dsLoadFromProject() {
     }
     if (data && Array.isArray(data) && data.length) {
         _dsShapes = data;
+        _dsActiveId = null;
         _dsUpdateSyncStatus('✓ restored from project', '#87CEEB');
+    } else {
+        _dsShapes = [];
+        _dsActiveId = null;
+    }
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+}
+
+/* Project loading (initial restoreSession, "Load Project", GitHub load, etc.)
+   happens asynchronously and can finish well after this script first runs,
+   and can also happen again later when the user switches projects. Rather
+   than hook every individual load path in app3.js, poll the exposed
+   currentProjectId/vibeTree identity and reload the Designer whenever it
+   changes — cheap, and catches every load path generically. */
+var _dsLastProjectKey = null;
+function _dsProjectKey() {
+    try {
+        return (typeof currentProjectId !== 'undefined' && currentProjectId) ? String(currentProjectId) : '(none)';
+    } catch (e) { return null; }
+}
+function _dsCheckProjectChange() {
+    var key = _dsProjectKey();
+    if (key === null) return;
+    if (key !== _dsLastProjectKey) {
+        var firstCheck = _dsLastProjectKey === null;
+        _dsLastProjectKey = key;
+        if (!firstCheck) _dsLoadFromProject();
     }
 }
 
@@ -4297,6 +4362,8 @@ document.addEventListener('DOMContentLoaded', function() {
     _dsInitCanvasEvents();
     dsRenderCanvas();
     dsRenderLayerList();
+    _dsLastProjectKey = _dsProjectKey();
+    setInterval(_dsCheckProjectChange, 1000);
 });
 
 })();
@@ -7555,4 +7622,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-        </html>
+    </html>
