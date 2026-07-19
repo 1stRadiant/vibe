@@ -2716,6 +2716,38 @@
 
                                 </div>
 
+                                <!-- ══ DESIGNER pane styles ══ -->
+                                <style>
+                                    .ds-body { display:flex; min-height:520px; }
+                                    .ds-canvas-area { flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; background:rgba(10,14,28,0.5); overflow:auto; padding:14px; }
+                                    .ds-canvas-wrapper { position:relative; flex-shrink:0; overflow:hidden; }
+                                    .ds-props-sidebar { width:280px; flex-shrink:0; border-left:1px solid var(--apui-border); background:rgba(5,8,18,0.9); overflow-y:auto; padding:8px; max-height:640px; }
+                                    .ds-prop-section { margin-bottom:8px; border:1px solid rgba(65,105,225,0.2); border-radius:6px; overflow:hidden; }
+                                    .ds-prop-section > summary { cursor:pointer; padding:7px 9px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#ff8a65; background:rgba(255,138,101,0.08); list-style:none; display:flex; align-items:center; gap:6px; }
+                                    .ds-prop-section > summary::-webkit-details-marker { display:none; }
+                                    .ds-prop-section > summary::before { content:'▸'; font-size:9px; transition:transform .15s; }
+                                    .ds-prop-section[open] > summary::before { transform:rotate(90deg); }
+                                    .ds-prop-row { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:5px 9px; font-size:11px; color:var(--apui-text-dim); }
+                                    .ds-prop-row > span:first-child { flex-shrink:0; }
+                                    .ds-prop-row input[type=text], .ds-prop-row input[type=number], .ds-prop-row select, .ds-prop-row textarea {
+                                        width:120px; background:rgba(0,0,0,0.45); border:1px solid rgba(65,105,225,0.3); color:var(--apui-text);
+                                        border-radius:4px; padding:3px 6px; font-family:'Fira Code',monospace; font-size:11px; box-sizing:border-box;
+                                    }
+                                    .ds-prop-row input[type=range] { width:120px; }
+                                    .ds-prop-row input[type=color] { width:34px; height:24px; padding:0; border:1px solid rgba(65,105,225,0.3); background:none; border-radius:4px; }
+                                    .ds-prop-row.two input[type=number] { width:52px; }
+                                    #ds-ai-prompt { width:100%; box-sizing:border-box; min-height:44px; resize:vertical; }
+                                    #ds-ai-apply-btn { width:100%; justify-content:center; margin-top:6px; }
+
+                                    @media (max-width: 880px) {
+                                        .ds-body { flex-direction:column; }
+                                        #ds-layer-panel { width:100% !important; max-height:130px; order:2; border-right:none !important; border-top:1px solid var(--apui-border); border-bottom:1px solid var(--apui-border); }
+                                        .ds-canvas-area { order:1; padding:10px; }
+                                        .ds-props-sidebar { width:100%; max-height:none; border-left:none; border-top:1px solid var(--apui-border); order:3; }
+                                        #ds-toolbar, #ds-toolbar * { font-size:11px; }
+                                    }
+                                </style>
+
                                 <!-- ══ DESIGNER pane ══ -->
                                 <div id="agt-pane-designer" class="agt-pane" style="flex-direction:column;gap:0;padding:0;">
 
@@ -2766,36 +2798,12 @@
 
                                         <button class="action-button small" onclick="dsNewShapeAtCenter()" title="Add a default-size element"><i class="bi bi-plus-circle"></i> New</button>
                                         <button class="action-button small" onclick="dsDuplicateShape()" title="Duplicate selected element"><i class="bi bi-copy"></i></button>
-                                        <button class="action-button small" onclick="dsNudgeZ(1)" title="Bring forward"><i class="bi bi-arrow-up"></i></button>
-                                        <button class="action-button small" onclick="dsNudgeZ(-1)" title="Send backward"><i class="bi bi-arrow-down"></i></button>
                                         <button class="action-button small danger" onclick="dsDeleteShape()" title="Delete selected element"><i class="bi bi-trash"></i></button>
                                         <button class="action-button small danger" onclick="dsClearAll()" title="Clear the whole canvas" style="margin-left:auto;">Clear</button>
                                     </div>
 
-                                    <!-- Properties bar (shown when an element is selected) -->
-                                    <div id="ds-props-bar" style="display:none;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--apui-border);background:rgba(0,0,0,0.18);flex-shrink:0;flex-wrap:wrap;font-size:11px;color:var(--apui-text-dim);">
-                                        <input type="text" id="ds-p-name" placeholder="name" style="width:90px;padding:4px 7px;font-size:11px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:4px;font-family:'Fira Code',monospace;" oninput="dsApplyProps()">
-                                        <label>X <input type="number" id="ds-p-x" style="width:56px;" oninput="dsApplyProps()"></label>
-                                        <label>Y <input type="number" id="ds-p-y" style="width:56px;" oninput="dsApplyProps()"></label>
-                                        <label>W <input type="number" id="ds-p-w" style="width:56px;" oninput="dsApplyProps()"></label>
-                                        <label>H <input type="number" id="ds-p-h" style="width:56px;" oninput="dsApplyProps()"></label>
-                                        <label>Rot° <input type="number" id="ds-p-rot" style="width:52px;" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-radius-wrap">Radius <input type="number" id="ds-p-radius" style="width:52px;" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-fill-wrap">Fill <input type="color" id="ds-p-fill" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-stroke-wrap">Stroke <input type="color" id="ds-p-stroke" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-strokew-wrap">Stroke W <input type="number" id="ds-p-strokew" style="width:46px;" oninput="dsApplyProps()"></label>
-                                        <label>Opacity <input type="range" id="ds-p-opacity" min="0" max="1" step="0.05" style="width:70px;" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-content-wrap" style="display:flex;align-items:center;gap:4px;">
-                                            <span id="ds-p-content-label">Text</span>
-                                            <textarea id="ds-p-content" rows="1" style="width:130px;resize:vertical;font-size:11px;padding:4px 6px;background:rgba(0,0,0,0.45);border:1px solid rgba(65,105,225,0.3);color:var(--apui-text);border-radius:4px;font-family:'Fira Code',monospace;" oninput="dsApplyProps()"></textarea>
-                                        </label>
-                                        <label id="ds-p-src-wrap">URL <input type="text" id="ds-p-src" placeholder="https://…" style="width:140px;" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-minmax-wrap">Min <input type="number" id="ds-p-min" style="width:48px;" oninput="dsApplyProps()"> Max <input type="number" id="ds-p-max" style="width:48px;" oninput="dsApplyProps()"></label>
-                                        <label id="ds-p-checked-wrap">On <input type="checkbox" id="ds-p-checked" onchange="dsApplyProps()"></label>
-                                    </div>
-
-                                    <!-- Designer body: layer list + canvas -->
-                                    <div style="display:flex;min-height:520px;">
+                                    <!-- Designer body: layer list + canvas + CSS sidebar -->
+                                    <div class="ds-body">
 
                                         <!-- Left: collapsible layer panel (collapsed by default) -->
                                         <div id="ds-layer-panel" style="width:28px;flex-shrink:0;border-right:1px solid var(--apui-border);background:rgba(5,8,18,0.85);display:flex;flex-direction:column;transition:width .15s;overflow:hidden;">
@@ -2808,15 +2816,111 @@
                                             </div>
                                         </div>
 
-                                        <!-- Right: canvas -->
-                                        <div style="flex:1;min-width:0;display:flex;flex-direction:column;background:rgba(10,14,28,0.5);overflow:auto;padding:14px;">
-                                            <div id="ds-canvas" style="position:relative;width:760px;height:460px;flex-shrink:0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
+                                        <!-- Middle: canvas -->
+                                        <div class="ds-canvas-area">
+                                            <div id="ds-canvas-wrapper" class="ds-canvas-wrapper">
+                                                <div id="ds-canvas" style="position:relative;width:760px;height:460px;transform-origin:0 0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Right: full CSS GUI editor sidebar -->
+                                        <div id="ds-props-sidebar" class="ds-props-sidebar">
+                                            <div id="ds-props-empty" style="color:var(--apui-text-dim);font-size:11px;text-align:center;padding:20px 8px;line-height:1.6;">Select an element on the canvas to edit its style here.</div>
+
+                                            <div id="ds-props-fields" style="display:none;">
+
+                                                <details class="ds-prop-section" open>
+                                                    <summary><i class="bi bi-stars"></i> AI Style Assistant</summary>
+                                                    <div style="padding:8px 9px;">
+                                                        <textarea id="ds-ai-prompt" rows="2" placeholder="e.g. make this a soft glassmorphism card with a subtle shadow, rotated slightly"></textarea>
+                                                        <button id="ds-ai-apply-btn" class="action-button small" onclick="dsApplyAI()" style="border-color:#ff8a65;color:#ff8a65;display:flex;align-items:center;gap:5px;"><i class="bi bi-magic"></i> Apply with AI</button>
+                                                        <div id="ds-ai-status" style="font-size:10px;color:var(--apui-text-dim);margin-top:5px;min-height:14px;"></div>
+                                                    </div>
+                                                </details>
+
+                                                <details class="ds-prop-section" open>
+                                                    <summary><i class="bi bi-tag"></i> Name</summary>
+                                                    <div class="ds-prop-row"><input type="text" id="ds-p-name" placeholder="name" style="width:100%;" oninput="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section" open>
+                                                    <summary><i class="bi bi-arrows-move"></i> Transform</summary>
+                                                    <div class="ds-prop-row two"><span>X / Y</span><span><input type="number" id="ds-p-x" oninput="dsApplyProps()"> <input type="number" id="ds-p-y" oninput="dsApplyProps()"></span></div>
+                                                    <div class="ds-prop-row two"><span>W / H</span><span><input type="number" id="ds-p-w" oninput="dsApplyProps()"> <input type="number" id="ds-p-h" oninput="dsApplyProps()"></span></div>
+                                                    <div class="ds-prop-row"><span>Rotation °</span><input type="number" id="ds-p-rot" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row two"><span>Scale X / Y</span><span><input type="number" id="ds-p-scalex" step="0.05" oninput="dsApplyProps()"> <input type="number" id="ds-p-scaley" step="0.05" oninput="dsApplyProps()"></span></div>
+                                                </details>
+
+                                                <details class="ds-prop-section" open>
+                                                    <summary><i class="bi bi-palette"></i> Appearance</summary>
+                                                    <div class="ds-prop-row" id="ds-p-fill-wrap"><span>Fill</span><input type="color" id="ds-p-fill" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row" id="ds-p-stroke-wrap"><span>Stroke</span><input type="color" id="ds-p-stroke" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row" id="ds-p-strokew-wrap"><span>Stroke width</span><input type="number" id="ds-p-strokew" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row" id="ds-p-radius-wrap"><span>Corner radius</span><input type="number" id="ds-p-radius" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row"><span>Opacity</span><input type="range" id="ds-p-opacity" min="0" max="1" step="0.05" oninput="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section">
+                                                    <summary><i class="bi bi-circle-half"></i> Shadow</summary>
+                                                    <div class="ds-prop-row"><span>Enabled</span><input type="checkbox" id="ds-p-shadow-on" onchange="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row two"><span>Offset X / Y</span><span><input type="number" id="ds-p-shadow-x" oninput="dsApplyProps()"> <input type="number" id="ds-p-shadow-y" oninput="dsApplyProps()"></span></div>
+                                                    <div class="ds-prop-row two"><span>Blur / Spread</span><span><input type="number" id="ds-p-shadow-blur" oninput="dsApplyProps()"> <input type="number" id="ds-p-shadow-spread" oninput="dsApplyProps()"></span></div>
+                                                    <div class="ds-prop-row"><span>Color</span><input type="color" id="ds-p-shadow-color" oninput="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section">
+                                                    <summary><i class="bi bi-droplet"></i> Filters</summary>
+                                                    <div class="ds-prop-row"><span>Blur (px)</span><input type="number" id="ds-p-filter-blur" min="0" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row"><span>Brightness %</span><input type="number" id="ds-p-filter-bright" min="0" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row"><span>Saturate %</span><input type="number" id="ds-p-filter-sat" min="0" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row"><span>Grayscale %</span><input type="number" id="ds-p-filter-gray" min="0" max="100" oninput="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section" id="ds-p-typography-section">
+                                                    <summary><i class="bi bi-type"></i> Typography</summary>
+                                                    <div class="ds-prop-row"><span>Font size</span><input type="number" id="ds-p-font-size" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row"><span>Font weight</span>
+                                                        <select id="ds-p-font-weight" onchange="dsApplyProps()">
+                                                            <option value="300">Light</option><option value="400">Regular</option>
+                                                            <option value="500">Medium</option><option value="600">Semibold</option>
+                                                            <option value="700">Bold</option><option value="800">Extrabold</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="ds-prop-row"><span>Align</span>
+                                                        <select id="ds-p-text-align" onchange="dsApplyProps()">
+                                                            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="ds-prop-row"><span>Letter spacing</span><input type="number" id="ds-p-letter-spacing" step="0.1" oninput="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section" id="ds-p-content-section" open>
+                                                    <summary><i class="bi bi-card-text"></i> Content</summary>
+                                                    <div class="ds-prop-row" id="ds-p-content-wrap"><span id="ds-p-content-label">Text</span></div>
+                                                    <div style="padding:0 9px 8px;" id="ds-p-content-wrap-inner"><textarea id="ds-p-content" rows="2" style="width:100%;box-sizing:border-box;" oninput="dsApplyProps()"></textarea></div>
+                                                    <div class="ds-prop-row" id="ds-p-src-wrap"><span>URL</span><input type="text" id="ds-p-src" placeholder="https://…" style="width:150px;" oninput="dsApplyProps()"></div>
+                                                    <div class="ds-prop-row two" id="ds-p-minmax-wrap"><span>Min / Max</span><span><input type="number" id="ds-p-min" oninput="dsApplyProps()"> <input type="number" id="ds-p-max" oninput="dsApplyProps()"></span></div>
+                                                    <div class="ds-prop-row" id="ds-p-checked-wrap"><span>On</span><input type="checkbox" id="ds-p-checked" onchange="dsApplyProps()"></div>
+                                                </details>
+
+                                                <details class="ds-prop-section">
+                                                    <summary><i class="bi bi-layers"></i> Order</summary>
+                                                    <div class="ds-prop-row">
+                                                        <span>Stacking</span>
+                                                        <span>
+                                                            <button class="action-button small" onclick="dsNudgeZ(1)" title="Bring forward"><i class="bi bi-arrow-up"></i></button>
+                                                            <button class="action-button small" onclick="dsNudgeZ(-1)" title="Send backward"><i class="bi bi-arrow-down"></i></button>
+                                                        </span>
+                                                    </div>
+                                                </details>
+
+                                            </div>
                                         </div>
 
                                     </div>
 
                                     <!-- Export / sync bar -->
-                                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.9);flex-shrink:0;">
+                                    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--apui-border);background:rgba(10,14,28,0.9);flex-shrink:0;flex-wrap:wrap;">
                                         <span id="ds-sync-status" style="font-size:11px;color:var(--apui-text-dim);flex:1;">Not synced yet — edits will sync to the project automatically.</span>
                                         <button class="action-button small" onclick="dsCopyCode()" style="border-color:#00ffcc;color:#00ffcc;" title="Copy generated HTML/CSS"><i class="bi bi-clipboard"></i> Copy HTML</button>
                                         <button class="action-button small" id="ds-merge-btn" onclick="dsForceSync()" style="border-color:#98c379;color:#98c379;" title="Force an immediate sync to the project"><i class="bi bi-arrow-repeat"></i> Sync Now</button>
@@ -3741,9 +3845,30 @@ function _dsFind(id) { return _dsShapes.find(function(s){ return s.id === id; })
 function _dsCanvasEl() { return document.getElementById('ds-canvas'); }
 function _dsEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+/* ── Responsive canvas scaling — keeps the fixed 760×460 design surface
+   fully visible (no horizontal scroll/clipping) on any screen size,
+   including mobile, by visually scaling it down while keeping all
+   stored coordinates in the real, unscaled 760×460 space. ── */
+var _dsCanvasScale = 1;
+function _dsUpdateCanvasScale() {
+    var wrapper = document.getElementById('ds-canvas-wrapper');
+    var canvas = _dsCanvasEl();
+    var area = wrapper && wrapper.parentElement;
+    if (!wrapper || !canvas || !area) return;
+    var availW = area.clientWidth - 4;
+    var availH = Math.max(220, window.innerHeight * 0.6);
+    var scale = Math.min(1, availW / CANVAS_W, availH / CANVAS_H);
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    _dsCanvasScale = scale;
+    canvas.style.transform = 'scale(' + scale + ')';
+    wrapper.style.width = Math.round(CANVAS_W * scale) + 'px';
+    wrapper.style.height = Math.round(CANVAS_H * scale) + 'px';
+}
+
 function _dsCanvasPoint(evt) {
     var rect = _dsCanvasEl().getBoundingClientRect();
-    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+    var scale = _dsCanvasScale || 1;
+    return { x: (evt.clientX - rect.left) / scale, y: (evt.clientY - rect.top) / scale };
 }
 function _rotV(v, theta) {
     var c = Math.cos(theta), s = Math.sin(theta);
@@ -3758,14 +3883,24 @@ function _dsMakeShape(type, x, y, w, h) {
     var n = _dsShapes.length + 1;
     return {
         id: _dsGenId(), name: type + '-' + n, type: type,
-        x: x, y: y, w: w, h: h, rotation: 0,
+        x: x, y: y, w: w, h: h, rotation: 0, scaleX: 1, scaleY: 1,
         fill: '#4169e1', stroke: '#87CEEB', strokeWidth: 0,
         radius: type === 'rectangle' ? 6 : 0, opacity: 1,
         content: meta.content !== undefined ? meta.content : '',
         src: '', checked: false,
         min: meta.min !== undefined ? meta.min : 0,
-        max: meta.max !== undefined ? meta.max : 100
+        max: meta.max !== undefined ? meta.max : 100,
+        shadowEnabled: false, shadowX: 4, shadowY: 4, shadowBlur: 10, shadowSpread: 0, shadowColor: '#000000',
+        filterBlur: 0, filterBrightness: 100, filterSaturate: 100, filterGrayscale: 0,
+        fontSize: 14, fontWeight: '400', textAlign: 'center', letterSpacing: 0
     };
+}
+
+/* ── Shared font/text CSS for any type that renders text content ── */
+var DS_TEXT_TYPES = ['text','link','x','button','checkbox','toggle','menu'];
+function _dsFontCss(el) {
+    return 'font-size:' + (el.fontSize || 14) + 'px;font-weight:' + (el.fontWeight || '400') + ';'
+         + 'text-align:' + (el.textAlign || 'center') + ';letter-spacing:' + (el.letterSpacing || 0) + 'px;';
 }
 
 /* ── Inner content per element type (editor preview vs. exported code) ── */
@@ -3781,19 +3916,19 @@ function _dsInnerHtml(el, forExport) {
                  + '<div style="width:' + pct + '%;height:100%;background:' + el.stroke + ';"></div></div>';
         }
         case 'text':
-            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:14px;text-align:center;overflow:hidden;' + pe + '">' + _dsEsc(el.content) + '</div>';
+            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;' + _dsFontCss(el) + 'overflow:hidden;' + pe + '">' + _dsEsc(el.content) + '</div>';
         case 'link':
-            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:14px;text-decoration:underline;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
+            return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;' + _dsFontCss(el) + 'text-decoration:underline;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
         case 'x':
             return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:' + el.fill + ';font-family:sans-serif;font-size:' + Math.round(Math.min(el.w, el.h) * 0.6) + 'px;line-height:1;' + pe + '">' + _dsEsc(el.content || '✕') + '</div>';
         case 'button':
-            return '<div style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + el.fill + ';color:' + el.stroke + ';font-family:sans-serif;font-size:13px;font-weight:600;border-radius:' + el.radius + 'px;' + pe + '">' + _dsEsc(el.content) + '</div>';
+            return '<div style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + el.fill + ';color:' + el.stroke + ';font-family:sans-serif;' + _dsFontCss(el) + 'font-weight:' + (el.fontWeight || '600') + ';border-radius:' + el.radius + 'px;' + pe + '">' + _dsEsc(el.content) + '</div>';
         case 'checkbox':
-            return '<label style="width:100%;height:100%;display:flex;align-items:center;gap:6px;font-family:sans-serif;font-size:13px;color:' + el.fill + ';' + pe + '"><input type="checkbox" ' + (el.checked ? 'checked' : '') + '> <span>' + _dsEsc(el.content) + '</span></label>';
+            return '<label style="width:100%;height:100%;display:flex;align-items:center;gap:6px;font-family:sans-serif;font-size:' + (el.fontSize||13) + 'px;color:' + el.fill + ';' + pe + '"><input type="checkbox" ' + (el.checked ? 'checked' : '') + '> <span>' + _dsEsc(el.content) + '</span></label>';
         case 'switch':
             return '<div style="width:100%;height:100%;background:' + (el.checked ? el.fill : '#555') + ';border-radius:999px;display:flex;align-items:center;justify-content:' + (el.checked ? 'flex-end' : 'flex-start') + ';padding:2px;box-sizing:border-box;' + pe + '"><div style="width:' + Math.max(4, el.h - 4) + 'px;height:' + Math.max(4, el.h - 4) + 'px;border-radius:50%;background:' + el.stroke + ';"></div></div>';
         case 'toggle':
-            return '<div onclick="this.style.background=(this.style.background.indexOf(\'' + el.stroke.replace(/'/g,'') + '\')>-1)?\'#555\':\'' + el.fill + '\'" style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + (el.checked ? el.fill : '#555') + ';color:#fff;font-family:sans-serif;font-size:13px;border-radius:' + Math.min(el.radius || 6, 20) + 'px;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
+            return '<div onclick="this.style.background=(this.style.background.indexOf(\'' + el.stroke.replace(/'/g,'') + '\')>-1)?\'#555\':\'' + el.fill + '\'" style="width:100%;height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:' + (el.checked ? el.fill : '#555') + ';color:#fff;font-family:sans-serif;' + _dsFontCss(el) + 'border-radius:' + Math.min(el.radius || 6, 20) + 'px;cursor:pointer;' + pe + '">' + _dsEsc(el.content) + '</div>';
         case 'slider':
             return '<input type="range" min="' + el.min + '" max="' + el.max + '" value="' + (el.content || 50) + '" style="width:100%;height:100%;accent-color:' + el.fill + ';' + pe + '">';
         case 'spinner':
@@ -3804,7 +3939,7 @@ function _dsInnerHtml(el, forExport) {
             var label = lines[0] || 'Menu';
             var items = lines.slice(1);
             return '<div style="position:relative;width:100%;height:100%;font-family:sans-serif;">'
-                 + '<button onclick="var m=this.nextElementSibling;m.style.display=(m.style.display===\'block\')?\'none\':\'block\';" style="width:100%;height:100%;background:' + el.fill + ';color:' + el.stroke + ';border:none;border-radius:' + el.radius + 'px;font-size:13px;cursor:pointer;' + pe + '">☰ ' + _dsEsc(label) + '</button>'
+                 + '<button onclick="var m=this.nextElementSibling;m.style.display=(m.style.display===\'block\')?\'none\':\'block\';" style="width:100%;height:100%;background:' + el.fill + ';color:' + el.stroke + ';border:none;border-radius:' + el.radius + 'px;' + _dsFontCss(el) + 'cursor:pointer;' + pe + '">☰ ' + _dsEsc(label) + '</button>'
                  + '<div style="display:none;position:absolute;top:100%;left:0;background:#222;border:1px solid #555;min-width:100%;z-index:10000;">'
                  + items.map(function(l){ return '<div style="padding:6px 10px;color:#eee;font-size:12px;white-space:nowrap;">' + _dsEsc(l) + '</div>'; }).join('')
                  + '</div></div>';
@@ -3858,10 +3993,22 @@ function _dsWrapperCss(el, forExport) {
             visual = '';
     }
     var z = _dsShapes.indexOf(el) + 1;
+    var shadow = '';
+    if (el.shadowEnabled) {
+        shadow = 'box-shadow:' + (el.shadowX||0) + 'px ' + (el.shadowY||0) + 'px ' + (el.shadowBlur||0) + 'px ' + (el.shadowSpread||0) + 'px ' + (el.shadowColor||'#000') + ';';
+    }
+    var filterParts = [];
+    if (el.filterBlur) filterParts.push('blur(' + el.filterBlur + 'px)');
+    if (el.filterBrightness !== undefined && el.filterBrightness !== 100) filterParts.push('brightness(' + el.filterBrightness + '%)');
+    if (el.filterSaturate !== undefined && el.filterSaturate !== 100) filterParts.push('saturate(' + el.filterSaturate + '%)');
+    if (el.filterGrayscale) filterParts.push('grayscale(' + el.filterGrayscale + '%)');
+    var filterCss = filterParts.length ? 'filter:' + filterParts.join(' ') + ';' : '';
+    var scaleX = (el.scaleX === undefined || el.scaleX === null) ? 1 : el.scaleX;
+    var scaleY = (el.scaleY === undefined || el.scaleY === null) ? 1 : el.scaleY;
     return 'position:absolute;left:' + Math.round(el.x) + 'px;top:' + Math.round(el.y) + 'px;'
         + 'width:' + Math.round(el.w) + 'px;height:' + Math.round(el.h) + 'px;'
-        + visual + 'opacity:' + el.opacity + ';'
-        + 'transform:rotate(' + Math.round(el.rotation) + 'deg);transform-origin:center center;'
+        + visual + 'opacity:' + el.opacity + ';' + shadow + filterCss
+        + 'transform:rotate(' + Math.round(el.rotation) + 'deg) scale(' + scaleX + ',' + scaleY + ');transform-origin:center center;'
         + 'z-index:' + z + ';' + (forExport ? '' : 'cursor:' + (_dsMode === 'rotate' ? 'grab' : (_dsMode === 'move' ? 'move' : 'default')) + ';touch-action:none;user-select:none;-webkit-user-select:none;');
 }
 
@@ -3988,18 +4135,22 @@ var DS_CONTENT_LABEL = {
 };
 
 function _dsSyncPropsBar() {
-    var bar = document.getElementById('ds-props-bar');
+    var empty = document.getElementById('ds-props-empty');
+    var fields = document.getElementById('ds-props-fields');
     var el = _dsFind(_dsActiveId);
-    if (!bar) return;
-    if (!el) { bar.style.display = 'none'; return; }
-    bar.style.display = 'flex';
-    var meta = DS_TYPES[el.type] || {};
+    if (!empty || !fields) return;
+    if (!el) { empty.style.display = ''; fields.style.display = 'none'; return; }
+    empty.style.display = 'none';
+    fields.style.display = '';
+
     document.getElementById('ds-p-name').value = el.name;
     document.getElementById('ds-p-x').value = Math.round(el.x);
     document.getElementById('ds-p-y').value = Math.round(el.y);
     document.getElementById('ds-p-w').value = Math.round(el.w);
     document.getElementById('ds-p-h').value = Math.round(el.h);
     document.getElementById('ds-p-rot').value = Math.round(el.rotation);
+    document.getElementById('ds-p-scalex').value = el.scaleX;
+    document.getElementById('ds-p-scaley').value = el.scaleY;
     document.getElementById('ds-p-fill').value = el.fill;
     document.getElementById('ds-p-stroke').value = el.stroke;
     document.getElementById('ds-p-strokew').value = el.strokeWidth;
@@ -4010,17 +4161,37 @@ function _dsSyncPropsBar() {
     document.getElementById('ds-p-min').value = el.min;
     document.getElementById('ds-p-max').value = el.max;
     document.getElementById('ds-p-checked').checked = !!el.checked;
+    document.getElementById('ds-p-shadow-on').checked = !!el.shadowEnabled;
+    document.getElementById('ds-p-shadow-x').value = el.shadowX;
+    document.getElementById('ds-p-shadow-y').value = el.shadowY;
+    document.getElementById('ds-p-shadow-blur').value = el.shadowBlur;
+    document.getElementById('ds-p-shadow-spread').value = el.shadowSpread;
+    document.getElementById('ds-p-shadow-color').value = el.shadowColor;
+    document.getElementById('ds-p-filter-blur').value = el.filterBlur;
+    document.getElementById('ds-p-filter-bright').value = el.filterBrightness;
+    document.getElementById('ds-p-filter-sat').value = el.filterSaturate;
+    document.getElementById('ds-p-filter-gray').value = el.filterGrayscale;
+    document.getElementById('ds-p-font-size').value = el.fontSize;
+    document.getElementById('ds-p-font-weight').value = el.fontWeight;
+    document.getElementById('ds-p-text-align').value = el.textAlign;
+    document.getElementById('ds-p-letter-spacing').value = el.letterSpacing;
 
     var show = function(id, on) { var n = document.getElementById(id); if (n) n.style.display = on ? '' : 'none'; };
     show('ds-p-radius-wrap', el.type === 'rectangle' || el.type === 'button' || el.type === 'menu' || el.type === 'toggle');
     show('ds-p-fill-wrap', el.type !== 'line' && el.type !== 'webview' && el.type !== 'doodle' && el.type !== 'image' && el.type !== 'video');
     show('ds-p-stroke-wrap', ['rectangle','oval','line','button','switch','menu','progressbar','toggle'].indexOf(el.type) > -1);
     show('ds-p-strokew-wrap', el.type === 'rectangle' || el.type === 'oval');
-    show('ds-p-content-wrap', DS_CONTENT_LABEL.hasOwnProperty(el.type));
+    var hasContent = DS_CONTENT_LABEL.hasOwnProperty(el.type);
+    show('ds-p-content-wrap', hasContent);
+    show('ds-p-content-wrap-inner', hasContent);
     document.getElementById('ds-p-content-label').textContent = DS_CONTENT_LABEL[el.type] || 'Text';
     show('ds-p-src-wrap', ['image','video','webview'].indexOf(el.type) > -1);
     show('ds-p-minmax-wrap', el.type === 'slider' || el.type === 'numberpicker');
     show('ds-p-checked-wrap', ['checkbox','switch','toggle'].indexOf(el.type) > -1);
+    var typoSection = document.getElementById('ds-p-typography-section');
+    if (typoSection) typoSection.style.display = DS_TEXT_TYPES.indexOf(el.type) > -1 ? '' : 'none';
+    var contentSection = document.getElementById('ds-p-content-section');
+    if (contentSection) contentSection.style.display = hasContent ? '' : 'none';
 }
 
 window.dsApplyProps = function() {
@@ -4032,6 +4203,8 @@ window.dsApplyProps = function() {
     el.w = Math.max(MIN_SIZE, parseFloat(document.getElementById('ds-p-w').value) || MIN_SIZE);
     el.h = Math.max(MIN_SIZE, parseFloat(document.getElementById('ds-p-h').value) || MIN_SIZE);
     el.rotation = parseFloat(document.getElementById('ds-p-rot').value) || 0;
+    el.scaleX = parseFloat(document.getElementById('ds-p-scalex').value) || 1;
+    el.scaleY = parseFloat(document.getElementById('ds-p-scaley').value) || 1;
     el.fill = document.getElementById('ds-p-fill').value;
     el.stroke = document.getElementById('ds-p-stroke').value;
     el.strokeWidth = Math.max(0, parseFloat(document.getElementById('ds-p-strokew').value) || 0);
@@ -4042,6 +4215,20 @@ window.dsApplyProps = function() {
     el.min = parseFloat(document.getElementById('ds-p-min').value) || 0;
     el.max = parseFloat(document.getElementById('ds-p-max').value) || 100;
     el.checked = document.getElementById('ds-p-checked').checked;
+    el.shadowEnabled = document.getElementById('ds-p-shadow-on').checked;
+    el.shadowX = parseFloat(document.getElementById('ds-p-shadow-x').value) || 0;
+    el.shadowY = parseFloat(document.getElementById('ds-p-shadow-y').value) || 0;
+    el.shadowBlur = Math.max(0, parseFloat(document.getElementById('ds-p-shadow-blur').value) || 0);
+    el.shadowSpread = parseFloat(document.getElementById('ds-p-shadow-spread').value) || 0;
+    el.shadowColor = document.getElementById('ds-p-shadow-color').value;
+    el.filterBlur = Math.max(0, parseFloat(document.getElementById('ds-p-filter-blur').value) || 0);
+    el.filterBrightness = Math.max(0, parseFloat(document.getElementById('ds-p-filter-bright').value) || 0) || 100;
+    el.filterSaturate = Math.max(0, parseFloat(document.getElementById('ds-p-filter-sat').value) || 0) || 100;
+    el.filterGrayscale = Math.max(0, Math.min(100, parseFloat(document.getElementById('ds-p-filter-gray').value) || 0));
+    el.fontSize = Math.max(1, parseFloat(document.getElementById('ds-p-font-size').value) || 14);
+    el.fontWeight = document.getElementById('ds-p-font-weight').value;
+    el.textAlign = document.getElementById('ds-p-text-align').value;
+    el.letterSpacing = parseFloat(document.getElementById('ds-p-letter-spacing').value) || 0;
     dsRenderCanvas();
     dsRenderLayerList();
     _dsSyncToProject();
@@ -4221,6 +4408,14 @@ function _dsInitCanvasEvents() {
         window.addEventListener('pointerup', _dsOnPointerUp);
     });
     dsSetMode('move');
+
+    _dsUpdateCanvasScale();
+    var area = document.querySelector('.ds-canvas-area');
+    if (area && typeof ResizeObserver !== 'undefined') {
+        var ro = new ResizeObserver(function() { _dsUpdateCanvasScale(); });
+        ro.observe(area);
+    }
+    window.addEventListener('resize', _dsUpdateCanvasScale);
 }
 
 /* ── Export ── */
@@ -4296,6 +4491,112 @@ window.dsForceSync = function() {
         mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Synced!';
         mergeBtn.disabled = true;
         setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 1400);
+    }
+};
+
+/* ── AI Style Assistant — reuses the app's existing AI integration
+   (window.callAI, the same one Workshop/AI-structure features use)
+   to translate a natural-language request into concrete property
+   values on the selected element. ── */
+var DS_AI_PROP_KEYS = ['fill','stroke','strokeWidth','radius','opacity','rotation','scaleX','scaleY','w','h',
+    'shadowEnabled','shadowX','shadowY','shadowBlur','shadowSpread','shadowColor',
+    'filterBlur','filterBrightness','filterSaturate','filterGrayscale',
+    'fontSize','fontWeight','textAlign','letterSpacing','content'];
+var DS_AI_NUMERIC_KEYS = { strokeWidth:1, radius:1, opacity:1, rotation:1, scaleX:1, scaleY:1, w:1, h:1,
+    shadowX:1, shadowY:1, shadowBlur:1, shadowSpread:1, filterBlur:1, filterBrightness:1, filterSaturate:1,
+    filterGrayscale:1, fontSize:1, letterSpacing:1 };
+var DS_AI_COLOR_KEYS = { fill:1, stroke:1, shadowColor:1 };
+
+function _dsParseAIJson(raw) {
+    try { return JSON.parse(raw); } catch (e) {}
+    var s = String(raw || '').trim().replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+    var oc = s.indexOf('{'), end = s.lastIndexOf('}');
+    if (oc !== -1 && end > oc) s = s.slice(oc, end + 1);
+    return JSON.parse(s); // throws if still broken — caller handles
+}
+
+function _dsApplyAIResult(el, result) {
+    if (!result || typeof result !== 'object') return false;
+    var changed = false;
+    Object.keys(result).forEach(function(key) {
+        if (DS_AI_PROP_KEYS.indexOf(key) === -1) return;
+        var val = result[key];
+        if (DS_AI_NUMERIC_KEYS[key]) {
+            var n = parseFloat(val);
+            if (!isNaN(n)) { el[key] = n; changed = true; }
+        } else if (DS_AI_COLOR_KEYS[key]) {
+            if (typeof val === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(val)) { el[key] = val; changed = true; }
+        } else if (key === 'shadowEnabled') {
+            el.shadowEnabled = !!val; changed = true;
+        } else if (key === 'fontWeight' || key === 'textAlign' || key === 'content') {
+            el[key] = String(val); changed = true;
+        }
+    });
+    if (changed) {
+        el.w = Math.max(MIN_SIZE, el.w);
+        el.h = Math.max(MIN_SIZE, el.h);
+        el.opacity = Math.max(0, Math.min(1, el.opacity));
+        el.filterGrayscale = Math.max(0, Math.min(100, el.filterGrayscale));
+    }
+    return changed;
+}
+
+window.dsApplyAI = async function() {
+    var statusEl = document.getElementById('ds-ai-status');
+    var setStatus = function(text, color) { if (statusEl) { statusEl.textContent = text; statusEl.style.color = color || 'var(--apui-text-dim)'; } };
+
+    var el = _dsFind(_dsActiveId);
+    if (!el) { setStatus('Select an element first.', '#e5c07b'); return; }
+
+    var promptEl = document.getElementById('ds-ai-prompt');
+    var prompt = (promptEl && promptEl.value || '').trim();
+    if (!prompt) { setStatus('Describe how you want it styled first.', '#e5c07b'); return; }
+
+    if (typeof window.callAI !== 'function') { setStatus('AI is not available in this build.', '#e06c75'); return; }
+
+    var btn = document.getElementById('ds-ai-apply-btn');
+    if (btn) btn.disabled = true;
+    setStatus('● thinking…', '#e5c07b');
+
+    var supportsText = DS_CONTENT_LABEL.hasOwnProperty(el.type);
+    var supportsFont = DS_TEXT_TYPES.indexOf(el.type) > -1;
+    var allowedKeys = ['fill','stroke','strokeWidth','radius','opacity','rotation','scaleX','scaleY','w','h',
+        'shadowEnabled','shadowX','shadowY','shadowBlur','shadowSpread','shadowColor',
+        'filterBlur','filterBrightness','filterSaturate','filterGrayscale']
+        .concat(supportsFont ? ['fontSize','fontWeight','textAlign','letterSpacing'] : [])
+        .concat(supportsText ? ['content'] : []);
+
+    var systemPrompt = "You are a CSS styling assistant embedded in a visual scene/graphic editor. "
+        + "Given a natural-language styling request and the current property values of ONE selected element "
+        + "(type: '" + el.type + "'), respond with ONLY a compact JSON object (no prose, no markdown fences) "
+        + "containing a subset of these keys: " + allowedKeys.join(', ') + ". "
+        + "fill/stroke/shadowColor must be hex colors like '#4169e1'. opacity is 0-1. rotation is degrees. "
+        + "scaleX/scaleY are multipliers around 1. w/h/radius/strokeWidth/shadowX/shadowY/shadowBlur/shadowSpread/fontSize/letterSpacing are numbers in px. "
+        + "filterBrightness/filterSaturate are percent (100 = normal), filterGrayscale is percent 0-100, filterBlur is px. "
+        + "fontWeight is one of 300/400/500/600/700/800 as a string. textAlign is left/center/right. "
+        + "Only include keys you are actually changing — omit anything you're leaving as-is.";
+    var currentValues = { fill: el.fill, stroke: el.stroke, strokeWidth: el.strokeWidth, radius: el.radius,
+        opacity: el.opacity, rotation: el.rotation, w: Math.round(el.w), h: Math.round(el.h),
+        shadowEnabled: el.shadowEnabled, fontSize: el.fontSize };
+    var userPrompt = "Current values: " + JSON.stringify(currentValues) + "\nRequest: " + prompt;
+
+    try {
+        var raw = await window.callAI(systemPrompt, userPrompt, true);
+        var parsed = _dsParseAIJson(raw);
+        var changed = _dsApplyAIResult(el, parsed);
+        if (changed) {
+            dsRenderCanvas();
+            dsRenderLayerList();
+            _dsSyncPropsBar();
+            _dsSyncToProject();
+            setStatus('✓ applied', '#98c379');
+        } else {
+            setStatus('AI did not return any recognizable style changes.', '#e5c07b');
+        }
+    } catch (err) {
+        setStatus('✗ ' + (err && err.message ? err.message : 'AI request failed'), '#e06c75');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 };
 
