@@ -3882,7 +3882,7 @@ function _dsMakeShape(type, x, y, w, h) {
     var meta = DS_TYPES[type] || DS_TYPES.rectangle;
     var n = _dsShapes.length + 1;
     return {
-        id: _dsGenId(), name: type + '-' + n, type: type,
+        id: _dsGenId(), name: type + '-' + n, type: type, parentId: null,
         x: x, y: y, w: w, h: h, rotation: 0, scaleX: 1, scaleY: 1,
         fill: '#4169e1', stroke: '#87CEEB', strokeWidth: 0,
         radius: type === 'rectangle' ? 6 : 0, opacity: 1,
@@ -4013,28 +4013,112 @@ function _dsWrapperCss(el, forExport) {
 }
 
 /* ── Rendering ── */
+/* ── Container nesting helpers ── */
+function _dsAbsPos(el) {
+    var x = el.x, y = el.y, p = _dsFind(el.parentId);
+    var guard = 0;
+    while (p && guard++ < 50) { x += p.x; y += p.y; p = _dsFind(p.parentId); }
+    return { x: x, y: y };
+}
+function _dsParentAbsOffset(el) {
+    var p = _dsFind(el.parentId);
+    return p ? _dsAbsPos(p) : { x: 0, y: 0 };
+}
+function _dsIsDescendant(node, ancestorId) {
+    var p = _dsFind(node.parentId);
+    var guard = 0;
+    while (p && guard++ < 50) {
+        if (p.id === ancestorId) return true;
+        p = _dsFind(p.parentId);
+    }
+    return false;
+}
+function _dsFindContainerAt(el, absPos) {
+    var cx = absPos.x + el.w / 2, cy = absPos.y + el.h / 2;
+    for (var i = _dsShapes.length - 1; i >= 0; i--) {
+        var cand = _dsShapes[i];
+        if (cand.id === el.id) continue;
+        if (cand.id === el.parentId) continue; // dropping back on current parent — no-op
+        if (_dsIsDescendant(cand, el.id)) continue; // would create a cycle
+        var cabs = _dsAbsPos(cand);
+        if (cx >= cabs.x && cx <= cabs.x + cand.w && cy >= cabs.y && cy <= cabs.y + cand.h) return cand;
+    }
+    return null;
+}
+function _dsReparent(el, container) {
+    var abs = _dsAbsPos(el);
+    var containerAbs = _dsAbsPos(container);
+    el.parentId = container.id;
+    el.x = abs.x - containerAbs.x;
+    el.y = abs.y - containerAbs.y;
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+    _dsSyncToProject();
+}
+function _dsShowContainerPrompt(el, container, absPos) {
+    var wrapper = document.getElementById('ds-canvas-wrapper');
+    if (!wrapper) return;
+    var old = document.getElementById('ds-container-prompt');
+    if (old) old.remove();
+    var scale = _dsCanvasScale || 1;
+    var box = document.createElement('div');
+    box.id = 'ds-container-prompt';
+    var left = Math.max(0, Math.min((CANVAS_W - 10) * scale, (absPos.x) * scale));
+    var top = (absPos.y + el.h + 6) * scale;
+    box.style.cssText = 'position:absolute;left:' + Math.round(left) + 'px;top:' + Math.round(top) + 'px;'
+        + 'background:#12172a;border:1px solid #ff8a65;border-radius:6px;padding:8px 10px;font-size:11px;'
+        + 'color:#e6e6ff;z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,0.5);white-space:normal;max-width:240px;'
+        + 'font-family:\'Fira Code\',monospace;pointer-events:auto;';
+    var msg = document.createElement('div');
+    msg.style.marginBottom = '6px';
+    msg.textContent = 'Place "' + el.name + '" inside "' + container.name + '"?';
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;';
+    var yesBtn = document.createElement('button');
+    yesBtn.textContent = 'Yes, place inside';
+    yesBtn.style.cssText = 'padding:4px 9px;background:#98c379;border:none;border-radius:4px;color:#0a0e18;font-weight:700;cursor:pointer;font-size:11px;';
+    var noBtn = document.createElement('button');
+    noBtn.textContent = 'No';
+    noBtn.style.cssText = 'padding:4px 9px;background:#444;border:none;border-radius:4px;color:#eee;cursor:pointer;font-size:11px;';
+    yesBtn.onclick = function(e) { e.stopPropagation(); _dsReparent(el, container); box.remove(); };
+    noBtn.onclick = function(e) { e.stopPropagation(); box.remove(); };
+    row.appendChild(yesBtn); row.appendChild(noBtn);
+    box.appendChild(msg); box.appendChild(row);
+    wrapper.appendChild(box);
+    var dismiss = function(e) { if (!box.contains(e.target)) { box.remove(); document.removeEventListener('pointerdown', dismiss); } };
+    setTimeout(function() { document.addEventListener('pointerdown', dismiss); }, 60);
+}
+
+/* ── Rendering (recursive so containers can hold nested children) ── */
+function _dsChildrenOf(parentId) {
+    return _dsShapes.filter(function(s) { return (s.parentId || null) === parentId; });
+}
+function _dsRenderNode(el, parentDom, rootCanvas) {
+    var node = document.createElement('div');
+    node.className = 'ds-shape';
+    node.dataset.id = el.id;
+    node.style.cssText = _dsWrapperCss(el, false);
+    node.innerHTML = _dsInnerHtml(el, false);
+    node.addEventListener('pointerdown', function(e) { _dsOnShapePointerDown(e, el.id); });
+    parentDom.appendChild(node);
+    _dsChildrenOf(el.id).forEach(function(child) { _dsRenderNode(child, node, rootCanvas); });
+    if (el.id === _dsActiveId) _dsRenderSelectionUI(el, rootCanvas);
+}
 function dsRenderCanvas() {
     var canvas = _dsCanvasEl();
     if (!canvas) return;
     canvas.innerHTML = '';
-    _dsShapes.forEach(function(el) {
-        var node = document.createElement('div');
-        node.className = 'ds-shape';
-        node.dataset.id = el.id;
-        node.style.cssText = _dsWrapperCss(el, false);
-        node.innerHTML = _dsInnerHtml(el, false);
-        node.addEventListener('pointerdown', function(e) { _dsOnShapePointerDown(e, el.id); });
-        canvas.appendChild(node);
-        if (el.id === _dsActiveId) _dsRenderSelectionUI(el, canvas);
-    });
+    _dsChildrenOf(null).forEach(function(el) { _dsRenderNode(el, canvas, canvas); });
 }
 
 function _dsRenderSelectionUI(el, canvas) {
     var theta = el.rotation * Math.PI / 180;
-    var center = { x: el.x + el.w/2, y: el.y + el.h/2 };
-    // Selection outline (rotates with shape)
+    var abs = _dsAbsPos(el);
+    var center = { x: abs.x + el.w/2, y: abs.y + el.h/2 };
+    // Selection outline (rotates with shape) — positioned in canvas-root (absolute) space
     var outline = document.createElement('div');
-    outline.style.cssText = 'position:absolute;left:' + el.x + 'px;top:' + el.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;'
+    outline.style.cssText = 'position:absolute;left:' + abs.x + 'px;top:' + abs.y + 'px;width:' + el.w + 'px;height:' + el.h + 'px;'
         + 'border:1px dashed #ff8a65;pointer-events:none;transform:rotate(' + el.rotation + 'deg);transform-origin:center center;z-index:9998;';
     canvas.appendChild(outline);
 
@@ -4073,9 +4157,11 @@ function dsRenderLayerList() {
     for (var i = _dsShapes.length - 1; i >= 0; i--) {
         (function(el, idx) {
             var isActive = el.id === _dsActiveId;
+            var depth = 0, p = _dsFind(el.parentId), guard = 0;
+            while (p && guard++ < 50) { depth++; p = _dsFind(p.parentId); }
             var row = document.createElement('div');
             row.className = 'ds-layer-item';
-            row.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;padding:5px 6px;background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
+            row.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;padding:5px 6px;margin-left:' + (depth * 12) + 'px;width:calc(100% - ' + (depth * 12) + 'px);background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
 
             var arrows = document.createElement('span');
             arrows.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;line-height:0;';
@@ -4262,15 +4348,36 @@ window.dsNewShapeAtCenter = function() {
 window.dsDuplicateShape = function() {
     var src = _dsFind(_dsActiveId);
     if (!src) return;
-    var copy = Object.assign({}, src, { id: _dsGenId(), name: src.name + '-copy', x: src.x + 16, y: src.y + 16 });
-    _dsShapes.push(copy);
-    dsSelectShape(copy.id);
+    var idMap = {};
+    var subtree = [src];
+    var frontier = [src.id];
+    while (frontier.length) {
+        var nextFrontier = [];
+        _dsShapes.forEach(function(s) { if (frontier.indexOf(s.parentId) > -1) { subtree.push(s); nextFrontier.push(s.id); } });
+        frontier = nextFrontier;
+    }
+    subtree.forEach(function(s) { idMap[s.id] = _dsGenId(); });
+    var newTopId = null;
+    subtree.forEach(function(s) {
+        var copy = Object.assign({}, s, { id: idMap[s.id] });
+        if (s.id === src.id) { copy.name = s.name + '-copy'; copy.x = s.x + 16; copy.y = s.y + 16; copy.parentId = s.parentId; newTopId = copy.id; }
+        else { copy.parentId = idMap[s.parentId] || s.parentId; }
+        _dsShapes.push(copy);
+    });
+    dsSelectShape(newTopId);
     _dsSyncToProject();
 };
 
 window.dsDeleteShape = function() {
     if (!_dsActiveId) return;
-    _dsShapes = _dsShapes.filter(function(s){ return s.id !== _dsActiveId; });
+    var idsToDelete = [_dsActiveId];
+    var frontier = [_dsActiveId];
+    while (frontier.length) {
+        var nextFrontier = [];
+        _dsShapes.forEach(function(s) { if (frontier.indexOf(s.parentId) > -1) { idsToDelete.push(s.id); nextFrontier.push(s.id); } });
+        frontier = nextFrontier;
+    }
+    _dsShapes = _dsShapes.filter(function(s){ return idsToDelete.indexOf(s.id) === -1; });
     _dsActiveId = null;
     dsRenderCanvas();
     dsRenderLayerList();
@@ -4322,10 +4429,11 @@ function _dsStartResize(e, id, handle) {
     var el = _dsFind(id);
     if (!el) return;
     var theta = el.rotation * Math.PI / 180;
-    var center0 = { x: el.x + el.w/2, y: el.y + el.h/2 };
+    var parentOff = _dsParentAbsOffset(el);
+    var center0 = { x: el.x + parentOff.x + el.w/2, y: el.y + parentOff.y + el.h/2 };
     var anchorLocal0 = { x: handle.sx ? -handle.sx * el.w/2 : 0, y: handle.sy ? -handle.sy * el.h/2 : 0 };
     var anchorWorld = _addV(center0, _rotV(anchorLocal0, theta));
-    _dsDrag = { mode:'resize', id:id, handle:handle, theta:theta, anchorWorld:anchorWorld };
+    _dsDrag = { mode:'resize', id:id, handle:handle, theta:theta, anchorWorld:anchorWorld, parentOff:parentOff };
     window.addEventListener('pointermove', _dsOnPointerMove);
     window.addEventListener('pointerup', _dsOnPointerUp);
 }
@@ -4333,7 +4441,7 @@ function _dsStartResize(e, id, handle) {
 function _dsStartRotate(e, id) {
     var el = _dsFind(id);
     if (!el) return;
-    _dsDrag = { mode:'rotate', id:id };
+    _dsDrag = { mode:'rotate', id:id, parentOff: _dsParentAbsOffset(el) };
     window.addEventListener('pointermove', _dsOnPointerMove);
     window.addEventListener('pointerup', _dsOnPointerUp);
 }
@@ -4362,10 +4470,10 @@ function _dsOnPointerMove(e) {
         var anchorLocalNew = { x: sx ? -sx * w2/2 : 0, y: sy ? -sy * h2/2 : 0 };
         var centerNew = _subV(_dsDrag.anchorWorld, _rotV(anchorLocalNew, _dsDrag.theta));
         el.w = w2; el.h = h2;
-        el.x = centerNew.x - w2/2;
-        el.y = centerNew.y - h2/2;
+        el.x = centerNew.x - w2/2 - _dsDrag.parentOff.x;
+        el.y = centerNew.y - h2/2 - _dsDrag.parentOff.y;
     } else if (_dsDrag.mode === 'rotate' && el) {
-        var center = { x: el.x + el.w/2, y: el.y + el.h/2 };
+        var center = { x: el.x + _dsDrag.parentOff.x + el.w/2, y: el.y + _dsDrag.parentOff.y + el.h/2 };
         var ang = Math.atan2(mouse.y - center.y, mouse.x - center.x) * 180 / Math.PI + 90;
         el.rotation = Math.round(ang);
     }
@@ -4380,6 +4488,22 @@ function _dsOnPointerUp() {
         if (el && el.w < 5 && el.h < 5) { el.w = meta.w; el.h = meta.h; }
         dsSelectShape(_dsDrag.id);
         dsSetMode('move');
+    } else if (_dsDrag && _dsDrag.mode === 'move') {
+        var movedEl = _dsFind(_dsDrag.id);
+        if (movedEl) {
+            var abs = _dsAbsPos(movedEl);
+            var container = _dsFindContainerAt(movedEl, abs);
+            if (container) {
+                _dsShowContainerPrompt(movedEl, container, abs);
+            } else if (movedEl.parentId) {
+                // Dropped outside any container — pop back out to the top level.
+                movedEl.parentId = null;
+                movedEl.x = abs.x;
+                movedEl.y = abs.y;
+                dsRenderCanvas();
+                dsRenderLayerList();
+            }
+        }
     }
     var hadDrag = !!_dsDrag;
     _dsDrag = null;
@@ -4419,10 +4543,14 @@ function _dsInitCanvasEvents() {
 }
 
 /* ── Export ── */
+function _dsBuildNodeHtml(el, indent) {
+    var pad = new Array(indent + 1).join('  ');
+    var children = _dsChildrenOf(el.id);
+    var inner = _dsInnerHtml(el, true) + (children.length ? '\n' + children.map(function(c) { return _dsBuildNodeHtml(c, indent + 1); }).join('\n') + '\n' + pad : '');
+    return pad + '<div class="' + el.name.replace(/\s+/g,'-') + '" style="' + _dsWrapperCss(el, true) + '">' + inner + '</div>';
+}
 function _dsBuildCode() {
-    var inner = _dsShapes.map(function(el) {
-        return '  <div class="' + el.name.replace(/\s+/g,'-') + '" style="' + _dsWrapperCss(el, true) + '">' + _dsInnerHtml(el, true) + '</div>';
-    }).join('\n');
+    var inner = _dsChildrenOf(null).map(function(el) { return _dsBuildNodeHtml(el, 1); }).join('\n');
     return '<div class="ds-scene" style="position:relative;width:' + CANVAS_W + 'px;height:' + CANVAS_H + 'px;">\n' + inner + '\n</div>';
 }
 
