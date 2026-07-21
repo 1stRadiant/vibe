@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4154,44 +4155,54 @@ function dsRenderLayerList() {
     Array.from(list.querySelectorAll('.ds-layer-item')).forEach(function(n){ n.remove(); });
     if (_dsShapes.length === 0) { if (empty) empty.style.display = ''; return; }
     if (empty) empty.style.display = 'none';
-    for (var i = _dsShapes.length - 1; i >= 0; i--) {
-        (function(el, idx) {
-            var isActive = el.id === _dsActiveId;
-            var depth = 0, p = _dsFind(el.parentId), guard = 0;
-            while (p && guard++ < 50) { depth++; p = _dsFind(p.parentId); }
-            var row = document.createElement('div');
-            row.className = 'ds-layer-item';
-            row.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;padding:5px 6px;margin-left:' + (depth * 12) + 'px;width:calc(100% - ' + (depth * 12) + 'px);background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
 
-            var arrows = document.createElement('span');
-            arrows.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;line-height:0;';
-            var upBtn = document.createElement('button');
-            upBtn.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
-            upBtn.title = 'Move up (bring forward)';
-            upBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (idx === _dsShapes.length - 1 ? '0.25' : '0.8') + ';';
-            upBtn.disabled = idx === _dsShapes.length - 1;
-            upBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(1, el.id); };
-            var downBtn = document.createElement('button');
-            downBtn.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
-            downBtn.title = 'Move down (send backward)';
-            downBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (idx === 0 ? '0.25' : '0.8') + ';';
-            downBtn.disabled = idx === 0;
-            downBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(-1, el.id); };
-            arrows.appendChild(upBtn); arrows.appendChild(downBtn);
+    // Render as a tree: each container's children are listed immediately
+    // beneath it (indented), so nesting is visible instead of a flat z-list.
+    function renderLevel(parentId, depth) {
+        var siblings = _dsShapes.filter(function(s) { return (s.parentId || null) === parentId; });
+        // siblings are stored in ascending z-order (later = on top); show top-first
+        for (var i = siblings.length - 1; i >= 0; i--) {
+            (function(el, sIdx) {
+                var isActive = el.id === _dsActiveId;
+                var row = document.createElement('div');
+                row.className = 'ds-layer-item';
+                row.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;padding:5px 6px;margin-left:' + (depth * 12) + 'px;width:calc(100% - ' + (depth * 12) + 'px);background:' + (isActive ? 'rgba(255,138,101,0.18)' : 'rgba(0,0,0,0.25)') + ';border:1px solid ' + (isActive ? 'rgba(255,138,101,0.7)' : 'rgba(65,105,225,0.2)') + ';border-radius:5px;cursor:pointer;font-family:\'Fira Code\',monospace;font-size:11px;color:' + (isActive ? '#ff8a65' : '#7a8aaa') + ';';
 
-            var dot = document.createElement('span');
-            dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + ((el.type === 'line') ? el.stroke : el.fill) + ';';
-            var label = document.createElement('span');
-            label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-            label.textContent = el.name;
-            var typeBadge = document.createElement('span');
-            typeBadge.style.cssText = 'font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.4);color:#7a8aaa;flex-shrink:0;';
-            typeBadge.textContent = el.type;
-            row.appendChild(arrows); row.appendChild(dot); row.appendChild(label); row.appendChild(typeBadge);
-            row.onclick = function() { dsSelectShape(el.id); };
-            list.appendChild(row);
-        })(_dsShapes[i], i);
+                var arrows = document.createElement('span');
+                arrows.style.cssText = 'display:flex;flex-direction:column;flex-shrink:0;line-height:0;';
+                var upBtn = document.createElement('button');
+                upBtn.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
+                upBtn.title = 'Move up (bring forward)';
+                upBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (sIdx === siblings.length - 1 ? '0.25' : '0.8') + ';';
+                upBtn.disabled = sIdx === siblings.length - 1;
+                upBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(1, el.id); };
+                var downBtn = document.createElement('button');
+                downBtn.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
+                downBtn.title = 'Move down (send backward)';
+                downBtn.style.cssText = 'background:none;border:none;color:inherit;cursor:pointer;padding:0;font-size:8px;line-height:1;opacity:' + (sIdx === 0 ? '0.25' : '0.8') + ';';
+                downBtn.disabled = sIdx === 0;
+                downBtn.onclick = function(e) { e.stopPropagation(); dsNudgeZ(-1, el.id); };
+                arrows.appendChild(upBtn); arrows.appendChild(downBtn);
+
+                var dot = document.createElement('span');
+                dot.style.cssText = 'width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + ((el.type === 'line') ? el.stroke : el.fill) + ';';
+                var label = document.createElement('span');
+                label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                label.textContent = el.name;
+                var typeBadge = document.createElement('span');
+                typeBadge.style.cssText = 'font-size:9px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.4);color:#7a8aaa;flex-shrink:0;';
+                typeBadge.textContent = el.type;
+                row.appendChild(arrows); row.appendChild(dot); row.appendChild(label); row.appendChild(typeBadge);
+                row.onclick = function() { dsSelectShape(el.id); };
+                list.appendChild(row);
+
+                // children go right under their parent, indented one level deeper
+                renderLevel(el.id, depth + 1);
+            })(siblings[i], i);
+        }
     }
+
+    renderLevel(null, 0);
 }
 
 /* ── Collapsible layer panel (collapsed by default) ── */
@@ -4399,9 +4410,17 @@ window.dsNudgeZ = function(dir, id) {
     var targetId = id || _dsActiveId;
     var idx = _dsShapes.findIndex(function(s){ return s.id === targetId; });
     if (idx < 0) return;
-    var swapIdx = idx + dir;
-    if (swapIdx < 0 || swapIdx >= _dsShapes.length) return;
-    var tmp = _dsShapes[idx]; _dsShapes[idx] = _dsShapes[swapIdx]; _dsShapes[swapIdx] = tmp;
+    var el = _dsShapes[idx];
+    // Only reorder among elements that share the same parent (container),
+    // so nudging in the layer list can't jump an element out of its group.
+    var pid = el.parentId || null;
+    var siblings = _dsShapes.filter(function(s) { return (s.parentId || null) === pid; });
+    var sIdx = siblings.indexOf(el);
+    var swapSIdx = sIdx + dir;
+    if (swapSIdx < 0 || swapSIdx >= siblings.length) return;
+    var other = siblings[swapSIdx];
+    var otherIdx = _dsShapes.indexOf(other);
+    var tmp = _dsShapes[idx]; _dsShapes[idx] = _dsShapes[otherIdx]; _dsShapes[otherIdx] = tmp;
     dsRenderCanvas();
     dsRenderLayerList();
     _dsSyncToProject();
