@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2797,6 +2796,13 @@
                                             <button class="action-button small ds-mode-btn" data-mode="rotate" onclick="dsSetMode('rotate')" title="Rotate — drag a selected element to spin it"><i class="bi bi-arrow-clockwise"></i></button>
                                         </div>
 
+                                        <!-- Device view switch: Desktop / Mobile — each keeps its own canvas -->
+                                        <div id="ds-view-group" style="display:flex;gap:2px;background:rgba(0,0,0,0.3);border-radius:6px;padding:2px;">
+                                            <button class="action-button small ds-view-btn" data-view="desktop" onclick="dsSetView('desktop')" title="Desktop canvas (1280×800)"><i class="bi bi-display"></i> Desktop</button>
+                                            <button class="action-button small ds-view-btn" data-view="mobile" onclick="dsSetView('mobile')" title="Mobile canvas (390×844)"><i class="bi bi-phone"></i> Mobile</button>
+                                        </div>
+                                        <button class="action-button small" id="ds-import-btn" onclick="dsImportFromProject()" title="Snapshot the live project's real HTML into this view's canvas, so you're editing the actual project"><i class="bi bi-cloud-download"></i> Import from Project</button>
+
                                         <button class="action-button small" onclick="dsNewShapeAtCenter()" title="Add a default-size element"><i class="bi bi-plus-circle"></i> New</button>
                                         <button class="action-button small" onclick="dsDuplicateShape()" title="Duplicate selected element"><i class="bi bi-copy"></i></button>
                                         <button class="action-button small danger" onclick="dsDeleteShape()" title="Delete selected element"><i class="bi bi-trash"></i></button>
@@ -2820,7 +2826,7 @@
                                         <!-- Middle: canvas -->
                                         <div class="ds-canvas-area">
                                             <div id="ds-canvas-wrapper" class="ds-canvas-wrapper">
-                                                <div id="ds-canvas" style="position:relative;width:760px;height:460px;transform-origin:0 0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
+                                                <div id="ds-canvas" style="position:relative;width:1280px;height:800px;transform-origin:0 0;background-color:#1a1f2e;background-image:linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);background-size:20px 20px;border:1px solid var(--apui-border);border-radius:4px;overflow:hidden;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none;"></div>
                                             </div>
                                         </div>
 
@@ -3800,8 +3806,15 @@ document.addEventListener('DOMContentLoaded', function() {
    ══════════════════════════════════════════════════════════════ */
 (function() {
 
-var CANVAS_W = 760, CANVAS_H = 460, MIN_SIZE = 8;
-var _dsShapes = [];      // { id, name, type, x,y,w,h, rotation, fill, stroke, strokeWidth, radius, opacity, content, src, checked, min, max }
+var DS_VIEWPORTS = {
+    desktop: { w: 1280, h: 800, label: 'Desktop' },
+    mobile:  { w: 390,  h: 844,  label: 'Mobile'  }
+};
+var _dsViewMode = 'desktop';
+var _dsSceneByView = { desktop: [], mobile: [] };      // independent shape sets per device view
+var _dsActiveIdByView = { desktop: null, mobile: null };
+var CANVAS_W = DS_VIEWPORTS.desktop.w, CANVAS_H = DS_VIEWPORTS.desktop.h, MIN_SIZE = 8;
+var _dsShapes = _dsSceneByView.desktop;      // { id, name, type, x,y,w,h, rotation, fill, stroke, strokeWidth, radius, opacity, content, src, checked, min, max }
 var _dsActiveId = null;
 var _dsMode = 'move';    // 'draw' | 'move' | 'resize' | 'rotate'
 var _dsDrag = null;      // active pointer interaction state
@@ -3846,10 +3859,10 @@ function _dsFind(id) { return _dsShapes.find(function(s){ return s.id === id; })
 function _dsCanvasEl() { return document.getElementById('ds-canvas'); }
 function _dsEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-/* ── Responsive canvas scaling — keeps the fixed 760×460 design surface
-   fully visible (no horizontal scroll/clipping) on any screen size,
-   including mobile, by visually scaling it down while keeping all
-   stored coordinates in the real, unscaled 760×460 space. ── */
+/* ── Responsive canvas scaling — keeps the design surface (size varies by
+   device view) fully visible (no horizontal scroll/clipping) on any screen
+   size, including mobile, by visually scaling it down while keeping all
+   stored coordinates in the real, unscaled CANVAS_W×CANVAS_H space. ── */
 var _dsCanvasScale = 1;
 function _dsUpdateCanvasScale() {
     var wrapper = document.getElementById('ds-canvas-wrapper');
@@ -3865,6 +3878,53 @@ function _dsUpdateCanvasScale() {
     wrapper.style.width = Math.round(CANVAS_W * scale) + 'px';
     wrapper.style.height = Math.round(CANVAS_H * scale) + 'px';
 }
+
+/* Push the current CANVAS_W/H onto the actual canvas element — called
+   whenever the active view (or its content-driven height) changes. */
+function _dsApplyCanvasSize() {
+    var canvas = _dsCanvasEl();
+    if (canvas) { canvas.style.width = CANVAS_W + 'px'; canvas.style.height = CANVAS_H + 'px'; }
+    _dsUpdateCanvasScale();
+}
+
+/* A real page can be taller than the device viewport preset, so grow the
+   canvas to fit whatever top-level content it holds instead of clipping it. */
+function _dsComputeCanvasHeight(shapes, vp) {
+    var maxBottom = shapes.reduce(function(m, s) { return s.parentId ? m : Math.max(m, s.y + s.h); }, 0);
+    return Math.max(vp.h, Math.ceil(maxBottom) + 24);
+}
+
+/* ── Desktop / Mobile view switch — each view keeps its own independent
+   shape set + selection, since a responsive page can legitimately look
+   different at different breakpoints. ── */
+function _dsUpdateViewButtons() {
+    document.querySelectorAll('.ds-view-btn').forEach(function(b) {
+        var active = b.dataset.view === _dsViewMode;
+        b.style.background = active ? 'rgba(255,138,101,0.28)' : '';
+        b.style.borderColor = active ? '#ff8a65' : '';
+        b.style.color = active ? '#ff8a65' : '';
+    });
+}
+window.dsSetView = function(view) {
+    if (!DS_VIEWPORTS[view] || view === _dsViewMode) return;
+    _dsSceneByView[_dsViewMode] = _dsShapes;
+    _dsActiveIdByView[_dsViewMode] = _dsActiveId;
+    _dsViewMode = view;
+    var vp = DS_VIEWPORTS[view];
+    _dsShapes = _dsSceneByView[view] || [];
+    _dsSceneByView[view] = _dsShapes;
+    _dsActiveId = _dsActiveIdByView[view] || null;
+    CANVAS_W = vp.w;
+    CANVAS_H = _dsShapes.length ? _dsComputeCanvasHeight(_dsShapes, vp) : vp.h;
+    _dsUpdateViewButtons();
+    _dsApplyCanvasSize();
+    dsRenderCanvas();
+    dsRenderLayerList();
+    _dsSyncPropsBar();
+    // First visit to this view this session and nothing saved for it yet —
+    // try to restore/import it, same as the initial load.
+    if (!_dsShapes.length) _dsLoadFromProject();
+};
 
 function _dsCanvasPoint(evt) {
     var rect = _dsCanvasEl().getBoundingClientRect();
@@ -4581,10 +4641,11 @@ window.dsCopyCode = function() {
     else { window.prompt('Copy the HTML/CSS below:', code); }
 };
 
-/* ── Live project sync — keeps one stable node in the project always
-   up to date with the current canvas, instead of a one-shot merge ── */
-var DS_NODE_ID = 'designer-live-scene';
-var DS_STORAGE_KEY = 'ds_shapes_backup_v1';
+/* ── Live project sync — keeps one stable node per device view in the
+   project always up to date with that view's canvas, instead of a
+   one-shot merge ── */
+var DS_NODE_ID = { desktop: 'designer-live-scene', mobile: 'designer-live-scene-mobile' };
+var DS_STORAGE_KEY = { desktop: 'ds_shapes_backup_v1', mobile: 'ds_shapes_backup_v1_mobile' };
 var _dsSyncTimer = null;
 
 function _dsUpdateSyncStatus(text, color) {
@@ -4597,26 +4658,29 @@ function _dsUpdateSyncStatus(text, color) {
 }
 
 function _dsRunSync() {
+    var view = _dsViewMode;
+    var label = DS_VIEWPORTS[view].label;
     var code = _dsBuildCode();
     var dataJSON = JSON.stringify(_dsShapes);
     var wroteToProject = false;
     if (typeof vibeTree !== 'undefined') {
         if (!vibeTree.children) vibeTree.children = [];
-        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID; });
+        var nodeId = DS_NODE_ID[view];
+        var node = vibeTree.children.find(function(n){ return n.id === nodeId; });
         if (!node) {
-            node = { id: DS_NODE_ID, type:'html', description:'[Designer] Live scene (' + _dsShapes.length + ' elements)', code: code, designerData: dataJSON, children: [] };
+            node = { id: nodeId, type:'html', description:'[Designer] Live scene — ' + label + ' (' + _dsShapes.length + ' elements)', code: code, designerData: dataJSON, children: [] };
             vibeTree.children.push(node);
         } else {
             node.code = code;
             node.designerData = dataJSON;
-            node.description = '[Designer] Live scene (' + _dsShapes.length + ' elements)';
+            node.description = '[Designer] Live scene — ' + label + ' (' + _dsShapes.length + ' elements)';
         }
         if (typeof autoSaveProject === 'function') autoSaveProject();
         if (typeof refreshAllUI === 'function') refreshAllUI();
         wroteToProject = true;
     }
-    try { localStorage.setItem(DS_STORAGE_KEY, dataJSON); } catch (e) {}
-    _dsUpdateSyncStatus(wroteToProject ? undefined : '✓ saved locally (project not loaded yet)', wroteToProject ? undefined : '#e5c07b');
+    try { localStorage.setItem(DS_STORAGE_KEY[view], dataJSON); } catch (e) {}
+    _dsUpdateSyncStatus(wroteToProject ? ('✓ synced to project (' + label + ') — ' + new Date().toLocaleTimeString()) : '✓ saved locally (project not loaded yet)', wroteToProject ? '#98c379' : '#e5c07b');
 }
 
 /* Debounced — call after every edit so the project is always close to live
@@ -4640,6 +4704,7 @@ window.dsForceSync = function() {
         setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 1400);
     }
 };
+
 
 /* ── AI Style Assistant — reuses the app's existing AI integration
    (window.callAI, the same one Workshop/AI-structure features use)
@@ -4747,28 +4812,253 @@ window.dsApplyAI = async function() {
     }
 };
 
-/* Restore the canvas from whatever the project (or local backup) already
-   holds, so re-opening the Designer or reloading the project continues
-   exactly where you left off instead of starting blank. */
-function _dsLoadFromProject() {
+/* ── Import real project HTML into the canvas ──────────────────────────
+   The Designer's canvas is a separate absolute-positioned scene by design,
+   so to let someone "actually edit the project" we take a snapshot: render
+   the project's real HTML in a hidden iframe at the chosen device width,
+   measure every visible element's rendered box, and turn that into shapes
+   nested the same way the real DOM was nested. It's a one-time visual
+   import (not a live two-way binding to the original responsive CSS) —
+   edits made afterward sync back as the Designer's own scene, same as
+   any hand-drawn canvas. ── */
+function _dsRgbToHex(rgbStr) {
+    if (!rgbStr) return null;
+    var m = String(rgbStr).match(/rgba?\(([^)]+)\)/);
+    if (!m) return /^#/.test(rgbStr) ? rgbStr : null;
+    var parts = m[1].split(',').map(function(s){ return parseFloat(s); });
+    if (parts.length >= 4 && parts[3] === 0) return null; // fully transparent
+    function h(n) { n = Math.max(0, Math.min(255, Math.round(n || 0))); var s = n.toString(16); return s.length === 1 ? '0' + s : s; }
+    return '#' + h(parts[0]) + h(parts[1]) + h(parts[2]);
+}
+
+/* Get the current project's full standalone HTML, however it's available. */
+function _dsGetProjectHtml() {
+    try {
+        if (typeof vibeTree !== 'undefined' && vibeTree && typeof _apuiBuildHtmlFromTree === 'function') {
+            var pid = (typeof currentProjectId !== 'undefined') ? currentProjectId : '';
+            var html = _apuiBuildHtmlFromTree(vibeTree, pid);
+            if (html && html.trim()) return html;
+        }
+    } catch (e) {}
+    try {
+        var ed = document.getElementById('full-code-editor');
+        if (ed && ed.value && ed.value.trim()) return ed.value;
+    } catch (e) {}
+    return null;
+}
+
+/* True once the project has real HTML content beyond the Designer's own
+   synced scene nodes — i.e. there's an actual project to import. */
+function _dsHasRealProjectContent() {
+    try {
+        if (typeof vibeTree === 'undefined' || !vibeTree || !vibeTree.children) return false;
+        var ownIds = {};
+        Object.keys(DS_NODE_ID).forEach(function(k) { ownIds[DS_NODE_ID[k]] = true; });
+        return vibeTree.children.some(function(n) { return n && n.type === 'html' && n.code && !ownIds[n.id]; });
+    } catch (e) { return false; }
+}
+
+var DS_IMPORT_SKIP_TAGS = { script:1, style:1, head:1, meta:1, link:1, noscript:1, template:1, title:1, svg:1, path:1, defs:1, base:1 };
+var DS_IMPORT_LEAF_TAGS = { img:1, input:1, textarea:1, select:1, video:1, iframe:1, hr:1, canvas:1 };
+var DS_IMPORT_TEXT_TAGS = { p:1, h1:1, h2:1, h3:1, h4:1, h5:1, h6:1, span:1, label:1, li:1, a:1, button:1, strong:1, em:1, small:1, blockquote:1, figcaption:1 };
+
+function _dsImportTagToType(tag, node) {
+    if (tag === 'img') return 'image';
+    if (tag === 'button') return 'button';
+    if (tag === 'a') return 'link';
+    if (tag === 'hr') return 'line';
+    if (tag === 'video') return 'video';
+    if (tag === 'iframe') return 'webview';
+    if (tag === 'input') {
+        var t = (node.getAttribute('type') || 'text').toLowerCase();
+        if (t === 'checkbox' || t === 'radio') return 'checkbox';
+        if (t === 'range') return 'slider';
+        if (t === 'number') return 'numberpicker';
+        return 'textedit';
+    }
+    if (tag === 'textarea') return 'textedit';
+    if (tag === 'select') return 'spinner';
+    if (DS_IMPORT_TEXT_TAGS[tag]) return 'text';
+    return 'rectangle'; // generic structural box — can hold children
+}
+
+/* Walk a rendered document and turn its visible elements into shapes,
+   preserving nesting via parentId (coordinates stored parent-relative,
+   matching how the canvas already nests elements). */
+function _dsExtractShapesFromDoc(doc, vp) {
+    var body = doc.body;
+    if (!body) return [];
+    var win = doc.defaultView;
+    var rootRect = body.getBoundingClientRect();
+    var shapes = [];
+    var MAX_SHAPES = 260;
+
+    function walk(node, parentId) {
+        var kids = node.children ? Array.prototype.slice.call(node.children) : [];
+        for (var i = 0; i < kids.length && shapes.length < MAX_SHAPES; i++) {
+            var child = kids[i];
+            var tag = child.tagName ? child.tagName.toLowerCase() : '';
+            if (!tag || DS_IMPORT_SKIP_TAGS[tag]) continue;
+            var style;
+            try { style = win.getComputedStyle(child); } catch (e) { continue; }
+            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
+            var rect = child.getBoundingClientRect();
+            if (rect.width < 2 || rect.height < 2) { walk(child, parentId); continue; } // invisible wrapper — recurse through it
+            var type = _dsImportTagToType(tag, child);
+            var isLeaf = !!DS_IMPORT_LEAF_TAGS[tag];
+            var textish = (type === 'text' || type === 'link' || type === 'button' || type === 'checkbox');
+            var content = '';
+            if (textish) content = (child.innerText != null ? child.innerText : (child.textContent || '')).trim().replace(/\s+/g, ' ').slice(0, 300);
+            var bg = _dsRgbToHex(style.backgroundColor);
+            var fill;
+            if (type === 'text' || type === 'link') fill = _dsRgbToHex(style.color) || '#e6e6e6';
+            else if (bg) fill = bg;
+            else if (type === 'button') fill = '#4169e1';
+            else fill = 'transparent';
+            var shape = {
+                id: _dsGenId(), name: tag + '-' + (shapes.length + 1), type: type, parentId: parentId,
+                x: rect.left - rootRect.left, y: rect.top - rootRect.top, w: rect.width, h: rect.height,
+                rotation: 0, scaleX: 1, scaleY: 1,
+                fill: fill, stroke: _dsRgbToHex(style.borderColor) || '#87CEEB', strokeWidth: 0,
+                radius: parseFloat(style.borderTopLeftRadius) || 0, opacity: parseFloat(style.opacity) || 1,
+                content: content, src: (tag === 'img' && (child.currentSrc || child.src)) || '',
+                checked: (tag === 'input' && child.checked) || false,
+                min: 0, max: 100,
+                shadowEnabled: false, shadowX: 4, shadowY: 4, shadowBlur: 10, shadowSpread: 0, shadowColor: '#000000',
+                filterBlur: 0, filterBrightness: 100, filterSaturate: 100, filterGrayscale: 0,
+                fontSize: parseFloat(style.fontSize) || 14, fontWeight: style.fontWeight || '400',
+                textAlign: (style.textAlign === 'start' ? 'left' : style.textAlign) || 'left', letterSpacing: parseFloat(style.letterSpacing) || 0
+            };
+            shapes.push(shape);
+            if (!isLeaf && !textish) walk(child, shape.id);
+        }
+    }
+    walk(body, null);
+
+    // Positions above are root-relative; convert to parent-relative to match
+    // how the canvas stores nested children.
+    var byId = {}; shapes.forEach(function(s) { byId[s.id] = { x: s.x, y: s.y }; });
+    shapes.forEach(function(s) {
+        if (s.parentId && byId[s.parentId]) { s.x -= byId[s.parentId].x; s.y -= byId[s.parentId].y; }
+    });
+    return shapes;
+}
+
+/* Render `html` off-screen at vpW×vpH and resolve with the extracted shapes. */
+function _dsImportHtmlAsShapes(html, vpW, vpH) {
+    return new Promise(function(resolve) {
+        var iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + vpW + 'px;height:' + vpH + 'px;border:0;visibility:hidden;pointer-events:none;';
+        document.body.appendChild(iframe);
+        var settled = false;
+        function finish(shapes) {
+            if (settled) return;
+            settled = true;
+            try { document.body.removeChild(iframe); } catch (e) {}
+            resolve(shapes);
+        }
+        var timeout = setTimeout(function() { finish([]); }, 7000);
+        iframe.onload = function() {
+            setTimeout(function() {
+                clearTimeout(timeout);
+                try { finish(_dsExtractShapesFromDoc(iframe.contentDocument, { w: vpW, h: vpH })); }
+                catch (e) { console.warn('[Designer] import failed:', e); finish([]); }
+            }, 220); // let layout/images/webfonts settle
+        };
+        iframe.srcdoc = html;
+    });
+}
+
+/* Manual "Import from Project" toolbar action — re-snapshots the live
+   project into the current view, replacing whatever is on the canvas. */
+window.dsImportFromProject = async function() {
+    var btn = document.getElementById('ds-import-btn');
+    var view = _dsViewMode;
+    var vp = DS_VIEWPORTS[view];
+    var html = _dsGetProjectHtml();
+    if (!html) { _dsUpdateSyncStatus('No project code found to import.', '#e5c07b'); return; }
+    if (_dsShapes.length && !confirm('Replace the current ' + vp.label + ' canvas with a fresh snapshot imported from the live project? Unsynced edits in this view will be lost.')) return;
+    if (btn) { btn.disabled = true; btn.dataset.origHtml = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Importing…'; }
+    _dsUpdateSyncStatus('● importing ' + vp.label.toLowerCase() + ' layout from project…', '#e5c07b');
+    try {
+        var shapes = await _dsImportHtmlAsShapes(html, vp.w, vp.h);
+        if (!shapes.length) { _dsUpdateSyncStatus('Import found no visible elements.', '#e5c07b'); return; }
+        if (view !== _dsViewMode) return; // user switched views mid-import
+        CANVAS_H = _dsComputeCanvasHeight(shapes, vp);
+        _dsShapes = shapes;
+        _dsSceneByView[view] = _dsShapes;
+        _dsActiveId = null;
+        _dsApplyCanvasSize();
+        dsRenderCanvas();
+        dsRenderLayerList();
+        _dsSyncPropsBar();
+        _dsSyncToProject();
+        _dsUpdateSyncStatus('✓ imported ' + shapes.length + ' elements from project (' + vp.label + ')', '#87CEEB');
+    } catch (e) {
+        console.error('[Designer] import failed', e);
+        _dsUpdateSyncStatus('Import failed — see console.', '#e06c75');
+    } finally {
+        if (btn) { btn.disabled = false; if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml; }
+    }
+};
+
+/* Restore the current view's canvas from whatever the project (or local
+   backup) already holds, so re-opening the Designer or reloading the
+   project continues exactly where you left off. If nothing has been
+   saved for this view yet but the project already has real UI content,
+   import a snapshot of it instead of starting blank — so edits made here
+   are edits to the actual project. */
+async function _dsLoadFromProject() {
+    var view = _dsViewMode;
+    var vp = DS_VIEWPORTS[view];
     var data = null;
     if (typeof vibeTree !== 'undefined' && vibeTree.children) {
-        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID; });
+        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID[view]; });
         if (node && node.designerData) {
             try { data = JSON.parse(node.designerData); } catch (e) {}
         }
     }
     if (!data) {
-        try { var raw = localStorage.getItem(DS_STORAGE_KEY); if (raw) data = JSON.parse(raw); } catch (e) {}
+        try { var raw = localStorage.getItem(DS_STORAGE_KEY[view]); if (raw) data = JSON.parse(raw); } catch (e) {}
     }
     if (data && Array.isArray(data) && data.length) {
         _dsShapes = data;
+        _dsSceneByView[view] = _dsShapes;
         _dsActiveId = null;
+        if (view === _dsViewMode) { CANVAS_H = _dsComputeCanvasHeight(_dsShapes, vp); _dsApplyCanvasSize(); }
         _dsUpdateSyncStatus('✓ restored from project', '#87CEEB');
-    } else {
-        _dsShapes = [];
-        _dsActiveId = null;
+        dsRenderCanvas();
+        dsRenderLayerList();
+        _dsSyncPropsBar();
+        return;
     }
+
+    if (_dsHasRealProjectContent()) {
+        var html = _dsGetProjectHtml();
+        if (html) {
+            _dsUpdateSyncStatus('● importing ' + vp.label.toLowerCase() + ' layout from project…', '#e5c07b');
+            try {
+                var shapes = await _dsImportHtmlAsShapes(html, vp.w, vp.h);
+                if (shapes.length && view === _dsViewMode) {
+                    CANVAS_H = _dsComputeCanvasHeight(shapes, vp);
+                    _dsShapes = shapes;
+                    _dsSceneByView[view] = _dsShapes;
+                    _dsActiveId = null;
+                    _dsApplyCanvasSize();
+                    dsRenderCanvas();
+                    dsRenderLayerList();
+                    _dsSyncPropsBar();
+                    _dsSyncToProject();
+                    _dsUpdateSyncStatus('✓ imported ' + shapes.length + ' elements from project (' + vp.label + ')', '#87CEEB');
+                    return;
+                }
+            } catch (e) { console.warn('[Designer] auto-import failed:', e); }
+        }
+    }
+
+    _dsShapes = [];
+    _dsSceneByView[view] = _dsShapes;
+    _dsActiveId = null;
     dsRenderCanvas();
     dsRenderLayerList();
     _dsSyncPropsBar();
@@ -4792,7 +5082,13 @@ function _dsCheckProjectChange() {
     if (key !== _dsLastProjectKey) {
         var firstCheck = _dsLastProjectKey === null;
         _dsLastProjectKey = key;
-        if (!firstCheck) _dsLoadFromProject();
+        if (!firstCheck) {
+            // Switched to a different project — drop cached view scenes from
+            // the old one so they don't leak in when the user changes views.
+            _dsSceneByView = { desktop: [], mobile: [] };
+            _dsActiveIdByView = { desktop: null, mobile: null };
+            _dsLoadFromProject();
+        }
     }
 }
 
@@ -4806,6 +5102,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
+    _dsUpdateViewButtons();
+    _dsApplyCanvasSize();
     _dsLoadFromProject();
     _dsInitCanvasEvents();
     dsRenderCanvas();
@@ -8070,4 +8368,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-    </html>
+                                                </html>
