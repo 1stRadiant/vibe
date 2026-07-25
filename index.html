@@ -5881,25 +5881,33 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   /* ── Patch switchToTab (runs after app3.js module has loaded) ──────────────
-     Two problems observed in the wild:
+     Two problems observed, both scoped to the Full Code / Context tabs only:
      1) app3.js bails early if the target tab pane already has 'active', which
         means clicking Full Code or Context a second time renders nothing.
      2) Occasionally the click never results in the pane becoming visible at
-        all (switchToTab not wired up yet, a thrown error inside it, etc.),
-        so the tab appears to just not open.
-     We intercept ONLY tab-button clicks, let app3.js's own handler run first,
-     then double-check the result on the next tick: if the pane still isn't
-     visible we do the show/hide ourselves; if it was already visible we
-     force the tab's render function so content actually shows up.
+        all, so the tab appears to just not open.
+     We intercept ONLY 'code'/'context' tab-button clicks — leaving every
+     other tab's click completely untouched — let app3.js's own handler run
+     first, then double-check the result on the next tick: if the pane still
+     isn't visible we do the show/hide ourselves; either way we force the
+     tab's render function so content actually shows up.
+     IMPORTANT: this must stay scoped to just these two tabs. Applying the
+     same "force it open" fallback to every tab previously broke tabs whose
+     real switchToTab does slower/async setup (loading the preview iframe,
+     starting the agent panel, etc.) — our immediate fallback was winning
+     the race and skipping that setup, so those tabs looked "active" but
+     never actually initialized. Do NOT widen the tabId check below without
+     re-testing every tab.
      We do NOT touch switchToTab itself — previous attempts at patching it
      caused wider button-breakage.                                            */
+  var DS_TAB_SAFETY_NET_IDS = { code: 1, context: 1 };
   window.addEventListener('load', function() {
     // Use event delegation on document.body (bubble phase — safe, no interference)
     document.body.addEventListener('click', function(e) {
       var btn = e.target.closest('.tab-button');
       if (!btn) return;
       var tabId = btn.dataset.tab;
-      if (!tabId) return;
+      if (!tabId || !DS_TAB_SAFETY_NET_IDS[tabId]) return;
 
       var pane = document.getElementById(tabId);
       var alreadyActive = pane && pane.classList.contains('active');
