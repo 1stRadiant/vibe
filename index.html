@@ -5881,10 +5881,16 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   /* ── Patch switchToTab (runs after app3.js module has loaded) ──────────────
-     app3.js bails early if the target tab pane already has 'active', which
-     means clicking Full Code or Context a second time renders nothing.
-     We intercept ONLY tab-button clicks and, if the target is already the
-     active pane, force-call the tab's render function directly.
+     Two problems observed in the wild:
+     1) app3.js bails early if the target tab pane already has 'active', which
+        means clicking Full Code or Context a second time renders nothing.
+     2) Occasionally the click never results in the pane becoming visible at
+        all (switchToTab not wired up yet, a thrown error inside it, etc.),
+        so the tab appears to just not open.
+     We intercept ONLY tab-button clicks, let app3.js's own handler run first,
+     then double-check the result on the next tick: if the pane still isn't
+     visible we do the show/hide ourselves; if it was already visible we
+     force the tab's render function so content actually shows up.
      We do NOT touch switchToTab itself — previous attempts at patching it
      caused wider button-breakage.                                            */
   window.addEventListener('load', function() {
@@ -5898,18 +5904,31 @@ document.addEventListener('DOMContentLoaded', function() {
       var pane = document.getElementById(tabId);
       var alreadyActive = pane && pane.classList.contains('active');
 
-      // If it's already active, switchToTab will return early without re-rendering.
-      // Force the relevant render ourselves.
-      if (alreadyActive) {
-        if (tabId === 'code') {
-          if (typeof showFullCode === 'function') { try { showFullCode(); } catch(e){} }
-          var ed = document.getElementById('full-code-editor');
-          _showCodeDropZone(ed && !ed.value);
+      // Let switchToTab (app3.js) run first, then verify it actually worked.
+      setTimeout(function() {
+        var stillHidden = pane && !pane.classList.contains('active');
+        if (stillHidden) {
+          // switchToTab didn't make the pane visible (not loaded yet, threw,
+          // or isn't wired to these elements) — do the switch ourselves.
+          document.querySelectorAll('.tab-content').forEach(function(p){ p.classList.remove('active'); });
+          pane.classList.add('active');
+          document.querySelectorAll('.tab-button').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === tabId); });
         }
-        if (tabId === 'context') {
-          if (typeof renderComponentList === 'function') { try { renderComponentList(); } catch(e){} }
+
+        // If it was already active, switchToTab will have returned early
+        // without re-rendering. Force the relevant render ourselves either
+        // way, since a fresh force-open above also needs its content filled.
+        if (alreadyActive || stillHidden) {
+          if (tabId === 'code') {
+            if (typeof showFullCode === 'function') { try { showFullCode(); } catch(e){} }
+            var ed = document.getElementById('full-code-editor');
+            _showCodeDropZone(ed && !ed.value);
+          }
+          if (tabId === 'context') {
+            if (typeof renderComponentList === 'function') { try { renderComponentList(); } catch(e){} }
+          }
         }
-      }
+      }, 0);
     });
   });
 });
@@ -8368,4 +8387,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </body>
-                                                </html>
+    </html>
