@@ -4641,53 +4641,52 @@ window.dsCopyCode = function() {
     else { window.prompt('Copy the HTML/CSS below:', code); }
 };
 
-/* ── Live project sync — keeps one stable node per device view in the
-   project always up to date with that view's canvas, instead of a
-   one-shot merge ── */
-var DS_NODE_ID = { desktop: 'designer-live-scene', mobile: 'designer-live-scene-mobile' };
-var DS_STORAGE_KEY = { desktop: 'ds_shapes_backup_v1', mobile: 'ds_shapes_backup_v1_mobile' };
+/* ── Persisting the canvas per project/view ──────────────────────────────
+   IMPORTANT: this used to also write a synthetic node into vibeTree.children
+   (tagged type:'html') so the scene would "live in the project". That turned
+   out to be the cause of the Files/Full-Code tabs breaking: those tabs list
+   vibeTree's type:'html' nodes as real project files, and our synthetic
+   node doesn't match whatever shape that code expects — so as soon as it
+   existed in the tree, iterating/rendering the Files or Full-Code tab (or
+   leaving those tabs) could throw and take other tab-switching down with it.
+   We now keep the canvas entirely in localStorage, namespaced per project id
+   + view, and never touch vibeTree. This means the scene doesn't travel
+   with a project ZIP export, but it stays out of the way of the rest of the
+   app — use "Import from Project" / "Sync Now" any time to pull the latest
+   real project code back into the canvas, or push a copy of the canvas's
+   HTML to the clipboard with "Copy Code" to paste in manually. ── */
 var _dsSyncTimer = null;
+
+function _dsStorageKey(view) {
+    return 'ds_scene_v2::' + _dsProjectKey() + '::' + view;
+}
 
 function _dsUpdateSyncStatus(text, color) {
     var el = document.getElementById('ds-sync-status');
     if (!el) return;
     var now = new Date();
     var stamp = now.toLocaleTimeString();
-    el.textContent = text || ('✓ synced to project — ' + stamp);
+    el.textContent = text || ('✓ saved — ' + stamp);
     el.style.color = color || '#98c379';
 }
 
 function _dsRunSync() {
     var view = _dsViewMode;
     var label = DS_VIEWPORTS[view].label;
-    var code = _dsBuildCode();
     var dataJSON = JSON.stringify(_dsShapes);
-    var wroteToProject = false;
-    if (typeof vibeTree !== 'undefined') {
-        if (!vibeTree.children) vibeTree.children = [];
-        var nodeId = DS_NODE_ID[view];
-        var node = vibeTree.children.find(function(n){ return n.id === nodeId; });
-        if (!node) {
-            node = { id: nodeId, type:'html', description:'[Designer] Live scene — ' + label + ' (' + _dsShapes.length + ' elements)', code: code, designerData: dataJSON, children: [] };
-            vibeTree.children.push(node);
-        } else {
-            node.code = code;
-            node.designerData = dataJSON;
-            node.description = '[Designer] Live scene — ' + label + ' (' + _dsShapes.length + ' elements)';
-        }
-        if (typeof autoSaveProject === 'function') autoSaveProject();
-        if (typeof refreshAllUI === 'function') refreshAllUI();
-        wroteToProject = true;
+    try {
+        localStorage.setItem(_dsStorageKey(view), dataJSON);
+        _dsUpdateSyncStatus('✓ saved (' + label + ') — ' + new Date().toLocaleTimeString(), '#98c379');
+    } catch (e) {
+        _dsUpdateSyncStatus('Could not save canvas locally — see console.', '#e06c75');
+        console.error('[Designer] save failed:', e);
     }
-    try { localStorage.setItem(DS_STORAGE_KEY[view], dataJSON); } catch (e) {}
-    _dsUpdateSyncStatus(wroteToProject ? ('✓ synced to project (' + label + ') — ' + new Date().toLocaleTimeString()) : '✓ saved locally (project not loaded yet)', wroteToProject ? '#98c379' : '#e5c07b');
 }
 
-/* Debounced — call after every edit so the project is always close to live
-   without hammering autoSaveProject on every pixel of a drag. */
+/* Debounced — call after every edit so we're not saving on every pixel of a drag. */
 function _dsSyncToProject() {
-    if (!_dsShapes.length && typeof vibeTree === 'undefined') return;
-    _dsUpdateSyncStatus('● syncing…', '#e5c07b');
+    if (!_dsShapes.length) return;
+    _dsUpdateSyncStatus('● saving…', '#e5c07b');
     clearTimeout(_dsSyncTimer);
     _dsSyncTimer = setTimeout(_dsRunSync, 350);
 }
@@ -4699,7 +4698,7 @@ window.dsForceSync = function() {
     var mergeBtn = document.getElementById('ds-merge-btn');
     if (mergeBtn) {
         var orig = mergeBtn.innerHTML;
-        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Synced!';
+        mergeBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Saved!';
         mergeBtn.disabled = true;
         setTimeout(function(){ mergeBtn.innerHTML = orig; mergeBtn.disabled = false; }, 1400);
     }
@@ -4847,14 +4846,14 @@ function _dsGetProjectHtml() {
     return null;
 }
 
-/* True once the project has real HTML content beyond the Designer's own
-   synced scene nodes — i.e. there's an actual project to import. */
+/* True once the project has real HTML content — i.e. there's an actual
+   project to import. (No exclusion needed anymore: the Designer no longer
+   writes anything into vibeTree, so every type:'html' node found here is
+   real project content.) */
 function _dsHasRealProjectContent() {
     try {
         if (typeof vibeTree === 'undefined' || !vibeTree || !vibeTree.children) return false;
-        var ownIds = {};
-        Object.keys(DS_NODE_ID).forEach(function(k) { ownIds[DS_NODE_ID[k]] = true; });
-        return vibeTree.children.some(function(n) { return n && n.type === 'html' && n.code && !ownIds[n.id]; });
+        return vibeTree.children.some(function(n) { return n && n.type === 'html' && n.code; });
     } catch (e) { return false; }
 }
 
@@ -5012,21 +5011,13 @@ async function _dsLoadFromProject() {
     var view = _dsViewMode;
     var vp = DS_VIEWPORTS[view];
     var data = null;
-    if (typeof vibeTree !== 'undefined' && vibeTree.children) {
-        var node = vibeTree.children.find(function(n){ return n.id === DS_NODE_ID[view]; });
-        if (node && node.designerData) {
-            try { data = JSON.parse(node.designerData); } catch (e) {}
-        }
-    }
-    if (!data) {
-        try { var raw = localStorage.getItem(DS_STORAGE_KEY[view]); if (raw) data = JSON.parse(raw); } catch (e) {}
-    }
+    try { var raw = localStorage.getItem(_dsStorageKey(view)); if (raw) data = JSON.parse(raw); } catch (e) {}
     if (data && Array.isArray(data) && data.length) {
         _dsShapes = data;
         _dsSceneByView[view] = _dsShapes;
         _dsActiveId = null;
         if (view === _dsViewMode) { CANVAS_H = _dsComputeCanvasHeight(_dsShapes, vp); _dsApplyCanvasSize(); }
-        _dsUpdateSyncStatus('✓ restored from project', '#87CEEB');
+        _dsUpdateSyncStatus('✓ restored', '#87CEEB');
         dsRenderCanvas();
         dsRenderLayerList();
         _dsSyncPropsBar();
