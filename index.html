@@ -2336,6 +2336,32 @@
                                     <button id="toggle-inspect-button" class="action-button" title="Click to select elements in the preview">Enable Inspect</button>
                                 </div>
                                 <iframe id="website-preview" title="Live Website Preview" style="flex:1; min-height:0; width:100%; border:none; display:block;"></iframe>
+
+                                <!-- ══════════════════════════════════════
+                                     ELEMENT INSPECTOR PANEL
+                                     Shown when an element is clicked while
+                                     Inspect mode is enabled. Lets the user
+                                     view/edit that element's code directly,
+                                     or ask the AI to change it.
+                                ═══════════════════════════════════════ -->
+                                <div id="inspect-panel" style="display:none; flex-shrink:0; max-height:45%; flex-direction:column; border-top:2px solid var(--apui-border-bright, #4169e1); background:rgba(8,12,28,0.98);">
+                                    <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--apui-border, rgba(65,105,225,0.35)); flex-shrink:0; flex-wrap:wrap;">
+                                        <i class="bi bi-bounding-box-circles" style="color:#87CEEB;"></i>
+                                        <span style="font-family:'Orbitron',sans-serif; font-size:0.8rem; color:#87CEEB; letter-spacing:0.5px;">SELECTED ELEMENT:</span>
+                                        <code id="inspect-panel-node-id" style="color:#ffd54f; font-size:0.85rem;">—</code>
+                                        <span id="inspect-panel-node-type" class="badge" style="background:rgba(65,105,225,0.25); font-size:0.7rem; font-weight:600;"></span>
+                                        <button id="inspect-panel-close-button" class="action-button small secondary" style="margin-left:auto;" title="Close inspector">✕</button>
+                                    </div>
+                                    <div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px 12px; gap:8px; overflow:hidden;">
+                                        <textarea id="inspect-panel-code-editor" spellcheck="false" placeholder="Element code will appear here..." style="flex:1; min-height:80px; width:100%; resize:vertical; background:#0a0e18; color:#e6e6ff; border:1px solid var(--apui-border, rgba(65,105,225,0.35)); border-radius:6px; font-family:'Fira Code','Roboto Mono',monospace; font-size:0.82rem; padding:8px; overflow:auto;"></textarea>
+                                        <div id="inspect-panel-status" style="font-size:0.78rem; color:#7a8aaa; min-height:16px;"></div>
+                                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                            <button id="inspect-panel-save-button" class="action-button primary">💾 Save Changes</button>
+                                            <input type="text" id="inspect-panel-ai-prompt" placeholder="Describe an edit for the AI to make to this element..." style="flex:1; min-width:180px; background:#0a0e18; color:#e6e6ff; border:1px solid var(--apui-border, rgba(65,105,225,0.35)); border-radius:6px; padding:6px 10px; font-family:'Rajdhani',sans-serif;">
+                                            <button id="inspect-panel-ai-button" class="action-button primary ai-powered-button">✨ Edit with AI</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -5171,6 +5197,7 @@ async function _loadHtmlFileIntoVibe(file, statusEl) {
           document.querySelectorAll('.tab-content').forEach(function(t){ t.classList.remove('active'); });
           var c = document.getElementById('code');
           if (c) c.classList.add('active');
+          document.querySelectorAll('.tab-button').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === 'code'); });
         }
       } catch(err) {
         if (statusEl) statusEl.textContent = '⚠ Error: ' + err.message;
