@@ -289,6 +289,16 @@ const previewContainer = document.getElementById('website-preview');
 const editorContainer = document.getElementById('vibe-editor');
 const toggleInspectButton = document.getElementById('toggle-inspect-button');
 
+const inspectPanel = document.getElementById('inspect-panel');
+const inspectPanelNodeIdEl = document.getElementById('inspect-panel-node-id');
+const inspectPanelNodeTypeEl = document.getElementById('inspect-panel-node-type');
+const inspectPanelCodeEditor = document.getElementById('inspect-panel-code-editor');
+const inspectPanelStatusEl = document.getElementById('inspect-panel-status');
+const inspectPanelSaveButton = document.getElementById('inspect-panel-save-button');
+const inspectPanelAiPromptInput = document.getElementById('inspect-panel-ai-prompt');
+const inspectPanelAiButton = document.getElementById('inspect-panel-ai-button');
+const inspectPanelCloseButton = document.getElementById('inspect-panel-close-button');
+
 const undoButton = document.getElementById('undo-button');
 const redoButton = document.getElementById('redo-button');
 const shareProjectButton = document.getElementById('share-project-button');
@@ -5314,7 +5324,164 @@ function toggleInspectMode() {
     } catch (e) {
         console.error('Failed to postMessage to iframe for inspect toggle:', e);
     }
+    // Turning inspect off closes the inspector panel too, since it no longer
+    // has anything live to point at. Turning it back on doesn't reopen it —
+    // the user needs to click an element again.
+    if (!inspectEnabled) hideInspectPanel();
 }
+
+// ══════════════════════════════════════════════════════════════════
+// ELEMENT INSPECTOR PANEL — click an element in Inspect mode to see
+// and edit its code right below the preview, manually or with AI.
+// ══════════════════════════════════════════════════════════════════
+let inspectPanelCurrentNodeId = null;
+
+function showInspectPanel(nodeId) {
+    const node = findNodeById(nodeId);
+    if (!node) {
+        console.error(`Inspector: node not found for id '${nodeId}'`);
+        return;
+    }
+    inspectPanelCurrentNodeId = nodeId;
+
+    if (inspectPanelNodeIdEl) inspectPanelNodeIdEl.textContent = node.id;
+    if (inspectPanelNodeTypeEl) inspectPanelNodeTypeEl.textContent = node.type || '';
+    if (inspectPanelCodeEditor) inspectPanelCodeEditor.value = node.code || '';
+    if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '';
+    if (inspectPanelAiPromptInput) inspectPanelAiPromptInput.value = '';
+
+    if (inspectPanel) inspectPanel.style.display = 'flex';
+}
+
+function hideInspectPanel() {
+    inspectPanelCurrentNodeId = null;
+    if (inspectPanel) inspectPanel.style.display = 'none';
+}
+
+function saveInspectPanelCode() {
+    if (!inspectPanelCurrentNodeId) return;
+    const node = findNodeById(inspectPanelCurrentNodeId);
+    if (!node) {
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'Error: node no longer exists.';
+        return;
+    }
+
+    const newCode = inspectPanelCodeEditor.value;
+    if (node.code === newCode) {
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'No changes to save.';
+        return;
+    }
+
+    recordHistory(`Edit code for ${node.id} (inspector)`);
+    node.code = newCode;
+    applyVibes();
+    autoSaveProject();
+
+    if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ Saved!';
+    const btn = inspectPanelSaveButton;
+    if (btn) {
+        const original = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Saved!';
+        setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1200);
+    }
+}
+
+async function runInspectPanelAiEdit() {
+    if (!inspectPanelCurrentNodeId) return;
+    const nodeId = inspectPanelCurrentNodeId;
+    const node = findNodeById(nodeId);
+    if (!node) {
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'Error: node no longer exists.';
+        return;
+    }
+
+    const prompt = (inspectPanelAiPromptInput.value || '').trim();
+    if (!prompt) {
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'Describe what you want the AI to change first.';
+        return;
+    }
+
+    const btn = inspectPanelAiButton;
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Editing... <div class="loading-spinner"></div>';
+    }
+    if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '';
+    showGlobalAgentLoader('AI is editing the selected element...');
+
+    try {
+        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+
+        const systemPrompt = `You are an expert AI developer. Your task is to modify a complete HTML file based on a user's request, which is **focused on a specific component** within the project.
+
+**INPUTS:**
+- **User Request:** The natural language command.
+- **Focus Node ID:** The ID of the component the user's request is about. This is your primary point of reference.
+- **Full Vibe Tree:** The JSON structure of the entire project. Use this to understand the relationships between the focus node and other components (like its CSS or JS dependencies).
+- **Full Current Code:** The complete HTML file you must edit.
+
+**RULES:**
+1.  Analyze the user's request in the context of the component identified by the \`Focus Node ID\`.
+2.  Your changes are **not limited** to the code of the focus node. You must modify any part of the \`Full Current Code\` necessary to achieve the goal. For example, if the user asks to style an HTML node, you should find the correct \`<style>\` block and add the CSS rules there.
+3.  **CRITICAL:** Your output must be **only the new, complete, and valid HTML code for the entire file.** Do not provide explanations, diffs, snippets, or markdown formatting. Your entire response must be the raw HTML source code.
+${getVibeDbInstructionsForAI()}
+${getImageGenerationInstructions()}`;
+
+        const userPrompt = `User Request: "${prompt}"
+Focus Node ID: "${nodeId}"
+
+Full Vibe Tree for context:
+\`\`\`json
+${JSON.stringify(vibeTree, null, 2)}
+\`\`\`
+
+Full Current Code to be modified:
+\`\`\`html
+${fullCurrentCode}
+\`\`\`
+`;
+        console.log(`Inspector: calling AI to edit node '${nodeId}'...`);
+        const newFullCode = await callAI(systemPrompt, userPrompt, false);
+
+        if (!newFullCode || !newFullCode.trim().toLowerCase().includes('</html>')) {
+            throw new Error("AI did not return valid HTML content. It might have been a partial response. Please try again.");
+        }
+
+        recordHistory(`AI edit for ${nodeId} (inspector)`);
+        await processCodeAndRefreshUI(newFullCode);
+        autoSaveProject();
+
+        // Refresh the panel with whatever the node's code looks like now
+        // (the node may have been restructured, so re-look-it-up by id).
+        const updatedNode = findNodeById(nodeId);
+        if (updatedNode) {
+            inspectPanelCodeEditor.value = updatedNode.code || '';
+            if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ AI edit applied!';
+        } else {
+            if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ AI edit applied (element id changed or was replaced).';
+        }
+        inspectPanelAiPromptInput.value = '';
+    } catch (e) {
+        console.error('Inspector AI edit failed:', e);
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = `Error: ${e.message || e}`;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml || '✨ Edit with AI';
+        }
+        hideGlobalAgentLoader();
+    }
+}
+
+// Listen for the iframe telling us an element was clicked while Inspect mode
+// was on, and pop open the inspector panel for that element.
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'vibe-node-click' && event.data.nodeId) {
+        showInspectPanel(event.data.nodeId);
+    }
+});
 
 // --- NEW: Inspector Tree Manipulation ---
 
@@ -5951,6 +6118,34 @@ function initializeMermaid() {
     });
     console.log("Mermaid.js initialized.");
 }
+
+// ── Ask the browser to keep our local project data around ──────────────
+// Without this, browsers are free to silently evict "best-effort" storage
+// (which includes IndexedDB, where local projects live) whenever the device
+// is low on disk space, or — on some browsers — after a period of the site
+// not being used. That silent eviction is almost certainly what causes
+// locally-saved projects to disappear "every now and then". Requesting
+// persistent storage tells the browser this data matters and shouldn't be
+// cleared automatically. It's a best-effort request: some browsers grant it
+// silently based on engagement, others prompt the user, and some may still
+// refuse it — so this reduces the problem but isn't a 100% guarantee, which
+// is also why regularly using "Save to Cloud" as a backup is worthwhile.
+(function requestPersistentLocalStorage() {
+    if (!(navigator.storage && navigator.storage.persist && navigator.storage.persisted)) return;
+    navigator.storage.persisted().then(function(alreadyGranted) {
+        if (alreadyGranted) {
+            console.log('[Storage] Persistent storage already granted — local projects are protected from automatic eviction.');
+            return;
+        }
+        navigator.storage.persist().then(function(granted) {
+            if (granted) {
+                console.log('[Storage] Persistent storage granted — local projects will not be auto-evicted.');
+            } else {
+                console.warn('[Storage] Persistent storage was NOT granted by the browser. Local projects may still be cleared under storage pressure or inactivity — using "Save to Cloud" as a backup is recommended.');
+            }
+        }).catch(function(e) { console.warn('[Storage] persist() request failed:', e); });
+    }).catch(function(e) { console.warn('[Storage] persisted() check failed:', e); });
+})();
 
 const DB_NAME = 'VibeLocalDB';
 const DB_VERSION = 3;
@@ -7124,6 +7319,17 @@ function bindEventListeners() {
     
     handleTabSwitching();
     if (toggleInspectButton) toggleInspectButton.addEventListener('click', toggleInspectMode);
+    if (inspectPanelSaveButton) inspectPanelSaveButton.addEventListener('click', saveInspectPanelCode);
+    if (inspectPanelAiButton) inspectPanelAiButton.addEventListener('click', runInspectPanelAiEdit);
+    if (inspectPanelCloseButton) inspectPanelCloseButton.addEventListener('click', hideInspectPanel);
+    if (inspectPanelAiPromptInput) {
+        inspectPanelAiPromptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                runInspectPanelAiEdit();
+            }
+        });
+    }
     if (undoButton) undoButton.addEventListener('click', doUndo);
     if (redoButton) redoButton.addEventListener('click', doRedo);
     if (shareProjectButton) shareProjectButton.addEventListener('click', handleShareProject);
@@ -10395,4 +10601,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-    }
+                                               }
