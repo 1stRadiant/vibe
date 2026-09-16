@@ -3947,11 +3947,11 @@ function applyVibes() {
     let inspectEnabled = false;
     let hoverEl = null;
     const inspectorStyles = \`.__vibe-inspect-highlight-hover{outline:2px solid #e5c07b !important;outline-offset:2px !important;box-shadow:0 0 8px rgba(229,192,123,.8) !important;cursor:pointer}.__vibe-inspect-highlight-clicked{outline:3px solid #61afef !important;outline-offset:2px !important;box-shadow:0 0 12px rgba(97,175,239,.9) !important;transition:all .5s ease-out !important}\`;
-    function getNodeId(el){const c=el.closest('[data-vibe-node-id]');return c?{nodeId:c.dataset.vibeNodeId,element:c}:null}
     function ensureStyles(){if(document.getElementById('vibe-inspector-styles'))return;const s=document.createElement('style');s.id='vibe-inspector-styles';s.textContent=inspectorStyles;document.head.appendChild(s)}
-    document.addEventListener('mouseover',e=>{if(!inspectEnabled)return;const t=getNodeId(e.target);if(t){if(hoverEl&&hoverEl!==t.element)hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=t.element;hoverEl.classList.add('__vibe-inspect-highlight-hover')}else if(hoverEl){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}});
+    function isSelectable(el){return el && el.nodeType===1 && el!==document.documentElement && el!==document.body && el!==document.head}
+    document.addEventListener('mouseover',e=>{if(!inspectEnabled)return;const t=e.target;if(isSelectable(t)){if(hoverEl&&hoverEl!==t)hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=t;hoverEl.classList.add('__vibe-inspect-highlight-hover')}else if(hoverEl){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}});
     document.addEventListener('mouseout',e=>{if(hoverEl&&!hoverEl.contains(e.relatedTarget)){hoverEl.classList.remove('__vibe-inspect-highlight-hover');hoverEl=null}});
-    document.addEventListener('click',e=>{if(!inspectEnabled)return;const t=getNodeId(e.target);if(t){e.preventDefault();e.stopPropagation();window.parent.postMessage({type:'vibe-node-click',nodeId:t.nodeId},'*');if(hoverEl)hoverEl.classList.remove('__vibe-inspect-highlight-hover');const el=t.element;el.classList.add('__vibe-inspect-highlight-clicked');setTimeout(()=>el.classList.remove('__vibe-inspect-highlight-clicked'),500)}},true);
+    document.addEventListener('click',e=>{if(!inspectEnabled)return;const el=e.target;if(!isSelectable(el))return;e.preventDefault();e.stopPropagation();const vnode=el.closest('[data-vibe-node-id]');window.parent.postMessage({type:'vibe-node-click',nodeId:vnode?vnode.dataset.vibeNodeId:null,outerHTML:el.outerHTML,tagName:el.tagName.toLowerCase(),elementId:el.id||'',className:(typeof el.className==='string')?el.className:''},'*');if(hoverEl)hoverEl.classList.remove('__vibe-inspect-highlight-hover');el.classList.add('__vibe-inspect-highlight-clicked');setTimeout(()=>el.classList.remove('__vibe-inspect-highlight-clicked'),500)},true);
 
     // --- Part 2: Console and Error Proxy Logic ---
     const MAX_DEPTH = 5;
@@ -5333,20 +5333,51 @@ function toggleInspectMode() {
 // ══════════════════════════════════════════════════════════════════
 // ELEMENT INSPECTOR PANEL — click an element in Inspect mode to see
 // and edit its code right below the preview, manually or with AI.
+//
+// The panel always shows the exact outerHTML of the element that was
+// clicked (not the larger vibe-tree node it happens to live inside),
+// so selecting a button only shows that button's code, not the whole
+// page. Saves work by patching that exact snippet directly into the
+// full document text and re-deriving the project from it — this
+// works whether or not the project has been broken into a structured
+// vibe tree yet.
 // ══════════════════════════════════════════════════════════════════
-let inspectPanelCurrentNodeId = null;
+let inspectPanelState = null; // { nodeId, outerHTML, tagName, elementId, className }
 
-function showInspectPanel(nodeId) {
-    const node = findNodeById(nodeId);
-    if (!node) {
-        console.error(`Inspector: node not found for id '${nodeId}'`);
-        return;
+function getCurrentFullCode() {
+    return (vibeTree && vibeTree.type === 'raw-html-container')
+        ? (vibeTree.code || '')
+        : generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+}
+
+function showInspectPanel(data) {
+    if (!data || !data.outerHTML) return;
+    inspectPanelState = {
+        nodeId: data.nodeId || null,
+        outerHTML: data.outerHTML,
+        tagName: data.tagName || 'element',
+        elementId: data.elementId || '',
+        className: data.className || ''
+    };
+
+    const label = inspectPanelState.elementId
+        ? `<${inspectPanelState.tagName}> #${inspectPanelState.elementId}`
+        : (inspectPanelState.className
+            ? `<${inspectPanelState.tagName}> .${inspectPanelState.className.trim().split(/\s+/).join('.')}`
+            : `<${inspectPanelState.tagName}>`);
+    if (inspectPanelNodeIdEl) inspectPanelNodeIdEl.textContent = label;
+
+    if (inspectPanelNodeTypeEl) {
+        const node = inspectPanelState.nodeId ? findNodeById(inspectPanelState.nodeId) : null;
+        if (node) {
+            inspectPanelNodeTypeEl.textContent = node.type;
+            inspectPanelNodeTypeEl.style.display = '';
+        } else {
+            inspectPanelNodeTypeEl.style.display = 'none';
+        }
     }
-    inspectPanelCurrentNodeId = nodeId;
 
-    if (inspectPanelNodeIdEl) inspectPanelNodeIdEl.textContent = node.id;
-    if (inspectPanelNodeTypeEl) inspectPanelNodeTypeEl.textContent = node.type || '';
-    if (inspectPanelCodeEditor) inspectPanelCodeEditor.value = node.code || '';
+    if (inspectPanelCodeEditor) inspectPanelCodeEditor.value = inspectPanelState.outerHTML;
     if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '';
     if (inspectPanelAiPromptInput) inspectPanelAiPromptInput.value = '';
 
@@ -5354,47 +5385,45 @@ function showInspectPanel(nodeId) {
 }
 
 function hideInspectPanel() {
-    inspectPanelCurrentNodeId = null;
+    inspectPanelState = null;
     if (inspectPanel) inspectPanel.style.display = 'none';
 }
 
 function saveInspectPanelCode() {
-    if (!inspectPanelCurrentNodeId) return;
-    const node = findNodeById(inspectPanelCurrentNodeId);
-    if (!node) {
-        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'Error: node no longer exists.';
-        return;
-    }
+    if (!inspectPanelState) return;
 
-    const newCode = inspectPanelCodeEditor.value;
-    if (node.code === newCode) {
+    const oldOuterHTML = inspectPanelState.outerHTML;
+    const newOuterHTML = inspectPanelCodeEditor.value;
+    if (newOuterHTML === oldOuterHTML) {
         if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'No changes to save.';
         return;
     }
 
-    recordHistory(`Edit code for ${node.id} (inspector)`);
-    node.code = newCode;
-    applyVibes();
-    autoSaveProject();
-
-    if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ Saved!';
-    const btn = inspectPanelSaveButton;
-    if (btn) {
-        const original = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Saved!';
-        setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1200);
+    const currentFullCode = getCurrentFullCode();
+    const idx = currentFullCode.indexOf(oldOuterHTML);
+    if (idx === -1) {
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = "Couldn't find this exact element in the code anymore (the page may have changed since you selected it) — try clicking it again, or use Edit with AI instead.";
+        return;
     }
+
+    const newFullCode = currentFullCode.slice(0, idx) + newOuterHTML + currentFullCode.slice(idx + oldOuterHTML.length);
+    recordHistory(`Edit <${inspectPanelState.tagName}> (inspector)`);
+
+    Promise.resolve(processCodeAndRefreshUI(newFullCode)).then(() => {
+        inspectPanelState.outerHTML = newOuterHTML;
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ Saved!';
+        const btn = inspectPanelSaveButton;
+        if (btn) {
+            const original = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Saved!';
+            setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1200);
+        }
+    });
 }
 
 async function runInspectPanelAiEdit() {
-    if (!inspectPanelCurrentNodeId) return;
-    const nodeId = inspectPanelCurrentNodeId;
-    const node = findNodeById(nodeId);
-    if (!node) {
-        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = 'Error: node no longer exists.';
-        return;
-    }
+    if (!inspectPanelState) return;
 
     const prompt = (inspectPanelAiPromptInput.value || '').trim();
     if (!prompt) {
@@ -5412,56 +5441,53 @@ async function runInspectPanelAiEdit() {
     showGlobalAgentLoader('AI is editing the selected element...');
 
     try {
-        const fullCurrentCode = generateFullCodeString(vibeTree, currentUser?.userId, currentProjectId);
+        const isRaw = vibeTree && vibeTree.type === 'raw-html-container';
+        const fullCurrentCode = getCurrentFullCode();
+        const focusDescriptor = `<${inspectPanelState.tagName}${inspectPanelState.elementId ? ` id="${inspectPanelState.elementId}"` : ''}${inspectPanelState.className ? ` class="${inspectPanelState.className}"` : ''}>`;
 
-        const systemPrompt = `You are an expert AI developer. Your task is to modify a complete HTML file based on a user's request, which is **focused on a specific component** within the project.
+        const systemPrompt = `You are an expert AI developer. Your task is to modify a complete HTML file based on a user's request, which is **focused on one specific element** the user selected in the live preview.
 
 **INPUTS:**
 - **User Request:** The natural language command.
-- **Focus Node ID:** The ID of the component the user's request is about. This is your primary point of reference.
-- **Full Vibe Tree:** The JSON structure of the entire project. Use this to understand the relationships between the focus node and other components (like its CSS or JS dependencies).
-- **Full Current Code:** The complete HTML file you must edit.
+- **Selected Element:** A short description of the exact element the user clicked, plus its exact current HTML. This is your primary point of reference — locate this exact snippet in the Full Current Code before editing.
+${isRaw ? '' : '- **Full Vibe Tree:** The JSON structure of the project. Use this to understand relationships (e.g. shared CSS/JS) but the HTML file is the source of truth to edit.\n'}- **Full Current Code:** The complete HTML file you must edit.
 
 **RULES:**
-1.  Analyze the user's request in the context of the component identified by the \`Focus Node ID\`.
-2.  Your changes are **not limited** to the code of the focus node. You must modify any part of the \`Full Current Code\` necessary to achieve the goal. For example, if the user asks to style an HTML node, you should find the correct \`<style>\` block and add the CSS rules there.
-3.  **CRITICAL:** Your output must be **only the new, complete, and valid HTML code for the entire file.** Do not provide explanations, diffs, snippets, or markdown formatting. Your entire response must be the raw HTML source code.
+1. Focus your change on the Selected Element, but you may edit any other part of the file necessary to achieve the goal (e.g. adding a CSS rule in a <style> block, or a JS handler in a <script> block).
+2. **CRITICAL:** Your output must be **only the new, complete, and valid HTML code for the entire file.** Do not provide explanations, diffs, snippets, or markdown formatting. Your entire response must be the raw HTML source code.
 ${getVibeDbInstructionsForAI()}
 ${getImageGenerationInstructions()}`;
 
         const userPrompt = `User Request: "${prompt}"
-Focus Node ID: "${nodeId}"
 
+Selected Element: ${focusDescriptor}
+Its exact current HTML:
+\`\`\`html
+${inspectPanelState.outerHTML}
+\`\`\`
+${isRaw ? '' : `
 Full Vibe Tree for context:
 \`\`\`json
 ${JSON.stringify(vibeTree, null, 2)}
 \`\`\`
-
+`}
 Full Current Code to be modified:
 \`\`\`html
 ${fullCurrentCode}
 \`\`\`
 `;
-        console.log(`Inspector: calling AI to edit node '${nodeId}'...`);
+        console.log(`Inspector: calling AI to edit <${inspectPanelState.tagName}>...`);
         const newFullCode = await callAI(systemPrompt, userPrompt, false);
 
         if (!newFullCode || !newFullCode.trim().toLowerCase().includes('</html>')) {
             throw new Error("AI did not return valid HTML content. It might have been a partial response. Please try again.");
         }
 
-        recordHistory(`AI edit for ${nodeId} (inspector)`);
+        recordHistory(`AI edit for <${inspectPanelState.tagName}> (inspector)`);
         await processCodeAndRefreshUI(newFullCode);
         autoSaveProject();
 
-        // Refresh the panel with whatever the node's code looks like now
-        // (the node may have been restructured, so re-look-it-up by id).
-        const updatedNode = findNodeById(nodeId);
-        if (updatedNode) {
-            inspectPanelCodeEditor.value = updatedNode.code || '';
-            if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ AI edit applied!';
-        } else {
-            if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ AI edit applied (element id changed or was replaced).';
-        }
+        if (inspectPanelStatusEl) inspectPanelStatusEl.textContent = '✓ AI edit applied! Click the element again to keep editing it.';
         inspectPanelAiPromptInput.value = '';
     } catch (e) {
         console.error('Inspector AI edit failed:', e);
@@ -5478,8 +5504,8 @@ ${fullCurrentCode}
 // Listen for the iframe telling us an element was clicked while Inspect mode
 // was on, and pop open the inspector panel for that element.
 window.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'vibe-node-click' && event.data.nodeId) {
-        showInspectPanel(event.data.nodeId);
+    if (event.data && event.data.type === 'vibe-node-click' && event.data.outerHTML) {
+        showInspectPanel(event.data);
     }
 });
 
@@ -10601,4 +10627,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                                               }
+          }
