@@ -789,6 +789,119 @@
             font-size: max(16px, 1em) !important;
         }
     }
+
+    /* ═══════════════════════════════════════════════════════════
+       JARVIS BRAIN — chat, next-up cards, system log, tracker modes
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Navbar launcher badge */
+    .jv-nav-badge {
+        position: absolute; top: -3px; right: -4px; min-width: 14px; height: 14px; padding: 0 3px;
+        border-radius: 7px; background: var(--ai-glow); color: #000; font: 700 0.55rem/14px 'Fira Code', monospace;
+        text-align: center; pointer-events: none;
+    }
+
+    /* Chat pane */
+    #jpr-pane-chat { overflow: hidden; }
+    .jv-next { flex-shrink: 0; border-bottom: 1px solid rgba(255,0,255,0.12); background: rgba(255,0,255,0.025); }
+    .jv-next-head {
+        display: flex; align-items: center; gap: 6px; padding: 6px 12px; cursor: pointer;
+        font-family: 'Fira Code', monospace; font-size: 0.58rem; color: rgba(255,0,255,0.7); user-select: none;
+    }
+    .jv-next-head .jv-spacer { flex: 1; }
+    .jv-next-head button { background: transparent; border: none; color: #777; cursor: pointer; font-size: 0.62rem; font-family: inherit; padding: 0 2px; }
+    .jv-next-head button:hover { color: var(--ai-glow); }
+    .jv-next-list { max-height: 176px; overflow-y: auto; padding: 0 8px 6px; }
+    .jv-next.collapsed .jv-next-list { display: none; }
+    .jv-card {
+        display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; margin-bottom: 4px;
+        background: rgba(10,14,28,0.8); border: 1px solid rgba(255,255,255,0.06); border-left: 2px solid var(--ai-glow); border-radius: 4px;
+    }
+    .jv-card.kind-err { border-left-color: #ef5350; }
+    .jv-card.kind-note { border-left-color: #ffb74d; }
+    .jv-card.kind-pred { border-left-color: var(--ai-edit); }
+    .jv-card-main { flex: 1; min-width: 0; display: flex; gap: 7px; }
+    .jv-card-icon { font-size: 0.8rem; line-height: 1.3; }
+    .jv-card-title { font-size: 0.74rem; color: var(--text); font-weight: 600; line-height: 1.3; }
+    .jv-card-why { font-size: 0.66rem; color: #7a819a; line-height: 1.4; margin-top: 1px; word-break: break-word; }
+    .jv-card-btns { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+    .jv-x { background: transparent; border: none; color: #444; cursor: pointer; font-size: 0.7rem; padding: 2px 4px; }
+    .jv-x:hover { color: #ff6b6b; }
+
+    .jv-chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .jv-msg { padding: 8px 11px; border-radius: 8px; font-size: 0.78rem; line-height: 1.55; max-width: 94%; word-wrap: break-word; overflow-wrap: anywhere; }
+    .jv-user { align-self: flex-end; background: rgba(65,105,225,0.32); color: #fff; border-bottom-right-radius: 2px; }
+    .jv-ai { align-self: flex-start; background: rgba(255,0,255,0.06); border: 1px solid rgba(255,0,255,0.2); border-bottom-left-radius: 2px; color: var(--text); }
+    .jv-ai.jv-welcome { background: transparent; border: 1px dashed rgba(255,255,255,0.12); color: #9aa1bd; font-size: 0.72rem; }
+    .jv-meta { font-family: 'Fira Code', monospace; font-size: 0.52rem; color: #555; margin-top: 4px; }
+    .jv-code { margin: 6px 0; padding: 7px 9px; background: #07090f; border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; overflow-x: auto; font-family: 'Fira Code', monospace; font-size: 0.64rem; line-height: 1.5; white-space: pre; }
+    .jv-inline { font-family: 'Fira Code', monospace; font-size: 0.68rem; background: rgba(0,0,0,0.4); padding: 1px 4px; border-radius: 3px; color: #f5c2ff; }
+    .jv-node-ref { font-family: 'Fira Code', monospace; font-size: 0.66rem; color: var(--ai-edit); background: rgba(0,255,204,0.08); border: 1px solid rgba(0,255,204,0.25); border-radius: 3px; padding: 0 4px; cursor: pointer; }
+    .jv-node-ref:hover { background: rgba(0,255,204,0.18); }
+    .jv-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    .jv-act { background: rgba(255,0,255,0.12); border: 1px solid rgba(255,0,255,0.4); color: #ffb3ff; border-radius: 4px; padding: 3px 9px; font: 600 0.66rem 'Rajdhani', sans-serif; cursor: pointer; }
+    .jv-act:hover { background: rgba(255,0,255,0.28); }
+    .jv-act.used { opacity: 0.4; cursor: default; text-decoration: line-through; }
+    .jv-typing { display: flex; gap: 4px; align-items: center; padding: 11px 14px; }
+    .jv-typing span { width: 5px; height: 5px; border-radius: 50%; background: var(--ai-glow); opacity: 0.35; animation: jv-dot 1s infinite; }
+    .jv-typing span:nth-child(2) { animation-delay: 0.15s; }
+    .jv-typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes jv-dot { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+    @media (prefers-reduced-motion: reduce) { .jv-typing span { animation: none; opacity: 0.7; } }
+
+    .jv-chips { flex-shrink: 0; display: flex; gap: 5px; overflow-x: auto; padding: 0 10px 6px; scrollbar-width: none; }
+    .jv-chips::-webkit-scrollbar { display: none; }
+    .jv-chip { flex-shrink: 0; background: rgba(65,105,225,0.1); border: 1px solid rgba(65,105,225,0.35); color: var(--secondary); border-radius: 12px; padding: 3px 10px; font: 600 0.66rem 'Rajdhani', sans-serif; cursor: pointer; white-space: nowrap; }
+    .jv-chip:hover { background: rgba(65,105,225,0.25); }
+    .jv-composer { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid rgba(255,0,255,0.15); background: rgba(10,6,20,0.9); }
+    #jv-input { flex: 1; background: rgba(16,24,48,0.8); border: 1px solid rgba(255,0,255,0.25); border-radius: 5px; color: var(--text); font: 0.78rem/1.4 'Rajdhani', sans-serif; padding: 7px 9px; resize: none; }
+    #jv-input:focus { outline: none; border-color: rgba(255,0,255,0.6); }
+    .jv-foot { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 4px 12px 7px; font-family: 'Fira Code', monospace; font-size: 0.56rem; color: #555; }
+    .jv-foot label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .jv-foot button { background: transparent; border: none; color: #666; font: inherit; cursor: pointer; padding: 0; }
+    .jv-foot button:hover { color: var(--ai-glow); }
+    .jv-foot .jv-spacer { flex: 1; }
+
+    /* PR reject reason */
+    .jpr-reason { flex: 1; min-width: 90px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text); font: 0.66rem 'Rajdhani', sans-serif; padding: 3px 7px; }
+    .jpr-reason:focus { outline: none; border-color: rgba(239,83,80,0.6); }
+
+    /* System log (shared by tracker sidebar and Jarvis panel) */
+    .sl-toolbar { flex-shrink: 0; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 6px; }
+    .sl-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+    .sl-filter { background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #777; border-radius: 10px; padding: 1px 8px; font: 600 0.62rem 'Rajdhani', sans-serif; cursor: pointer; }
+    .sl-filter:hover { color: var(--secondary); border-color: rgba(65,105,225,0.5); }
+    .sl-filter.active { color: var(--secondary); border-color: var(--primary); background: rgba(65,105,225,0.18); }
+    .sl-search { width: 100%; background: rgba(16,24,48,0.8); border: 1px solid rgba(65,105,225,0.25); border-radius: 4px; color: var(--text); font: 0.7rem 'Rajdhani', sans-serif; padding: 4px 8px; }
+    .sl-search:focus { outline: none; border-color: rgba(65,105,225,0.6); }
+    .sl-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 0 8px; }
+    .sl-day { position: sticky; top: 0; z-index: 1; padding: 4px 12px; background: rgba(8,12,24,0.96); font: 600 0.58rem 'Fira Code', monospace; color: #566; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .sl-row { display: flex; gap: 7px; padding: 5px 12px; border-left: 2px solid transparent; }
+    .sl-row:hover { background: rgba(65,105,225,0.05); }
+    .sl-time { flex-shrink: 0; width: 34px; font: 0.55rem 'Fira Code', monospace; color: #4a5068; padding-top: 2px; }
+    .sl-icon { flex-shrink: 0; font-size: 0.72rem; width: 16px; text-align: center; }
+    .sl-msg { flex: 1; min-width: 0; font-size: 0.72rem; line-height: 1.4; color: rgba(230,230,255,0.78); word-break: break-word; }
+    .sl-node { font: 0.58rem 'Fira Code', monospace; color: var(--ai-edit); background: rgba(0,255,204,0.07); border-radius: 3px; padding: 0 4px; margin-left: 3px; cursor: pointer; }
+    .sl-node.gone { color: #667; background: rgba(255,255,255,0.04); cursor: default; }
+    .sl-count { font: 0.55rem 'Fira Code', monospace; color: #888; }
+    .sl-row.t-error { border-left-color: #ef5350; background: rgba(239,83,80,0.05); }
+    .sl-row.t-fix, .sl-row.t-pr-merge { border-left-color: #66bb6a; }
+    .sl-row.t-pr-reject { border-left-color: #ef5350; }
+    .sl-row.t-pr-open, .sl-row.t-ai, .sl-row.t-task, .sl-row.t-predict, .sl-row.t-chat { border-left-color: rgba(255,0,255,0.55); }
+    .sl-row.t-open { border-left-color: var(--secondary); }
+    .sl-row.t-note { border-left-color: #ffb74d; }
+    .sl-empty { padding: 22px 16px; text-align: center; font: 0.65rem/1.9 'Fira Code', monospace; color: #444; }
+    .sl-foot { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid rgba(255,255,255,0.05); font: 0.56rem 'Fira Code', monospace; color: #555; }
+    .sl-foot .jv-spacer { flex: 1; }
+
+    /* Tracker sidebar: Notes | System log switch */
+    .rs-modes { display: flex; flex-shrink: 0; border-bottom: 1px solid rgba(65,105,225,0.2); }
+    .rs-mode { flex: 1; background: transparent; border: none; border-bottom: 2px solid transparent; color: #667; padding: 7px 4px; font: 700 0.72rem 'Rajdhani', sans-serif; cursor: pointer; }
+    .rs-mode:hover { color: #99a; }
+    .rs-mode.active { color: var(--secondary); border-bottom-color: var(--primary); background: rgba(65,105,225,0.08); }
+    .rs-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    #rs-log-view { display: none; }
+    #rs-log-count { font: 0.55rem 'Fira Code', monospace; color: #667; margin-left: 3px; }
 </style>
 </head>
 <body>
@@ -800,7 +913,7 @@
     <button class="btn-icon" title="Toggle Sidebar" onclick="toggleSidebar()">☰</button>
     <div class="navbar-brand">APUI<small>Vibe Tree Editor</small></div>
     <div class="navbar-input-area">
-        <input type="text" id="user-input" placeholder="AI command — describe an edit… (attach 📷 for visual context)">
+        <input type="text" id="user-input" placeholder="Ask Jarvis a question, or describe an edit…  (📷 attaches the preview)">
         <button class="btn-main" onclick="handleCommand()">RUN</button>
     </div>
     <!-- Vision controls -->
@@ -814,6 +927,7 @@
     </div>
     <button class="btn-main" style="background: var(--ai-edit); color:#000; margin-left:8px;" onclick="pushAllToVibeTree()" title="Push all edits to Vibe System">⬆ PUSH</button>
     <button class="btn-main success" style="margin-left:6px;" onclick="downloadProject()">⬇ EXPORT</button>
+    <button class="btn-icon" id="jarvis-toggle-btn" title="Talk to Jarvis" onclick="JarvisBrain.openChat()" style="margin-left:6px; font-size:1.1rem; position:relative;">🤖<span id="jv-nav-badge" class="jv-nav-badge" style="display:none"></span></button>
     <button class="btn-icon" title="Toggle Session Tracker" onclick="toggleRSidebar()" style="margin-left:6px; font-size:1.1rem;" id="tracker-toggle-btn">📋</button>
 </div>
 
@@ -869,53 +983,90 @@
 </div>
 <div id="overview-banner">Tap any node to open it · Pinch in to exit overview</div>
 
-<!-- Right Sidebar: Session Notes -->
+<!-- Right Sidebar: Tracker (per-project notes + system log) -->
 <div id="rsidebar">
     <div class="rsidebar-header">
-        <span class="rsidebar-title">🗒 Session Notes</span>
-        <div class="rsidebar-actions">
+        <span class="rsidebar-title">🗒 Tracker</span>
+        <div class="rsidebar-actions" id="rs-note-actions">
             <button class="rsidebar-btn" onclick="threadNew()" title="New thread">＋ Thread</button>
             <button class="rsidebar-btn danger" onclick="threadClearAll()" title="Clear all">Clear</button>
         </div>
     </div>
-    <!-- Thread tabs -->
-    <div id="thread-tabs"></div>
-    <!-- Active thread notes -->
-    <div id="thread-notes-area">
-        <div id="thread-empty-msg" style="padding:24px 16px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#333;line-height:1.9;">
-            No threads yet.<br>Tap ＋ Thread to start a session.
-        </div>
-        <div id="thread-note-list"></div>
+    <div class="rs-modes">
+        <button class="rs-mode active" data-mode="notes" onclick="rsMode('notes')">Notes</button>
+        <button class="rs-mode" data-mode="log" onclick="rsMode('log')">System log<span id="rs-log-count"></span></button>
     </div>
-    <!-- Note composer -->
-    <div id="note-composer">
-        <textarea id="note-input" placeholder="Write a note… (Enter to save)" rows="2"></textarea>
-        <div id="note-composer-actions">
-            <button class="note-status-btn" data-status="neutral" onclick="setNoteStatus('neutral')" title="Neutral">⬜</button>
-            <button class="note-status-btn" data-status="works"   onclick="setNoteStatus('works')"   title="Works">✅</button>
-            <button class="note-status-btn" data-status="broken"  onclick="setNoteStatus('broken')"  title="Doesn't work">❌</button>
-            <button class="note-status-btn" data-status="todo"    onclick="setNoteStatus('todo')"    title="To-do">🔲</button>
-            <button class="note-composer-save" onclick="saveNote()">Save</button>
+
+    <!-- Notes view (per project) -->
+    <div class="rs-view" id="rs-notes-view">
+        <div id="thread-tabs"></div>
+        <div id="thread-notes-area">
+            <div id="thread-empty-msg" style="padding:24px 16px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#333;line-height:1.9;">
+                No threads yet.<br>Tap ＋ Thread to start a session.
+            </div>
+            <div id="thread-note-list"></div>
+        </div>
+        <div id="note-composer">
+            <textarea id="note-input" placeholder="Write a note… (Enter to save)" rows="2"></textarea>
+            <div id="note-composer-actions">
+                <button class="note-status-btn" data-status="neutral" onclick="setNoteStatus('neutral')" title="Neutral">⬜</button>
+                <button class="note-status-btn" data-status="works"   onclick="setNoteStatus('works')"   title="Works">✅</button>
+                <button class="note-status-btn" data-status="broken"  onclick="setNoteStatus('broken')"  title="Doesn't work">❌</button>
+                <button class="note-status-btn" data-status="todo"    onclick="setNoteStatus('todo')"    title="To-do">🔲</button>
+                <button class="note-composer-save" onclick="saveNote()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System log view (per project, persistent) -->
+    <div class="rs-view" id="rs-log-view">
+        <div class="sl-toolbar">
+            <div class="sl-filters" id="rs-log-filters"></div>
+            <input class="sl-search" id="rs-log-search" type="search" placeholder="Search this project's log…">
+        </div>
+        <div class="sl-list" id="rs-log-list"></div>
+        <div class="sl-foot">
+            <span id="rs-log-foot"></span><span class="jv-spacer"></span>
+            <button class="rsidebar-btn" onclick="SystemLog.exportJson()">Export</button>
+            <button class="rsidebar-btn danger" onclick="SystemLog.clear()">Clear</button>
         </div>
     </div>
 </div>
 
-<!-- Jarvis PR Panel -->
+<!-- Jarvis panel: chat · tasks · PRs · project system log -->
 <div id="jarvis-pr-panel">
     <div class="jpr-header">
         <span style="font-size:1.1rem;">🤖</span>
-        <span class="jpr-title">JARVIS / PR REVIEW</span>
+        <span class="jpr-title">JARVIS</span>
         <button class="jpr-close-btn" onclick="jarvisPRPanelClose()" title="Close panel">✕</button>
     </div>
 
     <div class="jpr-tabs">
-        <div class="jpr-tab active" data-tab="tasks" onclick="jarvisPRTab('tasks')">Tasks<span class="jpr-badge" id="jpr-badge-tasks" style="display:none"></span></div>
+        <div class="jpr-tab active" data-tab="chat" onclick="jarvisPRTab('chat')">Chat</div>
+        <div class="jpr-tab" data-tab="tasks" onclick="jarvisPRTab('tasks')">Tasks<span class="jpr-badge" id="jpr-badge-tasks" style="display:none"></span></div>
         <div class="jpr-tab" data-tab="prs" onclick="jarvisPRTab('prs')">PRs<span class="jpr-badge" id="jpr-badge-prs" style="display:none"></span></div>
         <div class="jpr-tab" data-tab="log" onclick="jarvisPRTab('log')">Log</div>
     </div>
 
+    <!-- Chat Tab -->
+    <div class="jpr-tab-pane active" id="jpr-pane-chat">
+        <div class="jv-next" id="jv-next" style="display:none"></div>
+        <div class="jv-chat-list" id="jv-chat-list"></div>
+        <div class="jv-chips" id="jv-chips"></div>
+        <div class="jv-composer">
+            <textarea id="jv-input" rows="2" placeholder="Ask about this project…  (/help for commands)"></textarea>
+            <button class="jpr-btn primary" onclick="JarvisBrain.sendFromInput()">Ask</button>
+        </div>
+        <div class="jv-foot">
+            <label title="Jarvis flags new errors and refreshes predictions after merges"><input type="checkbox" id="jv-proactive" onchange="JarvisBrain.setProactive(this.checked)" checked> Proactive</label>
+            <span class="jv-spacer"></span>
+            <button onclick="JarvisBrain.predict(true)" title="Predict next steps from the project log">🔮 Predict</button>
+            <button onclick="JarvisBrain.clearChat()">Clear chat</button>
+        </div>
+    </div>
+
     <!-- Tasks Tab -->
-    <div class="jpr-tab-pane active" id="jpr-pane-tasks">
+    <div class="jpr-tab-pane" id="jpr-pane-tasks">
         <div class="jpr-task-composer">
             <textarea id="jpr-task-input" class="jpr-task-input" rows="2" placeholder="Describe a task for Jarvis… (e.g. 'Add smooth scroll to nav links')"></textarea>
             <div class="jpr-task-actions">
@@ -942,14 +1093,17 @@
         <div id="jpr-pr-list" style="flex:1;overflow-y:auto;"></div>
     </div>
 
-    <!-- Log Tab -->
+    <!-- Log Tab: the same persistent per-project system log as the tracker -->
     <div class="jpr-tab-pane" id="jpr-pane-log">
-        <div style="padding:6px 12px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;gap:6px;flex-shrink:0;align-items:center;">
-            <span style="font-family:'Fira Code',monospace;font-size:0.58rem;color:#555;flex:1;">Activity log</span>
-            <button class="jpr-btn" onclick="jarvisClearLog()" style="font-size:0.58rem;padding:3px 8px;">Clear</button>
+        <div class="sl-toolbar">
+            <div class="sl-filters" id="jpr-log-filters"></div>
+            <input class="sl-search" id="jpr-log-search" type="search" placeholder="Search this project's log…">
         </div>
-        <div class="jpr-log-list" id="jpr-log-list">
-            <div style="padding:20px 12px;text-align:center;font-family:'Fira Code',monospace;font-size:0.65rem;color:#333;" id="jpr-log-empty">No activity yet.</div>
+        <div class="sl-list" id="jpr-log-list"></div>
+        <div class="sl-foot">
+            <span id="jpr-log-foot"></span><span class="jv-spacer"></span>
+            <button class="jpr-btn" onclick="SystemLog.exportJson()" style="font-size:0.58rem;padding:3px 8px;">Export</button>
+            <button class="jpr-btn danger" onclick="SystemLog.clear()" style="font-size:0.58rem;padding:3px 8px;">Clear</button>
         </div>
     </div>
 
@@ -1016,7 +1170,17 @@ window.addEventListener('message', e => {
 
     // Parent sends full vibeTree whenever APUI tab is activated
     if (d.type === 'apui-init' && d.vibeTree) {
-        receiveVibeTree(d.vibeTree, d.pinnedNodes);
+        // Route through the project store: it switches per-project memory, logs what changed
+        // outside APUI, then hands the tree to the editor.
+        ProjectStore.pendingInit = true;
+        ProjectStore.enqueue(async () => {
+            try {
+                const changed = await ProjectStore.enter(d.projectId);
+                SystemLog.noteTreeArrival(d.vibeTree, changed, ProjectStore.projectId);
+                receiveVibeTree(d.vibeTree, d.pinnedNodes);
+                if (changed) JarvisBrain.renderAll();
+            } finally { ProjectStore.pendingInit = false; }
+        });
         return;
     }
     // Parent broadcasts current pin set (after pin/unpin from app3.js bridge)
@@ -1031,13 +1195,26 @@ window.addEventListener('message', e => {
     }
     // Parent reports a runtime error attributed to a node
     if (d.type === 'apui-node-error' && d.nodeId != null) {
-        setNodeError(d.nodeId, d.message || 'Unknown error');
+        const em = d.message || 'Unknown error';
+        if (nodeErrors[d.nodeId] !== em) SystemLog.add('error', `[${d.nodeId}] ${truncate(em, 200)}`, { node: d.nodeId, src: 'system' });
+        setNodeError(d.nodeId, em);
+        JarvisBrain.onError(em, d.nodeId);
+        return;
+    }
+    // Runtime errors from the main app's own preview/console (parent has no node to blame)
+    if (d.type === 'apui-outer-console-error' && d.message) {
+        SystemLog.add('error', `Main app: ${truncate(String(d.message), 200)}`, { src: 'parent' });
+        JarvisBrain.onError(d.message, null);
         return;
     }
     // iframe console relay
     if (d.type === 'console') {
         logToConsole(d.msg, d.level || 'info');
-        if (d.level === 'error') attributeRuntimeError(d.msg);
+        if (d.level === 'error') {
+            SystemLog.add('error', `Preview: ${truncate(String(d.msg), 200)}`, { src: 'system' });
+            attributeRuntimeError(d.msg);
+            JarvisBrain.onError(d.msg, null);
+        }
         return;
     }
 
@@ -1049,11 +1226,14 @@ window.addEventListener('message', e => {
         const goal = (d.goal || '').trim();
         if (!goal) { logToChat('system', '⚠ apui-jarvis-start: no goal provided'); return; }
         logToChat('system', `🤖 Jarvis: task queued from parent — "${goal}"`);
-        JarvisPR.addTask(goal);
-        // Don't force-open the panel — run silently, PR will be waiting when user checks
-        JarvisPR.runNext();
-        // Update badge so user notices a PR is ready
-        JarvisPR._updateBadges();
+        // Make sure the right project's memory is active before queueing
+        ProjectStore.enqueue(async () => {
+            await ProjectStore.enter(d.projectId);
+            JarvisPR.addTask(goal, { origin: 'parent' });
+            // Don't force-open the panel — run silently, PR will be waiting when user checks
+            JarvisPR.runNext();
+            JarvisPR._updateBadges();
+        });
         return;
     }
 
@@ -1070,7 +1250,7 @@ function requestTree() {
     setSyncLabel('Requesting tree…');
     // Fallback: if no response in 500ms, show demo tree
     setTimeout(() => {
-        if (vibeTree.children.length === 0) loadDemoTree();
+        if (vibeTree.children.length === 0 && !ProjectStore.pendingInit) loadDemoTree();
     }, 600);
 }
 
@@ -1165,6 +1345,10 @@ function togglePin(nodeId) {
 
 function applyExternalNodeUpdate(nodeId, newCode) {
     const node = findNodeInTree(nodeId);
+    if (node) {
+        const st = jvLineStat(jvNodeCode(node), newCode);
+        if (st.add || st.rem) SystemLog.add('sync', `Main app updated [${nodeId}] (+${st.add}/−${st.rem})`, { node: nodeId, src: 'parent', meta: { nodes: [nodeId] } });
+    }
     if (node) node.code = newCode;
     const editor = document.getElementById(`ed-${nodeId}`);
     if (editor) { editor.value = newCode; syncHighlight(nodeId); }
@@ -1536,6 +1720,7 @@ function onCodeInput(nodeId) {
     dirtyNodes.add(nodeId);
     updateDirtyDot(nodeId);
     setSyncDirty(true);
+    SystemLog.noteEdit(nodeId);
 
     // Write-through to tree with debounce for live preview
     if (window._previewTimer) clearTimeout(window._previewTimer);
@@ -1564,7 +1749,8 @@ function saveNodeToTree(nodeId) {
     // Push to parent
     postToParent('apui-node-update', { nodeId, newCode: node.code });
     toast(`[${nodeId}] saved to Vibe Tree ✓`);
-    trackerLog('edit', nodeId, `Saved · ${(node.code||'').split('\n').length} lines`);
+    SystemLog.flushBurst(nodeId);
+    trackerLog('push', nodeId, `Saved [${nodeId}] to Vibe System · ${jvCount(node.code)} lines`);
 
     // Animate button
     const btn = document.getElementById(`savebtn-${nodeId}`);
@@ -1586,7 +1772,8 @@ function pushAllToVibeTree() {
         if (node) updates.push({ nodeId: id, newCode: node.code });
     });
     postToParent('apui-bulk-update', { updates });
-    trackerLog('push', null, `Pushed ${updates.length} node(s) to Vibe System`);
+    updates.forEach(u => SystemLog.flushBurst(u.nodeId));
+    SystemLog.add('push', `Pushed ${updates.length} node(s) to Vibe System`, { src: 'user', meta: { nodes: updates.map(u => u.nodeId) } });
 
     dirtyNodes.clear();
     AppState.nodes.forEach((_, id) => updateDirtyDot(id));
@@ -1646,6 +1833,7 @@ function openAIFix(nodeId) {
     const err = nodeErrors[nodeId] || '';
     const req = prompt(`AI Fix — [${nodeId}]\n\nError: ${err}\n\nDescribe fix (or leave empty for auto):`, 'Fix this error automatically');
     if (req === null) return;
+    SystemLog.add('fix', `Asked AI to fix [${nodeId}]: ${truncate(err, 110)}`, { node: nodeId, src: 'user' });
     clearNodeError(nodeId);
     aiEditAll(nodeId, `Fix this error in node [${nodeId}]: ${err}. ${req}`);
 }
@@ -1992,26 +2180,9 @@ async function simulateThinking(triggerId) {
 }
 
 async function askAI(nodeId) {
-    const req = prompt(`Ask AI about [${nodeId}]:`);
+    const req = prompt(`Ask Jarvis about [${nodeId}]:`);
     if (!req) return;
-    ensureChat(); logToChat('user', `[${nodeId}]: ${req}`);
-    const images = apuiConsumeImages();
-    if (images.length) logToChat('system', `📷 ${images.length} image(s) attached as visual context`);
-    try {
-        await simulateThinking(nodeId);
-        const node   = findNodeInTree(nodeId);
-        const editor = document.getElementById(`ed-${nodeId}`);
-        const code   = editor ? editor.value : (node?.code || '');
-        const reply  = await callGemini(
-            'You are a concise technical assistant. Keep answers short and specific.' +
-            (images.length ? ' The user has attached image(s) showing the current visual state of the project — reference them in your answer if relevant.' : ''),
-            `Node [${nodeId}] (${node?.type}):\n\`\`\`\n${code}\n\`\`\`\n\nQuestion: ${req}`,
-            false,
-            images
-        );
-        logToChat('ai', reply);
-        trackerLog('ai', nodeId, `Asked: ${req.slice(0, 60)}`);
-    } catch(e) { logToChat('system', '⚠ ' + e.message); }
+    JarvisBrain.ask(req, { focus: [nodeId] });
 }
 
 // Core multi-node AI edit — builds an agent plan and applies it directly to vibeTree,
@@ -2025,6 +2196,7 @@ async function aiEditAll(triggerId, explicitReq = null) {
     const images = apuiConsumeImages();
 
     ensureChat(); enforceNodeLimit('chat'); logToChat('user', req);
+    SystemLog.add('ai', `Direct edit request: "${truncate(req, 120)}"`, { src: 'user' });
     if (images.length) logToChat('system', `📷 ${images.length} screenshot/image(s) attached — Jarvis will use visual context`);
 
     try {
@@ -2051,10 +2223,14 @@ RULES:
 2. Prefer updating existing nodes over creating.
 3. HTML nodes: body-level markup only (no <html>/<head>/<body> tags).
 4. CSS: standalone styles. JS: standalone logic.
-5. "create" actions need a valid parentId that exists in the tree (use "${vibeTree.id}" for root).${imageInstruction}`;
+5. "create" actions need a valid parentId that exists in the tree (use "${vibeTree.id}" for root).
+6. Read PROJECT MEMORY: stay consistent with the user's recent work, don't undo it, and don't repeat proposals they rejected.${imageInstruction}`;
 
         const user = `VIBE TREE CONTEXT:
 ${JSON.stringify(context, null, 2)}
+
+PROJECT MEMORY (recorded history of this project):
+${JarvisBrain.buildBrief({ includeCode: false })}
 
 TREE ROOT ID: ${vibeTree.id}
 USER REQUEST: "${req}"
@@ -2065,7 +2241,8 @@ Return the JSON object now.`;
         logToChat('system', 'Jarvis drafting changes…');
         const raw = await callGemini(sys, user, true, images);
         let plan;
-        try { plan = JSON.parse(raw); } catch { throw new Error('AI returned invalid JSON'); }
+        plan = jvParseJson(raw);
+        if (!plan) throw new Error('AI returned invalid JSON');
 
         logToChat('ai', `Plan: ${plan.plan}`);
         logToChat('ai', `Applying ${plan.actions?.length || 0} action(s)…`);
@@ -2125,6 +2302,7 @@ Return the JSON object now.`;
         renderSidebar();
         logToChat('ai', 'Done! Preview updated.');
         updatePreview();
+        JarvisBrain.onEvent('ai-edit');
 
         if (AppState.nodes.has('preview')) {
             await delay(300); centerOnNode('preview', 500);
@@ -2182,6 +2360,26 @@ const JarvisPR = {
     _stopRequested: false,
     _prCounter: 0,
     _taskIdCounter: 0,
+    _mergeWatch: null,
+
+    /* ── Per-project persistence ─────────────────────────── */
+    loadFrom(rec) {
+        this.tasks = (rec.tasks || []).map(t => Object.assign({}, t, { addedAt: new Date(t.addedAt || Date.now()) }));
+        this.prs   = (rec.prs   || []).map(p => Object.assign({}, p, { createdAt: new Date(p.createdAt || Date.now()) }));
+        this._taskIdCounter = this.tasks.reduce((m, t) => Math.max(m, t.id || 0), 0);
+        this._prCounter     = this.prs.reduce((m, p) => Math.max(m, p.id || 0), 0);
+        this.running = false; this._runAllMode = false; this._stopRequested = false; this._mergeWatch = null;
+        // A refresh mid-run leaves tasks stuck in "working" — put them back in the queue
+        let interrupted = 0;
+        this.tasks.forEach(t => { if (t.status === 'working') { t.status = 'pending'; interrupted++; } });
+        document.getElementById('taskbar')?.classList.remove('jarvis-active');
+        document.getElementById('jarvis-status-pill')?.classList.remove('active');
+        document.getElementById('jpr-stop-btn') && (document.getElementById('jpr-stop-btn').style.display = 'none');
+        this._renderTasks(); this._renderPRs(); this._updateBadges();
+        this._setStatus(this.prs.some(p => p.status === 'open') ? `${this.prs.filter(p => p.status === 'open').length} PR(s) awaiting review` : 'Idle');
+        if (interrupted) SystemLog.add('info', `${interrupted} task${interrupted > 1 ? 's were' : ' was'} interrupted by a refresh and moved back to the queue`, { src: 'system' });
+    },
+    saveTo(rec) { rec.tasks = this.tasks; rec.prs = this.prs; },
 
     /* ── Public: Panel UI ─────────────────────────────────── */
 
@@ -2191,10 +2389,14 @@ const JarvisPR = {
         document.getElementById('rsidebar')?.classList.remove('open');
         this._renderTasks();
         this._renderPRs();
+        if (document.getElementById('jpr-pane-chat')?.classList.contains('active')) JarvisBrain.onChatShown();
+        else if (document.getElementById('jpr-pane-log')?.classList.contains('active')) SystemLog.refresh(true);
+        JarvisBrain._updateNavBadge();
     },
 
     closePanel() {
         document.getElementById('jarvis-pr-panel')?.classList.remove('open');
+        JarvisBrain._updateNavBadge();
     },
 
     switchTab(tab) {
@@ -2203,21 +2405,25 @@ const JarvisPR = {
         if (tab === 'prs') this._renderPRs();
         if (tab === 'tasks') this._renderTasks();
         if (tab === 'log') this._renderLog();
+        if (tab === 'chat') JarvisBrain.onChatShown();
     },
 
     /* ── Task management ─────────────────────────────────── */
 
-    addTask(text) {
+    addTask(text, meta = {}) {
         if (!text?.trim()) return;
         const task = {
             id: ++this._taskIdCounter,
             text: text.trim(),
             status: 'pending',
             prIds: [],
-            addedAt: new Date()
+            addedAt: new Date(),
+            origin: meta.origin || 'user',
+            nodeIds: Array.isArray(meta.nodeIds) ? meta.nodeIds : []
         };
         this.tasks.push(task);
-        this._logEntry('task', `Task queued: "${text.trim().slice(0,60)}"`);
+        const via = { chat: ' (from chat)', prediction: ' (from a prediction)', error: ' (from an error)', note: ' (from a note)', parent: ' (from the main app)' }[task.origin] || '';
+        this._logEntry('task', `Task queued${via}: "${text.trim().slice(0,70)}"`, { node: task.nodeIds[0] || null });
         this._renderTasks();
         this._updateBadges();
         return task;
@@ -2294,8 +2500,11 @@ const JarvisPR = {
         if (pill) pill.classList.add('active');
         if (pillTxt) pillTxt.textContent = task.text.slice(0,30) + '…';
 
+        const pid = ProjectStore.projectId;
+        this._logEntry('task', `Jarvis started: "${task.text.slice(0,70)}"`, { node: (task.nodeIds || [])[0] || null });
         try {
-            const plan = await this._callJarvis(task.text);
+            const plan = await this._callJarvis(task);
+            if (ProjectStore.projectId !== pid) return;   // project switched mid-run — discard
             if (!plan) throw new Error('Jarvis returned empty plan');
 
             // Build PR object with actions (capture old code for diff)
@@ -2304,10 +2513,12 @@ const JarvisPR = {
                 if (action.actionType === 'update') {
                     const treeNode = findNodeInTree(action.nodeId);
                     if (!treeNode) continue;
+                    if (typeof action.newCode !== 'string' || !action.newCode.trim()) continue;
+                    if (action.newCode === jvNodeCode(treeNode)) continue;   // no-op edit
                     prActions.push({
                         actionType: 'update',
                         nodeId: action.nodeId,
-                        oldCode: treeNode.code || '',
+                        oldCode: jvNodeCode(treeNode),
                         newCode: action.newCode,
                         narration: action.narration || ''
                     });
@@ -2342,8 +2553,13 @@ const JarvisPR = {
                 this.prs.push(pr);
                 task.prIds.push(pr.id);
                 task.status = 'done';
-                this._logEntry('task', `PR #${pr.id} opened: "${pr.title.slice(0,50)}"`);
+                const prNodes = prActions.map(a => a.nodeId);
+                this._logEntry('pr-open', `PR #${pr.id} opened: "${pr.title.slice(0,70)}" → ${prNodes.map(n => '[' + n + ']').join(', ')}`, { node: prNodes[0], meta: { nodes: prNodes, prId: pr.id } });
                 logToChat('ai', `🔀 PR #${pr.id} ready for review: ${pr.title}`);
+                if (task.origin && task.origin !== 'user' && task.origin !== 'parent') {
+                    JarvisBrain.say(`🔀 **PR #${pr.id}** is ready: ${pr.title}\nIt touches ${prNodes.map(n => '[' + n + ']').join(', ')}. Review it in the PRs tab.`);
+                }
+                JarvisBrain.onEvent('pr-open');
                 // Auto-switch to PRs tab and highlight
                 this.switchTab('prs');
                 this._renderPRs();
@@ -2371,8 +2587,12 @@ const JarvisPR = {
 
     /* ── Call Gemini to plan changes ────────────────────────── */
 
-    async _callJarvis(taskText) {
-        const context = getVibeContext();
+    async _callJarvis(task) {
+        const taskText = typeof task === 'string' ? task : task.text;
+        const origin   = typeof task === 'string' ? 'user' : (task.origin || 'user');
+        const nodeIds  = typeof task === 'string' ? [] : (task.nodeIds || []);
+        const context  = getVibeContext();
+        const memory   = JarvisBrain.buildBrief({ includeCode: false });
         const sys = `You are Jarvis, a senior full-stack assistant embedded in APUI Vibe Editor.
 Your job is to propose SMALL, FOCUSED improvements to the user's CURRENT active project.
 You make careful, targeted edits — never rewrite things that don't need changing.
@@ -2380,6 +2600,9 @@ You are NOT building a new project from scratch. You are helping the user improv
 
 CURRENT PROJECT TREE (what the user is working on):
 ${JSON.stringify(context, null, 2)}
+
+PROJECT MEMORY (recorded history of this project — use it):
+${memory}
 
 Return ONLY valid JSON in this format:
 {
@@ -2412,16 +2635,22 @@ RULES:
 3. Make SMALL focused changes — 1-3 nodes max.
 4. If the task asks for something the tree doesn't support, create a new node.
 5. Do not add AI attribution comments to the code.
-6. Keep changes coherent with the existing code style.`;
+6. Keep changes coherent with the existing code style.
+7. Read PROJECT MEMORY first. Do not repeat a proposal the user already rejected unless the task explicitly asks for it, and take any rejection reasons seriously.
+8. Do not undo or overwrite what the user changed recently unless the task requires it.
+9. If a node already appears in an open PR, avoid touching it unless the task requires it — and say so in the narration.
+10. If the task is already satisfied by the current code, return an empty "actions" array.`;
 
-        const user = `TASK: "${taskText}"
+        const user = `TASK: "${taskText}"${origin !== 'user' ? `\n(This task originated from: ${origin})` : ''}${nodeIds.length ? `\nRelevant nodes: ${nodeIds.map(id => '[' + id + ']').join(', ')}` : ''}
 
 ROOT ID: ${vibeTree.id}
 
 Plan your changes carefully, then return the JSON now.`;
 
         const raw = await callGemini(sys, user, true, []);
-        return JSON.parse(raw);
+        const plan = jvParseJson(raw);
+        if (!plan) throw new Error('Jarvis returned invalid JSON');
+        return plan;
     },
 
     /* ── PR actions: merge / reject ─────────────────────────── */
@@ -2465,16 +2694,23 @@ Plan your changes carefully, then return the JSON now.`;
         }
 
         pr.status = 'merged';
+        pr.mergedAt = new Date();
         if (pushUpdates.length) {
             postToParent('apui-bulk-update', { updates: pushUpdates });
         }
+        // Post-merge watch: an error in the next few seconds is probably ours
+        const watch = this._mergeWatch = { prId: pr.id, title: pr.title.slice(0, 60), until: Date.now() + 8000, hit: false };
         renderSidebar();
         updatePreview();
 
-        this._logEntry('merge', `PR #${pr.id} merged — "${pr.title.slice(0,50)}"`);
+        let addL = 0, remL = 0;
+        pr.actions.forEach(a => { const st = jvLineStat(a.oldCode, a.newCode); addL += st.add; remL += st.rem; });
+        const mNodes = pr.actions.map(a => a.nodeId);
+        this._logEntry('merge', `PR #${pr.id} merged — "${pr.title.slice(0,60)}" (+${addL}/−${remL} in ${mNodes.length} node${mNodes.length > 1 ? 's' : ''})`, { node: mNodes[0], meta: { nodes: mNodes, prId: pr.id } });
         logToChat('ai', `✅ PR #${pr.id} merged: ${pr.title}`);
         toast(`✅ PR #${pr.id} merged`);
-        trackerLog('push', null, `Jarvis PR #${pr.id} merged · ${pushUpdates.length} change(s)`);
+        setTimeout(() => { if (!watch.hit) SystemLog.add('info', `PR #${pr.id}: no errors in the first 8s after merge`, { src: 'system' }); }, 8200);
+        JarvisBrain.onEvent('merge');
         this._renderPRs();
         this._updateBadges();
         this._setStatus(this.prs.filter(p=>p.status==='open').length > 0
@@ -2486,7 +2722,11 @@ Plan your changes carefully, then return the JSON now.`;
         const pr = this.prs.find(p => p.id === prId);
         if (!pr || pr.status !== 'open') return;
         pr.status = 'closed';
-        this._logEntry('reject', `PR #${pr.id} rejected — "${pr.title.slice(0,50)}"`);
+        const reason = (document.getElementById(`jpr-reason-${prId}`)?.value || '').trim().slice(0, 200);
+        if (reason) pr.rejectReason = reason;
+        const rNodes = pr.actions.map(a => a.nodeId);
+        this._logEntry('reject', `PR #${pr.id} rejected — "${pr.title.slice(0,60)}"${reason ? ` · reason: ${reason}` : ''}`, { node: rNodes[0], meta: { nodes: rNodes, prId: pr.id } });
+        JarvisBrain.onEvent('reject');
         logToChat('system', `❌ PR #${pr.id} rejected`);
         toast(`❌ PR #${pr.id} rejected`);
         this._renderPRs();
@@ -2512,6 +2752,7 @@ Plan your changes carefully, then return the JSON now.`;
     /* ── Render helpers ──────────────────────────────────────── */
 
     _renderTasks() {
+        ProjectStore.touch();
         const list = document.getElementById('jpr-task-list');
         const empty = document.getElementById('jpr-task-empty');
         if (!list) return;
@@ -2539,6 +2780,7 @@ Plan your changes carefully, then return the JSON now.`;
     },
 
     _renderPRs() {
+        ProjectStore.touch();
         const list = document.getElementById('jpr-pr-list');
         const summary = document.getElementById('jpr-pr-summary');
         const mergeAllBtn = document.getElementById('jpr-merge-all-btn');
@@ -2561,7 +2803,9 @@ Plan your changes carefully, then return the JSON now.`;
             card.id = `jpr-pr-${pr.id}`;
 
             const diffHtml = pr.actions.map(a => {
-                const diff = _buildDiff(a.oldCode, a.newCode);
+                const diff = (a.newCode == null)
+                    ? '<div class="jpr-diff-line ctx" style="font-style:italic;">Diff archived to keep the project record small</div>'
+                    : _buildDiff(a.oldCode, a.newCode);
                 const label = a.isNew ? `➕ NEW: ${a.nodeId}` : `✏ ${a.nodeId}`;
                 return `<div class="jpr-diff-block">
                     <div class="jpr-diff-filename">${label}${a.narration ? '<br><span style="color:#4169e1;font-style:italic;">' + escapeHTML(a.narration) + '</span>' : ''}</div>
@@ -2573,6 +2817,7 @@ Plan your changes carefully, then return the JSON now.`;
                 <div class="jpr-pr-actions">
                     <button class="jpr-btn success" onclick="JarvisPR.mergePR(${pr.id})">✓ Merge</button>
                     <button class="jpr-btn danger" onclick="JarvisPR.rejectPR(${pr.id})">✗ Reject</button>
+                    <input class="jpr-reason" id="jpr-reason-${pr.id}" maxlength="200" placeholder="Why? (Jarvis learns from this)">
                     <span style="font-family:'Fira Code',monospace;font-size:0.55rem;color:#444;margin-left:auto;">${pr.actions.length} file${pr.actions.length>1?'s':''} changed</span>
                 </div>` : `<div style="font-family:'Fira Code',monospace;font-size:0.58rem;color:${pr.status==='merged'?'#66bb6a':'#ef5350'};padding:6px 0;">${pr.status === 'merged' ? '✅ Merged' : '❌ Rejected'}</div>`;
 
@@ -2581,7 +2826,7 @@ Plan your changes carefully, then return the JSON now.`;
                     <span class="jpr-pr-status-dot ${pr.status}"></span>
                     <div class="jpr-pr-info">
                         <div class="jpr-pr-title">${escapeHTML(pr.title)}</div>
-                        <div class="jpr-pr-meta">PR #${pr.id} · ${pr.category} · ${_relTime(pr.createdAt)}</div>
+                        <div class="jpr-pr-meta">PR #${pr.id} · ${pr.category} · ${_relTime(pr.createdAt)}${pr.rejectReason ? ' · ' + escapeHTML(pr.rejectReason) : ''}</div>
                     </div>
                     <span class="jpr-pr-chevron">›</span>
                 </div>
@@ -2598,35 +2843,18 @@ Plan your changes carefully, then return the JSON now.`;
         if (card) { card.classList.add('expanded'); card.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
     },
 
-    _renderLog() {
-        const list = document.getElementById('jpr-log-list');
-        const empty = document.getElementById('jpr-log-empty');
-        if (!list) return;
-        list.querySelectorAll('.jpr-log-entry').forEach(e => e.remove());
-        if (!this.log.length) { if (empty) empty.style.display = 'block'; return; }
-        if (empty) empty.style.display = 'none';
-        [...this.log].reverse().forEach(entry => {
-            const el = document.createElement('div');
-            el.className = `jpr-log-entry ${entry.type}`;
-            el.innerHTML = `<span class="jpr-log-time">${_timeStr(entry.time)} </span>${escapeHTML(entry.msg)}`;
-            list.appendChild(el);
-        });
+    _renderLog() { SystemLog.mountAll(); SystemLog.refresh(true); },
+
+    _logEntry(type, msg, opts = {}) {
+        const map = { merge: 'pr-merge', reject: 'pr-reject' };
+        SystemLog.add(map[type] || type, msg, Object.assign({ src: 'jarvis' }, opts));
     },
 
-    _logEntry(type, msg) {
-        this.log.push({ type, msg, time: new Date() });
-        if (this.log.length > 200) this.log.splice(0, this.log.length - 200);
-        // Re-render log if it's active
-        const logPane = document.getElementById('jpr-pane-log');
-        if (logPane?.classList.contains('active')) this._renderLog();
-    },
-
-    clearLog() {
-        this.log = [];
-        this._renderLog();
-    },
+    clearLog() { SystemLog.clear(); },
 
     _updateBadges() {
+        ProjectStore.touch();
+        JarvisBrain._updateNavBadge();
         const pendingCount = this.tasks.filter(t => t.status === 'pending').length;
         const openPRCount  = this.prs.filter(p => p.status === 'open').length;
         const taskBadge = document.getElementById('jpr-badge-tasks');
@@ -2687,6 +2915,957 @@ function _relTime(date) {
 function _timeStr(date) {
     return date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
+
+/* ════════════════════════════════════════════════════════════════
+   PROJECT MEMORY LAYER
+   ProjectStore  — one persistent record per project (log, tasks, PRs,
+                   chat, notes, predictions). Survives refresh.
+   SystemLog     — the per-project system log everything writes to.
+   JarvisBrain   — project-aware chat, briefing builder, predictions.
+   ════════════════════════════════════════════════════════════════ */
+
+const SYSTEM_NODE_IDS = new Set(['preview', 'chat', 'console', 'settings']);
+
+/* ── small helpers ─────────────────────────────────────────────── */
+function jvParseJson(raw) {
+    if (raw && typeof raw === 'object') return raw;
+    let s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    try { return JSON.parse(s); } catch (_) {}
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a >= 0 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch (_) {} }
+    return null;
+}
+function jvRel(ts) {
+    const s = Math.max(0, Math.round((Date.now() - (+new Date(ts))) / 1000));
+    if (s < 45) return 'just now';
+    if (s < 3600) return Math.max(1, Math.round(s / 60)) + 'm ago';
+    if (s < 86400) return Math.round(s / 3600) + 'h ago';
+    return Math.round(s / 86400) + 'd ago';
+}
+function jvClock(ts) { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+function jvDay(ts) {
+    const d = new Date(ts), t = new Date(), y = new Date();
+    y.setDate(t.getDate() - 1);
+    if (d.toDateString() === t.toDateString()) return 'Today';
+    if (d.toDateString() === y.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function jvSafeId(id) { return typeof id === 'string' && /^[A-Za-z0-9_\-.:]+$/.test(id); }
+function jvHash(s) { let h = 0; s = String(s); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function jvNewId(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function jvCount(code) { return code ? String(code).split('\n').length : 0; }
+/** Rough added/removed line counts between two strings (multiset diff — fast, order-insensitive). */
+function jvLineStat(a, b) {
+    const A = String(a || '').split('\n'), B = String(b || '').split('\n');
+    const cnt = new Map();
+    A.forEach(l => cnt.set(l, (cnt.get(l) || 0) + 1));
+    let add = 0;
+    B.forEach(l => { const c = cnt.get(l) || 0; if (c > 0) cnt.set(l, c - 1); else add++; });
+    let rem = 0; cnt.forEach(v => { rem += v; });
+    return { add, rem };
+}
+function jvNodeCode(node) {
+    const ed = document.getElementById(`ed-${node.id}`);
+    return ed ? ed.value : (node.code || '');
+}
+function jvLooksLikeQuestion(t) {
+    const s = String(t || '').trim();
+    if (!s) return false;
+    if (s.startsWith('?') || s.startsWith('/')) return true;
+    if (/\?\s*$/.test(s)) return true;
+    return /^(what|whats|what's|why|how come|how many|how does|how do|where|when|which|who|explain|summari[sz]e|describe|does|did|is there|are there|tell me about|any (errors|issues|problems))\b/i.test(s);
+}
+
+/** Minimal, safe markdown: code fences, `inline`, **bold**, [node-id] chips, newlines. */
+function jvRenderMd(src) {
+    const blocks = [];
+    let s = String(src || '').replace(/```[\w-]*\n?([\s\S]*?)```/g, (_, code) => {
+        blocks.push(`<pre class="jv-code"><code>${escapeHTML(code.replace(/\n$/, ''))}</code></pre>`);
+        return `\u0000${blocks.length - 1}\u0000`;
+    });
+    s = escapeHTML(s);
+    s = s.replace(/`([^`\n]+)`/g, '<code class="jv-inline">$1</code>');
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+    s = s.replace(/\[([A-Za-z0-9_\-.:]+)\]/g, (m, id) =>
+        (findNodeInTree(id) && !SYSTEM_NODE_IDS.has(id))
+            ? `<span class="jv-node-ref" onclick="JarvisBrain.openNode('${id}')">${id}</span>` : m);
+    s = s.replace(/\n/g, '<br>');
+    return s.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PROJECT STORE
+   ════════════════════════════════════════════════════════════════ */
+const ProjectStore = {
+    DB_NAME: 'apui_projects_v1',   // own database — never collides with jarvis_db / app3.js stores
+    STORE: 'projects',
+    projectId: null,
+    rec: null,
+    _db: null, _dbFailed: false,
+    _chain: Promise.resolve(),
+    _timer: null, _dirty: false,
+
+    /** Serialise async work (project switches, tree arrivals) so they never interleave. */
+    enqueue(fn) {
+        this._chain = this._chain.then(fn).catch(e => console.error('[ProjectStore]', e));
+        return this._chain;
+    },
+
+    _open() {
+        if (this._db) return Promise.resolve(this._db);
+        if (this._dbFailed || !window.indexedDB) return Promise.reject(new Error('IndexedDB unavailable'));
+        return new Promise((resolve, reject) => {
+            let req;
+            try { req = indexedDB.open(this.DB_NAME, 1); } catch (e) { this._dbFailed = true; return reject(e); }
+            req.onupgradeneeded = () => {
+                if (!req.result.objectStoreNames.contains(this.STORE)) req.result.createObjectStore(this.STORE, { keyPath: 'id' });
+            };
+            req.onsuccess = () => {
+                this._db = req.result;
+                this._db.onversionchange = () => { try { this._db.close(); } catch (_) {} this._db = null; };
+                resolve(this._db);
+            };
+            req.onerror = () => { this._dbFailed = true; reject(req.error); };
+        });
+    },
+    async _get(id) {
+        try {
+            const db = await this._open();
+            return await new Promise((res, rej) => {
+                const r = db.transaction(this.STORE).objectStore(this.STORE).get(id);
+                r.onsuccess = () => res(r.result || null);
+                r.onerror = () => rej(r.error);
+            });
+        } catch (_) {
+            try { const s = localStorage.getItem('apui_proj::' + id); return s ? JSON.parse(s) : null; } catch (__) { return null; }
+        }
+    },
+    async _put(rec) {
+        try {
+            const db = await this._open();
+            await new Promise((res, rej) => {
+                const tx = db.transaction(this.STORE, 'readwrite');
+                tx.objectStore(this.STORE).put(rec);
+                tx.oncomplete = res;
+                tx.onerror = tx.onabort = () => rej(tx.error);
+            });
+            return true;
+        } catch (_) {
+            try { localStorage.setItem('apui_proj::' + rec.id, JSON.stringify(rec)); return true; } catch (__) { return false; }
+        }
+    },
+    _blank(id) {
+        return { id, v: 1, created: Date.now(), updated: Date.now(), log: [], tasks: [], prs: [], chat: [], predictions: [], notes: null, meta: { sessions: 0, dismissed: [] } };
+    },
+
+    /** Make `rawId` the active project. Resolves true if the project changed. */
+    async enter(rawId) {
+        const id = rawId === undefined ? (this.projectId || '__standalone__') : (rawId || '__unsaved__');
+        if (this.rec && this.projectId === id) return false;
+        await this.flush();
+        const existing = await this._get(id);
+        const rec = Object.assign(this._blank(id), existing || {});
+        ['log', 'tasks', 'prs', 'chat', 'predictions'].forEach(k => { if (!Array.isArray(rec[k])) rec[k] = []; });
+        rec.meta = Object.assign({ sessions: 0, dismissed: [] }, rec.meta || {});
+        if (!Array.isArray(rec.meta.dismissed)) rec.meta.dismissed = [];
+        this.projectId = id;
+        this.rec = rec;
+        this._adopt(!existing);
+        return true;
+    },
+    _adopt(isNew) {
+        JarvisPR.loadFrom(this.rec);
+        const imported = NoteThreads.loadFrom(this.rec);
+        SystemLog.drainPending();
+        if (imported) SystemLog.add('note', `Imported ${imported} note${imported > 1 ? 's' : ''} from before notes were tracked per project`, { src: 'system' });
+        JarvisBrain.onProjectEntered(isNew);
+    },
+
+    touch() {
+        if (!this.rec) return;
+        this._dirty = true;
+        clearTimeout(this._timer);
+        this._timer = setTimeout(() => this._save(), 300);
+    },
+    async flush() { clearTimeout(this._timer); if (this._dirty) await this._save(); },
+    async _save() {
+        const rec = this.rec;
+        if (!rec) return;
+        this._dirty = false;
+        JarvisPR.saveTo(rec);
+        NoteThreads.saveTo(rec);
+        this._compact(rec);
+        rec.updated = Date.now();
+        await this._put(rec);
+    },
+    _compact(rec) {
+        if (rec.log.length > 1500) rec.log.splice(0, rec.log.length - 1200);
+        if (rec.chat.length > 300) rec.chat.splice(0, rec.chat.length - 200);
+        if (rec.tasks.length > 150) rec.tasks.splice(0, rec.tasks.length - 120);
+        if (rec.meta.dismissed.length > 120) rec.meta.dismissed.splice(0, rec.meta.dismissed.length - 80);
+        // Archive the code of old, finished PRs so the record stays small
+        rec.prs.forEach((pr, i) => {
+            if (i < rec.prs.length - 25 && pr.status !== 'open' && !pr.compacted) {
+                pr.actions = (pr.actions || []).map(a => ({ actionType: a.actionType, nodeId: a.nodeId, narration: a.narration, isNew: a.isNew }));
+                pr.compacted = true;
+            }
+        });
+    }
+};
+window.addEventListener('pagehide', () => { ProjectStore.flush(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ProjectStore.flush(); });
+
+/* ════════════════════════════════════════════════════════════════
+   SYSTEM LOG
+   ════════════════════════════════════════════════════════════════ */
+const LOG_TYPES = {
+    open:       { icon: '📂', group: 'system' },
+    sync:       { icon: '🔄', group: 'edits' },
+    edit:       { icon: '✏️', group: 'edits' },
+    create:     { icon: '➕', group: 'edits' },
+    delete:     { icon: '🗑', group: 'edits' },
+    push:       { icon: '⬆', group: 'edits' },
+    ai:         { icon: '🤖', group: 'jarvis' },
+    task:       { icon: '📝', group: 'jarvis' },
+    'pr-open':  { icon: '🔀', group: 'jarvis' },
+    'pr-merge': { icon: '✅', group: 'jarvis' },
+    'pr-reject':{ icon: '❌', group: 'jarvis' },
+    chat:       { icon: '💬', group: 'jarvis' },
+    predict:    { icon: '🔮', group: 'jarvis' },
+    error:      { icon: '⚠️', group: 'errors' },
+    fix:        { icon: '🩹', group: 'errors' },
+    note:       { icon: '🗒', group: 'notes' },
+    export:     { icon: '⬇', group: 'system' },
+    info:       { icon: 'ℹ️', group: 'system' }
+};
+const LOG_FILTERS = [['all', 'All'], ['edits', 'Edits'], ['jarvis', 'Jarvis'], ['errors', 'Errors'], ['notes', 'Notes'], ['system', 'System']];
+
+const SystemLog = {
+    filter: 'all',
+    query: '',
+    _pending: [],
+    _bursts: {},
+    _raf: 0,
+    PREFIXES: ['rs-log', 'jpr-log'],   // element-id prefixes of the views that show the log
+
+    get entries() { return ProjectStore.rec ? ProjectStore.rec.log : []; },
+
+    add(type, msg, opts = {}) {
+        if (!ProjectStore.rec) { this._pending.push({ type, msg, opts, ts: Date.now() }); return null; }
+        const log = ProjectStore.rec.log;
+        const now = opts.ts || Date.now();
+        const node = opts.node || null;
+        const text = String(msg == null ? '' : msg).replace(/\s+/g, ' ').trim().slice(0, 300);
+        const last = log[log.length - 1];
+        if (last && last.type === type && last.msg === text && last.node === node && now - last.ts < 4000) {
+            last.count = (last.count || 1) + 1;
+            last.ts = now;
+        } else {
+            log.push({ id: jvNewId('l'), ts: now, type: LOG_TYPES[type] ? type : 'info', src: opts.src || 'system', node, msg: text, meta: opts.meta || null });
+        }
+        ProjectStore.touch();
+        this.refresh();
+        JarvisBrain.onLogEntry();
+        return log[log.length - 1];
+    },
+    drainPending() {
+        const p = this._pending; this._pending = [];
+        p.forEach(e => this.add(e.type, e.msg, Object.assign({}, e.opts, { ts: e.ts })));
+    },
+
+    /** Tree arrived from the Vibe System. Logs project opens and anything changed outside APUI. */
+    noteTreeArrival(next, projectChanged, projectId) {
+        const nodesOf = t => flattenTree(t).map(x => x.node).filter(n => n !== t && !SYSTEM_NODE_IDS.has(n.id));
+        const nextNodes = nodesOf(next);
+        if (projectChanged) {
+            const rec = ProjectStore.rec;
+            const last = rec.log.length ? rec.log[rec.log.length - 1].ts : null;
+            rec.meta.sessions = (rec.meta.sessions || 0) + 1;
+            this.add('open', `Opened ${projectId} · ${nextNodes.length} node${nextNodes.length === 1 ? '' : 's'}${last ? ` · last activity ${jvRel(last)}` : ' · first time tracked'}`, { src: 'system' });
+            return;
+        }
+        // Same project: compare against what APUI currently holds → these are changes made elsewhere
+        const prev = new Map(nodesOf(vibeTree).map(n => [n.id, n]));
+        const seen = new Set();
+        const changes = [];
+        nextNodes.forEach(n => {
+            seen.add(n.id);
+            const old = prev.get(n.id);
+            if (!old) { changes.push({ id: n.id, kind: 'added', add: jvCount(n.code), rem: 0 }); return; }
+            if ((old.code || '') !== (n.code || '')) { const st = jvLineStat(old.code, n.code); changes.push({ id: n.id, kind: 'changed', add: st.add, rem: st.rem }); }
+        });
+        prev.forEach((n, id) => { if (!seen.has(id)) changes.push({ id, kind: 'removed', add: 0, rem: jvCount(n.code) }); });
+        if (!changes.length) return;
+        if (changes.length <= 4) {
+            changes.forEach(c => this.add('sync',
+                c.kind === 'added' ? `Main app added [${c.id}] (${c.add} lines)` :
+                c.kind === 'removed' ? `Main app removed [${c.id}]` :
+                `Main app changed [${c.id}] (+${c.add}/−${c.rem})`, { node: c.id, src: 'parent', meta: { nodes: [c.id] } }));
+        } else {
+            const A = changes.reduce((s, c) => s + c.add, 0), R = changes.reduce((s, c) => s + c.rem, 0);
+            this.add('sync', `Main app changed ${changes.length} nodes (+${A}/−${R})`, { src: 'parent', meta: { nodes: changes.map(c => c.id) } });
+        }
+    },
+
+    /** Coalesce keystrokes into one "Edited [node]" entry per burst of typing. */
+    noteEdit(nodeId) {
+        const node = findNodeInTree(nodeId);
+        if (!node) return;
+        let b = this._bursts[nodeId];
+        if (!b) b = this._bursts[nodeId] = { base: node.code || '', timer: null };
+        clearTimeout(b.timer);
+        b.timer = setTimeout(() => this.flushBurst(nodeId), 5000);
+    },
+    flushBurst(nodeId) {
+        const b = this._bursts[nodeId];
+        if (!b) return;
+        clearTimeout(b.timer);
+        delete this._bursts[nodeId];
+        const node = findNodeInTree(nodeId);
+        const cur = node ? jvNodeCode(node) : '';
+        if (cur === b.base) return;
+        const st = jvLineStat(b.base, cur);
+        this.add('edit', `Edited [${nodeId}] (+${st.add}/−${st.rem})`, { node: nodeId, src: 'user', meta: { nodes: [nodeId] } });
+    },
+
+    /* ── analysis helpers (used by the brief and predictions) ── */
+    _nodesOf(e) { return (e.meta && e.meta.nodes) ? e.meta.nodes : (e.node ? [e.node] : []); },
+    recentNodeActivity(minutes) {
+        const m = new Map(), cut = Date.now() - minutes * 60000;
+        this.entries.forEach(e => {
+            if (e.ts < cut || !['edit', 'push', 'sync', 'ai', 'create', 'pr-merge'].includes(e.type)) return;
+            this._nodesOf(e).forEach(id => m.set(id, (m.get(id) || 0) + 1));
+        });
+        return m;
+    },
+    hotSpots(hours, limit = 5) {
+        const m = this.recentNodeActivity(hours * 60);
+        return [...m.entries()].map(([id, n]) => ({ id, n })).filter(h => findNodeInTree(h.id)).sort((a, b) => b.n - a.n).slice(0, limit);
+    },
+
+    /* ── rendering ── */
+    setFilter(f) { this.filter = f; this.refresh(true); },
+    setQuery(q) { this.query = String(q || '').toLowerCase().trim(); this.refresh(true); },
+    _visibleEntries() {
+        const q = this.query, f = this.filter;
+        return this.entries.filter(e => {
+            if (f !== 'all' && (LOG_TYPES[e.type] || LOG_TYPES.info).group !== f) return false;
+            if (q && !(e.msg.toLowerCase().includes(q) || (e.node || '').toLowerCase().includes(q) || e.type.includes(q))) return false;
+            return true;
+        });
+    },
+    _rowHtml(e) {
+        const t = LOG_TYPES[e.type] || LOG_TYPES.info;
+        let chip = '';
+        if (e.node && jvSafeId(e.node)) {
+            chip = findNodeInTree(e.node)
+                ? ` <span class="sl-node" onclick="JarvisBrain.openNode('${e.node}')">${escapeHTML(e.node)}</span>`
+                : ` <span class="sl-node gone" title="No longer in the project">${escapeHTML(e.node)}</span>`;
+        }
+        return `<div class="sl-row t-${e.type}" title="${new Date(e.ts).toLocaleString()} · ${e.src}"><span class="sl-time">${jvClock(e.ts)}</span><span class="sl-icon">${t.icon}</span><div class="sl-msg">${escapeHTML(e.msg)}${e.count > 1 ? ` <span class="sl-count">×${e.count}</span>` : ''}${chip}</div></div>`;
+    },
+    _isShown(prefix) {
+        if (prefix === 'rs-log') return document.getElementById('rsidebar')?.classList.contains('open') && document.getElementById('rs-log-view')?.style.display !== 'none';
+        return document.getElementById('jarvis-pr-panel')?.classList.contains('open') && document.getElementById('jpr-pane-log')?.classList.contains('active');
+    },
+    mountAll() {
+        this.PREFIXES.forEach(p => {
+            const f = document.getElementById(p + '-filters');
+            if (f) f.innerHTML = LOG_FILTERS.map(([k, label]) => `<button class="sl-filter${this.filter === k ? ' active' : ''}" onclick="SystemLog.setFilter('${k}')">${label}</button>`).join('');
+            const s = document.getElementById(p + '-search');
+            if (s && !s._bound) { s._bound = true; s.addEventListener('input', () => { this.setQuery(s.value); this.PREFIXES.forEach(q => { const o = document.getElementById(q + '-search'); if (o && o !== s) o.value = s.value; }); }); }
+        });
+    },
+    refresh(force) {
+        // count badge is cheap — always update
+        const badge = document.getElementById('rs-log-count');
+        if (badge) badge.textContent = this.entries.length ? `(${this.entries.length})` : '';
+        if (this._raf) return;
+        this._raf = requestAnimationFrame(() => {
+            this._raf = 0;
+            this.PREFIXES.forEach(p => {
+                if (!this._isShown(p)) return;
+                this.mountAll();
+                const list = document.getElementById(p + '-list');
+                if (!list) return;
+                const vis = this._visibleEntries();
+                const total = this.entries.length;
+                const foot = document.getElementById(p + '-foot');
+                if (foot) foot.textContent = vis.length === total ? `${total} entries` : `${vis.length} of ${total}`;
+                if (!vis.length) {
+                    list.innerHTML = `<div class="sl-empty">${total ? 'Nothing matches this filter.' : 'No activity recorded yet.<br>Edits, Jarvis runs, errors, chats and notes for this project will appear here.'}</div>`;
+                    return;
+                }
+                const shown = vis.slice(-300).reverse();
+                let html = '', day = '';
+                shown.forEach(e => {
+                    const d = jvDay(e.ts);
+                    if (d !== day) { day = d; html += `<div class="sl-day">${d}</div>`; }
+                    html += this._rowHtml(e);
+                });
+                if (vis.length > shown.length) html += `<div class="sl-empty">Showing the newest ${shown.length} of ${vis.length}. Export for the full log.</div>`;
+                list.innerHTML = html;
+            });
+        });
+    },
+    exportJson() {
+        const rec = ProjectStore.rec;
+        if (!rec) { toast('No project loaded yet'); return; }
+        JarvisPR.saveTo(rec); NoteThreads.saveTo(rec);
+        const blob = new Blob([JSON.stringify({ project: rec.id, exported: new Date().toISOString(), log: rec.log, tasks: rec.tasks, prs: rec.prs, notes: rec.notes, chat: rec.chat }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `apui-${String(rec.id).replace(/[^\w.-]+/g, '_')}-system-log.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        this.add('export', 'Exported the system log', { src: 'user' });
+    },
+    clear() {
+        if (!ProjectStore.rec || !confirm('Clear the system log for this project? Jarvis will lose that history too.')) return;
+        ProjectStore.rec.log.length = 0;
+        this.add('info', 'System log cleared', { src: 'user' });
+        this.refresh(true);
+    }
+};
+
+/** Legacy hook used across the editor: trackerLog(type, nodeId, msg). Now writes the real log. */
+function trackerLog(type, nodeId, msg) {
+    const src = /^(AI|Jarvis)\b/.test(String(msg || '')) ? 'jarvis' : 'user';
+    SystemLog.add(LOG_TYPES[type] ? type : 'info', msg, { node: nodeId || null, src, meta: nodeId ? { nodes: [nodeId] } : null });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   JARVIS BRAIN — awareness, chat, predictions
+   ════════════════════════════════════════════════════════════════ */
+const JarvisBrain = {
+    busy: false,
+    unread: 0,
+    proactive: (() => { try { return localStorage.getItem('apui_jarvis_proactive') !== '0'; } catch (_) { return true; } })(),
+    _welcome: null,
+    _chipTexts: [],
+    _nextItems: [],
+    _predictTimer: null,
+    _lastPredictAt: 0,
+    _lastErrSay: 0,
+    _lastErrMsg: '',
+    _nextCollapsed: (() => { try { return localStorage.getItem('apui_jv_next_collapsed') === '1'; } catch (_) { return false; } })(),
+
+    QUICK: ['What changed recently?', "What's broken?", 'Summarize this project', 'What should I do next?'],
+
+    init() {
+        const inp = document.getElementById('jv-input');
+        if (inp && !inp._bound) {
+            inp._bound = true;
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendFromInput(); } });
+        }
+        const cb = document.getElementById('jv-proactive');
+        if (cb) cb.checked = this.proactive;
+        SystemLog.mountAll();
+        this.renderAll();
+    },
+    setProactive(on) {
+        this.proactive = !!on;
+        try { localStorage.setItem('apui_jarvis_proactive', on ? '1' : '0'); } catch (_) {}
+    },
+
+    /* ── panel plumbing ── */
+    openChat(prefill) {
+        JarvisPR.openPanel();
+        JarvisPR.switchTab('chat');
+        const inp = document.getElementById('jv-input');
+        if (inp) { if (prefill) inp.value = prefill; setTimeout(() => inp.focus(), 350); }
+    },
+    onChatShown() { this.unread = 0; this._updateNavBadge(); this.renderAll(); },
+    _updateNavBadge() {
+        const b = document.getElementById('jv-nav-badge');
+        if (!b) return;
+        const panelOpen = document.getElementById('jarvis-pr-panel')?.classList.contains('open');
+        const n = JarvisPR.prs.filter(p => p.status === 'open').length + (panelOpen ? 0 : this.unread);
+        b.textContent = n; b.style.display = n ? 'block' : 'none';
+    },
+    renderAll() { this.renderNext(); this.renderChat(); },
+
+    onProjectEntered(isNew) {
+        const rec = ProjectStore.rec;
+        const openPRs = JarvisPR.prs.filter(p => p.status === 'open').length;
+        const pending = JarvisPR.tasks.filter(t => t.status === 'pending').length;
+        if (isNew || !rec.log.length) {
+            this._welcome = `Jarvis is now tracking **${ProjectStore.projectId}**. Everything you and I do here is written to this project's system log, and I read it before answering. Ask me anything about the project.`;
+        } else {
+            const last = rec.log[rec.log.length - 1];
+            const recent = rec.log.filter(e => e.type !== 'open').slice(-3).map(e => `• ${e.msg}`).join('\n');
+            this._welcome = `Welcome back. Last activity ${jvRel(last.ts)}.` +
+                (openPRs ? ` ${openPRs} PR${openPRs > 1 ? 's are' : ' is'} waiting for review.` : '') +
+                (pending ? ` ${pending} task${pending > 1 ? 's' : ''} queued.` : '') +
+                (recent ? `\nMost recent:\n${recent}` : '');
+        }
+        this._lastErrSay = 0; this._lastErrMsg = '';
+        this.renderAll();
+        this._updateNavBadge();
+    },
+    onLogEntry() { /* hook for future ambient reactions */ },
+    onEvent(kind) {
+        this.renderNext();
+        this._updateNavBadge();
+        if (kind === 'merge' || kind === 'ai-edit') this.schedulePredict(kind);
+    },
+
+    /* ── talking ── */
+    say(text, actions = [], followups = []) {
+        const rec = ProjectStore.rec;
+        if (!rec) return null;
+        const m = { id: jvNewId('m'), role: 'jarvis', text, ts: Date.now(), actions, followups };
+        rec.chat.push(m);
+        ProjectStore.touch();
+        const panelOpen = document.getElementById('jarvis-pr-panel')?.classList.contains('open');
+        const chatActive = document.getElementById('jpr-pane-chat')?.classList.contains('active');
+        if (!(panelOpen && chatActive)) this.unread++;
+        this._updateNavBadge();
+        this.renderChat();
+        return m;
+    },
+    _userMsg(text) {
+        const rec = ProjectStore.rec;
+        if (!rec) return;
+        rec.chat.push({ id: jvNewId('m'), role: 'user', text, ts: Date.now() });
+        ProjectStore.touch();
+        this.renderChat();
+    },
+    sendFromInput() {
+        const inp = document.getElementById('jv-input');
+        if (!inp) return;
+        const v = inp.value.trim();
+        if (!v) return;
+        inp.value = '';
+        this.send(v);
+    },
+    /** Public entry point (chat box, navbar, node "ask" button). */
+    ask(text, opts = {}) { this.openChat(); return this.send(text, opts); },
+    chip(i) { const t = this._chipTexts[i]; if (t) this.send(t); },
+
+    SYS_CHAT: `You are Jarvis, the resident AI engineer inside APUI — a visual editor that builds web projects out of a tree of HTML, CSS and JS nodes. You are wired into every part of the app: the node tree, the PR queue, the tracker notes and the project's persistent system log. Speak like a sharp, calm chief of staff: direct, specific, a little dry. No filler, no flattery.
+
+You are given a PROJECT BRIEF. It is ground truth about this project right now, including its recorded history.
+RULES:
+- Answer from the brief. If it does not show something, say you can't see it. Never invent nodes, history, errors or code.
+- Refer to nodes exactly as [node-id] so they become clickable.
+- When citing history, use the relative times in the log ("12m ago").
+- You cannot edit code from chat. When a change is warranted, offer it as an action the user can queue; every change still goes through PR review.
+- Keep answers short. Use a code block only when showing code.
+- When asked what to do next, base it on evidence: unresolved errors, BROKEN/TODO notes, rejected proposals, recent edit patterns.
+
+Return ONLY JSON:
+{"answer": "text", "actions": [{"kind": "queue_task" | "run_now" | "add_note" | "open_node", "label": "short button label", "task": "self-contained task (queue_task/run_now)", "text": "note text (add_note)", "status": "todo|broken|works|neutral (add_note)", "nodeId": "existing node id (open_node)"}], "followups": ["up to 3 short follow-up questions the user might ask"]}
+Use at most 3 actions and only when genuinely useful.`,
+
+    async send(text, opts = {}) {
+        text = String(text || '').trim();
+        if (!text) return;
+        if (this.busy) { toast('Jarvis is still answering the last question'); return; }
+        if (!ProjectStore.rec) { toast('Jarvis is still loading the project…'); return; }
+        if (text.startsWith('/')) return this.slash(text);
+
+        const pid = ProjectStore.projectId;
+        this._userMsg(text);
+        SystemLog.add('chat', `Asked Jarvis: ${truncate(text, 110)}`, { src: 'user', node: (opts.focus || [])[0] || null });
+        logToChat('user', truncate(text, 200));
+
+        if (!AppState.settings.apiKey) {
+            this.say('I need a Gemini API key to answer that. Add one in **Settings** (the settings node on the canvas). Slash commands like /status, /log and /errors work without one.');
+            return;
+        }
+        this.busy = true; this.renderChat();
+        try {
+            const images = typeof apuiConsumeImages === 'function' ? apuiConsumeImages() : [];
+            const rec = ProjectStore.rec;
+            const history = rec.chat.slice(-11, -1).map(m => `${m.role === 'user' ? 'USER' : 'JARVIS'}: ${truncate(String(m.text), 600)}`).join('\n');
+            const brief = this.buildBrief({ focus: opts.focus || [], question: text });
+            const user = `PROJECT BRIEF\n${brief}\n\nCONVERSATION SO FAR\n${history || '(start of conversation)'}\n${opts.focus && opts.focus.length ? `\nThe user is asking specifically about: ${opts.focus.map(f => '[' + f + ']').join(', ')}\n` : ''}${images.length ? '\nThe user attached screenshot(s) of the live preview — use them.\n' : ''}\nUSER: ${text}\n\nReturn the JSON now.`;
+            const raw = await callGemini(this.SYS_CHAT, user, true, images);
+            if (ProjectStore.projectId !== pid) return;   // user switched projects mid-request
+            const data = jvParseJson(raw) || { answer: String(raw || '').trim() };
+            const answer = String(data.answer || data.reply || '').trim() || 'I got an empty response. Try rephrasing.';
+            const actions = (Array.isArray(data.actions) ? data.actions : []).slice(0, 3).map(a => this._cleanAction(a)).filter(Boolean);
+            const followups = (Array.isArray(data.followups) ? data.followups : []).map(f => truncate(String(f), 70)).slice(0, 3);
+            this.busy = false;
+            this.say(answer, actions, followups);
+            logToChat('ai', truncate(answer, 400));
+        } catch (e) {
+            this.busy = false;
+            if (ProjectStore.projectId === pid) {
+                this.say(`⚠ ${e.message || 'Request failed'}`);
+                SystemLog.add('info', `Jarvis chat failed: ${e.message}`, { src: 'system' });
+            }
+        } finally {
+            this.busy = false;
+            this.renderChat();
+        }
+    },
+    _cleanAction(a) {
+        if (!a || typeof a !== 'object') return null;
+        const kind = String(a.kind || '');
+        if (kind === 'queue_task' || kind === 'run_now') {
+            const task = String(a.task || '').trim();
+            if (task.length < 6) return null;
+            return { kind, label: truncate(String(a.label || (kind === 'run_now' ? 'Run now' : 'Queue task')), 34), task, origin: 'chat', used: false };
+        }
+        if (kind === 'add_note') {
+            const text = String(a.text || '').trim();
+            if (!text) return null;
+            const status = ['todo', 'broken', 'works', 'neutral'].includes(a.status) ? a.status : 'neutral';
+            return { kind, label: truncate(String(a.label || 'Save note'), 34), text, status, used: false };
+        }
+        if (kind === 'open_node') {
+            if (!jvSafeId(a.nodeId) || !findNodeInTree(a.nodeId)) return null;
+            return { kind, label: truncate(String(a.label || `Open ${a.nodeId}`), 34), nodeId: a.nodeId, used: false };
+        }
+        return null;
+    },
+    runAction(msgId, idx) {
+        const rec = ProjectStore.rec;
+        const m = rec && rec.chat.find(x => x.id === msgId);
+        const a = m && m.actions && m.actions[idx];
+        if (!a || a.used) return;
+        if (a.kind === 'queue_task') {
+            JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] });
+            toast('Task queued — run it from the Tasks tab');
+        } else if (a.kind === 'run_now') {
+            const t = JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] });
+            if (t && !JarvisPR.running) { JarvisPR.switchTab('tasks'); JarvisPR._runTask(t); }
+            else toast('Jarvis is busy — queued instead');
+        } else if (a.kind === 'add_note') {
+            NoteThreads.addNote(a.text, a.status || 'neutral');
+            toast('Note saved to the tracker');
+        } else if (a.kind === 'open_node') {
+            this.openNode(a.nodeId);
+            return;
+        }
+        a.used = true;
+        ProjectStore.touch();
+        this.renderChat();
+    },
+    openNode(id) {
+        if (!findNodeInTree(id)) { toast(`[${id}] is not in the project any more`); return; }
+        spawnNodeFromTree(id);
+        const el = AppState.nodes.get(id);
+        if (el) { el.classList.add('ai-updating'); setTimeout(() => el.classList.remove('ai-updating'), 1200); }
+        if (window.innerWidth <= 600) JarvisPR.closePanel();
+    },
+    clearChat() {
+        if (!ProjectStore.rec || !confirm('Clear this project\'s Jarvis conversation? The system log is kept.')) return;
+        ProjectStore.rec.chat.length = 0;
+        ProjectStore.touch();
+        this._welcome = null;
+        this.renderChat();
+    },
+
+    /* ── slash commands (work offline, no API key needed) ── */
+    slash(raw) {
+        const [cmd, ...rest] = raw.trim().split(/\s+/);
+        const arg = rest.join(' ').trim();
+        this._userMsg(raw);
+        const rec = ProjectStore.rec;
+        switch (cmd.toLowerCase()) {
+            case '/help':
+                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/task <text>` queue a task for a PR\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/clear` clear this conversation\n\nAnything else is a question about the project.');
+                break;
+            case '/status': {
+                const nodes = flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).length;
+                const open = JarvisPR.prs.filter(p => p.status === 'open').length;
+                const errs = Object.keys(nodeErrors);
+                const last = rec.log.length ? jvRel(rec.log[rec.log.length - 1].ts) : 'never';
+                this.say(`**${ProjectStore.projectId}**\n${nodes} nodes · ${rec.log.length} log entries · last activity ${last}\n${open} open PR${open === 1 ? '' : 's'} · ${JarvisPR.tasks.filter(t => t.status === 'pending').length} queued task(s) · ${dirtyNodes.size} unsaved node(s)\n${errs.length ? 'Errors: ' + errs.map(e => '[' + e + ']').join(', ') : 'No node errors flagged.'}`);
+                break;
+            }
+            case '/log': {
+                const n = Math.min(40, Math.max(1, parseInt(arg, 10) || 10));
+                const rows = rec.log.slice(-n).reverse().map(e => `${jvClock(e.ts)} ${(LOG_TYPES[e.type] || LOG_TYPES.info).icon} ${e.msg}`);
+                this.say(rows.length ? rows.join('\n') : 'The log is empty.');
+                break;
+            }
+            case '/errors': {
+                const ids = Object.keys(nodeErrors);
+                const recent = rec.log.filter(e => e.type === 'error').slice(-5).reverse().map(e => `• ${jvRel(e.ts)}: ${e.msg}`);
+                this.say((ids.length ? ids.map(i => `• [${i}] ${nodeErrors[i]}`).join('\n') : 'No node errors flagged right now.') + (recent.length ? `\n\nRecent errors:\n${recent.join('\n')}` : ''));
+                break;
+            }
+            case '/notes': {
+                const lines = [];
+                NoteThreads.threads.forEach(t => (t.notes || []).forEach(n => lines.push(`${STATUS_ICONS[n.status] || '⬜'} ${n.text}  (${t.name})`)));
+                this.say(lines.length ? lines.join('\n') : 'No notes in this project yet.');
+                break;
+            }
+            case '/task':
+                if (!arg) { this.say('Usage: `/task describe what should change`'); break; }
+                JarvisPR.addTask(arg, { origin: 'user' });
+                this.say(`Queued: "${truncate(arg, 100)}". Run it from the Tasks tab, or send \`/run\`.`);
+                break;
+            case '/run':
+                if (JarvisPR.running) this.say('Jarvis is already working on a task.');
+                else if (!JarvisPR.tasks.some(t => t.status === 'pending')) this.say('Nothing is queued.');
+                else { this.say('Running the next task…'); JarvisPR.runNext(); }
+                break;
+            case '/predict': this.predict(true); break;
+            case '/clear': this.clearChat(); break;
+            default: this.say(`I don't know \`${cmd}\`. Try /help.`);
+        }
+    },
+
+    /* ── the brief: everything Jarvis knows about the project, as text ── */
+    buildBrief(opts = {}) {
+        const { focus = [], question = '', includeCode = true, codeBudget = 48000 } = opts;
+        const rec = ProjectStore.rec, now = Date.now();
+        const flat = flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id));
+        const out = [];
+        const first = rec && rec.log.length ? rec.log[0].ts : null;
+
+        out.push('=== PROJECT ===');
+        out.push(`id: ${ProjectStore.projectId} | root: ${vibeTree.id}${vibeTree.description ? ' — ' + vibeTree.description : ''}`);
+        out.push(`now: ${new Date(now).toLocaleString()} | tracked since: ${first ? new Date(first).toLocaleString() : 'this session'} | sessions: ${rec ? rec.meta.sessions : 1}`);
+
+        out.push('\n=== STRUCTURE (id · type · size · flags) ===');
+        flat.forEach(({ node, depth }) => {
+            const flags = [nodeErrors[node.id] ? 'ERROR' : '', dirtyNodes.has(node.id) ? 'unsaved' : '', AppState.pinnedNodes.has(node.id) ? 'pinned' : ''].filter(Boolean).join(',');
+            out.push(`${'  '.repeat(Math.max(0, depth - 1))}- [${node.id}] ${node.type} · ${jvCount(jvNodeCode(node))} lines${node.description ? ' · ' + node.description : ''}${flags ? ' · ' + flags : ''}`);
+        });
+        if (!flat.length) out.push('(no nodes)');
+
+        if (includeCode) {
+            const q = String(question).toLowerCase();
+            const words = q.split(/[^a-z0-9]+/).filter(w => w.length > 3);
+            const recent = SystemLog.recentNodeActivity(60);
+            const inOpenPR = new Set();
+            JarvisPR.prs.filter(p => p.status === 'open').forEach(p => (p.actions || []).forEach(a => inOpenPR.add(a.nodeId)));
+            const ranked = flat.map(({ node }) => {
+                let s = 0;
+                if (focus.includes(node.id)) s += 100;
+                if (q.includes(node.id.toLowerCase())) s += 60;
+                const hay = (node.id + ' ' + (node.description || '')).toLowerCase();
+                if (words.some(w => hay.includes(w))) s += 25;
+                if (nodeErrors[node.id]) s += 40;
+                s += Math.min(30, (recent.get(node.id) || 0) * 10);
+                if (inOpenPR.has(node.id)) s += 15;
+                if (dirtyNodes.has(node.id)) s += 10;
+                return { node, s };
+            }).sort((a, b) => b.s - a.s);
+            let used = 0;
+            const parts = [];
+            for (const { node } of ranked) {
+                const code = jvNodeCode(node);
+                if (!code) continue;
+                const room = codeBudget - used;
+                let body = code;
+                if (code.length > room) body = (room > 800 ? code.slice(0, room) : code.split('\n').slice(0, 8).join('\n')) + '\n/* …truncated… */';
+                parts.push(`--- [${node.id}] (${node.type}) ---\n${body}`);
+                used += body.length;
+            }
+            out.push('\n=== CODE (most relevant first) ===');
+            out.push(parts.length ? parts.join('\n\n') : '(no code yet)');
+        }
+
+        out.push('\n=== HEALTH ===');
+        const errIds = Object.keys(nodeErrors);
+        out.push(errIds.length ? errIds.map(id => `- [${id}] ${nodeErrors[id]}`).join('\n') : 'No node errors flagged.');
+        const recentErr = SystemLog.entries.filter(e => e.type === 'error' && now - e.ts < 3600e3).slice(-5);
+        if (recentErr.length) out.push('Recent errors (last hour): ' + recentErr.map(e => `${jvRel(e.ts)}: ${e.msg}`).join(' | '));
+        out.push(`Unsaved nodes: ${dirtyNodes.size ? [...dirtyNodes].map(i => '[' + i + ']').join(', ') : 'none'}`);
+
+        out.push('\n=== SYSTEM LOG (recorded history, oldest → newest) ===');
+        const tail = SystemLog.entries.slice(-40);
+        out.push(tail.length ? tail.map(e => `${jvRel(e.ts)} · ${e.type}${e.node ? ' · ' + e.node : ''} · ${e.msg}${e.count > 1 ? ' ×' + e.count : ''}`).join('\n') : '(empty)');
+        if (rec) out.push(`(${rec.log.length} entries total)`);
+        const hot = SystemLog.hotSpots(24);
+        if (hot.length) out.push('Most-touched nodes (24h): ' + hot.map(h => `[${h.id}]×${h.n}`).join(', '));
+
+        out.push('\n=== JARVIS: PRs & TASKS ===');
+        const prs = JarvisPR.prs.slice(-8);
+        out.push(prs.length ? prs.map(p => `PR #${p.id} ${String(p.status).toUpperCase()} "${p.title}" nodes=[${(p.actions || []).map(a => a.nodeId).join(',')}]${p.rejectReason ? ' — rejected because: ' + p.rejectReason : ''} (${jvRel(p.createdAt)})`).join('\n') : 'No PRs yet.');
+        const merged = JarvisPR.prs.filter(p => p.status === 'merged').length, closed = JarvisPR.prs.filter(p => p.status === 'closed').length;
+        if (merged || closed) out.push(`Totals: ${merged} merged, ${closed} rejected.`);
+        const queued = JarvisPR.tasks.filter(t => t.status === 'pending' || t.status === 'working');
+        out.push(queued.length ? 'Queued tasks: ' + queued.map(t => `"${truncate(t.text, 90)}"`).join('; ') : 'No queued tasks.');
+
+        out.push('\n=== USER NOTES (tracker) ===');
+        const label = { neutral: 'note', works: 'WORKS', broken: 'BROKEN', todo: 'TODO' };
+        const noteLines = [];
+        NoteThreads.threads.forEach(t => (t.notes || []).slice(-12).forEach(n => noteLines.push(`${label[n.status] || n.status} [${t.name}, ${jvRel(n.time)}]: ${n.text}`)));
+        noteLines.sort((a, b) => (/^(BROKEN|TODO)/.test(b) ? 1 : 0) - (/^(BROKEN|TODO)/.test(a) ? 1 : 0));
+        out.push(noteLines.length ? noteLines.slice(0, 24).join('\n') : '(no notes)');
+        return out.join('\n');
+    },
+
+    /* ── predictions ── */
+    localNext() {
+        const rec = ProjectStore.rec, out = [];
+        if (!rec) return out;
+        const dismissed = new Set(rec.meta.dismissed);
+        const add = o => { if (!dismissed.has(o.id)) out.push(o); };
+        Object.keys(nodeErrors).forEach(id => {
+            if (!findNodeInTree(id)) return;
+            add({ id: `err:${id}:${jvHash(nodeErrors[id])}`, kind: 'err', icon: '⚠️', title: `Fix the error in [${id}]`, why: truncate(nodeErrors[id], 120), task: `Fix this error in node [${id}]: ${nodeErrors[id]}`, nodeIds: [id], origin: 'error' });
+        });
+        NoteThreads.threads.forEach(t => (t.notes || []).forEach(n => {
+            if (n.status === 'broken') add({ id: `note:${n.id}`, kind: 'note', icon: '❌', title: 'Broken, per your note', why: truncate(n.text, 120), task: `Investigate and fix: ${n.text}`, origin: 'note' });
+        }));
+        const open = JarvisPR.prs.filter(p => p.status === 'open');
+        if (open.length) add({ id: `prs:${open.map(p => p.id).join(',')}`, kind: 'pr', icon: '🔀', title: `${open.length} PR${open.length > 1 ? 's' : ''} waiting for review`, why: truncate(open[open.length - 1].title, 110), action: 'review', label: 'Review' });
+        if (dirtyNodes.size) add({ id: `dirty:${[...dirtyNodes].sort().join(',')}`, kind: 'pr', icon: '⬆', title: `${dirtyNodes.size} unsaved node${dirtyNodes.size > 1 ? 's' : ''}`, why: 'Push them so the main app and this log stay in sync', action: 'push', label: 'Push' });
+        // Same node rejected twice → Jarvis is guessing wrong; ask for direction
+        const rej = {};
+        JarvisPR.prs.filter(p => p.status === 'closed').forEach(p => (p.actions || []).forEach(a => { rej[a.nodeId] = (rej[a.nodeId] || 0) + 1; }));
+        Object.keys(rej).filter(id => rej[id] >= 2 && findNodeInTree(id)).slice(0, 1).forEach(id =>
+            add({ id: `rej:${id}:${rej[id]}`, kind: 'pred', icon: '🧭', title: `My proposals for [${id}] were rejected ${rej[id]}×`, why: 'Tell me what you want there and I will stop guessing', action: 'ask', label: 'Tell Jarvis', prefill: `For [${id}], what I actually want is: ` }));
+        SystemLog.hotSpots(0.5, 1).filter(h => h.n >= 4).forEach(h =>
+            add({ id: `hot:${h.id}:${Math.floor(h.n / 4)}`, kind: 'pred', icon: '🔥', title: `You keep editing [${h.id}]`, why: `${h.n} changes in the last 30 minutes. Want a second pair of eyes?`, task: `Review [${h.id}] for bugs, inconsistencies and quick wins, given how it has been changing recently.`, nodeIds: [h.id], origin: 'prediction' }));
+        NoteThreads.threads.forEach(t => (t.notes || []).forEach(n => {
+            if (n.status === 'todo') add({ id: `todo:${n.id}`, kind: 'note', icon: '🔲', title: 'To-do from your notes', why: truncate(n.text, 120), task: n.text, origin: 'note' });
+        }));
+        return out;
+    },
+    _allNext() {
+        const rec = ProjectStore.rec;
+        if (!rec) return [];
+        const dismissed = new Set(rec.meta.dismissed);
+        const llm = (rec.predictions || []).filter(p => !dismissed.has(p.id)).map(p => Object.assign({ kind: 'pred', icon: '🔮' }, p));
+        return this.localNext().concat(llm);
+    },
+    renderNext() {
+        const box = document.getElementById('jv-next');
+        if (!box) return;
+        const items = this._allNext();
+        this._nextItems = items;
+        if (!items.length) { box.style.display = 'none'; return; }
+        box.style.display = '';
+        box.classList.toggle('collapsed', this._nextCollapsed);
+        const cards = items.slice(0, 6).map((it, i) => {
+            const label = it.label || 'Queue';
+            return `<div class="jv-card kind-${it.kind || 'pred'}">
+                <div class="jv-card-main"><span class="jv-card-icon">${it.icon || '🔮'}</span><div><div class="jv-card-title">${escapeHTML(it.title)}</div><div class="jv-card-why">${escapeHTML(it.why || '')}</div></div></div>
+                <div class="jv-card-btns"><button class="jpr-btn primary" onclick="JarvisBrain.takeNext(${i})">${escapeHTML(label)}</button><button class="jv-x" title="Dismiss" onclick="JarvisBrain.dismissNext(${i})">✕</button></div></div>`;
+        }).join('');
+        box.innerHTML = `<div class="jv-next-head" onclick="JarvisBrain.toggleNext()"><span>🔮 Next up (${items.length})</span><span class="jv-spacer"></span><button title="Ask Jarvis to predict from the log" onclick="event.stopPropagation();JarvisBrain.predict(true)">refresh</button><span>${this._nextCollapsed ? '▸' : '▾'}</span></div><div class="jv-next-list">${cards}</div>`;
+    },
+    toggleNext() {
+        this._nextCollapsed = !this._nextCollapsed;
+        try { localStorage.setItem('apui_jv_next_collapsed', this._nextCollapsed ? '1' : '0'); } catch (_) {}
+        this.renderNext();
+    },
+    takeNext(i) {
+        const it = this._nextItems[i];
+        if (!it) return;
+        if (it.action === 'review') { JarvisPR.switchTab('prs'); return; }
+        if (it.action === 'push') { pushAllToVibeTree(); this.renderNext(); return; }
+        if (it.action === 'ask') { this.openChat(it.prefill || ''); return; }
+        if (it.task) {
+            JarvisPR.addTask(it.task, { origin: it.origin || 'prediction', nodeIds: it.nodeIds || [] });
+            toast('Task queued — run it from the Tasks tab');
+            this._dismiss(it.id);
+        }
+    },
+    dismissNext(i) { const it = this._nextItems[i]; if (it) this._dismiss(it.id); },
+    _dismiss(id) {
+        const rec = ProjectStore.rec;
+        if (!rec) return;
+        rec.meta.dismissed.push(id);
+        ProjectStore.touch();
+        this.renderNext();
+    },
+
+    SYS_PREDICT: `You are Jarvis, the resident AI engineer inside APUI. Predict what the developer should do NEXT on this project, using its recorded history (system log, PR outcomes, notes, errors) and code — not generic advice.
+Return ONLY JSON:
+{"predictions":[{"title":"short imperative, under 70 characters","why":"one sentence citing concrete evidence from the log, notes or code","task":"a self-contained task that could be queued as a PR","nodeIds":["existing node ids"],"confidence":0.0}]}
+RULES: max 4, ordered by expected value. Each needs concrete evidence. Skip anything already merged or already in an open PR. Skip things the user rejected unless circumstances changed. Prefer fixing known problems over adding features. nodeIds must exist in the structure.`,
+
+    schedulePredict(reason) {
+        if (!this.proactive || !AppState.settings.apiKey) return;
+        clearTimeout(this._predictTimer);
+        this._predictTimer = setTimeout(() => {
+            if (Date.now() - this._lastPredictAt < 60000 || this.busy || JarvisPR.running) return;
+            this.predict(false);
+        }, 4000);
+    },
+    async predict(manual) {
+        if (!ProjectStore.rec) return;
+        if (!AppState.settings.apiKey) { if (manual) this.say('I need a Gemini API key to predict from the log. Add one in Settings.'); return; }
+        const pid = ProjectStore.projectId;
+        this._lastPredictAt = Date.now();
+        if (manual) toast('Jarvis is reading the log…');
+        try {
+            const raw = await callGemini(this.SYS_PREDICT, `PROJECT BRIEF\n${this.buildBrief({ question: 'what should happen next' })}\n\nReturn the JSON now.`, true, []);
+            if (ProjectStore.projectId !== pid) return;
+            const data = jvParseJson(raw);
+            const list = (data && Array.isArray(data.predictions)) ? data.predictions : [];
+            const clean = list.slice(0, 4).map((p, i) => {
+                const title = truncate(String(p.title || '').trim(), 80), task = String(p.task || '').trim();
+                if (!title || task.length < 6) return null;
+                const nodeIds = (Array.isArray(p.nodeIds) ? p.nodeIds : []).filter(id => jvSafeId(id) && findNodeInTree(id));
+                return { id: `p:${jvHash(title)}:${Math.floor(Date.now() / 3600e3)}`, title, why: truncate(String(p.why || ''), 160), task, nodeIds, origin: 'prediction', confidence: Number(p.confidence) || 0, ts: Date.now() };
+            }).filter(Boolean);
+            ProjectStore.rec.predictions = clean;
+            ProjectStore.touch();
+            if (clean.length) SystemLog.add('predict', `Predicted next: ${clean.map(c => c.title).join(' · ')}`, { src: 'jarvis' });
+            this.renderNext();
+            if (manual && !clean.length) toast('Nothing worth flagging right now');
+        } catch (e) {
+            if (manual) toast('⚠ ' + e.message);
+        }
+    },
+
+    /* ── ambient reactions ── */
+    onError(message, nodeId) {
+        const msg = truncate(String(message || ''), 220), now = Date.now();
+        const w = JarvisPR._mergeWatch;
+        if (w && now < w.until) {
+            w.hit = true;
+            SystemLog.add('error', `Possible regression from PR #${w.prId}: ${msg}`, { node: nodeId || null, src: 'jarvis' });
+            this.say(`⚠ An error showed up right after PR #${w.prId} was merged:\n\`${msg}\`\nWant me to queue a fix?`,
+                [{ kind: 'queue_task', label: 'Queue a fix PR', task: `Fix the runtime error that appeared after PR #${w.prId} ("${w.title}") was merged: ${msg}`, origin: 'error', nodeIds: nodeId ? [nodeId] : [], used: false }]);
+            this.renderNext();
+            return;
+        }
+        this.renderNext();
+        if (!this.proactive) return;
+        if (now - this._lastErrSay < 25000 || (msg === this._lastErrMsg && now - this._lastErrSay < 120000)) return;
+        this._lastErrSay = now; this._lastErrMsg = msg;
+        this.say(`⚠ ${nodeId ? `[${nodeId}] reported` : 'The preview reported'}:\n\`${msg}\``,
+            [{ kind: 'queue_task', label: 'Queue a fix PR', task: nodeId ? `Fix this error in node [${nodeId}]: ${msg}` : `Fix this runtime error in the project: ${msg}`, origin: 'error', nodeIds: nodeId ? [nodeId] : [], used: false }]);
+    },
+
+    /* ── rendering ── */
+    _msgHtml(m) {
+        if (m.role === 'user') return `<div class="jv-msg jv-user">${escapeHTML(m.text).replace(/\n/g, '<br>')}</div>`;
+        const acts = (m.actions || []).map((a, i) => `<button class="jv-act${a.used ? ' used' : ''}" ${a.used ? 'disabled' : ''} onclick="JarvisBrain.runAction('${m.id}',${i})">${escapeHTML(a.label)}</button>`).join('');
+        return `<div class="jv-msg jv-ai">${jvRenderMd(m.text)}${acts ? `<div class="jv-acts">${acts}</div>` : ''}<div class="jv-meta">${jvClock(m.ts)}</div></div>`;
+    },
+    renderChat() {
+        const el = document.getElementById('jv-chat-list');
+        if (!el) return;
+        const msgs = ProjectStore.rec ? ProjectStore.rec.chat : [];
+        let html = this._welcome ? `<div class="jv-msg jv-ai jv-welcome">${jvRenderMd(this._welcome)}</div>` : '';
+        html += msgs.map(m => this._msgHtml(m)).join('');
+        if (this.busy) html += '<div class="jv-msg jv-ai jv-typing"><span></span><span></span><span></span></div>';
+        el.innerHTML = html;
+        el.scrollTop = el.scrollHeight;
+        const lastAi = [...msgs].reverse().find(m => m.role === 'jarvis');
+        this._chipTexts = (lastAi && lastAi.followups && lastAi.followups.length) ? lastAi.followups : this.QUICK;
+        const chips = document.getElementById('jv-chips');
+        if (chips) chips.innerHTML = this._chipTexts.map((t, i) => `<button class="jv-chip" onclick="JarvisBrain.chip(${i})">${escapeHTML(t)}</button>`).join('');
+        const inp = document.getElementById('jv-input');
+        if (inp) inp.disabled = false;
+    }
+};
+
+/* Panel / tracker helpers referenced from HTML */
+function rsMode(mode) {
+    document.querySelectorAll('.rs-mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const notes = document.getElementById('rs-notes-view'), log = document.getElementById('rs-log-view'), acts = document.getElementById('rs-note-actions');
+    if (notes) notes.style.display = mode === 'notes' ? 'flex' : 'none';
+    if (log) log.style.display = mode === 'log' ? 'flex' : 'none';
+    if (acts) acts.style.visibility = mode === 'notes' ? 'visible' : 'hidden';
+    try { localStorage.setItem('apui_rs_mode', mode); } catch (_) {}
+    if (mode === 'log') SystemLog.refresh(true);
+}
+
 
 /* ── Global shim: map old Jarvis calls to new system ────────── */
 const Jarvis = {
@@ -3248,6 +4427,9 @@ async function handleCommand(specificCmd = null) {
             ensureChat(); enforceNodeLimit('chat'); centerOnNode('chat', 350);
             await aiEditAll('root', editReq);
         }
+    } else if (jvLooksLikeQuestion(val)) {
+        // Questions go to Jarvis chat (project-aware) instead of triggering an edit
+        JarvisBrain.ask(val.replace(/^\?\s*/, ''));
     } else {
         // Free-form AI command — images already in _apuiPendingImages will be consumed inside aiEditAll
         ensureChat(); enforceNodeLimit('chat'); centerOnNode('chat', 350);
@@ -3694,24 +4876,38 @@ const NoteThreads = {
 
     get active() { return this.threads.find(t => t.id === this.activeId) || null; },
 
-    init() {
-        const saved = localStorage.getItem('apui_note_threads');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                this.threads  = parsed.threads  || [];
-                this.activeId = parsed.activeId || null;
-            } catch {}
-        }
-        if (!this.threads.length) this.newThread('Thread 1');
-        else this.renderAll();
-    },
+    init() { this.renderAll(); },   // real data arrives through loadFrom() once the project is known
 
-    save() {
-        localStorage.setItem('apui_note_threads', JSON.stringify({
-            threads: this.threads, activeId: this.activeId
-        }));
+    /** Load this project's notes. Returns how many legacy (pre-per-project) notes were imported. */
+    loadFrom(rec) {
+        let n = rec.notes, imported = 0;
+        if (!n || !Array.isArray(n.threads)) {
+            n = { threads: [], activeId: null };
+            // One-time: adopt the old single global note store into the first project opened.
+            // The legacy key is left untouched.
+            try {
+                if (!localStorage.getItem('apui_notes_migrated')) {
+                    const saved = JSON.parse(localStorage.getItem('apui_note_threads') || 'null');
+                    if (saved && Array.isArray(saved.threads) && saved.threads.some(t => (t.notes || []).length)) {
+                        n = { threads: saved.threads, activeId: saved.activeId || (saved.threads[0] && saved.threads[0].id) || null };
+                        imported = saved.threads.reduce((c, t) => c + (t.notes || []).length, 0);
+                    }
+                    localStorage.setItem('apui_notes_migrated', '1');
+                }
+            } catch (_) {}
+        }
+        this.threads  = n.threads;
+        this.activeId = n.activeId;
+        if (!this.threads.length) {
+            this.threads.push({ id: 'th-' + Date.now(), name: 'Thread 1', notes: [] });
+            this.activeId = this.threads[0].id;
+        }
+        if (!this.active) this.activeId = this.threads[0].id;
+        this.renderAll();
+        return imported;
     },
+    saveTo(rec) { rec.notes = { threads: this.threads, activeId: this.activeId }; },
+    save() { ProjectStore.touch(); },
 
     newThread(name) {
         const id = 'th-' + Date.now();
@@ -3742,6 +4938,8 @@ const NoteThreads = {
         this.save();
         this.renderNotes();
         this.renderTabs();
+        SystemLog.add('note', `${STATUS_ICONS[status] || '⬜'} ${truncate(note.text, 140)}`, { src: 'user' });
+        JarvisBrain.renderNext();
     },
 
     deleteNote(noteId) {
@@ -3759,6 +4957,8 @@ const NoteThreads = {
         note.status = order[(order.indexOf(note.status) + 1) % order.length];
         this.save();
         this.renderNotes();
+        SystemLog.add('note', `Marked ${note.status}: ${truncate(note.text, 110)}`, { src: 'user' });
+        JarvisBrain.renderNext();
     },
 
     renderAll() {
@@ -3822,7 +5022,7 @@ function threadNew() {
     if (name?.trim()) NoteThreads.newThread(name.trim());
 }
 function threadClearAll() {
-    if (!confirm('Delete all threads and notes?')) return;
+    if (!confirm('Delete all threads and notes for this project?')) return;
     NoteThreads.threads = [];
     NoteThreads.activeId = null;
     NoteThreads.save();
@@ -3843,8 +5043,7 @@ function saveNote() {
     setNoteStatus('neutral');
 }
 
-// trackerLog is now a no-op (auto-logging removed — notes are manual)
-function trackerLog() {}
+// trackerLog() lives with the SystemLog above — it writes the persistent per-project log.
 function trackerInit() { NoteThreads.init(); }
 function trackerNewSession() { threadNew(); }
 function trackerClear() { if (NoteThreads.active) { NoteThreads.active.notes = []; NoteThreads.save(); NoteThreads.renderNotes(); } }
@@ -3855,6 +5054,7 @@ function toggleRSidebar() {
     if (!rs) return;
     const isOpen = rs.classList.toggle('open');
     if (btn) btn.style.color = isOpen ? 'var(--ai-edit)' : '';
+    if (isOpen) SystemLog.refresh(true);
 }
 function toggleSidebar() {
     const sb = document.getElementById('sidebar');
@@ -3955,6 +5155,7 @@ function downloadProject() {
     a.href=URL.createObjectURL(new Blob([full],{type:'text/html'}));
     a.download='vibe-export.html'; a.click();
     logToChat('system','Project exported from Vibe Tree.');
+    SystemLog.add('export', 'Exported the project as a single HTML file', { src: 'user' });
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -3974,6 +5175,12 @@ function loadDemoTree() {
     rebuildFromTree();
     renderSidebar();
     toast('Demo tree loaded — connect to Vibe System for live sync');
+    ProjectStore.enqueue(async () => {
+        if (ProjectStore.rec) return;   // a real project arrived in the meantime
+        await ProjectStore.enter('__standalone__');
+        SystemLog.add('open', 'Demo project loaded (not connected to a Vibe System project)', { src: 'system' });
+        JarvisBrain.renderAll();
+    });
     logToConsole('Standalone mode: demo tree loaded.', 'success');
 }
 
@@ -4019,6 +5226,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     trackerInit();
     renderTaskbar();
+    JarvisBrain.init();
+    try { rsMode(localStorage.getItem('apui_rs_mode') === 'log' ? 'log' : 'notes'); } catch (_) {}
 
     // Note composer: Shift+Enter = newline, Enter alone = save
     const noteInput = document.getElementById('note-input');
@@ -4030,4 +5239,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-    </html>
+            </html>
