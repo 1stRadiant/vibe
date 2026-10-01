@@ -10244,6 +10244,152 @@ let _apuiBridgeListenerAttached = false;
 window.addEventListener('message', handleApuiMessage);
 _apuiBridgeListenerAttached = true;
 
+/* ═══════════════════════════════════════════════════════════════
+   JARVIS CONTROL BRIDGE
+   Lets the Jarvis assistant inside APUI drive the rest of the Vibe
+   System: switch tabs, manage Auto-Pilot triggers and the Agent queue,
+   save, checkpoint, list/open projects. Every call originates from a
+   plan the user approved in APUI; only the APUI frame may call it.
+   ═══════════════════════════════════════════════════════════════ */
+function _jvHud(text, opts = {}) {
+    let hud = document.getElementById('jv-hud');
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'jv-hud';
+        hud.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:2147483000;max-width:min(380px,calc(100vw - 28px));display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;background:rgba(10,6,20,.96);border:1px solid rgba(255,0,255,.55);border-radius:10px;box-shadow:0 0 18px rgba(255,0,255,.25);font:600 12px/1.35 Rajdhani,system-ui,sans-serif;color:#f3d9ff;';
+        document.body.appendChild(hud);
+    }
+    const away = !document.getElementById('apui')?.classList.contains('active');
+    hud.textContent = '';
+    const label = document.createElement('span');
+    label.textContent = '🤖 ' + text;
+    hud.appendChild(label);
+    const addBtn = (txt, fn) => {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.style.cssText = 'background:rgba(255,0,255,.22);border:1px solid rgba(255,0,255,.7);color:#fff;border-radius:6px;padding:2px 9px;font:inherit;cursor:pointer;';
+        b.onclick = fn;
+        hud.appendChild(b);
+    };
+    if (opts.tab && opts.tab !== 'apui') addBtn(`Open ${opts.tab}`, () => switchToTab(opts.tab));
+    if (away) addBtn('Back to Jarvis', () => { switchToTab('apui'); hud.remove(); });
+    clearTimeout(hud._t);
+    hud._t = setTimeout(() => hud.remove(), away ? 20000 : 4500);
+}
+
+function _jvTriggerList() {
+    return triggers.map(t => ({ id: t.id, when: t.condition, do: t.actionType, value: t.actionValue, enabled: t.enabled, fired: t.fireCount }));
+}
+
+async function handleApuiControl(d, e) {
+    const frame = document.getElementById('apui-frame');
+    if (!frame || e.source !== frame.contentWindow || typeof d.reqId !== 'string') return;   // only the APUI frame may drive the app
+    const reply = (ok, payload) => {
+        try { frame.contentWindow.postMessage({ type: 'apui-control-result', reqId: d.reqId, ok, [ok ? 'data' : 'error']: payload }, '*'); } catch (_) {}
+    };
+    const a = (d.args && typeof d.args === 'object') ? d.args : {};
+    try {
+        switch (d.action) {
+            case 'get_state': {
+                const active = document.querySelector('.tab-content-area .tab-content.active');
+                return reply(true, {
+                    activeTab: active ? active.id : null,
+                    project: { id: currentProjectId, storage: currentProjectStorageType, loggedIn: !!currentUser },
+                    triggers: _jvTriggerList(),
+                    agent: { running: !!isTaskQueueRunning, waitingForReply: !!waitingForAgentConfirmation, queue: taskQueue.map(t => typeof t === 'string' ? t : t.prompt).slice(0, 15) },
+                    tabs: [...document.querySelectorAll('.tab-content-area .tab-content')].map(x => x.id)
+                });
+            }
+            case 'switch_tab': {
+                const tab = String(a.tab || '');
+                if (!/^[\w-]+$/.test(tab) || !document.querySelector(`.tab-content-area #${tab}`)) throw new Error(`There is no "${tab}" tab.`);
+                switchToTab(tab);
+                _jvHud(`Switched to ${tab}`, { tab });
+                return reply(true, { activeTab: tab });
+            }
+            case 'list_triggers': return reply(true, _jvTriggerList());
+            case 'add_trigger': {
+                const t = addTrigger(String(a.condition), String(a.action), String(a.value || ''));
+                if (!t) throw new Error('The main app rejected that trigger (check the Agent log).');
+                _jvHud(`Armed trigger ${t.id}`, { tab: 'agent' });
+                return reply(true, { id: t.id, when: t.condition, do: t.actionType });
+            }
+            case 'remove_trigger': {
+                if (!triggers.some(t => t.id === a.id)) throw new Error(`No trigger "${a.id}".`);
+                removeTrigger(a.id);
+                return reply(true, { removed: a.id });
+            }
+            case 'toggle_trigger': {
+                const t = triggers.find(x => x.id === a.id);
+                if (!t) throw new Error(`No trigger "${a.id}".`);
+                t.enabled = !!a.enabled; renderTriggersPanel();
+                return reply(true, { id: t.id, enabled: t.enabled });
+            }
+            case 'queue_agent_task': {
+                const prompt = String(a.prompt || '').trim();
+                if (!prompt) throw new Error('Empty prompt.');
+                taskQueue.push({ prompt, images: [] });
+                renderTaskQueue(); updateTaskQueueUI();
+                _jvHud('Queued a task for the Agent', { tab: 'agent' });
+                return reply(true, { queued: taskQueue.length });
+            }
+            case 'start_agent_queue': {
+                if (isTaskQueueRunning) throw new Error('The Agent queue is already running.');
+                if (!taskQueue.length) throw new Error('The Agent queue is empty.');
+                handleStartTaskQueue().catch(err => console.error('Jarvis-started queue failed:', err));
+                _jvHud('Agent queue started', { tab: 'agent' });
+                return reply(true, { started: true, tasks: taskQueue.length });
+            }
+            case 'stop_agent_queue': {
+                handleStopTaskQueue();
+                return reply(true, { running: !!isTaskQueueRunning });
+            }
+            case 'clear_agent_queue': {
+                if (isTaskQueueRunning) throw new Error('The queue is running. Stop it first.');
+                const n = taskQueue.length;
+                taskQueue.length = 0;
+                renderTaskQueue(); updateTaskQueueUI();
+                return reply(true, { cleared: n });
+            }
+            case 'save_checkpoint': {
+                if (!currentProjectId) throw new Error('This project has no id yet. Save it from the Start tab first.');
+                await _checkpointApi.save(currentProjectId, String(a.label || 'Jarvis checkpoint').slice(0, 80), vibeTree);
+                try { _renderCheckpointPanel(); } catch (_) {}
+                return reply(true, { saved: a.label || 'Jarvis checkpoint' });
+            }
+            case 'save_project': {
+                if (!currentProjectId) throw new Error('This project has no id yet. Save it from the Start tab first.');
+                autoSaveProject();
+                return reply(true, { saved: currentProjectId });
+            }
+            case 'list_projects': {
+                let list;
+                if (a.storage === 'cloud') {
+                    if (!currentUser) throw new Error('Not logged in, so cloud projects are not available.');
+                    list = await api.listProjects(currentUser.userId);
+                } else list = await localApi.listProjects();
+                return reply(true, { storage: a.storage === 'cloud' ? 'cloud' : 'local', projects: (list || []).filter(p => !String(p).includes('__form__')).slice(0, 50), current: currentProjectId });
+            }
+            case 'load_project': {
+                const id = String(a.id || ''), storage = a.storage === 'cloud' ? 'cloud' : 'local';
+                if (!id) throw new Error('No project id.');
+                await handleLoadProject({ target: { dataset: { id, storage } } });
+                if (currentProjectId !== id) throw new Error(`Could not open "${id}".`);
+                _jvHud(`Opened project ${id}`, {});
+                return reply(true, { opened: id });
+            }
+            case 'check_and_fix_errors': {
+                Promise.resolve(window.vibeCheckAndFixErrors()).catch(err => console.error('Jarvis-started error scan failed:', err));
+                _jvHud('Scanning for errors…', { tab: 'agent' });
+                return reply(true, { started: true });
+            }
+            default: throw new Error(`Unknown control action "${String(d.action).slice(0, 40)}".`);
+        }
+    } catch (err) {
+        reply(false, err && err.message ? err.message : String(err));
+    }
+}
+
 function injectBridgeIntoApui() {
     const frame = document.getElementById('apui-frame');
     if (!frame) return;
@@ -10385,6 +10531,12 @@ function handleApuiMessage(e) {
                     pinnedNodes: [..._apuiPinnedNodes]
                 }, '*');
             }
+            break;
+        }
+
+        // Jarvis (inside APUI) controlling the wider app — see handleApuiControl
+        case 'apui-control': {
+            handleApuiControl(d, e);
             break;
         }
 
@@ -10627,4 +10779,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-          }
+            }
