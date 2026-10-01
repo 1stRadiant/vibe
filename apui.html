@@ -902,6 +902,46 @@
     .rs-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
     #rs-log-view { display: none; }
     #rs-log-count { font: 0.55rem 'Fira Code', monospace; color: #667; margin-left: 3px; }
+    /* ── Intent-first conversation: questions, plans, steps ── */
+    .jv-qs { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .jv-q-text { font-size: 0.74rem; font-weight: 600; color: #f0d9ff; margin-bottom: 4px; }
+    .jv-opts { display: flex; flex-wrap: wrap; gap: 5px; }
+    .jv-opt { background: rgba(65,105,225,0.12); border: 1px solid rgba(65,105,225,0.45); color: var(--secondary); border-radius: 12px; padding: 3px 10px; font: 600 0.68rem 'Rajdhani', sans-serif; cursor: pointer; text-align: left; }
+    .jv-opt:hover:not(:disabled) { background: rgba(65,105,225,0.28); }
+    .jv-opt.on { background: rgba(255,0,255,0.2); border-color: rgba(255,0,255,0.7); color: #ffd6ff; }
+    .jv-opt:disabled { opacity: 0.45; cursor: default; }
+    .jv-hint { font: 0.56rem 'Fira Code', monospace; color: #666; margin-top: 4px; }
+    .jv-plan { margin-top: 8px; border: 1px solid rgba(255,0,255,0.3); border-radius: 6px; background: rgba(8,6,18,0.7); overflow: hidden; }
+    .jv-plan.st-pending { border-color: rgba(255,0,255,0.6); box-shadow: 0 0 10px rgba(255,0,255,0.12); }
+    .jv-plan.st-cancelled, .jv-plan.st-superseded, .jv-plan.st-interrupted { opacity: 0.55; }
+    .jv-plan-head { padding: 7px 10px; font-size: 0.72rem; line-height: 1.45; background: rgba(255,0,255,0.07); border-bottom: 1px solid rgba(255,0,255,0.15); }
+    .jv-step { display: flex; gap: 8px; padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: flex-start; }
+    .jv-step input[type=checkbox] { margin-top: 3px; accent-color: #ff00ff; flex-shrink: 0; }
+    .jv-step-st { width: 14px; flex-shrink: 0; text-align: center; font-size: 0.78rem; }
+    .jv-step.s-ok .jv-step-st { color: #66bb6a; } .jv-step.s-fail .jv-step-st { color: #ef5350; }
+    .jv-step.s-skipped { opacity: 0.5; }
+    .jv-step-main { flex: 1; min-width: 0; }
+    .jv-step-title { font-size: 0.72rem; line-height: 1.4; word-break: break-word; }
+    .jv-step-why { font-size: 0.64rem; color: #7a819a; margin-top: 1px; }
+    .jv-kind { font: 700 0.54rem 'Fira Code', monospace; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.07); color: #aab; margin-right: 3px; white-space: nowrap; }
+    .jv-kind.k-test { color: #00ffcc; background: rgba(0,255,204,0.1); }
+    .jv-kind.k-control { color: #8fb0ff; background: rgba(65,105,225,0.18); }
+    .jv-kind.k-pr { color: #ffb3ff; background: rgba(255,0,255,0.14); }
+    .jv-kind.k-project { color: #ffb74d; background: rgba(255,183,77,0.15); }
+    .jv-warn { color: #ffb74d; }
+    .jv-det { margin-top: 3px; font-size: 0.62rem; color: #8a90a8; }
+    .jv-det summary { cursor: pointer; }
+    .jv-det ol { margin: 3px 0 0 16px; padding: 0; font-family: 'Fira Code', monospace; font-size: 0.56rem; line-height: 1.6; }
+    .jv-step-log { margin-top: 4px; font: 0.56rem/1.55 'Fira Code', monospace; color: #8fd19e; max-height: 150px; overflow-y: auto; }
+    .jv-step-log .bad, .jv-step-res.bad { color: #ff8a80; }
+    .jv-step-res { margin-top: 3px; font: 0.6rem/1.5 'Fira Code', monospace; color: #9aa; white-space: pre-wrap; word-break: break-word; }
+    .jv-plan-btns { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+    .jv-plan-status { padding: 6px 10px; font: 0.62rem 'Fira Code', monospace; color: #9aa; }
+    .jv-plan-btns .jv-plan-status { padding: 0; }
+    .jv-plan .jv-hint { padding: 0 10px 7px; margin: 0; }
+    .jv-act.primary { background: rgba(255,0,255,0.3); border-color: rgba(255,0,255,0.8); color: #fff; }
+    .sl-row.t-test { border-left-color: #00ffcc; }
+    .sl-row.t-action { border-left-color: rgba(255,0,255,0.55); }
 </style>
 </head>
 <body>
@@ -913,7 +953,7 @@
     <button class="btn-icon" title="Toggle Sidebar" onclick="toggleSidebar()">☰</button>
     <div class="navbar-brand">APUI<small>Vibe Tree Editor</small></div>
     <div class="navbar-input-area">
-        <input type="text" id="user-input" placeholder="Ask Jarvis a question, or describe an edit…  (📷 attaches the preview)">
+        <input type="text" id="user-input" placeholder="Tell Jarvis what you want — he'll check before acting  (! = direct edit · 📷 attaches the preview)">
         <button class="btn-main" onclick="handleCommand()">RUN</button>
     </div>
     <!-- Vision controls -->
@@ -1054,7 +1094,7 @@
         <div class="jv-chat-list" id="jv-chat-list"></div>
         <div class="jv-chips" id="jv-chips"></div>
         <div class="jv-composer">
-            <textarea id="jv-input" rows="2" placeholder="Ask about this project…  (/help for commands)"></textarea>
+            <textarea id="jv-input" rows="2" placeholder="Ask, or tell me what you want…  (/help for commands)"></textarea>
             <button class="jpr-btn primary" onclick="JarvisBrain.sendFromInput()">Ask</button>
         </div>
         <div class="jv-foot">
@@ -1196,13 +1236,16 @@ window.addEventListener('message', e => {
     // Parent reports a runtime error attributed to a node
     if (d.type === 'apui-node-error' && d.nodeId != null) {
         const em = d.message || 'Unknown error';
+        PreviewDriver.noteError(`[${d.nodeId}] ${em}`);
         if (nodeErrors[d.nodeId] !== em) SystemLog.add('error', `[${d.nodeId}] ${truncate(em, 200)}`, { node: d.nodeId, src: 'system' });
         setNodeError(d.nodeId, em);
         JarvisBrain.onError(em, d.nodeId);
         return;
     }
     // Runtime errors from the main app's own preview/console (parent has no node to blame)
+    if (d.type === 'apui-control-result') { Bridge.resolve(d); return; }
     if (d.type === 'apui-outer-console-error' && d.message) {
+        PreviewDriver.noteError('Main app: ' + d.message);
         SystemLog.add('error', `Main app: ${truncate(String(d.message), 200)}`, { src: 'parent' });
         JarvisBrain.onError(d.message, null);
         return;
@@ -1212,6 +1255,7 @@ window.addEventListener('message', e => {
         logToConsole(d.msg, d.level || 'info');
         if (d.level === 'error') {
             SystemLog.add('error', `Preview: ${truncate(String(d.msg), 200)}`, { src: 'system' });
+            PreviewDriver.noteError(d.msg);
             attributeRuntimeError(d.msg);
             JarvisBrain.onError(d.msg, null);
         }
@@ -1225,14 +1269,11 @@ window.addEventListener('message', e => {
         if (d.vibeTree) receiveVibeTree(d.vibeTree, []);
         const goal = (d.goal || '').trim();
         if (!goal) { logToChat('system', '⚠ apui-jarvis-start: no goal provided'); return; }
-        logToChat('system', `🤖 Jarvis: task queued from parent — "${goal}"`);
-        // Make sure the right project's memory is active before queueing
+        logToChat('system', `🤖 Jarvis: goal received from the main app — "${goal}". Talking it through first.`);
+        // Intent first: Jarvis asks / proposes in chat; nothing is queued or run until the user approves a plan.
         ProjectStore.enqueue(async () => {
             await ProjectStore.enter(d.projectId);
-            JarvisPR.addTask(goal, { origin: 'parent' });
-            // Don't force-open the panel — run silently, PR will be waiting when user checks
-            JarvisPR.runNext();
-            JarvisPR._updateBadges();
+            JarvisBrain.send(goal);
         });
         return;
     }
@@ -2560,8 +2601,8 @@ const JarvisPR = {
                     JarvisBrain.say(`🔀 **PR #${pr.id}** is ready: ${pr.title}\nIt touches ${prNodes.map(n => '[' + n + ']').join(', ')}. Review it in the PRs tab.`);
                 }
                 JarvisBrain.onEvent('pr-open');
-                // Auto-switch to PRs tab and highlight
-                this.switchTab('prs');
+                // Plans from chat stay in chat (the reply has a Review button); other origins jump to the PRs tab
+                if (task.origin !== 'chat') this.switchTab('prs');
                 this._renderPRs();
             }
 
@@ -2711,6 +2752,7 @@ Plan your changes carefully, then return the JSON now.`;
         toast(`✅ PR #${pr.id} merged`);
         setTimeout(() => { if (!watch.hit) SystemLog.add('info', `PR #${pr.id}: no errors in the first 8s after merge`, { src: 'system' }); }, 8200);
         JarvisBrain.onEvent('merge');
+        JarvisBrain.afterMerge(pr);
         this._renderPRs();
         this._updateBadges();
         this._setStatus(this.prs.filter(p=>p.status==='open').length > 0
@@ -3135,10 +3177,12 @@ const LOG_TYPES = {
     error:      { icon: '⚠️', group: 'errors' },
     fix:        { icon: '🩹', group: 'errors' },
     note:       { icon: '🗒', group: 'notes' },
+    test:       { icon: '🧪', group: 'tests' },
+    action:     { icon: '⚙️', group: 'jarvis' },
     export:     { icon: '⬇', group: 'system' },
     info:       { icon: 'ℹ️', group: 'system' }
 };
-const LOG_FILTERS = [['all', 'All'], ['edits', 'Edits'], ['jarvis', 'Jarvis'], ['errors', 'Errors'], ['notes', 'Notes'], ['system', 'System']];
+const LOG_FILTERS = [['all', 'All'], ['edits', 'Edits'], ['jarvis', 'Jarvis'], ['errors', 'Errors'], ['tests', 'Tests'], ['notes', 'Notes'], ['system', 'System']];
 
 const SystemLog = {
     filter: 'all',
@@ -3387,6 +3431,7 @@ const JarvisBrain = {
 
     onProjectEntered(isNew) {
         const rec = ProjectStore.rec;
+        rec.chat.forEach(m => { if (m.plan && m.plan.status === 'running') { m.plan.status = 'interrupted'; m.plan.steps.forEach(s => { if (s.status === 'running') { s.status = 'skipped'; s.result = 'interrupted by a reload'; } }); } });
         const openPRs = JarvisPR.prs.filter(p => p.status === 'open').length;
         const pending = JarvisPR.tasks.filter(t => t.status === 'pending').length;
         if (isNew || !rec.log.length) {
@@ -3411,10 +3456,11 @@ const JarvisBrain = {
     },
 
     /* ── talking ── */
-    say(text, actions = [], followups = []) {
+    say(text, actions = [], followups = [], extra = null) {
         const rec = ProjectStore.rec;
         if (!rec) return null;
         const m = { id: jvNewId('m'), role: 'jarvis', text, ts: Date.now(), actions, followups };
+        if (extra) Object.assign(m, extra);
         rec.chat.push(m);
         ProjectStore.touch();
         const panelOpen = document.getElementById('jarvis-pr-panel')?.classList.contains('open');
@@ -3427,6 +3473,7 @@ const JarvisBrain = {
     _userMsg(text) {
         const rec = ProjectStore.rec;
         if (!rec) return;
+        rec.chat.forEach(x => { if (x.questions && !x.answered) x.answered = true; });
         rec.chat.push({ id: jvNewId('m'), role: 'user', text, ts: Date.now() });
         ProjectStore.touch();
         this.renderChat();
@@ -3443,107 +3490,289 @@ const JarvisBrain = {
     ask(text, opts = {}) { this.openChat(); return this.send(text, opts); },
     chip(i) { const t = this._chipTexts[i]; if (t) this.send(t); },
 
-    SYS_CHAT: `You are Jarvis, the resident AI engineer inside APUI — a visual editor that builds web projects out of a tree of HTML, CSS and JS nodes. You are wired into every part of the app: the node tree, the PR queue, the tracker notes and the project's persistent system log. Speak like a sharp, calm chief of staff: direct, specific, a little dry. No filler, no flattery.
+    /* ════ INTENT-FIRST CONVERSATION ═══════════════════════════════
+       Jarvis understands first (answer / clarify / inspect), proposes a
+       plan, and acts only after the user approves it. Code changes still
+       go through PR review on top of that. */
+    planRunning: null,
 
-You are given a PROJECT BRIEF. It is ground truth about this project right now, including its recorded history.
-RULES:
-- Answer from the brief. If it does not show something, say you can't see it. Never invent nodes, history, errors or code.
-- Refer to nodes exactly as [node-id] so they become clickable.
-- When citing history, use the relative times in the log ("12m ago").
-- You cannot edit code from chat. When a change is warranted, offer it as an action the user can queue; every change still goes through PR review.
-- Keep answers short. Use a code block only when showing code.
-- When asked what to do next, base it on evidence: unresolved errors, BROKEN/TODO notes, rejected proposals, recent edit patterns.
+    systemPrompt() {
+        return `You are Jarvis, the resident AI engineer inside APUI, the visual editor of the Vibe System. You work WITH the user: understand first, act second. Calm chief-of-staff tone: direct, specific, a little dry. No filler, no flattery.
+
+You are given a PROJECT BRIEF (ground truth: node tree, code, errors, the recorded system log, PRs, notes, recent test runs) and the CONVERSATION. You can see everything; you can touch nothing until the user approves a plan.
+
+CHOOSE ONE MODE PER REPLY
+1. "answer": questions, explanations, status. Answer from the brief. If it doesn't show something, say so (or use "inspect"). Never invent nodes, history, errors or code.
+2. "clarify": the request is ambiguous, under-specified or open to several reasonable readings, or you'd be guessing a behaviour or design choice. Ask 1-3 short questions, each with 2-4 tappable options. Propose nothing in the same reply.
+3. "plan": the request is clear enough to act on. Restate what you understood in one sentence ("understanding") and list the steps. Then STOP: the user reviews the plan and approves, edits or cancels it. Nothing happens before that.
+4. "inspect": you need facts first (page structure, a node's code, the log, triggers). List read-only tools; their results come straight back to you. At most 3 rounds. Don't inspect what the brief already tells you.
+
+WHEN TO ASK INSTEAD OF PLANNING
+Ask if: the change affects behaviour rather than just wording or colour; it touches more than two nodes; "improve", "fix" or "make it better" came with no specifics; there are two plausible readings; you'd be inventing requirements. Don't ask when the request is specific and low-risk, when the brief or conversation already answers it, or about something the user already told you. Never more than 3 questions. Once the user has answered, move on to a plan.
+
+RULES
+- Code changes happen ONLY through the make_pr action, which opens a pull request the user still reviews. Never say code has changed. One make_pr per distinct change; list every relevant node in nodeIds.
+- Never put run_test after make_pr in the same plan (the PR isn't merged yet). Offer to test once it is.
+- To test: inspect_preview first so selectors come from the real page, then plan a run_test. Prefer ids and names from the outline; "text:Label" targets are fine for buttons and links. Give every flow at least one expect_* step and end with expect_no_errors.
+- Don't plan clicks on destructive controls (delete, reset, pay, log out…) unless the user asked for exactly that.
+- Reference nodes as [node-id] so they're clickable. Cite history with the relative times in the log.
+- Keep "say" short. Plain text with \`code\` and **bold**; code blocks only when showing code.
+- Plan steps run in order and stop if an action fails. At most 8 steps.
+
+TOOLS
+${JarvisTools.catalog()}
+
+STEP TYPES for run_test.steps (target = CSS selector, or "text:Visible label"):
+{"do":"click","target":"…"} · {"do":"type","target":"…","text":"…","clear":true,"submit":false} · {"do":"select","target":"…","value":"…"} · {"do":"check","target":"…","checked":true} · {"do":"press","key":"Enter","target":"(optional)"} · {"do":"scroll_to","target":"…"} · {"do":"scroll","y":600} or {"do":"scroll","to":"top|bottom"} · {"do":"hover","target":"…"} · {"do":"wait","ms":500} or {"do":"wait","for":"…"} · {"do":"expect_text","text":"…","in":"(optional selector)","absent":false} · {"do":"expect_visible","target":"…"} · {"do":"expect_value","target":"…","value":"…"} · {"do":"expect_count","target":"css","count":3} · {"do":"expect_no_errors"} · {"do":"reload"}
 
 Return ONLY JSON:
-{"answer": "text", "actions": [{"kind": "queue_task" | "run_now" | "add_note" | "open_node", "label": "short button label", "task": "self-contained task (queue_task/run_now)", "text": "note text (add_note)", "status": "todo|broken|works|neutral (add_note)", "nodeId": "existing node id (open_node)"}], "followups": ["up to 3 short follow-up questions the user might ask"]}
-Use at most 3 actions and only when genuinely useful.`,
+{"mode":"answer|clarify|plan|inspect","say":"what the user reads","questions":[{"q":"…","options":["…","…"]}],"understanding":"one sentence","steps":[{"tool":"…","args":{…},"why":"short reason"}],"inspect":[{"tool":"…","args":{…}}],"followups":["up to 3 short follow-ups"]}
+Include only the fields the mode needs.`;
+    },
+
+    _history(skipLastUser) {
+        const rec = ProjectStore.rec;
+        const msgs = rec.chat.slice(skipLastUser ? -13 : -12, skipLastUser ? -1 : undefined);
+        return msgs.map(m => {
+            if (m.role === 'user') return `USER: ${truncate(String(m.text), 600)}`;
+            let t = truncate(String(m.text), 500);
+            if (m.questions && m.questions.length) t += ` [I asked: ${m.questions.map(q => q.q + ' (' + q.options.join(' / ') + ')').join(' | ')}]`;
+            if (m.plan) {
+                const p = m.plan;
+                t += ` [PLAN "${truncate(p.understanding, 120)}" — status: ${p.status}. Steps: ${p.steps.map(s => `${s.tool}${s.status !== 'pending' ? ':' + s.status : ''}${s.result ? ' (' + truncate(s.result.split('\n')[0], 80) + ')' : ''}`).join('; ')}]`;
+            }
+            return `JARVIS: ${t}`;
+        }).join('\n');
+    },
 
     async send(text, opts = {}) {
         text = String(text || '').trim();
         if (!text) return;
-        if (this.busy) { toast('Jarvis is still answering the last question'); return; }
+        if (this.busy) { toast('Jarvis is still working on the last message'); return; }
         if (!ProjectStore.rec) { toast('Jarvis is still loading the project…'); return; }
-        if (text.startsWith('/')) return this.slash(text);
-
-        const pid = ProjectStore.projectId;
-        this._userMsg(text);
-        SystemLog.add('chat', `Asked Jarvis: ${truncate(text, 110)}`, { src: 'user', node: (opts.focus || [])[0] || null });
-        logToChat('user', truncate(text, 200));
-
-        if (!AppState.settings.apiKey) {
-            this.say('I need a Gemini API key to answer that. Add one in **Settings** (the settings node on the canvas). Slash commands like /status, /log and /errors work without one.');
+        if (/^\/edit(\s|$)/i.test(text)) {   // explicit bypass: direct edit, no conversation
+            const req = text.replace(/^\/edit\s*/i, '').trim();
+            this._userMsg(text);
+            if (!req) { this.say('Usage: `/edit what to change`. This skips the conversation and edits straight away; for anything else just talk to me.'); return; }
+            ensureChat(); enforceNodeLimit('chat');
+            this.say('Direct edit, no review step. Applying it now…');
+            aiEditAll('root', req);
             return;
         }
-        this.busy = true; this.renderChat();
+        if (/^\/test(\s|$)/i.test(text)) text = 'Test this: ' + (text.replace(/^\/test\s*/i, '').trim() || 'walk through the main user flows of the project and check they work');
+        else if (text.startsWith('/')) return this.slash(text);
+
+        if (!opts.hidden) {
+            this._userMsg(text);
+            SystemLog.add('chat', `Asked Jarvis: ${truncate(text, 110)}`, { src: 'user', node: (opts.focus || [])[0] || null });
+            logToChat('user', truncate(text, 200));
+        }
+        if (!AppState.settings.apiKey) {
+            this.say('I need a Gemini API key to talk this through. Add one in **Settings** (the settings node on the canvas). Slash commands like /status, /log and /errors work without one.');
+            return;
+        }
+        await this.converse(text, opts);
+    },
+
+    async _runRead(c) {
+        const name = jvStr(c && c.tool, 40), def = JarvisTools.get(name);
+        if (!def || def.kind !== 'read') return { tool: name || '?', text: `"${name}" is not a read-only tool, so I can't run it while investigating.` };
         try {
-            const images = typeof apuiConsumeImages === 'function' ? apuiConsumeImages() : [];
-            const rec = ProjectStore.rec;
-            const history = rec.chat.slice(-11, -1).map(m => `${m.role === 'user' ? 'USER' : 'JARVIS'}: ${truncate(String(m.text), 600)}`).join('\n');
-            const brief = this.buildBrief({ focus: opts.focus || [], question: text });
-            const user = `PROJECT BRIEF\n${brief}\n\nCONVERSATION SO FAR\n${history || '(start of conversation)'}\n${opts.focus && opts.focus.length ? `\nThe user is asking specifically about: ${opts.focus.map(f => '[' + f + ']').join(', ')}\n` : ''}${images.length ? '\nThe user attached screenshot(s) of the live preview — use them.\n' : ''}\nUSER: ${text}\n\nReturn the JSON now.`;
-            const raw = await callGemini(this.SYS_CHAT, user, true, images);
-            if (ProjectStore.projectId !== pid) return;   // user switched projects mid-request
-            const data = jvParseJson(raw) || { answer: String(raw || '').trim() };
-            const answer = String(data.answer || data.reply || '').trim() || 'I got an empty response. Try rephrasing.';
-            const actions = (Array.isArray(data.actions) ? data.actions : []).slice(0, 3).map(a => this._cleanAction(a)).filter(Boolean);
-            const followups = (Array.isArray(data.followups) ? data.followups : []).map(f => truncate(String(f), 70)).slice(0, 3);
+            const r = await def.run(def.check((c && c.args) || {}));
+            return { tool: name, text: truncate(String(r.text || '(empty)'), 3800), image: r.image || null };
+        } catch (e) { return { tool: name, text: 'ERROR: ' + e.message }; }
+    },
+
+    async converse(text, opts = {}) {
+        const pid = ProjectStore.projectId;
+        this.busy = true; this.renderChat();
+        const observations = (opts.observations || []).slice();
+        let images = (typeof apuiConsumeImages === 'function' ? apuiConsumeImages() : []).concat(opts.images || []);
+        try {
+            let data = null;
+            for (let round = 0; round <= 3; round++) {
+                const brief = this.buildBrief({ focus: opts.focus || [], question: text });
+                const obs = observations.length ? `\nWHAT YOUR READ-ONLY TOOLS RETURNED THIS TURN\n${observations.map(o => `[${o.tool}]\n${o.text}`).join('\n\n')}\n` : '';
+                const user = `PROJECT BRIEF\n${brief}\n\nCONVERSATION SO FAR\n${this._history(!opts.hidden) || '(start of conversation)'}\n${opts.focus && opts.focus.length ? `\nThe user is asking specifically about: ${opts.focus.map(f => '[' + f + ']').join(', ')}\n` : ''}${images.length ? `\n${images.length} image(s) attached (screenshots of the live preview) — use them.\n` : ''}${obs}\n${opts.hidden ? 'SYSTEM NOTE' : 'USER'}: ${text}\n\nReturn the JSON now.`;
+                const raw = await callGemini(this.systemPrompt(), user, true, images);
+                if (ProjectStore.projectId !== pid) return;
+                data = jvParseJson(raw) || { mode: 'answer', say: String(raw || '').trim() };
+                const calls = (data.mode === 'inspect' && Array.isArray(data.inspect)) ? data.inspect.slice(0, 4) : [];
+                if (!calls.length || round === 3) break;
+                for (const c of calls) {
+                    const o = await this._runRead(c);
+                    if (o.image) { images = images.concat([o.image]); delete o.image; }
+                    observations.push(o);
+                }
+            }
             this.busy = false;
-            this.say(answer, actions, followups);
-            logToChat('ai', truncate(answer, 400));
+            this._deliver(data);
+            logToChat('ai', truncate(String(data.say || data.answer || data.mode || ''), 400));
         } catch (e) {
             this.busy = false;
             if (ProjectStore.projectId === pid) {
                 this.say(`⚠ ${e.message || 'Request failed'}`);
                 SystemLog.add('info', `Jarvis chat failed: ${e.message}`, { src: 'system' });
             }
-        } finally {
-            this.busy = false;
+        } finally { this.busy = false; this.renderChat(); }
+    },
+
+    _cleanSteps(raw) {
+        const out = [];
+        (Array.isArray(raw) ? raw : []).slice(0, 8).forEach(s => {
+            const name = jvStr(s && s.tool, 40), def = JarvisTools.get(name);
+            if (!def || def.kind === 'read') return;
+            try { out.push({ tool: name, args: def.check((s && s.args) || {}), why: jvStr(s.why, 140), checked: true, status: 'pending', result: '' }); }
+            catch (_) { /* invalid step: dropped, never guessed at */ }
+        });
+        const pr = out.findIndex(s => s.tool === 'make_pr');
+        if (pr >= 0) for (let i = out.length - 1; i > pr; i--) if (out[i].tool === 'run_test') out.splice(i, 1);
+        return out;
+    },
+
+    _deliver(data) {
+        let mode = ['answer', 'clarify', 'plan', 'inspect'].includes(data.mode) ? data.mode : 'answer';
+        let say = jvStr(data.say || data.answer || data.reply, 2500);
+        const followups = (Array.isArray(data.followups) ? data.followups : []).map(f => truncate(jvStr(f, 70), 70)).filter(Boolean).slice(0, 3);
+        if (mode === 'clarify') {
+            const qs = (Array.isArray(data.questions) ? data.questions : []).slice(0, 3).map(q => ({
+                q: jvStr(q && (q.q || q.question) || (typeof q === 'string' ? q : ''), 180),
+                options: (Array.isArray(q && q.options) ? q.options : []).map(o => jvStr(o, 56)).filter(Boolean).slice(0, 4), pick: null
+            })).filter(q => q.q);
+            if (qs.length) return this.say(say || 'Before I touch anything:', [], [], { questions: qs });
+            mode = 'answer';
+        }
+        if (mode === 'plan') {
+            const steps = this._cleanSteps(data.steps);
+            if (steps.length) {
+                ProjectStore.rec.chat.forEach(m => { if (m.plan && m.plan.status === 'pending') m.plan.status = 'superseded'; });
+                const plan = { id: jvNewId('p'), understanding: jvStr(data.understanding || say, 240), status: 'pending', steps };
+                return this.say(say || 'Here is what I would do:', [], followups, { plan });
+            }
+            say = (say ? say + '\n\n' : '') + "(I couldn't turn that into valid steps. Tell me a bit more about what you want and I'll try again.)";
+        }
+        if (mode === 'inspect' && !say) say = "I looked around but couldn't settle on an answer. Tell me more about what you're after.";
+        this.say(say || 'Nothing to add.', [], followups);
+    },
+
+    pickOption(msgId, qi, oi) {
+        const m = ProjectStore.rec && ProjectStore.rec.chat.find(x => x.id === msgId);
+        if (!m || !m.questions || m.answered) return;
+        const q = m.questions[qi];
+        if (!q || !q.options[oi]) return;
+        if (m.questions.length === 1) { m.answered = true; q.pick = oi; this.send(q.options[oi]); return; }
+        q.pick = q.pick === oi ? null : oi;
+        ProjectStore.touch(); this.renderChat();
+    },
+    submitAnswers(msgId) {
+        const m = ProjectStore.rec && ProjectStore.rec.chat.find(x => x.id === msgId);
+        if (!m || !m.questions || m.answered) return;
+        const lines = m.questions.filter(q => q.pick != null).map(q => `${q.q} → ${q.options[q.pick]}`);
+        if (!lines.length) { toast('Pick an answer first, or just type your reply'); return; }
+        m.answered = true;
+        this.send(lines.join('\n'));
+    },
+    toggleStep(msgId, i, on) {
+        const m = ProjectStore.rec && ProjectStore.rec.chat.find(x => x.id === msgId);
+        if (!m || !m.plan || m.plan.status !== 'pending' || !m.plan.steps[i]) return;
+        m.plan.steps[i].checked = !!on;
+        ProjectStore.touch(); this.renderChat();
+    },
+    adjustPlan() { this.openChat('Change the plan: '); },
+    cancelPlan(msgId) {
+        const m = ProjectStore.rec && ProjectStore.rec.chat.find(x => x.id === msgId);
+        if (!m || !m.plan || m.plan.status !== 'pending') return;
+        m.plan.status = 'cancelled';
+        SystemLog.add('action', `Plan cancelled by user: ${truncate(m.plan.understanding, 120)}`, { src: 'user' });
+        ProjectStore.touch(); this.renderChat();
+    },
+    stopPlan() {
+        if (this.planRunning) { this.planRunning.stopRequested = true; PreviewDriver.abort(); toast('Stopping after the current step…'); }
+    },
+
+    async approvePlan(msgId) {
+        const rec = ProjectStore.rec;
+        const m = rec && rec.chat.find(x => x.id === msgId);
+        if (!m || !m.plan || m.plan.status !== 'pending') return;
+        if (this.planRunning || this.busy) { toast('Jarvis is busy. Try again in a moment.'); return; }
+        const p = m.plan, picked = p.steps.filter(s => s.checked);
+        if (!picked.length) { toast('Tick at least one step'); return; }
+        const pid = ProjectStore.projectId;
+        p.status = 'running'; p.stopRequested = false; this.planRunning = p;
+        p.steps.forEach(s => { if (!s.checked) { s.status = 'skipped'; s.result = 'not selected'; } });
+        SystemLog.add('action', `Plan approved: ${truncate(p.understanding, 130)} (${picked.length} step${picked.length > 1 ? 's' : ''})`, { src: 'user' });
+        this.renderChat();
+
+        let halted = false, failedTest = null;
+        const prIds = [];
+        for (const s of picked) {
+            if (p.stopRequested || halted) { s.status = 'skipped'; s.result = p.stopRequested ? 'stopped' : 'skipped after an earlier step failed'; continue; }
+            if (ProjectStore.projectId !== pid) { this.planRunning = null; return; }
+            s.status = 'running'; s.log = []; this.renderChat();
+            const def = JarvisTools.get(s.tool);
+            const label = JarvisTools.describe(s.tool, s.args);
+            try {
+                if (!def) throw new Error('unknown tool');
+                const r = await def.run(s.args, { onStep: st => { s.log.push(JarvisTools.stepLine(st)); if (s.log.length > 30) s.log.shift(); this.renderChat(); } });
+                s.result = truncate(String(r.text || 'done'), 700);
+                if (r.test) {
+                    s.status = r.test.failed ? 'fail' : 'ok';
+                    const firstBad = r.test.results.find(x => x.status === 'fail');
+                    SystemLog.add('test', `${r.test.failed ? '❌' : '✅'} “${r.test.name}”: ${r.test.passed}/${r.test.results.length} steps passed${firstBad ? ' — ' + truncate(firstBad.detail, 120) : ''}`, { src: 'jarvis', meta: { target: r.test.target, failures: r.test.results.filter(x => x.status === 'fail').slice(0, 3).map(x => JarvisTools.stepLine(x)) } });
+                    if (r.test.failed) { halted = true; if (!failedTest) failedTest = r.test; }
+                } else {
+                    s.status = 'ok';
+                    if (s.tool !== 'make_pr') SystemLog.add('action', `${label} → ${truncate(String(r.text || 'done').split('\n')[0], 100)}`, { src: 'jarvis' });
+                }
+                if (r.prId) prIds.push(r.prId);
+            } catch (e) {
+                s.status = 'fail'; s.result = e.message || String(e); halted = true;
+                SystemLog.add('action', `⚠ Step failed: ${label} — ${truncate(s.result, 140)}`, { src: 'jarvis' });
+            }
             this.renderChat();
         }
+        p.status = halted ? 'failed' : (p.stopRequested ? 'stopped' : 'done');
+        this.planRunning = null;
+        ProjectStore.touch(); this.renderChat(); this._updateNavBadge();
+
+        const lines = picked.map(s => `${{ ok: '✓', fail: '✗', skipped: '–' }[s.status] || '·'} ${JarvisTools.describe(s.tool, s.args)}${s.result && s.status !== 'skipped' ? ' → ' + truncate(s.result.split('\n')[0], 110) : ''}`);
+        const actions = prIds.map(id => ({ kind: 'tab', label: `Review PR #${id}`, tab: 'prs', used: false }));
+        this.say(`${halted ? '**Stopped early.**' : p.stopRequested ? '**Stopped.**' : '**Done.**'}\n${lines.join('\n')}`, actions, prIds.length ? ['Test it once I merge it'] : []);
+        if (failedTest) {
+            await this.converse('[Automatic follow-up] The test run above had failures. Work out the most likely cause from the code and the failing steps, and explain it briefly. If a fix is warranted, propose it as a plan or ask what I want; do not assume.',
+                { hidden: true, observations: [{ tool: 'test_report', text: JarvisTools.formatTest(failedTest) }] });
+        }
     },
-    _cleanAction(a) {
-        if (!a || typeof a !== 'object') return null;
-        const kind = String(a.kind || '');
-        if (kind === 'queue_task' || kind === 'run_now') {
-            const task = String(a.task || '').trim();
-            if (task.length < 6) return null;
-            return { kind, label: truncate(String(a.label || (kind === 'run_now' ? 'Run now' : 'Queue task')), 34), task, origin: 'chat', used: false };
-        }
-        if (kind === 'add_note') {
-            const text = String(a.text || '').trim();
-            if (!text) return null;
-            const status = ['todo', 'broken', 'works', 'neutral'].includes(a.status) ? a.status : 'neutral';
-            return { kind, label: truncate(String(a.label || 'Save note'), 34), text, status, used: false };
-        }
-        if (kind === 'open_node') {
-            if (!jvSafeId(a.nodeId) || !findNodeInTree(a.nodeId)) return null;
-            return { kind, label: truncate(String(a.label || `Open ${a.nodeId}`), 34), nodeId: a.nodeId, used: false };
-        }
-        return null;
+
+    afterMerge(pr) {
+        const task = JarvisPR.tasks.find(t => t.id === pr.taskId);
+        if (!task || task.origin !== 'chat') return;
+        const nodes = pr.actions.map(a => a.nodeId);
+        setTimeout(() => {
+            const w = JarvisPR._mergeWatch;
+            if (!ProjectStore.rec || (w && w.prId === pr.id && w.hit)) return;
+            this.say(`PR #${pr.id} is merged. Want me to check it in the live preview?`,
+                [{ kind: 'ask', label: 'Test it', prompt: `PR #${pr.id} ("${pr.title}") was just merged, touching ${nodes.map(n => '[' + n + ']').join(', ')}. Look at the preview and propose a quick test of what it changed.`, used: false }]);
+        }, 9000);
     },
+
     runAction(msgId, idx) {
         const rec = ProjectStore.rec;
         const m = rec && rec.chat.find(x => x.id === msgId);
         const a = m && m.actions && m.actions[idx];
         if (!a || a.used) return;
-        if (a.kind === 'queue_task') {
-            JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] });
-            toast('Task queued — run it from the Tasks tab');
-        } else if (a.kind === 'run_now') {
-            const t = JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] });
-            if (t && !JarvisPR.running) { JarvisPR.switchTab('tasks'); JarvisPR._runTask(t); }
-            else toast('Jarvis is busy — queued instead');
-        } else if (a.kind === 'add_note') {
-            NoteThreads.addNote(a.text, a.status || 'neutral');
-            toast('Note saved to the tracker');
-        } else if (a.kind === 'open_node') {
-            this.openNode(a.nodeId);
-            return;
-        }
+        if (a.kind === 'tab') { JarvisPR.openPanel(); JarvisPR.switchTab(a.tab); return; }
+        if (a.kind === 'open_node') { this.openNode(a.nodeId); return; }
         a.used = true;
         ProjectStore.touch();
+        if (a.kind === 'ask') { this.renderChat(); this.send(a.prompt); return; }
+        // Legacy buttons from conversations saved before plans existed
+        if (a.kind === 'queue_task') { JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] }); toast('Task queued — run it from the Tasks tab'); }
+        else if (a.kind === 'run_now') { const t = JarvisPR.addTask(a.task, { origin: a.origin || 'chat', nodeIds: a.nodeIds || [] }); if (t && !JarvisPR.running) { JarvisPR.switchTab('tasks'); JarvisPR._runTask(t); } else toast('Jarvis is busy — queued instead'); }
+        else if (a.kind === 'add_note') { NoteThreads.addNote(a.text, a.status || 'neutral'); toast('Note saved to the tracker'); }
         this.renderChat();
     },
+
     openNode(id) {
         if (!findNodeInTree(id)) { toast(`[${id}] is not in the project any more`); return; }
         spawnNodeFromTree(id);
@@ -3567,7 +3796,7 @@ Use at most 3 actions and only when genuinely useful.`,
         const rec = ProjectStore.rec;
         switch (cmd.toLowerCase()) {
             case '/help':
-                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/task <text>` queue a task for a PR\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/clear` clear this conversation\n\nAnything else is a question about the project.');
+                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/test <what>` have me test the running project\n`/task <text>` queue a PR task yourself\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/edit <text>` direct edit, skips the conversation\n`/clear` clear this conversation\n\nAnything else is a conversation: I ask first, propose a plan, and only act once you approve.');
                 break;
             case '/status': {
                 const nodes = flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).length;
@@ -3685,6 +3914,13 @@ Use at most 3 actions and only when genuinely useful.`,
         const queued = JarvisPR.tasks.filter(t => t.status === 'pending' || t.status === 'working');
         out.push(queued.length ? 'Queued tasks: ' + queued.map(t => `"${truncate(t.text, 90)}"`).join('; ') : 'No queued tasks.');
 
+        out.push('\n=== RECENT TEST RUNS ===');
+        const tr = SystemLog.entries.filter(e => e.type === 'test').slice(-5);
+        out.push(tr.length ? tr.map(e => `${jvRel(e.ts)}: ${e.msg}${e.meta && e.meta.failures && e.meta.failures.length ? ' | ' + e.meta.failures[0] : ''}`).join('\n') : 'No UI tests run yet.');
+        const pend = rec ? rec.chat.filter(m => m.plan && m.plan.status === 'pending') : [];
+        if (pend.length) out.push("Plans awaiting the user's approval: " + pend.map(m => `"${truncate(m.plan.understanding, 100)}"`).join('; '));
+        out.push(`Main app link: ${Bridge.connected ? 'connected (can switch tabs, manage triggers and the Agent queue)' : 'standalone (APUI only)'}. APUI preview: ${document.getElementById('preview-frame') ? 'open' : 'closed (opens by itself when testing)'}.`);
+
         out.push('\n=== USER NOTES (tracker) ===');
         const label = { neutral: 'note', works: 'WORKS', broken: 'BROKEN', todo: 'TODO' };
         const noteLines = [];
@@ -3738,7 +3974,7 @@ Use at most 3 actions and only when genuinely useful.`,
         box.style.display = '';
         box.classList.toggle('collapsed', this._nextCollapsed);
         const cards = items.slice(0, 6).map((it, i) => {
-            const label = it.label || 'Queue';
+            const label = it.label || 'Discuss';
             return `<div class="jv-card kind-${it.kind || 'pred'}">
                 <div class="jv-card-main"><span class="jv-card-icon">${it.icon || '🔮'}</span><div><div class="jv-card-title">${escapeHTML(it.title)}</div><div class="jv-card-why">${escapeHTML(it.why || '')}</div></div></div>
                 <div class="jv-card-btns"><button class="jpr-btn primary" onclick="JarvisBrain.takeNext(${i})">${escapeHTML(label)}</button><button class="jv-x" title="Dismiss" onclick="JarvisBrain.dismissNext(${i})">✕</button></div></div>`;
@@ -3757,9 +3993,9 @@ Use at most 3 actions and only when genuinely useful.`,
         if (it.action === 'push') { pushAllToVibeTree(); this.renderNext(); return; }
         if (it.action === 'ask') { this.openChat(it.prefill || ''); return; }
         if (it.task) {
-            JarvisPR.addTask(it.task, { origin: it.origin || 'prediction', nodeIds: it.nodeIds || [] });
-            toast('Task queued — run it from the Tasks tab');
             this._dismiss(it.id);
+            this.openChat();
+            this.send(`Let's deal with this: ${it.title}${it.why ? ' (' + it.why + ')' : ''}. Suggested task: ${it.task}`, { focus: it.nodeIds || [] });
         }
     },
     dismissNext(i) { const it = this._nextItems[i]; if (it) this._dismiss(it.id); },
@@ -3818,8 +4054,8 @@ RULES: max 4, ordered by expected value. Each needs concrete evidence. Skip anyt
         if (w && now < w.until) {
             w.hit = true;
             SystemLog.add('error', `Possible regression from PR #${w.prId}: ${msg}`, { node: nodeId || null, src: 'jarvis' });
-            this.say(`⚠ An error showed up right after PR #${w.prId} was merged:\n\`${msg}\`\nWant me to queue a fix?`,
-                [{ kind: 'queue_task', label: 'Queue a fix PR', task: `Fix the runtime error that appeared after PR #${w.prId} ("${w.title}") was merged: ${msg}`, origin: 'error', nodeIds: nodeId ? [nodeId] : [], used: false }]);
+            this.say(`⚠ An error showed up right after PR #${w.prId} was merged:\n\`${msg}\`\nWant me to look into it?`,
+                [{ kind: 'ask', label: 'Investigate', prompt: `A runtime error appeared right after PR #${w.prId} ("${w.title}") was merged: ${msg}. Find the cause and tell me what you'd do.`, used: false }]);
             this.renderNext();
             return;
         }
@@ -3828,14 +4064,39 @@ RULES: max 4, ordered by expected value. Each needs concrete evidence. Skip anyt
         if (now - this._lastErrSay < 25000 || (msg === this._lastErrMsg && now - this._lastErrSay < 120000)) return;
         this._lastErrSay = now; this._lastErrMsg = msg;
         this.say(`⚠ ${nodeId ? `[${nodeId}] reported` : 'The preview reported'}:\n\`${msg}\``,
-            [{ kind: 'queue_task', label: 'Queue a fix PR', task: nodeId ? `Fix this error in node [${nodeId}]: ${msg}` : `Fix this runtime error in the project: ${msg}`, origin: 'error', nodeIds: nodeId ? [nodeId] : [], used: false }]);
+            [{ kind: 'ask', label: 'Investigate', prompt: nodeId ? `Node [${nodeId}] reported this error: ${msg}. Find the cause and tell me what you'd do.` : `The preview reported this runtime error: ${msg}. Find the cause and tell me what you'd do.`, used: false }]);
     },
 
     /* ── rendering ── */
+    _qHtml(m) {
+        const qs = m.questions.map((q, qi) => `<div class="jv-q"><div class="jv-q-text">${escapeHTML(q.q)}</div>${q.options.length ? `<div class="jv-opts">${q.options.map((o, oi) => `<button class="jv-opt${q.pick === oi ? ' on' : ''}" ${m.answered ? 'disabled' : ''} onclick="JarvisBrain.pickOption('${m.id}',${qi},${oi})">${escapeHTML(o)}</button>`).join('')}</div>` : ''}</div>`).join('');
+        const go = (!m.answered && m.questions.length > 1) ? `<div class="jv-acts"><button class="jv-act" onclick="JarvisBrain.submitAnswers('${m.id}')">Continue →</button></div>` : '';
+        return `<div class="jv-qs">${qs}${go}${m.answered ? '' : '<div class="jv-hint">…or just type your own answer below.</div>'}</div>`;
+    },
+    _planHtml(m) {
+        const p = m.plan, live = p.status === 'pending';
+        const ST = { pending: '', running: '⏳', ok: '✓', fail: '✗', skipped: '–' };
+        const rows = p.steps.map((s, i) => {
+            const def = JarvisTools.get(s.tool);
+            const [ico, lbl] = def ? JarvisTools.KINDS[def.kind] : ['•', s.tool];
+            const risky = s.tool === 'run_test' && s.args.steps.some(x => x.risky);
+            const testSteps = s.tool === 'run_test' ? `<details class="jv-det"><summary>${s.args.steps.length} steps</summary><ol>${s.args.steps.map(x => `<li>${escapeHTML(x.do + (x.target ? ' ' + x.target : '') + (x.text != null ? ' “' + x.text + '”' : '') + (x.value != null ? ' = ' + x.value : '') + (x.key ? ' ' + x.key : '') + (x.y != null ? ' y=' + x.y : '') + (x.to ? ' ' + x.to : '') + (x.ms ? ' ' + x.ms + 'ms' : '') + (x.risky ? '  ⚠ destructive-looking' : ''))}</li>`).join('')}</ol></details>` : '';
+            const log = (s.log && s.log.length && s.status !== 'pending') ? `<div class="jv-step-log">${s.log.map(l => `<div class="${l.startsWith('✗') ? 'bad' : ''}">${escapeHTML(l)}</div>`).join('')}</div>` : '';
+            const res = (s.result && !(s.log && s.log.length)) ? `<div class="jv-step-res ${s.status === 'fail' ? 'bad' : ''}">${escapeHTML(s.result)}</div>` : '';
+            return `<div class="jv-step s-${s.status}">${live ? `<input type="checkbox" ${s.checked ? 'checked' : ''} onchange="JarvisBrain.toggleStep('${m.id}',${i},this.checked)">` : `<span class="jv-step-st">${ST[s.status] || ''}</span>`}<div class="jv-step-main"><div class="jv-step-title"><span class="jv-kind k-${def ? def.kind : 'x'}">${ico} ${lbl}</span> ${escapeHTML(def ? JarvisTools.describe(s.tool, s.args) : s.tool)}${risky ? ' <span class="jv-warn">⚠</span>' : ''}</div>${s.why ? `<div class="jv-step-why">${escapeHTML(s.why)}</div>` : ''}${testSteps}${log}${res}</div></div>`;
+        }).join('');
+        const n = p.steps.filter(s => s.checked).length;
+        const foot = live
+            ? `<div class="jv-plan-btns"><button class="jv-act primary" onclick="JarvisBrain.approvePlan('${m.id}')">▶ Approve${n < p.steps.length ? ` (${n})` : ''}</button><button class="jv-act" onclick="JarvisBrain.adjustPlan()">✎ Adjust</button><button class="jv-act" onclick="JarvisBrain.cancelPlan('${m.id}')">✕ Cancel</button></div>`
+            : p.status === 'running'
+                ? `<div class="jv-plan-btns"><button class="jv-act" onclick="JarvisBrain.stopPlan()">■ Stop</button><span class="jv-plan-status">Running…</span></div>`
+                : `<div class="jv-plan-status">${{ done: '✅ Done', failed: '⚠ Stopped on a failed step', stopped: '■ Stopped', cancelled: 'Cancelled', superseded: 'Replaced by a newer plan', interrupted: 'Interrupted by a reload' }[p.status] || p.status}</div>`;
+        return `<div class="jv-plan st-${p.status}"><div class="jv-plan-head">🧭 <b>Plan</b> · ${escapeHTML(p.understanding)}</div>${rows}${foot}${live ? '<div class="jv-hint">Nothing runs until you approve. Untick a step to skip it.</div>' : ''}</div>`;
+    },
     _msgHtml(m) {
         if (m.role === 'user') return `<div class="jv-msg jv-user">${escapeHTML(m.text).replace(/\n/g, '<br>')}</div>`;
         const acts = (m.actions || []).map((a, i) => `<button class="jv-act${a.used ? ' used' : ''}" ${a.used ? 'disabled' : ''} onclick="JarvisBrain.runAction('${m.id}',${i})">${escapeHTML(a.label)}</button>`).join('');
-        return `<div class="jv-msg jv-ai">${jvRenderMd(m.text)}${acts ? `<div class="jv-acts">${acts}</div>` : ''}<div class="jv-meta">${jvClock(m.ts)}</div></div>`;
+        return `<div class="jv-msg jv-ai">${jvRenderMd(m.text)}${m.questions && m.questions.length ? this._qHtml(m) : ''}${m.plan ? this._planHtml(m) : ''}${acts ? `<div class="jv-acts">${acts}</div>` : ''}<div class="jv-meta">${jvClock(m.ts)}</div></div>`;
     },
     renderChat() {
         const el = document.getElementById('jv-chat-list');
@@ -3865,6 +4126,655 @@ function rsMode(mode) {
     try { localStorage.setItem('apui_rs_mode', mode); } catch (_) {}
     if (mode === 'log') SystemLog.refresh(true);
 }
+
+/* ════════════════════════════════════════════════════════════════
+   PREVIEW DRIVER — Jarvis' hands. Navigates the running project like a
+   user would: click, type, select, scroll, hover, wait, assert.
+   Works on APUI's own preview frame ('preview') or the Vibe System's
+   Preview tab ('app') when the browser allows reaching into it.
+   ════════════════════════════════════════════════════════════════ */
+const jvSleep = ms => new Promise(r => setTimeout(r, ms));
+const DESTRUCTIVE_RE = /\b(delete|remove|erase|wipe|reset|clear all|clear data|log ?out|sign ?out|unsubscribe|deactivate|pay|purchase|buy now|place order|checkout|send money)\b/i;
+const TEST_ACTIONS = ['click', 'type', 'select', 'check', 'press', 'scroll_to', 'scroll', 'hover', 'wait',
+    'expect_text', 'expect_visible', 'expect_value', 'expect_count', 'expect_no_errors', 'reload'];
+const TEST_NEEDS_TARGET = new Set(['click', 'type', 'select', 'check', 'scroll_to', 'hover', 'expect_visible', 'expect_value', 'expect_count']);
+const KNOWN_TABS = ['start', 'preview', 'editor', 'agent', 'chat', 'flowchart', 'wiki', 'flow-trace', 'nervous-system', 'apui', 'console', 'files', 'context', 'code'];
+const TRIGGER_CONDITIONS = ['task-failed', 'task-complete', 'queue-complete', 'runtime-error', 'agent-log'];
+const TRIGGER_ACTION_TYPES = ['run-prompt', 'retry-task', 'goto-tab'];
+
+const PreviewDriver = {
+    errors: [],        // runtime errors seen in the preview / main app: { ts, msg }
+    running: false,
+    aborted: false,
+
+    noteError(msg) {
+        this.errors.push({ ts: Date.now(), msg: String(msg).slice(0, 240) });
+        if (this.errors.length > 60) this.errors.shift();
+    },
+    abort() { this.aborted = true; },
+
+    /* ── finding the window to drive ── */
+    async getWin(target) {
+        if (target === 'app') {
+            try {
+                const f = window.parent.document.getElementById('website-preview');
+                if (!f || !f.contentWindow || !f.contentDocument || !f.contentDocument.body) throw new Error('empty');
+                return f.contentWindow;
+            } catch (_) {
+                throw new Error("I can't reach the main app's Preview tab from here (browser cross-origin rules, or nothing is loaded in it). Test the APUI preview instead.");
+            }
+        }
+        if (!document.getElementById('preview-frame')) {
+            const cx = (-AppState.pan.x + window.innerWidth / 2) / AppState.scale - 180;
+            const cy = (-AppState.pan.y + (window.innerHeight - 52) / 2) / AppState.scale - 130;
+            createSystemNode('preview', 'Live Preview', 'preview', cx, cy);
+            updatePreview();
+        }
+        enforceNodeLimit('preview');
+        centerOnNode('preview', 300);
+        await jvSleep(350);
+        const f = document.getElementById('preview-frame');
+        if (!f || !f.contentWindow) throw new Error('The preview frame is not available.');
+        return f.contentWindow;
+    },
+    async waitReady(win, ms = 6000) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < ms) {
+            try { if (win.document.readyState === 'complete' && win.document.body && win.location.href !== 'about:blank') return true; } catch (_) {}
+            await jvSleep(100);
+        }
+        return false;
+    },
+    installGuards(win) {
+        if (win.__jvGuard) return;
+        win.__jvGuard = true; win.__jvBlocked = [];
+        // Bubble-phase, so the app's own handlers run first. We only stop what would navigate away.
+        win.addEventListener('submit', e => {
+            if (!e.defaultPrevented) { e.preventDefault(); win.__jvBlocked.push('form submit would have reloaded the page'); }
+        });
+        win.addEventListener('click', e => {
+            const a = e.target && e.target.closest && e.target.closest('a[href]');
+            if (!a || e.defaultPrevented) return;
+            const h = a.getAttribute('href') || '';
+            if (h.startsWith('#') || /^javascript:/i.test(h) || h === '') return;
+            e.preventDefault();
+            win.__jvBlocked.push(`navigation to "${h.slice(0, 60)}" blocked`);
+        });
+    },
+
+    /* ── element helpers ── */
+    norm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); },
+    isVisible(el, win) {
+        try {
+            const r = el.getBoundingClientRect();
+            if (r.width <= 0 || r.height <= 0) return false;
+            const cs = win.getComputedStyle(el);
+            return cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
+        } catch (_) { return false; }
+    },
+    labelOf(el) {
+        const v = el.getAttribute && (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.getAttribute('alt'));
+        const own = (el.tagName === 'INPUT' && /^(button|submit|reset)$/i.test(el.type)) ? el.value : (el.innerText || el.textContent || '');
+        return String(own || v || el.name || el.id || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    },
+    desc(el) {
+        const t = el.tagName.toLowerCase() + (el.type && el.tagName === 'INPUT' ? `[${el.type}]` : '');
+        const l = this.labelOf(el);
+        return `<${t}>${l ? ` "${l}"` : ''}`;
+    },
+    uniqueSelector(el, doc) {
+        const win = doc.defaultView;
+        const esc = s => (win.CSS && win.CSS.escape) ? win.CSS.escape(s) : String(s).replace(/[^\w-]/g, '\\$&');
+        const count = s => { try { return doc.querySelectorAll(s).length; } catch (_) { return 0; } };
+        const tag = el.tagName.toLowerCase();
+        if (el.id && count('#' + esc(el.id)) === 1) return '#' + el.id;
+        for (const a of ['data-testid', 'data-test', 'name', 'aria-label']) {
+            const v = el.getAttribute(a);
+            if (v) { const s = `${tag}[${a}="${v.replace(/"/g, '\\"')}"]`; if (count(s) === 1) return s; }
+        }
+        const cls = [...el.classList].filter(c => !/^\d|active|open|hover|focus|selected|show|hidden/.test(c)).slice(0, 2);
+        if (cls.length) { const s = tag + cls.map(c => '.' + esc(c)).join(''); if (count(s) === 1) return s; }
+        let cur = el, parts = [];
+        for (let d = 0; cur && cur.nodeType === 1 && cur !== doc.body && d < 5; d++) {
+            const sib = cur.parentElement ? [...cur.parentElement.children].filter(x => x.tagName === cur.tagName) : [];
+            const seg = cur.tagName.toLowerCase() + (sib.length > 1 ? `:nth-of-type(${sib.indexOf(cur) + 1})` : '');
+            parts.unshift(cur.id ? '#' + esc(cur.id) : seg);
+            const s = parts.join(' > ');
+            if (count(s) === 1) return s;
+            cur = cur.parentElement;
+        }
+        return parts.join(' > ');
+    },
+    findByText(win, text, mode) {
+        const doc = win.document, q = this.norm(text);
+        if (!q) return null;
+        const sel = mode === 'click'
+            ? 'button,a,[role=button],[role=tab],[role=link],[role=menuitem],[role=option],input[type=button],input[type=submit],input[type=checkbox],input[type=radio],summary,label,select,[onclick],[tabindex]'
+            : mode === 'field' ? 'input,textarea,select,[contenteditable=""],[contenteditable=true]' : '*';
+        const scoreOf = el => {
+            const labels = [];
+            if (mode === 'field') {
+                labels.push(el.placeholder, el.getAttribute('aria-label'), el.name, el.id, el.title);
+                if (el.labels) [...el.labels].forEach(l => labels.push(l.textContent));
+            } else {
+                labels.push(el.getAttribute('aria-label'), el.title, el.tagName === 'INPUT' ? el.value : null, el.alt, el.textContent);
+            }
+            let best = 0;
+            labels.forEach(l => {
+                const n = this.norm(l); if (!n) return;
+                if (n === q) best = Math.max(best, 3);
+                else if (n.includes(q)) best = Math.max(best, n.length < q.length * 4 + 20 ? 2 : 1);
+            });
+            return best;
+        };
+        const area = el => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+        const hits = [...doc.querySelectorAll(sel)]
+            .map(el => ({ el, s: scoreOf(el), v: this.isVisible(el, win) ? 1 : 0 })).filter(x => x.s > 0);
+        if (!hits.length) return null;
+        hits.sort((a, b) => (b.v - a.v) || (b.s - a.s) || (area(a.el) - area(b.el)));
+        return hits[0].el;
+    },
+    find(win, target, mode) {
+        const t = String(target || '').trim();
+        if (!t) return null;
+        if (/^text:/i.test(t)) return this.findByText(win, t.replace(/^text:/i, ''), mode);
+        let el = null;
+        try { el = win.document.querySelector(t); } catch (_) { /* not valid CSS — treat as a label */ }
+        return el || this.findByText(win, t, mode);
+    },
+    need(ctx, target, mode) {
+        if (!target) throw new Error('This step needs a "target".');
+        const el = this.find(ctx.win, target, mode);
+        if (!el) throw new Error(`Couldn't find "${target}" on the page.`);
+        return el;
+    },
+    guardDestructive(el, step) {
+        const label = this.labelOf(el);
+        if (DESTRUCTIVE_RE.test(label) && !step.risky)
+            throw new Error(`Skipped: ${this.desc(el)} looks destructive and wasn't in the approved plan.`);
+    },
+
+    /* ── effects the user can watch ── */
+    ring(win, el, color = '#ff00ff') {
+        try {
+            const r = el.getBoundingClientRect(), d = win.document;
+            const o = d.createElement('div');
+            o.style.cssText = `position:fixed;z-index:2147483647;pointer-events:none;border:2px solid ${color};border-radius:6px;box-shadow:0 0 14px ${color};transition:opacity .5s;left:${r.left - 3}px;top:${r.top - 3}px;width:${r.width + 6}px;height:${r.height + 6}px;`;
+            d.body.appendChild(o);
+            setTimeout(() => { o.style.opacity = '0'; }, 350);
+            setTimeout(() => o.remove(), 900);
+        } catch (_) {}
+    },
+    async reveal(ctx, el) {
+        if (!this.isVisible(el, ctx.win)) {
+            try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (_) {}
+            await jvSleep(120);
+            if (!this.isVisible(el, ctx.win)) throw new Error(`${this.desc(el)} exists but isn't visible (hidden, collapsed or zero-size).`);
+        }
+        try {
+            const r = el.getBoundingClientRect();
+            if (r.top < 0 || r.bottom > ctx.win.innerHeight) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); await jvSleep(380); }
+        } catch (_) {}
+    },
+    fire(win, el, type, init = {}, Ctor) {
+        const C = Ctor || win.MouseEvent;
+        el.dispatchEvent(new C(type, Object.assign({ bubbles: true, cancelable: true, view: win }, init)));
+    },
+    async pointer(ctx, el) {
+        const w = ctx.win, r = el.getBoundingClientRect();
+        const init = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
+        this.ring(w, el);
+        ['mouseover', 'mousemove', 'mousedown'].forEach(t => this.fire(w, el, t, init));
+        try { el.focus && el.focus({ preventScroll: true }); } catch (_) {}
+        this.fire(w, el, 'mouseup', init);
+    },
+    setValue(win, el, v) {
+        if (el.isContentEditable) { el.textContent = v; return; }
+        const proto = el.tagName === 'TEXTAREA' ? win.HTMLTextAreaElement.prototype : el.tagName === 'SELECT' ? win.HTMLSelectElement.prototype : win.HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value');
+        if (setter && setter.set) setter.set.call(el, v); else el.value = v;
+    },
+    key(win, el, type, key) { this.fire(win, el, type, { key, code: key.length === 1 ? 'Key' + key.toUpperCase() : key }, win.KeyboardEvent); },
+    async poll(fn, ms = 1600) {
+        const t0 = Date.now();
+        for (;;) {
+            let v; try { v = fn(); } catch (_) { v = false; }
+            if (v) return v;
+            if (Date.now() - t0 > ms) return false;
+            await jvSleep(120);
+        }
+    },
+
+    /* ── a single step ── */
+    async runStep(ctx, st) {
+        const w = ctx.win;
+        const needsPage = st.do !== 'wait' && st.do !== 'reload';
+        if (needsPage && !(w.document && w.document.body)) throw new Error('The page is not loaded.');
+        switch (st.do) {
+            case 'click': {
+                const el = this.need(ctx, st.target, 'click');
+                this.guardDestructive(el, st);
+                await this.reveal(ctx, el);
+                await this.pointer(ctx, el);
+                el.click();
+                await jvSleep(160);
+                return `clicked ${this.desc(el)}`;
+            }
+            case 'type': {
+                const el = this.need(ctx, st.target, 'field');
+                if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable) throw new Error(`${this.desc(el)} isn't something you can type into.`);
+                await this.reveal(ctx, el);
+                this.ring(w, el, '#00ffcc');
+                el.focus();
+                const text = String(st.text == null ? '' : st.text);
+                if (st.clear !== false) { this.setValue(w, el, ''); this.fire(w, el, 'input', { inputType: 'deleteContent' }, w.InputEvent); }
+                if (text.length <= 28) {
+                    let acc = st.clear === false ? (el.value || el.textContent || '') : '';
+                    for (const ch of text) {
+                        this.key(w, el, 'keydown', ch); this.key(w, el, 'keypress', ch);
+                        acc += ch; this.setValue(w, el, acc);
+                        this.fire(w, el, 'input', { data: ch, inputType: 'insertText' }, w.InputEvent);
+                        this.key(w, el, 'keyup', ch);
+                        await jvSleep(14);
+                    }
+                } else {
+                    this.setValue(w, el, (st.clear === false ? (el.value || '') : '') + text);
+                    this.fire(w, el, 'input', { data: text, inputType: 'insertText' }, w.InputEvent);
+                }
+                this.fire(w, el, 'change', {}, w.Event);
+                if (st.submit) {
+                    this.key(w, el, 'keydown', 'Enter'); this.key(w, el, 'keyup', 'Enter');
+                    if (el.form) { try { el.form.requestSubmit ? el.form.requestSubmit() : el.form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); } catch (_) {} }
+                }
+                await jvSleep(120);
+                return `typed "${text.length > 40 ? text.slice(0, 40) + '…' : text}" into ${this.desc(el)}${st.submit ? ' and submitted' : ''}`;
+            }
+            case 'select': {
+                const el = this.need(ctx, st.target, 'field');
+                if (el.tagName !== 'SELECT') throw new Error(`${this.desc(el)} isn't a dropdown.`);
+                const want = this.norm(st.value);
+                const opt = [...el.options].find(o => this.norm(o.value) === want) || [...el.options].find(o => this.norm(o.textContent) === want) || [...el.options].find(o => this.norm(o.textContent).includes(want));
+                if (!opt) throw new Error(`No option matching "${st.value}" (has: ${[...el.options].slice(0, 6).map(o => o.textContent.trim()).join(', ')}).`);
+                await this.reveal(ctx, el);
+                this.ring(w, el, '#00ffcc');
+                this.setValue(w, el, opt.value);
+                this.fire(w, el, 'input', {}, w.Event); this.fire(w, el, 'change', {}, w.Event);
+                await jvSleep(120);
+                return `selected "${opt.textContent.trim()}" in ${this.desc(el)}`;
+            }
+            case 'check': {
+                const el = this.need(ctx, st.target, 'click');
+                const box = el.matches && el.matches('input[type=checkbox],input[type=radio]') ? el : (el.querySelector && el.querySelector('input[type=checkbox],input[type=radio]')) || (el.control || null);
+                if (!box) throw new Error(`${this.desc(el)} isn't a checkbox or radio.`);
+                const want = st.checked !== false;
+                if (box.checked !== want) { await this.reveal(ctx, box.offsetParent ? box : el); await this.pointer(ctx, box.offsetParent ? box : el); box.click(); await jvSleep(140); }
+                if (box.checked !== want) throw new Error(`${this.desc(box)} did not become ${want ? 'checked' : 'unchecked'}.`);
+                return `${want ? 'checked' : 'unchecked'} ${this.desc(box)}`;
+            }
+            case 'press': {
+                const key = String(st.key || '').slice(0, 20);
+                if (!key) throw new Error('press needs a "key".');
+                const el = st.target ? this.need(ctx, st.target, 'any') : (w.document.activeElement && w.document.activeElement !== w.document.body ? w.document.activeElement : w.document.body);
+                if (st.target) { await this.reveal(ctx, el); el.focus && el.focus(); }
+                this.key(w, el, 'keydown', key); this.key(w, el, 'keypress', key); this.key(w, el, 'keyup', key);
+                if (key === 'Enter' && el.form && el.tagName === 'INPUT') { try { el.form.requestSubmit(); } catch (_) {} }
+                await jvSleep(140);
+                return `pressed ${key}${el !== w.document.body ? ' on ' + this.desc(el) : ''}`;
+            }
+            case 'hover': {
+                const el = this.need(ctx, st.target, 'any');
+                await this.reveal(ctx, el);
+                const r = el.getBoundingClientRect(), init = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+                this.ring(w, el, '#ffb74d');
+                ['mouseover', 'mouseenter', 'mousemove'].forEach(t => this.fire(w, el, t, init));
+                await jvSleep(200);
+                return `hovered ${this.desc(el)}`;
+            }
+            case 'scroll_to': {
+                const el = this.need(ctx, st.target, 'any');
+                if (!this.isVisible(el, w) && !el.getBoundingClientRect().height && w.getComputedStyle(el).display === 'none') throw new Error(`${this.desc(el)} is display:none, so there is nothing to scroll to.`);
+                el.scrollIntoView({ block: st.block || 'center', behavior: 'smooth' });
+                await jvSleep(520);
+                const r = el.getBoundingClientRect();
+                if (r.bottom < 0 || r.top > w.innerHeight) throw new Error(`Scrolled, but ${this.desc(el)} still isn't in view.`);
+                this.ring(w, el, '#4169e1');
+                return `scrolled to ${this.desc(el)} (scrollY ${Math.round(w.scrollY)})`;
+            }
+            case 'scroll': {
+                const max = w.document.documentElement.scrollHeight - w.innerHeight;
+                let y = w.scrollY;
+                if (st.to === 'top') y = 0; else if (st.to === 'bottom') y = max;
+                else if (typeof st.y === 'number') y = st.y; else if (typeof st.by === 'number') y = w.scrollY + st.by;
+                y = Math.max(0, Math.min(max, y));
+                w.scrollTo({ top: y, behavior: 'smooth' });
+                await jvSleep(520);
+                return `scrolled to ${Math.round(w.scrollY)} of ${Math.max(0, Math.round(max))}px`;
+            }
+            case 'wait': {
+                if (st.for || st.gone) {
+                    const tgt = st.for || st.gone, ms = Math.min(8000, Number(st.timeout) || 4000);
+                    const ok = await this.poll(() => { const el = this.find(w, tgt, 'any'); return st.gone ? !el || !this.isVisible(el, w) : (el && this.isVisible(el, w)); }, ms);
+                    if (!ok) throw new Error(`Timed out waiting for "${tgt}" ${st.gone ? 'to disappear' : 'to appear'}.`);
+                    return `${st.gone ? 'gone' : 'appeared'}: "${tgt}"`;
+                }
+                const ms = Math.max(50, Math.min(5000, Number(st.ms) || 500));
+                await jvSleep(ms);
+                return `waited ${ms}ms`;
+            }
+            case 'expect_text': {
+                const text = this.norm(st.text);
+                if (!text) throw new Error('expect_text needs "text".');
+                const scope = () => { const root = st.in ? this.find(w, st.in, 'any') : w.document.body; return root ? this.norm(root.innerText || root.textContent) : ''; };
+                if (st.absent) {
+                    const gone = await this.poll(() => !scope().includes(text));
+                    if (!gone) throw new Error(`Expected "${st.text}" to be absent, but it is on the page.`);
+                    return `"${st.text}" is absent, as expected`;
+                }
+                const ok = await this.poll(() => scope().includes(text));
+                if (!ok) throw new Error(`Expected to see "${st.text}"${st.in ? ` in ${st.in}` : ''}, but it isn't there. Page says: "${scope().slice(0, 100)}…"`);
+                return `found "${st.text}"`;
+            }
+            case 'expect_visible': {
+                const el = await this.poll(() => { const e = this.find(w, st.target, 'any'); return e && this.isVisible(e, w) ? e : null; });
+                if (!el) throw new Error(`Expected "${st.target}" to be visible, but it ${this.find(w, st.target, 'any') ? 'is hidden' : 'does not exist'}.`);
+                return `${this.desc(el)} is visible`;
+            }
+            case 'expect_value': {
+                const el = this.need(ctx, st.target, 'field');
+                const got = el.value != null ? el.value : el.textContent;
+                if (this.norm(got) !== this.norm(st.value)) throw new Error(`Expected ${this.desc(el)} to hold "${st.value}" but it holds "${String(got).slice(0, 60)}".`);
+                return `${this.desc(el)} holds "${st.value}"`;
+            }
+            case 'expect_count': {
+                const want = Number(st.count);
+                let n = -1;
+                const ok = await this.poll(() => { try { n = w.document.querySelectorAll(st.target).length; } catch (_) { n = -1; } return n === want; });
+                if (!ok) throw new Error(`Expected ${want} × "${st.target}" but found ${n}.`);
+                return `${n} × "${st.target}"`;
+            }
+            case 'expect_no_errors': {
+                await jvSleep(250);
+                const errs = this.errors.slice(ctx.errStart);
+                if (errs.length) throw new Error(`${errs.length} runtime error(s): ${errs.slice(-2).map(e => e.msg).join(' | ')}`);
+                return 'no runtime errors';
+            }
+            case 'reload': {
+                if (ctx.target === 'app') { w.location.reload(); await jvSleep(300); }
+                else { const old = w.location.href; updatePreview(); await this.poll(() => w.location.href !== old, 4000); }
+                await this.waitReady(w);
+                return 'reloaded the page';
+            }
+            default: throw new Error(`Unknown step "${st.do}".`);
+        }
+    },
+
+    /** Run a validated test spec. onStep(result, index) is called as each step finishes. */
+    async run(spec, onStep) {
+        if (this.running) throw new Error('A test is already running.');
+        this.running = true; this.aborted = false;
+        const target = spec.target === 'app' ? 'app' : 'preview';
+        const t0 = Date.now(), results = [];
+        try {
+            if (target === 'app') { try { await Bridge.call('switch_tab', { tab: 'preview' }); await jvSleep(400); } catch (_) {} }
+            const win = await this.getWin(target);
+            if (!(await this.waitReady(win))) throw new Error('The page never finished loading.');
+            const ctx = { win, target, errStart: this.errors.length };
+            let halted = false;
+            for (let i = 0; i < spec.steps.length; i++) {
+                const st = spec.steps[i];
+                if (this.aborted || halted) { const r = { i, do: st.do, target: st.target || '', status: 'skip', detail: this.aborted ? 'stopped' : 'skipped after an earlier step failed', ms: 0 }; results.push(r); onStep && onStep(r, i); continue; }
+                const s0 = Date.now();
+                let r;
+                try {
+                    this.installGuards(win);
+                    const b0 = (win.__jvBlocked || []).length;
+                    const detail = await this.runStep(ctx, st);
+                    this.installGuards(win);
+                    const blocked = (win.__jvBlocked || []).slice(b0);
+                    r = { i, do: st.do, target: st.target || '', status: 'pass', detail: detail + (blocked.length ? ` · ⚠ ${blocked.join('; ')}` : ''), ms: Date.now() - s0 };
+                } catch (e) {
+                    r = { i, do: st.do, target: st.target || '', status: 'fail', detail: e.message || String(e), ms: Date.now() - s0 };
+                    if (!/^expect_/.test(st.do)) halted = true;   // can't carry on if an action itself failed
+                }
+                results.push(r); onStep && onStep(r, i);
+            }
+            return {
+                name: spec.name, target, ms: Date.now() - t0, results,
+                passed: results.filter(r => r.status === 'pass').length,
+                failed: results.filter(r => r.status === 'fail').length,
+                skipped: results.filter(r => r.status === 'skip').length,
+                errors: this.errors.slice(ctx.errStart).map(e => e.msg)
+            };
+        } finally { this.running = false; }
+    },
+
+    /** Compact text description of what's on the page, for Jarvis to plan against. */
+    async outline(target) {
+        const win = await this.getWin(target === 'app' ? 'app' : 'preview');
+        await this.waitReady(win);
+        this.installGuards(win);
+        const doc = win.document, L = [];
+        L.push(`PAGE "${doc.title || '(untitled)'}" · viewport ${win.innerWidth}×${win.innerHeight} · scroll ${Math.round(win.scrollY)}/${doc.documentElement.scrollHeight}px`);
+        const heads = [...doc.querySelectorAll('h1,h2,h3,section[id],main,nav,header,footer')].slice(0, 24).map(el => {
+            const t = el.tagName.toLowerCase();
+            return `${t}${el.id ? '#' + el.id : ''}${/^h\d$/.test(t) ? ` "${this.labelOf(el)}"` : ''}`;
+        });
+        if (heads.length) L.push('STRUCTURE: ' + heads.join(' · '));
+        const inter = [...doc.querySelectorAll('a[href],button,input,select,textarea,summary,[role=button],[role=tab],[onclick]')].slice(0, 70);
+        L.push(`INTERACTIVE (${inter.length}):`);
+        inter.forEach((el, i) => {
+            const tag = el.tagName.toLowerCase() + (el.tagName === 'INPUT' ? `[${el.type}]` : '');
+            const flags = [el.disabled ? 'disabled' : '', this.isVisible(el, win) ? '' : 'hidden', el.checked ? 'checked' : ''].filter(Boolean).join(',');
+            const val = (el.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio)$/i.test(el.type) || el.tagName === 'TEXTAREA') && el.value ? ` value="${String(el.value).slice(0, 30)}"` : '';
+            L.push(` ${i + 1}. ${tag} "${this.labelOf(el)}"${val} → ${this.uniqueSelector(el, doc)}${flags ? ' (' + flags + ')' : ''}`);
+        });
+        L.push('TEXT: ' + this.norm(doc.body.innerText || '').slice(0, 450));
+        const errs = this.errors.slice(-3);
+        if (errs.length) L.push('RECENT ERRORS: ' + errs.map(e => e.msg).join(' | '));
+        return L.join('\n');
+    }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   BRIDGE — Jarvis' reach into the rest of the Vibe System (app3.js)
+   ════════════════════════════════════════════════════════════════ */
+const Bridge = {
+    _pending: new Map(), _n: 0,
+    get connected() { try { return !!window.parent && window.parent !== window; } catch (_) { return false; } },
+    call(action, args = {}, timeout = 9000) {
+        return new Promise((resolve, reject) => {
+            if (!this.connected) return reject(new Error('APUI is running standalone, so the main app is out of reach.'));
+            const reqId = 'c' + (++this._n) + Date.now().toString(36);
+            const timer = setTimeout(() => {
+                this._pending.delete(reqId);
+                reject(new Error('The main app did not answer. Is the updated app3.js (with the Jarvis control bridge) loaded?'));
+            }, timeout);
+            this._pending.set(reqId, { resolve, reject, timer });
+            postToParent('apui-control', { reqId, action, args });
+        });
+    },
+    resolve(d) {
+        const p = this._pending.get(d.reqId);
+        if (!p) return;
+        clearTimeout(p.timer); this._pending.delete(d.reqId);
+        d.ok ? p.resolve(d.data) : p.reject(new Error(d.error || 'The main app refused that action.'));
+    }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   JARVIS TOOLS — everything Jarvis can do, with how risky each is.
+   risk 'read'  → runs on its own while Jarvis investigates
+   anything else → only ever runs inside a plan the user approved
+   ════════════════════════════════════════════════════════════════ */
+const jvStr = (v, n = 400) => String(v == null ? '' : v).trim().slice(0, n);
+const jvJson = (o, n = 2500) => { let s; try { s = JSON.stringify(o); } catch (_) { s = String(o); } return s.length > n ? s.slice(0, n) + '…' : s; };
+function jvNeedNode(id) {
+    if (!jvSafeId(id) || !findNodeInTree(id) || SYSTEM_NODE_IDS.has(id)) throw new Error(`There is no node "${id}".`);
+    return id;
+}
+
+const JarvisTools = {
+    KINDS: { read: ['👁', 'read'], test: ['🧪', 'test'], control: ['🎛', 'control'], pr: ['✏️', 'PR'], project: ['⚠️', 'project'] },
+    defs: {
+        /* ── read-only ── */
+        get_state: { kind: 'read', sig: '{}', doc: 'Snapshot of the main app: active tab, project, triggers, agent queue.',
+            check: () => ({}),
+            run: async () => {
+                const local = { project: ProjectStore.projectId, nodes: flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).length, apuiPreviewOpen: !!document.getElementById('preview-frame') };
+                let main = 'unavailable (standalone)';
+                try { main = await Bridge.call('get_state'); } catch (e) { main = 'unavailable: ' + e.message; }
+                return { text: jvJson({ apui: local, mainApp: main }, 3000) };
+            } },
+        read_node: { kind: 'read', sig: '{"id":"node-id"}', doc: 'Full code of one node.',
+            check: a => ({ id: jvNeedNode(a.id) }),
+            run: async a => { const n = findNodeInTree(a.id); const c = jvNodeCode(n); return { text: `[${a.id}] (${n.type}, ${jvCount(c)} lines)\n${c.length > 7000 ? c.slice(0, 7000) + '\n…truncated' : c}` }; } },
+        search_code: { kind: 'read', sig: '{"query":"text"}', doc: 'Find lines containing text across all nodes.',
+            check: a => { if (jvStr(a.query).length < 2) throw new Error('query too short'); return { query: jvStr(a.query, 80) }; },
+            run: async a => {
+                const q = a.query.toLowerCase(), hits = [];
+                flattenTree().forEach(({ node }) => {
+                    if (node === vibeTree || SYSTEM_NODE_IDS.has(node.id)) return;
+                    jvNodeCode(node).split('\n').forEach((ln, i) => { if (hits.length < 30 && ln.toLowerCase().includes(q)) hits.push(`[${node.id}] L${i + 1}: ${ln.trim().slice(0, 140)}`); });
+                });
+                return { text: hits.length ? hits.join('\n') : `No matches for "${a.query}".` };
+            } },
+        read_log: { kind: 'read', sig: '{"limit":30,"type":"error|test|edit|…"}', doc: 'Entries from the project system log.',
+            check: a => ({ limit: Math.max(1, Math.min(60, parseInt(a.limit, 10) || 30)), type: a.type ? jvStr(a.type, 20) : '' }),
+            run: async a => {
+                const rows = SystemLog.entries.filter(e => !a.type || e.type === a.type).slice(-a.limit).map(e => `${jvRel(e.ts)} · ${e.type} · ${e.msg}`);
+                return { text: rows.length ? rows.join('\n') : 'No matching log entries.' };
+            } },
+        inspect_preview: { kind: 'read', sig: '{"target":"preview|app"}', doc: 'Outline of the running page: sections, buttons, inputs (with selectors), visible text, scroll position, recent errors. Use this before writing a test.',
+            check: a => ({ target: a.target === 'app' ? 'app' : 'preview' }),
+            run: async a => ({ text: await PreviewDriver.outline(a.target) }) },
+        screenshot_preview: { kind: 'read', sig: '{}', doc: 'Look at the APUI preview as an image.',
+            check: () => ({}),
+            run: async () => ({ text: 'Screenshot of the APUI preview attached.', image: await apuiCapturePreview() }) },
+        list_triggers: { kind: 'read', sig: '{}', doc: 'Auto-pilot WHEN/DO triggers armed in the main app.',
+            check: () => ({}), run: async () => ({ text: jvJson(await Bridge.call('list_triggers')) }) },
+        list_projects: { kind: 'read', sig: '{"storage":"local|cloud"}', doc: 'Saved projects the user could open.',
+            check: a => ({ storage: a.storage === 'cloud' ? 'cloud' : 'local' }),
+            run: async a => ({ text: jvJson(await Bridge.call('list_projects', a)) }) },
+
+        /* ── tests: drive the running project ── */
+        run_test: { kind: 'test', sig: '{"name":"…","target":"preview|app","steps":[…]}', doc: 'Drive the running page like a user. See STEP TYPES.',
+            check: a => {
+                const steps = (Array.isArray(a.steps) ? a.steps : []).slice(0, 30).map(s => {
+                    if (!s || !TEST_ACTIONS.includes(s.do)) return null;
+                    const o = { do: s.do };
+                    ['target', 'text', 'value', 'key', 'in', 'for', 'gone', 'to', 'block'].forEach(k => { if (s[k] != null) o[k] = jvStr(s[k], 200); });
+                    ['y', 'by', 'ms', 'count', 'timeout'].forEach(k => { if (s[k] != null && isFinite(+s[k])) o[k] = +s[k]; });
+                    ['clear', 'submit', 'checked', 'absent'].forEach(k => { if (typeof s[k] === 'boolean') o[k] = s[k]; });
+                    if (TEST_NEEDS_TARGET.has(o.do) && !o.target) return null;
+                    if (o.do === 'type' && o.text == null) return null;
+                    if (['click', 'check'].includes(o.do) && DESTRUCTIVE_RE.test(o.target || '')) o.risky = true;
+                    return o;
+                }).filter(Boolean);
+                if (!steps.length) throw new Error('no valid test steps');
+                return { name: jvStr(a.name || 'UI test', 70), target: a.target === 'app' ? 'app' : 'preview', steps };
+            },
+            run: async (a, ctx) => {
+                const res = await PreviewDriver.run(a, (r, i) => ctx && ctx.onStep && ctx.onStep(r, i));
+                return { text: JarvisTools.formatTest(res), test: res };
+            } },
+
+        /* ── control: the main app and its ecosystem ── */
+        switch_tab: { kind: 'control', sig: `{"tab":"${KNOWN_TABS.join('|')}"}`, doc: 'Switch the main app to another tab. (Leaving the APUI tab hides this chat; a "Back to Jarvis" pill appears.)',
+            check: a => { if (!KNOWN_TABS.includes(a.tab)) throw new Error(`unknown tab "${a.tab}"`); return { tab: a.tab }; },
+            run: async a => ({ text: jvJson(await Bridge.call('switch_tab', a)) }) },
+        open_node: { kind: 'control', sig: '{"id":"node-id"}', doc: 'Bring a node into view on the APUI canvas.',
+            check: a => ({ id: jvNeedNode(a.id) }), run: async a => { JarvisBrain.openNode(a.id); return { text: `Opened [${a.id}]` }; } },
+        add_trigger: { kind: 'control', sig: `{"condition":"${TRIGGER_CONDITIONS.join('|')}","action":"${TRIGGER_ACTION_TYPES.join('|')}","value":"prompt text or tab name"}`, doc: 'Arm an auto-pilot rule: WHEN condition DO action.',
+            check: a => {
+                if (!TRIGGER_CONDITIONS.includes(a.condition)) throw new Error('bad condition');
+                if (!TRIGGER_ACTION_TYPES.includes(a.action)) throw new Error('bad action');
+                const value = jvStr(a.value, 300);
+                if (a.action === 'run-prompt' && !value) throw new Error('run-prompt needs prompt text');
+                if (a.action === 'goto-tab' && !KNOWN_TABS.includes(value)) throw new Error('goto-tab needs a valid tab');
+                return { condition: a.condition, action: a.action, value };
+            },
+            run: async a => ({ text: jvJson(await Bridge.call('add_trigger', a)) }) },
+        remove_trigger: { kind: 'control', sig: '{"id":"trigger-1"}', doc: 'Remove an armed trigger (see list_triggers).',
+            check: a => ({ id: jvStr(a.id, 40) }), run: async a => ({ text: jvJson(await Bridge.call('remove_trigger', a)) }) },
+        toggle_trigger: { kind: 'control', sig: '{"id":"trigger-1","enabled":true}', doc: 'Enable or pause a trigger.',
+            check: a => ({ id: jvStr(a.id, 40), enabled: a.enabled !== false }), run: async a => ({ text: jvJson(await Bridge.call('toggle_trigger', a)) }) },
+        queue_agent_task: { kind: 'control', sig: '{"prompt":"…"}', doc: "Add a prompt to the main app's Agent task queue (does not start it).",
+            check: a => { const p = jvStr(a.prompt, 800); if (p.length < 4) throw new Error('prompt too short'); return { prompt: p }; },
+            run: async a => ({ text: jvJson(await Bridge.call('queue_agent_task', a)) }) },
+        start_agent_queue: { kind: 'control', sig: '{}', doc: "Start running the main app's Agent queue.", check: () => ({}), run: async () => ({ text: jvJson(await Bridge.call('start_agent_queue')) }) },
+        stop_agent_queue: { kind: 'control', sig: '{}', doc: "Stop the main app's Agent queue.", check: () => ({}), run: async () => ({ text: jvJson(await Bridge.call('stop_agent_queue')) }) },
+        clear_agent_queue: { kind: 'control', sig: '{}', doc: "Empty the main app's Agent queue (only when idle).", check: () => ({}), run: async () => ({ text: jvJson(await Bridge.call('clear_agent_queue')) }) },
+        save_checkpoint: { kind: 'control', sig: '{"label":"…"}', doc: 'Save a restore point of the project.',
+            check: a => ({ label: jvStr(a.label || 'Jarvis checkpoint', 80) }), run: async a => ({ text: jvJson(await Bridge.call('save_checkpoint', a)) }) },
+        save_project: { kind: 'control', sig: '{}', doc: 'Save the project to its storage.', check: () => ({}), run: async () => ({ text: jvJson(await Bridge.call('save_project')) }) },
+        push_nodes: { kind: 'control', sig: '{}', doc: 'Push unsaved APUI edits to the Vibe System.', check: () => ({}),
+            run: async () => { const n = dirtyNodes.size; pushAllToVibeTree(); return { text: `Pushed ${n} node(s)` }; } },
+        add_note: { kind: 'control', sig: '{"text":"…","status":"todo|broken|works|neutral"}', doc: 'Add a note to the tracker.',
+            check: a => { const t = jvStr(a.text, 400); if (!t) throw new Error('empty note'); return { text: t, status: ['todo', 'broken', 'works', 'neutral'].includes(a.status) ? a.status : 'neutral' }; },
+            run: async a => { NoteThreads.addNote(a.text, a.status); return { text: 'Note saved' }; } },
+
+        /* ── changes ── */
+        make_pr: { kind: 'pr', sig: '{"task":"self-contained description of the change","nodeIds":["…"]}', doc: 'Have me write the code and open a pull request for you to review. This is the ONLY way code changes.',
+            check: a => {
+                const task = jvStr(a.task, 900);
+                if (task.length < 8) throw new Error('task too short');
+                return { task, nodeIds: (Array.isArray(a.nodeIds) ? a.nodeIds : []).filter(id => jvSafeId(id) && findNodeInTree(id)).slice(0, 6) };
+            },
+            run: async a => {
+                if (JarvisPR.running) throw new Error('Jarvis is already drafting another PR.');
+                const t = JarvisPR.addTask(a.task, { origin: 'chat', nodeIds: a.nodeIds });
+                await JarvisPR._runTask(t);
+                if (t.status === 'pending') throw new Error('I could not draft the PR (check the Tasks tab).');
+                const pr = JarvisPR.prs.find(p => p.id === (t.prIds || [])[0]);
+                return { text: pr ? `PR #${pr.id} opened: ${pr.title}` : 'No changes were needed.', prId: pr ? pr.id : null };
+            } },
+        check_and_fix_errors: { kind: 'pr', sig: '{}', doc: "Run the main app's own error scan-and-fix (edits code directly, outside PR review).", check: () => ({}),
+            run: async () => ({ text: jvJson(await Bridge.call('check_and_fix_errors')) }) },
+        load_project: { kind: 'project', sig: '{"id":"project-id","storage":"local|cloud"}', doc: 'Open a different saved project. Unsaved changes in the current one are lost.',
+            check: a => { const id = jvStr(a.id, 120); if (!id) throw new Error('no project id'); return { id, storage: a.storage === 'cloud' ? 'cloud' : 'local' }; },
+            run: async a => ({ text: jvJson(await Bridge.call('load_project', a)) }) }
+    },
+
+    get(name) { return Object.prototype.hasOwnProperty.call(this.defs, name) ? this.defs[name] : null; },
+    isRead(name) { const d = this.get(name); return !!d && d.kind === 'read'; },
+    catalog() {
+        const line = ([n, d]) => `- ${n} ${d.sig} — ${d.doc}`;
+        const E = Object.entries(this.defs);
+        return `READ-ONLY (put these in "inspect"; they run immediately and you get the results back):\n${E.filter(([, d]) => d.kind === 'read').map(line).join('\n')}\n\nACTIONS (only ever in a "plan"; nothing runs until the user approves):\n${E.filter(([, d]) => d.kind !== 'read').map(line).join('\n')}`;
+    },
+    describe(name, a) {
+        switch (name) {
+            case 'run_test': return `Test “${a.name}” on ${a.target === 'app' ? 'the main app Preview tab' : 'the APUI preview'} — ${a.steps.length} step${a.steps.length > 1 ? 's' : ''}`;
+            case 'switch_tab': return `Switch the main app to the “${a.tab}” tab`;
+            case 'open_node': return `Open [${a.id}] on the canvas`;
+            case 'add_trigger': return `Arm trigger: WHEN ${a.condition} → ${a.action}${a.value ? ` “${truncate(a.value, 60)}”` : ''}`;
+            case 'remove_trigger': return `Remove trigger ${a.id}`;
+            case 'toggle_trigger': return `${a.enabled ? 'Enable' : 'Pause'} trigger ${a.id}`;
+            case 'queue_agent_task': return `Queue for the main Agent: “${truncate(a.prompt, 80)}”`;
+            case 'start_agent_queue': return 'Start the main Agent queue';
+            case 'stop_agent_queue': return 'Stop the main Agent queue';
+            case 'clear_agent_queue': return 'Clear the main Agent queue';
+            case 'save_checkpoint': return `Save checkpoint “${a.label}”`;
+            case 'save_project': return 'Save the project';
+            case 'push_nodes': return 'Push unsaved APUI edits to the Vibe System';
+            case 'add_note': return `Add a ${a.status} note: “${truncate(a.text, 70)}”`;
+            case 'make_pr': return `Open a PR: ${truncate(a.task, 110)}${a.nodeIds.length ? ' → ' + a.nodeIds.map(n => '[' + n + ']').join(', ') : ''}`;
+            case 'check_and_fix_errors': return "Run the main app's error scan & auto-fix (bypasses PR review)";
+            case 'load_project': return `Open project “${a.id}” (${a.storage}) — unsaved changes here are lost`;
+            default: return name;
+        }
+    },
+    stepLine(r) {
+        const icon = r.status === 'pass' ? '✓' : r.status === 'fail' ? '✗' : '–';
+        return `${icon} ${r.i + 1}. ${r.do}${r.target ? ' ' + truncate(r.target, 40) : ''} — ${truncate(r.detail, 160)}`;
+    },
+    formatTest(res) {
+        const head = `${res.failed ? '❌' : '✅'} “${res.name}”: ${res.passed}/${res.results.length} steps passed${res.skipped ? `, ${res.skipped} skipped` : ''} (${(res.ms / 1000).toFixed(1)}s)`;
+        const bad = res.results.filter(r => r.status === 'fail').map(r => this.stepLine(r));
+        const errs = res.errors.length ? [`Runtime errors during the run: ${res.errors.slice(-3).map(e => truncate(e, 120)).join(' | ')}`] : [];
+        return [head, ...bad, ...errs].join('\n');
+    }
+};
 
 
 /* ── Global shim: map old Jarvis calls to new system ────────── */
@@ -4424,16 +5334,18 @@ async function handleCommand(specificCmd = null) {
         await apuiScreenshot();
         const editReq = prompt('Screenshot captured! What should Jarvis fix or improve based on what you see?');
         if (editReq) {
-            ensureChat(); enforceNodeLimit('chat'); centerOnNode('chat', 350);
-            await aiEditAll('root', editReq);
+            JarvisBrain.ask(editReq);
         }
+    } else if (/^!\s*\S/.test(val)) {
+        // "!" prefix = power-user direct edit, no conversation, no PR
+        ensureChat(); enforceNodeLimit('chat'); centerOnNode('chat', 350);
+        await aiEditAll('root', val.replace(/^!\s*/, ''));
     } else if (jvLooksLikeQuestion(val)) {
         // Questions go to Jarvis chat (project-aware) instead of triggering an edit
         JarvisBrain.ask(val.replace(/^\?\s*/, ''));
     } else {
-        // Free-form AI command — images already in _apuiPendingImages will be consumed inside aiEditAll
-        ensureChat(); enforceNodeLimit('chat'); centerOnNode('chat', 350);
-        await aiEditAll('root', val);
+        // Free-form request: Jarvis talks it through first (clarify → plan → approve). Prefix with ! for a direct edit.
+        JarvisBrain.ask(val);
     }
     if (!specificCmd) userInput.value = '';
 }
@@ -5239,4 +6151,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-            </html>
+    </html>
