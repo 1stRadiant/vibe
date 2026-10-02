@@ -10390,6 +10390,80 @@ async function handleApuiControl(d, e) {
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   PAIR MODE chip — the main app's window onto how Jarvis is working
+   with you: the Help dial, "my take first", and how much AI-written
+   code you haven't read yet. State lives in APUI (per project); this
+   chip mirrors it on every tab and can change the dial.
+   ═══════════════════════════════════════════════════════════════ */
+const PAIR_LEVEL_UI = [
+    { name: 'Coach',     blurb: 'Questions and hints only. You do the thinking and the typing.' },
+    { name: 'Outline',   blurb: 'The approach as steps and pseudocode. You write the code.' },
+    { name: 'Snippets',  blurb: 'Short examples in chat. You write and integrate the real code.' },
+    { name: 'Draft PRs', blurb: 'Jarvis writes the code as a PR you review.' }
+];
+let _pairState = { dial: 3, takeFirst: false, unread: 0, aiTouched: 0, decisions: 0 };
+
+function _pairSend(msg) {
+    try { const f = document.getElementById('apui-frame'); if (f && f.contentWindow) f.contentWindow.postMessage(msg, '*'); } catch (_) {}
+}
+
+function updatePairChip(s) {
+    if (s) {
+        _pairState = {
+            dial: Math.max(0, Math.min(3, parseInt(s.dial, 10) || 0)),
+            takeFirst: !!s.takeFirst,
+            unread: Math.max(0, parseInt(s.unread, 10) || 0),
+            aiTouched: Math.max(0, parseInt(s.aiTouched, 10) || 0),
+            decisions: Math.max(0, parseInt(s.decisions, 10) || 0)
+        };
+    }
+    const st = _pairState;
+    const dialEl = document.getElementById('pair-chip-dial');
+    if (dialEl) dialEl.textContent = PAIR_LEVEL_UI[st.dial].name;
+    const debt = document.getElementById('pair-chip-debt');
+    if (debt) { debt.textContent = st.unread ? `${st.unread} unread` : ''; debt.style.display = st.unread ? 'inline-block' : 'none'; }
+    document.querySelectorAll('#pair-levels .pair-level').forEach((b, i) => b.classList.toggle('on', i === st.dial));
+    const take = document.getElementById('pair-take');
+    if (take) take.checked = st.takeFirst;
+    const line = document.getElementById('pair-debt-line');
+    if (line) {
+        line.textContent = st.aiTouched
+            ? (st.unread ? `${st.unread} of ${st.aiTouched} AI-written nodes not read yet.` : `You've read all ${st.aiTouched} AI-written nodes.`)
+            : 'No AI-written code yet.';
+        line.classList.toggle('warn', st.unread > 0);
+    }
+}
+
+function pairChipInit() {
+    const chip = document.getElementById('pair-chip'), pop = document.getElementById('pair-pop');
+    if (!chip || !pop || chip._bound) return;
+    chip._bound = true;
+    const levels = document.getElementById('pair-levels');
+    if (levels) {
+        levels.innerHTML = PAIR_LEVEL_UI.map((l, i) => `<button type="button" class="pair-level" data-level="${i}"><b>${l.name}</b><span>${l.blurb}</span></button>`).join('');
+        levels.addEventListener('click', e => {
+            const b = e.target.closest('.pair-level');
+            if (!b) return;
+            const dial = parseInt(b.dataset.level, 10);
+            _pairState.dial = dial; updatePairChip();
+            _pairSend({ type: 'apui-set-pair', dial });
+        });
+    }
+    const take = document.getElementById('pair-take');
+    if (take) take.addEventListener('change', () => { _pairState.takeFirst = take.checked; _pairSend({ type: 'apui-set-pair', takeFirst: take.checked }); });
+    chip.addEventListener('click', e => { e.stopPropagation(); pop.style.display = pop.style.display === 'none' ? 'block' : 'none'; });
+    document.addEventListener('click', e => { if (!pop.contains(e.target) && e.target !== chip) pop.style.display = 'none'; });
+    const open = document.getElementById('pair-open-model');
+    if (open) open.addEventListener('click', () => {
+        pop.style.display = 'none';
+        switchToTab('apui');
+        setTimeout(() => _pairSend({ type: 'apui-open-model' }), 250);
+    });
+    updatePairChip();
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pairChipInit); else pairChipInit();
+
 function injectBridgeIntoApui() {
     const frame = document.getElementById('apui-frame');
     if (!frame) return;
@@ -10531,6 +10605,12 @@ function handleApuiMessage(e) {
                     pinnedNodes: [..._apuiPinnedNodes]
                 }, '*');
             }
+            break;
+        }
+
+        // Pair Mode state from APUI → the chip in the toolbar
+        case 'apui-pair-state': {
+            updatePairChip(d);
             break;
         }
 
@@ -10779,4 +10859,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-            }
+                  }
