@@ -942,6 +942,42 @@
     .jv-act.primary { background: rgba(255,0,255,0.3); border-color: rgba(255,0,255,0.8); color: #fff; }
     .sl-row.t-test { border-left-color: #00ffcc; }
     .sl-row.t-action { border-left-color: rgba(255,0,255,0.55); }
+
+    /* ── PAIR MODE: dial, review brief, comparison, Model tab ── */
+    .jv-dial { flex-shrink: 0; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 2px 10px 6px; }
+    .jv-dial-label { font: 700 0.6rem 'Fira Code', monospace; color: #8a90a8; margin-right: 2px; }
+    .jv-dial-btn { background: transparent; border: 1px solid rgba(255,255,255,0.12); color: #8a90a8; border-radius: 10px; padding: 1px 9px; font: 700 0.64rem 'Rajdhani', sans-serif; cursor: pointer; }
+    .jv-dial-btn:hover { color: var(--secondary); border-color: rgba(65,105,225,0.55); }
+    .jv-dial-btn.on { color: #fff; border-color: rgba(255,0,255,0.75); background: rgba(255,0,255,0.2); }
+    .jv-take { display: flex; align-items: center; gap: 4px; margin-left: auto; font: 0.58rem 'Fira Code', monospace; color: #777; cursor: pointer; }
+    .jv-compare { padding: 7px 10px; font-size: 0.68rem; line-height: 1.45; color: #cfe; background: rgba(0,255,204,0.06); border-bottom: 1px solid rgba(0,255,204,0.15); }
+    .jpr-brief { margin: 8px 0; padding: 8px 10px; border: 1px solid rgba(255,183,77,0.35); border-radius: 5px; background: rgba(255,183,77,0.05); font-size: 0.68rem; line-height: 1.5; }
+    .jpr-brief-h { font: 700 0.64rem 'Fira Code', monospace; color: #ffb74d; margin-bottom: 4px; }
+    .jpr-brief-h span { font-weight: 400; color: #8a7a5a; margin-left: 6px; }
+    .jpr-brief-sec { margin-top: 5px; color: #d8d4c8; }
+    .jpr-brief-sec b { color: #ffd699; font-size: 0.64rem; }
+    .jpr-brief-sec ul { margin: 2px 0 0 16px; padding: 0; }
+    #jpr-pane-model { overflow-y: auto; }
+    .pm-wrap { padding: 4px 0 14px; }
+    .pm-sec { margin-bottom: 8px; }
+    .pm-h { position: sticky; top: 0; z-index: 1; padding: 7px 12px; background: rgba(8,12,24,0.97); font: 700 0.72rem 'Rajdhani', sans-serif; color: #dbe; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .pm-sub { font: 0.56rem 'Fira Code', monospace; color: #667; font-weight: 400; }
+    .pm-row { display: flex; gap: 8px; align-items: flex-start; padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); border-left: 2px solid transparent; }
+    .pm-row.st-unread { border-left-color: #ffb74d; background: rgba(255,183,77,0.04); }
+    .pm-row.st-owned { border-left-color: #66bb6a; }
+    .pm-main { flex: 1; min-width: 0; font-size: 0.72rem; line-height: 1.5; word-break: break-word; }
+    .pm-btns { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+    .pm-btns .jpr-btn { font-size: 0.58rem; padding: 2px 8px; }
+    .pm-badge { font: 700 0.54rem 'Fira Code', monospace; padding: 1px 6px; border-radius: 3px; margin: 0 4px; background: rgba(255,255,255,0.07); color: #aab; }
+    .pm-badge.b-unread { color: #ffb74d; background: rgba(255,183,77,0.14); }
+    .pm-badge.b-owned { color: #66bb6a; background: rgba(102,187,106,0.14); }
+    .pm-words { margin-top: 3px; font-size: 0.64rem; font-style: italic; color: #8fd19e; }
+    .pm-empty { padding: 14px 12px; font: 0.62rem/1.8 'Fira Code', monospace; color: #444; }
+    .pm-add { display: flex; gap: 6px; padding: 7px 12px; }
+    .pm-add input { flex: 1; background: rgba(16,24,48,0.8); border: 1px solid rgba(65,105,225,0.3); border-radius: 4px; color: var(--text); font: 0.7rem 'Rajdhani', sans-serif; padding: 4px 8px; }
+    .pm-add input:focus { outline: none; border-color: rgba(65,105,225,0.7); }
+    .sl-row.t-decision { border-left-color: #ffb74d; }
+    .sl-row.t-own { border-left-color: #66bb6a; }
 </style>
 </head>
 <body>
@@ -1086,6 +1122,7 @@
         <div class="jpr-tab" data-tab="tasks" onclick="jarvisPRTab('tasks')">Tasks<span class="jpr-badge" id="jpr-badge-tasks" style="display:none"></span></div>
         <div class="jpr-tab" data-tab="prs" onclick="jarvisPRTab('prs')">PRs<span class="jpr-badge" id="jpr-badge-prs" style="display:none"></span></div>
         <div class="jpr-tab" data-tab="log" onclick="jarvisPRTab('log')">Log</div>
+        <div class="jpr-tab" data-tab="model" onclick="jarvisPRTab('model')">Model<span class="jpr-badge" id="jpr-badge-model" style="display:none"></span></div>
     </div>
 
     <!-- Chat Tab -->
@@ -1093,6 +1130,7 @@
         <div class="jv-next" id="jv-next" style="display:none"></div>
         <div class="jv-chat-list" id="jv-chat-list"></div>
         <div class="jv-chips" id="jv-chips"></div>
+        <div class="jv-dial" id="jv-dial"></div>
         <div class="jv-composer">
             <textarea id="jv-input" rows="2" placeholder="Ask, or tell me what you want…  (/help for commands)"></textarea>
             <button class="jpr-btn primary" onclick="JarvisBrain.sendFromInput()">Ask</button>
@@ -1146,6 +1184,9 @@
             <button class="jpr-btn danger" onclick="SystemLog.clear()" style="font-size:0.58rem;padding:3px 8px;">Clear</button>
         </div>
     </div>
+
+    <!-- Model Tab: what you decided, what you have read -->
+    <div class="jpr-tab-pane" id="jpr-pane-model"><div class="pm-wrap" id="pm-wrap"></div></div>
 
     <!-- Run bar -->
     <div class="jpr-run-bar">
@@ -1244,6 +1285,8 @@ window.addEventListener('message', e => {
     }
     // Runtime errors from the main app's own preview/console (parent has no node to blame)
     if (d.type === 'apui-control-result') { Bridge.resolve(d); return; }
+    if (d.type === 'apui-set-pair') { ProjectStore.enqueue(async () => Pair.set({ dial: d.dial, takeFirst: typeof d.takeFirst === 'boolean' ? d.takeFirst : undefined }, { silent: true })); return; }
+    if (d.type === 'apui-open-model') { ProjectStore.enqueue(async () => JarvisBrain.openModel()); return; }
     if (d.type === 'apui-outer-console-error' && d.message) {
         PreviewDriver.noteError('Main app: ' + d.message);
         SystemLog.add('error', `Main app: ${truncate(String(d.message), 200)}`, { src: 'parent' });
@@ -2339,6 +2382,7 @@ Return the JSON object now.`;
         // Push all changes to the parent Vibe System in one shot
         postToParent('apui-bulk-update', { updates: pushUpdates });
         if (pushUpdates.length) trackerLog('push', null, `AI pushed ${pushUpdates.length} update(s) to Vibe System`);
+        Ledger.markAIEdits(pushUpdates);
 
         renderSidebar();
         logToChat('ai', 'Done! Preview updated.');
@@ -2447,6 +2491,7 @@ const JarvisPR = {
         if (tab === 'tasks') this._renderTasks();
         if (tab === 'log') this._renderLog();
         if (tab === 'chat') JarvisBrain.onChatShown();
+        if (tab === 'model') Pair.renderModel();
     },
 
     /* ── Task management ─────────────────────────────────── */
@@ -2588,6 +2633,7 @@ const JarvisPR = {
                     title: plan.plan || task.text,
                     category: plan.category || 'edit',
                     actions: prActions,
+                    brief: Pair.cleanBrief(plan.brief),
                     status: 'open',
                     createdAt: new Date()
                 };
@@ -2649,6 +2695,7 @@ Return ONLY valid JSON in this format:
 {
   "plan": "One sentence describing what you're changing and why",
   "category": "layout|style|logic|animation|component|config|bugfix|improvement",
+  "brief": {"assumptions": ["what you assumed without being able to check"], "risks": ["what could break"], "check": ["what the user should verify by hand"], "alternative": "one other approach and why you did not take it"},
   "actions": [
     {
       "actionType": "update",
@@ -2680,7 +2727,9 @@ RULES:
 7. Read PROJECT MEMORY first. Do not repeat a proposal the user already rejected unless the task explicitly asks for it, and take any rejection reasons seriously.
 8. Do not undo or overwrite what the user changed recently unless the task requires it.
 9. If a node already appears in an open PR, avoid touching it unless the task requires it — and say so in the narration.
-10. If the task is already satisfied by the current code, return an empty "actions" array.`;
+10. If the task is already satisfied by the current code, return an empty "actions" array.
+11. Fill "brief" candidly: the user reads it before merging. At most 3 short items per list; no padding, no reassurance.
+12. Respect the DECISIONS section of PROJECT MEMORY. They are the user's choices, not yours to revisit.`;
 
         const user = `TASK: "${taskText}"${origin !== 'user' ? `\n(This task originated from: ${origin})` : ''}${nodeIds.length ? `\nRelevant nodes: ${nodeIds.map(id => '[' + id + ']').join(', ')}` : ''}
 
@@ -2753,6 +2802,7 @@ Plan your changes carefully, then return the JSON now.`;
         setTimeout(() => { if (!watch.hit) SystemLog.add('info', `PR #${pr.id}: no errors in the first 8s after merge`, { src: 'system' }); }, 8200);
         JarvisBrain.onEvent('merge');
         JarvisBrain.afterMerge(pr);
+        Ledger.markAIMerge(pr);
         this._renderPRs();
         this._updateBadges();
         this._setStatus(this.prs.filter(p=>p.status==='open').length > 0
@@ -2859,20 +2909,23 @@ Plan your changes carefully, then return the JSON now.`;
                 <div class="jpr-pr-actions">
                     <button class="jpr-btn success" onclick="JarvisPR.mergePR(${pr.id})">✓ Merge</button>
                     <button class="jpr-btn danger" onclick="JarvisPR.rejectPR(${pr.id})">✗ Reject</button>
-                    <input class="jpr-reason" id="jpr-reason-${pr.id}" maxlength="200" placeholder="Why? (Jarvis learns from this)">
+                    <button class="jpr-btn" onclick="JarvisPR.revisePR(${pr.id})" title="Send it back with the feedback in the box">↻ Revise</button>
+                    <button class="jpr-btn" onclick="JarvisPR.challengePR(${pr.id})" title="Make Jarvis argue against its own change">⚔ Challenge</button>
+                    <input class="jpr-reason" id="jpr-reason-${pr.id}" maxlength="200" placeholder="Feedback to revise, or why you reject">
                     <span style="font-family:'Fira Code',monospace;font-size:0.55rem;color:#444;margin-left:auto;">${pr.actions.length} file${pr.actions.length>1?'s':''} changed</span>
-                </div>` : `<div style="font-family:'Fira Code',monospace;font-size:0.58rem;color:${pr.status==='merged'?'#66bb6a':'#ef5350'};padding:6px 0;">${pr.status === 'merged' ? '✅ Merged' : '❌ Rejected'}</div>`;
+                </div>` : `<div style="font-family:'Fira Code',monospace;font-size:0.58rem;color:${pr.status==='merged'?'#66bb6a':'#ef5350'};padding:6px 0;">${pr.status === 'merged' ? '✅ Merged' : (pr.revised ? '↻ Sent back for revision' : '❌ Rejected')}</div>`;
 
             card.innerHTML = `
                 <div class="jpr-pr-header" onclick="this.closest('.jpr-pr-card').classList.toggle('expanded')">
                     <span class="jpr-pr-status-dot ${pr.status}"></span>
                     <div class="jpr-pr-info">
                         <div class="jpr-pr-title">${escapeHTML(pr.title)}</div>
-                        <div class="jpr-pr-meta">PR #${pr.id} · ${pr.category} · ${_relTime(pr.createdAt)}${pr.rejectReason ? ' · ' + escapeHTML(pr.rejectReason) : ''}</div>
+                        <div class="jpr-pr-meta">PR #${pr.id} · ${pr.category}${pr.revises ? ' · revises #' + pr.revises : ''} · ${_relTime(pr.createdAt)}${pr.rejectReason ? ' · ' + escapeHTML(pr.rejectReason) : ''}</div>
                     </div>
                     <span class="jpr-pr-chevron">›</span>
                 </div>
                 <div class="jpr-pr-body">
+                    ${Pair.briefHtml(pr)}
                     ${diffHtml}
                     ${actionHtml}
                 </div>`;
@@ -3097,7 +3150,7 @@ const ProjectStore = {
         }
     },
     _blank(id) {
-        return { id, v: 1, created: Date.now(), updated: Date.now(), log: [], tasks: [], prs: [], chat: [], predictions: [], notes: null, meta: { sessions: 0, dismissed: [] } };
+        return { id, v: 1, created: Date.now(), updated: Date.now(), log: [], tasks: [], prs: [], chat: [], predictions: [], notes: null, decisions: [], ledger: {}, meta: { sessions: 0, dismissed: [] } };
     },
 
     /** Make `rawId` the active project. Resolves true if the project changed. */
@@ -3110,6 +3163,9 @@ const ProjectStore = {
         ['log', 'tasks', 'prs', 'chat', 'predictions'].forEach(k => { if (!Array.isArray(rec[k])) rec[k] = []; });
         rec.meta = Object.assign({ sessions: 0, dismissed: [] }, rec.meta || {});
         if (!Array.isArray(rec.meta.dismissed)) rec.meta.dismissed = [];
+        if (!Array.isArray(rec.decisions)) rec.decisions = [];
+        if (!rec.ledger || typeof rec.ledger !== 'object') rec.ledger = {};
+        rec.meta.pair = Object.assign(Pair.defaults(), rec.meta.pair || {});
         this.projectId = id;
         this.rec = rec;
         this._adopt(!existing);
@@ -3121,6 +3177,7 @@ const ProjectStore = {
         SystemLog.drainPending();
         if (imported) SystemLog.add('note', `Imported ${imported} note${imported > 1 ? 's' : ''} from before notes were tracked per project`, { src: 'system' });
         JarvisBrain.onProjectEntered(isNew);
+        Pair.onProjectEntered();
     },
 
     touch() {
@@ -3143,6 +3200,7 @@ const ProjectStore = {
     _compact(rec) {
         if (rec.log.length > 1500) rec.log.splice(0, rec.log.length - 1200);
         if (rec.chat.length > 300) rec.chat.splice(0, rec.chat.length - 200);
+        if (rec.decisions && rec.decisions.length > 300) rec.decisions.splice(0, rec.decisions.length - 250);
         if (rec.tasks.length > 150) rec.tasks.splice(0, rec.tasks.length - 120);
         if (rec.meta.dismissed.length > 120) rec.meta.dismissed.splice(0, rec.meta.dismissed.length - 80);
         // Archive the code of old, finished PRs so the record stays small
@@ -3179,6 +3237,8 @@ const LOG_TYPES = {
     note:       { icon: '🗒', group: 'notes' },
     test:       { icon: '🧪', group: 'tests' },
     action:     { icon: '⚙️', group: 'jarvis' },
+    decision:   { icon: '📌', group: 'notes' },
+    own:        { icon: '🧠', group: 'notes' },
     export:     { icon: '⬇', group: 'system' },
     info:       { icon: 'ℹ️', group: 'system' }
 };
@@ -3405,6 +3465,7 @@ const JarvisBrain = {
         const cb = document.getElementById('jv-proactive');
         if (cb) cb.checked = this.proactive;
         SystemLog.mountAll();
+        Pair.renderDial();
         this.renderAll();
     },
     setProactive(on) {
@@ -3442,6 +3503,7 @@ const JarvisBrain = {
             this._welcome = `Welcome back. Last activity ${jvRel(last.ts)}.` +
                 (openPRs ? ` ${openPRs} PR${openPRs > 1 ? 's are' : ' is'} waiting for review.` : '') +
                 (pending ? ` ${pending} task${pending > 1 ? 's' : ''} queued.` : '') +
+                (Ledger.unreadCount() ? ` ${Ledger.unreadCount()} node${Ledger.unreadCount() > 1 ? 's' : ''} of AI-written code you haven't read yet (Model tab).` : '') +
                 (recent ? `\nMost recent:\n${recent}` : '');
         }
         this._lastErrSay = 0; this._lastErrMsg = '';
@@ -3519,6 +3581,8 @@ RULES
 - Keep "say" short. Plain text with \`code\` and **bold**; code blocks only when showing code.
 - Plan steps run in order and stop if an action fails. At most 8 steps.
 
+${Pair.promptSection()}
+
 TOOLS
 ${JarvisTools.catalog()}
 
@@ -3526,7 +3590,7 @@ STEP TYPES for run_test.steps (target = CSS selector, or "text:Visible label"):
 {"do":"click","target":"…"} · {"do":"type","target":"…","text":"…","clear":true,"submit":false} · {"do":"select","target":"…","value":"…"} · {"do":"check","target":"…","checked":true} · {"do":"press","key":"Enter","target":"(optional)"} · {"do":"scroll_to","target":"…"} · {"do":"scroll","y":600} or {"do":"scroll","to":"top|bottom"} · {"do":"hover","target":"…"} · {"do":"wait","ms":500} or {"do":"wait","for":"…"} · {"do":"expect_text","text":"…","in":"(optional selector)","absent":false} · {"do":"expect_visible","target":"…"} · {"do":"expect_value","target":"…","value":"…"} · {"do":"expect_count","target":"css","count":3} · {"do":"expect_no_errors"} · {"do":"reload"}
 
 Return ONLY JSON:
-{"mode":"answer|clarify|plan|inspect","say":"what the user reads","questions":[{"q":"…","options":["…","…"]}],"understanding":"one sentence","steps":[{"tool":"…","args":{…},"why":"short reason"}],"inspect":[{"tool":"…","args":{…}}],"followups":["up to 3 short follow-ups"]}
+{"mode":"answer|clarify|plan|inspect","say":"what the user reads","questions":[{"q":"…","options":["…","…"]}],"understanding":"one sentence","comparison":"only when the user gave their own approach","steps":[{"tool":"…","args":{…},"why":"short reason"}],"inspect":[{"tool":"…","args":{…}}],"followups":["up to 3 short follow-ups"]}
 Include only the fields the mode needs.`;
     },
 
@@ -3559,9 +3623,13 @@ Include only the fields the mode needs.`;
             aiEditAll('root', req);
             return;
         }
+        if (/^\/decide(\s|$)/i.test(text)) { this._userMsg(text); Decisions.manual(text.replace(/^\/decide\s*/i, '')); return; }
+        if (/^\/review(\s|$)/i.test(text)) { const rv = Pair.reviewRequest(text); if (!rv) return; text = rv.text; opts = Object.assign({}, opts, { focus: rv.focus }); }
+        else if (/^\/(dial|model|teach|skip)(\s|$)/i.test(text)) { this._userMsg(text); Pair.slash(text); return; }
         if (/^\/test(\s|$)/i.test(text)) text = 'Test this: ' + (text.replace(/^\/test\s*/i, '').trim() || 'walk through the main user flows of the project and check they work');
         else if (text.startsWith('/')) return this.slash(text);
 
+        if (!opts.hidden && ProjectStore.rec.meta.teach) { this._userMsg(text); return Ledger.evaluateTeach(text); }
         if (!opts.hidden) {
             this._userMsg(text);
             SystemLog.add('chat', `Asked Jarvis: ${truncate(text, 110)}`, { src: 'user', node: (opts.focus || [])[0] || null });
@@ -3625,6 +3693,10 @@ Include only the fields the mode needs.`;
             try { out.push({ tool: name, args: def.check((s && s.args) || {}), why: jvStr(s.why, 140), checked: true, status: 'pending', result: '' }); }
             catch (_) { /* invalid step: dropped, never guessed at */ }
         });
+        this._lastDropped = 0;
+        if (!Pair.canWriteCode) {
+            for (let i = out.length - 1; i >= 0; i--) if (out[i].tool === 'make_pr' || out[i].tool === 'check_and_fix_errors') { out.splice(i, 1); this._lastDropped++; }
+        }
         const pr = out.findIndex(s => s.tool === 'make_pr');
         if (pr >= 0) for (let i = out.length - 1; i > pr; i--) if (out[i].tool === 'run_test') out.splice(i, 1);
         return out;
@@ -3644,12 +3716,13 @@ Include only the fields the mode needs.`;
         }
         if (mode === 'plan') {
             const steps = this._cleanSteps(data.steps);
+            if (this._lastDropped) say = (say ? say + '\n\n' : '') + `(Help is set to **${Pair.name}**, so I left out the part where I write code. Raise the dial above the message box, or type \`/dial 3\`, if you want me to draft it.)`;
             if (steps.length) {
                 ProjectStore.rec.chat.forEach(m => { if (m.plan && m.plan.status === 'pending') m.plan.status = 'superseded'; });
-                const plan = { id: jvNewId('p'), understanding: jvStr(data.understanding || say, 240), status: 'pending', steps };
+                const plan = { id: jvNewId('p'), understanding: jvStr(data.understanding || say, 240), comparison: jvStr(data.comparison, 420), status: 'pending', steps };
                 return this.say(say || 'Here is what I would do:', [], followups, { plan });
             }
-            say = (say ? say + '\n\n' : '') + "(I couldn't turn that into valid steps. Tell me a bit more about what you want and I'll try again.)";
+            if (!this._lastDropped) say = (say ? say + '\n\n' : '') + "(I couldn't turn that into valid steps. Tell me a bit more about what you want and I'll try again.)";
         }
         if (mode === 'inspect' && !say) say = "I looked around but couldn't settle on an answer. Tell me more about what you're after.";
         this.say(say || 'Nothing to add.', [], followups);
@@ -3660,7 +3733,7 @@ Include only the fields the mode needs.`;
         if (!m || !m.questions || m.answered) return;
         const q = m.questions[qi];
         if (!q || !q.options[oi]) return;
-        if (m.questions.length === 1) { m.answered = true; q.pick = oi; this.send(q.options[oi]); return; }
+        if (m.questions.length === 1) { m.answered = true; q.pick = oi; Decisions.fromAnswer(q); this.send(q.options[oi]); return; }
         q.pick = q.pick === oi ? null : oi;
         ProjectStore.touch(); this.renderChat();
     },
@@ -3670,6 +3743,7 @@ Include only the fields the mode needs.`;
         const lines = m.questions.filter(q => q.pick != null).map(q => `${q.q} → ${q.options[q.pick]}`);
         if (!lines.length) { toast('Pick an answer first, or just type your reply'); return; }
         m.answered = true;
+        m.questions.forEach(q => Decisions.fromAnswer(q));
         this.send(lines.join('\n'));
     },
     toggleStep(msgId, i, on) {
@@ -3701,6 +3775,7 @@ Include only the fields the mode needs.`;
         p.status = 'running'; p.stopRequested = false; this.planRunning = p;
         p.steps.forEach(s => { if (!s.checked) { s.status = 'skipped'; s.result = 'not selected'; } });
         SystemLog.add('action', `Plan approved: ${truncate(p.understanding, 130)} (${picked.length} step${picked.length > 1 ? 's' : ''})`, { src: 'user' });
+        if (picked.some(s => s.tool === 'make_pr')) Decisions.add({ title: 'Go ahead: ' + p.understanding, choice: 'approved the plan', source: 'plan' });
         this.renderChat();
 
         let halted = false, failedTest = null;
@@ -3763,6 +3838,7 @@ Include only the fields the mode needs.`;
         if (!a || a.used) return;
         if (a.kind === 'tab') { JarvisPR.openPanel(); JarvisPR.switchTab(a.tab); return; }
         if (a.kind === 'open_node') { this.openNode(a.nodeId); return; }
+        if (a.kind === 'teach') { a.used = true; ProjectStore.touch(); this.renderChat(); Ledger.startTeach(a.nodeId); return; }
         a.used = true;
         ProjectStore.touch();
         if (a.kind === 'ask') { this.renderChat(); this.send(a.prompt); return; }
@@ -3796,7 +3872,7 @@ Include only the fields the mode needs.`;
         const rec = ProjectStore.rec;
         switch (cmd.toLowerCase()) {
             case '/help':
-                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/test <what>` have me test the running project\n`/task <text>` queue a PR task yourself\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/edit <text>` direct edit, skips the conversation\n`/clear` clear this conversation\n\nAnything else is a conversation: I ask first, propose a plan, and only act once you approve.');
+                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/test <what>` have me test the running project\n`/task <text>` queue a PR task yourself\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/edit <text>` direct edit, skips the conversation\n`/dial 0-3` how much help I give\n`/decide <text>` record a decision of yours\n`/review [node]` critique your code\n`/teach [node]` explain a node back to me\n`/model` open decisions and understanding\n`/clear` clear this conversation\n\nAnything else is a conversation: I ask first, propose a plan, and only act once you approve.');
                 break;
             case '/status': {
                 const nodes = flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).length;
@@ -3914,6 +3990,10 @@ Include only the fields the mode needs.`;
         const queued = JarvisPR.tasks.filter(t => t.status === 'pending' || t.status === 'working');
         out.push(queued.length ? 'Queued tasks: ' + queued.map(t => `"${truncate(t.text, 90)}"`).join('; ') : 'No queued tasks.');
 
+        out.push('\n=== DECISIONS (made by the user: respect them, do not relitigate unless asked) ===');
+        out.push(Decisions.briefLines());
+        out.push('\n=== UNDERSTANDING (AI-written code and whether the user has read it) ===');
+        out.push(Ledger.briefLines());
         out.push('\n=== RECENT TEST RUNS ===');
         const tr = SystemLog.entries.filter(e => e.type === 'test').slice(-5);
         out.push(tr.length ? tr.map(e => `${jvRel(e.ts)}: ${e.msg}${e.meta && e.meta.failures && e.meta.failures.length ? ' | ' + e.meta.failures[0] : ''}`).join('\n') : 'No UI tests run yet.');
@@ -4091,7 +4171,7 @@ RULES: max 4, ordered by expected value. Each needs concrete evidence. Skip anyt
             : p.status === 'running'
                 ? `<div class="jv-plan-btns"><button class="jv-act" onclick="JarvisBrain.stopPlan()">■ Stop</button><span class="jv-plan-status">Running…</span></div>`
                 : `<div class="jv-plan-status">${{ done: '✅ Done', failed: '⚠ Stopped on a failed step', stopped: '■ Stopped', cancelled: 'Cancelled', superseded: 'Replaced by a newer plan', interrupted: 'Interrupted by a reload' }[p.status] || p.status}</div>`;
-        return `<div class="jv-plan st-${p.status}"><div class="jv-plan-head">🧭 <b>Plan</b> · ${escapeHTML(p.understanding)}</div>${rows}${foot}${live ? '<div class="jv-hint">Nothing runs until you approve. Untick a step to skip it.</div>' : ''}</div>`;
+        return `<div class="jv-plan st-${p.status}"><div class="jv-plan-head">🧭 <b>Plan</b> · ${escapeHTML(p.understanding)}</div>${p.comparison ? `<div class="jv-compare">⚖ ${escapeHTML(p.comparison)}</div>` : ''}${rows}${foot}${live ? '<div class="jv-hint">Nothing runs until you approve. Untick a step to skip it.</div>' : ''}</div>`;
     },
     _msgHtml(m) {
         if (m.role === 'user') return `<div class="jv-msg jv-user">${escapeHTML(m.text).replace(/\n/g, '<br>')}</div>`;
@@ -4775,6 +4855,343 @@ const JarvisTools = {
         return [head, ...bad, ...errs].join('\n');
     }
 };
+
+
+
+/* ════════════════════════════════════════════════════════════════
+   PAIR MODE — you steer, Jarvis does the legwork.
+   1. Delegation dial   how much Jarvis hands back: Coach → Draft PRs
+   2. Decisions         what YOU chose, recorded; Jarvis respects it
+   3. Understanding     AI-written code stays "unread" until you read
+                        it or teach it back in your own words
+   4. Review brief      every PR shows its assumptions and risks; you
+                        can Revise it with feedback or Challenge it
+   ════════════════════════════════════════════════════════════════ */
+const PAIR_LEVELS = [
+    { id: 0, name: 'Coach',     blurb: 'Questions and hints only. You do the thinking and the typing.',
+      rule: 'Never give solutions or code. Ask sharp questions, point at where in the project to look, name the concept or pattern involved, and say what you would check. Only "answer", "clarify" and "inspect" modes. No make_pr.' },
+    { id: 1, name: 'Outline',   blurb: 'The approach as steps and pseudocode. You write the code.',
+      rule: 'Give the approach as numbered steps and pseudocode. No real code, no make_pr.' },
+    { id: 2, name: 'Snippets',  blurb: 'Short examples in chat. You write and integrate the real code.',
+      rule: 'Illustrate with short code examples (15 lines at most) in your answers. The user writes and integrates the real code. No make_pr.' },
+    { id: 3, name: 'Draft PRs', blurb: 'Jarvis writes the code as a PR you review.',
+      rule: 'You may plan make_pr to write code as a pull request for the user to review.' }
+];
+
+const Pair = {
+    defaults() {
+        let d = 3;
+        try { const v = parseInt(localStorage.getItem('apui_pair_dial'), 10); if (v >= 0 && v <= 3) d = v; } catch (_) {}
+        return { dial: d, takeFirst: false };
+    },
+    get state() { return (ProjectStore.rec && ProjectStore.rec.meta.pair) || this.defaults(); },
+    get level() { return this.state.dial; },
+    get name() { return PAIR_LEVELS[this.level].name; },
+    get canWriteCode() { return this.level >= 3; },
+
+    set(patch, opts = {}) {
+        const rec = ProjectStore.rec;
+        if (!rec) {   // no project yet: remember the preferred default for when one opens
+            if (patch && patch.dial != null) { try { localStorage.setItem('apui_pair_dial', String(Math.max(0, Math.min(3, parseInt(patch.dial, 10) || 0)))); } catch (_) {} }
+            return;
+        }
+        const p = rec.meta.pair;
+        if (patch.dial != null) {
+            const d = Math.max(0, Math.min(3, parseInt(patch.dial, 10)));
+            if (isFinite(d) && d !== p.dial) {
+                p.dial = d;
+                try { localStorage.setItem('apui_pair_dial', String(d)); } catch (_) {}
+                SystemLog.add('action', `Delegation set to ${PAIR_LEVELS[d].name}: ${PAIR_LEVELS[d].blurb}`, { src: 'user' });
+                if (!opts.silent) toast(`Jarvis: ${PAIR_LEVELS[d].name} — ${PAIR_LEVELS[d].blurb}`);
+            }
+        }
+        if (typeof patch.takeFirst === 'boolean' && patch.takeFirst !== p.takeFirst) {
+            p.takeFirst = patch.takeFirst;
+            SystemLog.add('action', `“My take first” turned ${p.takeFirst ? 'on' : 'off'}`, { src: 'user' });
+        }
+        ProjectStore.touch(); this.renderDial(); this.broadcast();
+    },
+
+    /** The part of Jarvis' system prompt that makes it a pair partner at the chosen level. */
+    promptSection() {
+        const L = PAIR_LEVELS[this.level];
+        const first = this.state.takeFirst ? `
+MY-TAKE-FIRST IS ON: before you plan a change to code or design, check whether the user has said how THEY would approach it. If not, reply in "clarify" mode with exactly ONE open question, "How would you approach this?", offering a single option "Skip, show me yours". Once they've answered, plan, and fill "comparison": where their approach and yours differ and which you'd pick and why. Say so plainly if theirs is better. Never use this on pure questions or tiny tweaks.` : '';
+        return `PAIRING STANCE
+You are a pair, not a vending machine. When the user's idea has a flaw, say so plainly and show why. When a decision is theirs (architecture, trade-offs, naming, UX), offer 2-3 options with trade-offs and a recommendation, and let them decide. Once they decide, say any remaining disagreement once, then help them do it their way. Respect the DECISIONS section of the brief; don't reopen settled choices unless asked. Prefer a question that sharpens their thinking over an answer that replaces it.
+
+DELEGATION LEVEL: ${L.id} of 3, "${L.name}". The user chose how much to hand over; honour it exactly. ${L.rule}
+If they ask for more than this level allows, tell them to raise the Help dial above the message box (or type /dial 3). Do not quietly do more.${first}`;
+    },
+
+    broadcast() {
+        const rec = ProjectStore.rec;
+        postToParent('apui-pair-state', {
+            dial: this.level, dialName: this.name, takeFirst: !!this.state.takeFirst,
+            unread: Ledger.unreadCount(), aiTouched: Ledger.liveEntries().length,
+            decisions: rec ? rec.decisions.length : 0, project: ProjectStore.projectId
+        });
+    },
+    onProjectEntered() { this.renderDial(); this.renderModel(); this.broadcast(); },
+
+    renderDial() {
+        const el = document.getElementById('jv-dial');
+        if (!el) return;
+        const s = this.state;
+        el.innerHTML = `<span class="jv-dial-label" title="How much should Jarvis hand back? You choose.">🎚 Help</span>` +
+            PAIR_LEVELS.map(l => `<button class="jv-dial-btn${l.id === s.dial ? ' on' : ''}" title="${escapeHTML(l.blurb)}" onclick="Pair.set({dial:${l.id}})">${l.name}</button>`).join('') +
+            `<label class="jv-take" title="Jarvis asks how you'd do it first, then compares with its own approach"><input type="checkbox" ${s.takeFirst ? 'checked' : ''} onchange="Pair.set({takeFirst:this.checked})"> my take first</label>`;
+    },
+
+    /* ── slash commands ── */
+    slash(raw) {
+        const [cmd, ...rest] = raw.trim().split(/\s+/);
+        const arg = rest.join(' ').trim();
+        switch (cmd.toLowerCase()) {
+            case '/dial': {
+                const n = PAIR_LEVELS.findIndex(l => l.name.toLowerCase() === arg.toLowerCase() || String(l.id) === arg);
+                if (n < 0) { JarvisBrain.say(`**Help dial: ${this.name}** (${this.level})\n${PAIR_LEVELS.map(l => `${l.id} · **${l.name}**: ${l.blurb}`).join('\n')}\n\nSet it with \`/dial 0-3\`.`); return; }
+                this.set({ dial: n }, { silent: true });
+                JarvisBrain.say(`Help dial set to **${PAIR_LEVELS[n].name}**. ${PAIR_LEVELS[n].blurb}`);
+                return;
+            }
+            case '/model': JarvisBrain.openModel(); return;
+            case '/teach': {
+                let id = arg;
+                if (!id) { const next = Ledger.liveEntries().filter(([, e]) => e.state === 'unread')[0]; id = next && next[0]; }
+                if (!id) { JarvisBrain.say('There is nothing unread to teach back. Name a node: `/teach node-id`.'); return; }
+                Ledger.startTeach(id); return;
+            }
+            case '/skip':
+                if (ProjectStore.rec.meta.teach) { delete ProjectStore.rec.meta.teach; ProjectStore.touch(); JarvisBrain.say('Teach-back cancelled.'); }
+                else JarvisBrain.say('Nothing to skip.');
+                return;
+        }
+    },
+    reviewRequest(text) {
+        let id = text.replace(/^\/review\s*/i, '').trim().replace(/^\[|\]$/g, '');
+        if (!id) { const h = SystemLog.hotSpots(3, 1)[0]; id = h && h.id; }
+        if (!id || !findNodeInTree(id) || SYSTEM_NODE_IDS.has(id)) {
+            JarvisBrain._userMsg(text);
+            JarvisBrain.say(id ? `There is no node "${id}".` : 'Which node? Try `/review node-id`. (I look at whatever you edited most recently when you don\'t say.)');
+            return null;
+        }
+        return { focus: [id], text: `Review [${id}] as a critical senior pair. Lead with the one to three issues that matter most (bugs, edge cases, hidden coupling, readability) and cite the code, then say briefly what is solid.${this.canWriteCode ? '' : ' Point and explain; do not rewrite it for me.'}` };
+    },
+
+    /* ── PR review brief ── */
+    cleanBrief(b) {
+        if (!b || typeof b !== 'object') return null;
+        const arr = v => (Array.isArray(v) ? v : []).map(x => jvStr(x, 170)).filter(Boolean).slice(0, 4);
+        const out = { assumptions: arr(b.assumptions), risks: arr(b.risks), check: arr(b.check), alternative: jvStr(b.alternative, 260) };
+        return (out.assumptions.length || out.risks.length || out.check.length || out.alternative) ? out : null;
+    },
+    briefHtml(pr) {
+        const b = pr.brief;
+        if (!b) return '';
+        const sec = (t, l) => l && l.length ? `<div class="jpr-brief-sec"><b>${t}</b><ul>${l.map(x => `<li>${escapeHTML(x)}</li>`).join('')}</ul></div>` : '';
+        return `<div class="jpr-brief"><div class="jpr-brief-h">🔎 Review brief <span>read before you merge</span></div>${sec('Assumed', b.assumptions)}${sec('Could break', b.risks)}${sec('Check by hand', b.check)}${b.alternative ? `<div class="jpr-brief-sec"><b>Road not taken</b><div>${escapeHTML(b.alternative)}</div></div>` : ''}</div>`;
+    },
+
+    /* ── Model tab ── */
+    renderModel() {
+        const el = document.getElementById('pm-wrap');
+        const badge = document.getElementById('jpr-badge-model');
+        const rec = ProjectStore.rec;
+        const unread = Ledger.unreadCount();
+        if (badge) { badge.textContent = unread; badge.style.display = unread ? 'inline-block' : 'none'; }
+        if (!el) return;
+        const typed = document.getElementById('pm-decide') ? document.getElementById('pm-decide').value : '';
+        if (!rec) { el.innerHTML = '<div class="sl-empty">Open a project and this fills with what you have decided and what you have read.</div>'; return; }
+        const LBL = { unread: 'AI-written · unread', read: 'read', owned: 'owned' };
+        const entries = Ledger.liveEntries().sort((a, b) => ((a[1].state === 'unread' ? 0 : 1) - (b[1].state === 'unread' ? 0 : 1)) || (b[1].ts - a[1].ts));
+        const rows = entries.filter(([id]) => jvSafeId(id)).map(([id, e]) => `
+            <div class="pm-row st-${e.state}"><div class="pm-main">
+                <span class="jv-node-ref" onclick="JarvisBrain.openNode('${id}')">${id}</span>
+                <span class="pm-badge b-${e.state}">${LBL[e.state] || e.state}</span>
+                <span class="pm-sub">${e.aiLines || 0} AI lines · ${jvRel(e.ts)}</span>
+                ${e.inMyWords ? `<div class="pm-words">“${escapeHTML(truncate(e.inMyWords, 160))}”</div>` : ''}
+            </div><div class="pm-btns">
+                <button class="jpr-btn" onclick="Ledger.explain('${id}')">Explain</button>
+                ${e.state === 'unread' ? `<button class="jpr-btn" onclick="Ledger.setState('${id}','read')">✓ Read</button>` : ''}
+                ${e.state !== 'owned' ? `<button class="jpr-btn primary" onclick="Ledger.startTeach('${id}')">Teach back</button>` : ''}
+            </div></div>`).join('');
+        const decs = [...rec.decisions].reverse().map(d => `
+            <div class="pm-row"><div class="pm-main"><b>${escapeHTML(d.title)}</b>${d.choice ? ` → ${escapeHTML(d.choice)}` : ''}
+                <div class="pm-sub">${d.alternatives && d.alternatives.length ? 'over: ' + escapeHTML(d.alternatives.join(', ')) + ' · ' : ''}${jvRel(d.ts)} · ${escapeHTML(d.source)}</div></div>
+                <button class="jv-x" title="Remove" onclick="Decisions.remove('${d.id}')">✕</button></div>`).join('');
+        el.innerHTML = `
+            <div class="pm-sec"><div class="pm-h">🧠 Understanding <span class="pm-sub">${unread} unread · ${entries.length} AI-touched</span></div>
+                ${rows || '<div class="pm-empty">Nothing AI-written yet. When Jarvis merges code it appears here until you have read it or taught it back.</div>'}
+            </div>
+            <div class="pm-sec"><div class="pm-h">📌 Decisions <span class="pm-sub">${rec.decisions.length} · yours, and Jarvis respects them</span></div>
+                <div class="pm-add"><input id="pm-decide" maxlength="160" placeholder="Record a decision… (e.g. plain localStorage, no framework)" onkeydown="if(event.key==='Enter')Decisions.addFromInput()"><button class="jpr-btn primary" onclick="Decisions.addFromInput()">＋</button></div>
+                ${decs || '<div class="pm-empty">Choices you make while talking with Jarvis are recorded here automatically. Add your own any time.</div>'}
+            </div>`;
+        const inp = document.getElementById('pm-decide');
+        if (inp && typed) inp.value = typed;
+    }
+};
+
+/* ── Decisions: what the human chose ── */
+const Decisions = {
+    add(d) {
+        const rec = ProjectStore.rec;
+        if (!rec) return null;
+        const title = jvStr(d.title, 160);
+        if (!title) return null;
+        const last = rec.decisions[rec.decisions.length - 1];
+        if (last && last.title === title && last.choice === jvStr(d.choice, 160)) return last;
+        const item = { id: jvNewId('d'), ts: Date.now(), title, choice: jvStr(d.choice, 160), alternatives: (d.alternatives || []).map(a => jvStr(a, 60)).filter(Boolean).slice(0, 5), source: d.source || 'you' };
+        rec.decisions.push(item);
+        if (rec.decisions.length > 300) rec.decisions.splice(0, rec.decisions.length - 250);
+        SystemLog.add('decision', `📌 ${title}${item.choice ? ' → ' + item.choice : ''}`, { src: 'user' });
+        ProjectStore.touch(); Pair.renderModel(); Pair.broadcast();
+        return item;
+    },
+    fromAnswer(q) { if (q && q.pick != null && q.options[q.pick]) this.add({ title: q.q, choice: q.options[q.pick], alternatives: q.options.filter((_, i) => i !== q.pick), source: 'chosen' }); },
+    manual(text) {
+        const t = jvStr(text, 160);
+        if (!t) { JarvisBrain.say('Usage: `/decide what you decided`, for example `/decide keep it single-file, no build step`.'); return; }
+        this.add({ title: t, source: 'you' });
+        JarvisBrain.say(`📌 Recorded. I'll treat that as settled: "${truncate(t, 120)}"`);
+    },
+    addFromInput() {
+        const inp = document.getElementById('pm-decide');
+        if (!inp || !inp.value.trim()) return;
+        const v = inp.value; inp.value = '';
+        this.add({ title: v, source: 'you' });
+    },
+    remove(id) {
+        const rec = ProjectStore.rec;
+        if (!rec) return;
+        rec.decisions = rec.decisions.filter(d => d.id !== id);
+        ProjectStore.touch(); Pair.renderModel(); Pair.broadcast();
+    },
+    briefLines() {
+        const rec = ProjectStore.rec;
+        const l = rec ? rec.decisions.slice(-15) : [];
+        return l.length ? l.map(d => `- ${d.title}${d.choice ? ' → ' + d.choice : ''}${d.alternatives && d.alternatives.length ? ' (over: ' + d.alternatives.join(', ') + ')' : ''} · ${jvRel(d.ts)}`).join('\n') : '(none recorded yet)';
+    }
+};
+
+/* ── Understanding ledger: AI-written code stays "unread" until the human engages ── */
+const Ledger = {
+    map() { return ProjectStore.rec ? ProjectStore.rec.ledger : {}; },
+    liveEntries() { return Object.entries(this.map()).filter(([id]) => findNodeInTree(id)); },
+    unreadCount() { return this.liveEntries().filter(([, e]) => e.state === 'unread').length; },
+    _changed() { ProjectStore.touch(); Pair.renderModel(); Pair.broadcast(); JarvisBrain._updateNavBadge(); },
+    _ai(id, lines) {
+        if (!jvSafeId(id)) return;
+        const m = this.map();
+        const e = m[id] || (m[id] = { state: 'unread', aiLines: 0, ts: 0 });
+        e.state = 'unread'; e.aiLines = (e.aiLines || 0) + Math.max(0, lines | 0); e.ts = Date.now(); delete e.inMyWords;
+    },
+    markAIMerge(pr) {
+        if (!ProjectStore.rec) return;
+        pr.actions.forEach(a => this._ai(a.nodeId, a.isNew ? jvCount(a.newCode) : jvLineStat(a.oldCode || '', a.newCode || '').add));
+        this._changed();
+    },
+    markAIEdits(updates) {
+        if (!ProjectStore.rec || !updates || !updates.length) return;
+        updates.forEach(u => this._ai(u.nodeId, jvCount(u.newCode)));
+        this._changed();
+    },
+    setState(id, state) {
+        const e = this.map()[id];
+        if (!e || !['read', 'owned', 'unread'].includes(state)) return;
+        e.state = state; e.ts = Date.now();
+        SystemLog.add('own', `${state === 'owned' ? '🧠 Taught back' : '✓ Read'} [${id}]`, { node: id, src: 'user' });
+        this._changed();
+    },
+    explain(id) {
+        if (!findNodeInTree(id)) return;
+        JarvisBrain.ask(`Explain [${id}] to me: what it does, how it connects to the nodes around it, and the one thing that would surprise someone new to it. Keep it tight.`, { focus: [id] });
+    },
+    startTeach(id) {
+        const rec = ProjectStore.rec;
+        if (!rec) return;
+        if (!jvSafeId(id) || !findNodeInTree(id) || SYSTEM_NODE_IDS.has(id)) { JarvisBrain.say(`There is no node "${id}".`); return; }
+        rec.meta.teach = { nodeId: id, ts: Date.now() };
+        ProjectStore.touch();
+        JarvisBrain.openChat();
+        JarvisBrain.say(`**Teach-back: [${id}]**\nIn your own words: what does it do, what does it depend on, and what is the riskiest part? Answer below and I'll check it against the code. Rough is fine. (\`/skip\` to cancel.)`);
+    },
+    SYS_TEACH: `You check whether a developer really understands a piece of code they asked an AI to write. Compare their explanation with the code. Be fair but exact: credit correct understanding even when informally worded, and flag what is wrong or missing. Don't lecture.
+Return ONLY JSON: {"verdict":"solid|partial|off","feedback":"2-4 sentences, second person","missed":["up to 3 specific things they missed or got wrong"],"followup":"one probing question that would deepen it, or empty"}`,
+    async evaluateTeach(text) {
+        const rec = ProjectStore.rec, t = rec && rec.meta.teach;
+        if (!t) return;
+        const node = findNodeInTree(t.nodeId);
+        delete rec.meta.teach; ProjectStore.touch();
+        if (!node) { JarvisBrain.say('That node is gone, so I cancelled the teach-back.'); return; }
+        if (!AppState.settings.apiKey) { JarvisBrain.say('I need a Gemini API key to check your answer. Add one in Settings, then `/teach ' + t.nodeId + '` again.'); return; }
+        const pid = ProjectStore.projectId;
+        JarvisBrain.busy = true; JarvisBrain.renderChat();
+        try {
+            const code = jvNodeCode(node);
+            const raw = await callGemini(this.SYS_TEACH, `NODE [${node.id}] (${node.type})\n${code.length > 6000 ? code.slice(0, 6000) + '\n…truncated' : code}\n\nDEVELOPER'S EXPLANATION\n${truncate(text, 1500)}\n\nReturn the JSON now.`, true, []);
+            if (ProjectStore.projectId !== pid) return;
+            const r = jvParseJson(raw) || {};
+            const verdict = ['solid', 'partial', 'off'].includes(r.verdict) ? r.verdict : 'partial';
+            const missed = (Array.isArray(r.missed) ? r.missed : []).map(x => jvStr(x, 160)).filter(Boolean).slice(0, 3);
+            const e = this.map()[node.id] || (this.map()[node.id] = { state: 'unread', aiLines: 0, ts: 0 });
+            let head, actions = [];
+            if (verdict === 'solid') { e.state = 'owned'; e.inMyWords = jvStr(text, 600); head = `✅ **That's solid.** [${node.id}] is yours now.`; }
+            else if (verdict === 'partial') { if (e.state === 'unread') e.state = 'read'; head = `🟡 **Close.** You've got the shape of it.`; actions = [{ kind: 'teach', label: 'Try again', nodeId: node.id, used: false }]; }
+            else { head = `🔴 **Not quite.** Worth another look before you rely on it.`; actions = [{ kind: 'ask', label: 'Explain it to me', prompt: `Explain [${node.id}] to me, then I'll try the teach-back again.`, used: false }, { kind: 'teach', label: 'Try again', nodeId: node.id, used: false }]; }
+            e.ts = Date.now();
+            SystemLog.add('own', `${verdict === 'solid' ? '🧠' : '🟡'} Teach-back on [${node.id}]: ${verdict}`, { node: node.id, src: 'user' });
+            JarvisBrain.busy = false;
+            JarvisBrain.say(`${head}\n${jvStr(r.feedback, 700)}${missed.length ? '\n\nMissed or off:\n' + missed.map(m => '• ' + m).join('\n') : ''}${r.followup ? '\n\nTo go deeper: ' + jvStr(r.followup, 220) : ''}`, actions);
+            this._changed();
+        } catch (err) {
+            JarvisBrain.busy = false;
+            JarvisBrain.say(`⚠ ${err.message || 'Teach-back failed'}`);
+        } finally { JarvisBrain.busy = false; JarvisBrain.renderChat(); }
+    },
+    briefLines() {
+        const l = this.liveEntries();
+        if (!l.length) return '(no AI-written code recorded yet)';
+        return l.sort((a, b) => b[1].ts - a[1].ts).slice(0, 14).map(([id, e]) => `- [${id}] ${e.state}${e.aiLines ? ', ' + e.aiLines + ' AI lines' : ''}${e.inMyWords ? ' · in the user\'s words: "' + truncate(e.inMyWords, 100) + '"' : ''}`).join('\n');
+    }
+};
+
+/* ── PR: revise with feedback, or make Jarvis argue against its own change ── */
+Object.assign(JarvisPR, {
+    _diffText(pr, cap = 3000) {
+        const t = pr.actions.map(a => `[${a.nodeId}]${a.isNew ? ' (new)' : ''}\n--- before\n${truncate(a.oldCode || '', 900)}\n+++ after\n${truncate(a.newCode == null ? '(archived)' : a.newCode, 1400)}`).join('\n\n');
+        return t.length > cap ? t.slice(0, cap) + '\n…truncated' : t;
+    },
+    async revisePR(prId) {
+        const pr = this.prs.find(p => p.id === prId);
+        if (!pr || pr.status !== 'open') return;
+        const box = document.getElementById(`jpr-reason-${prId}`);
+        const fb = (box && box.value || '').trim().slice(0, 300);
+        if (!fb) { toast('Type what to change in the box first'); box && box.focus(); return; }
+        if (this.running) { toast('Jarvis is busy drafting another PR'); return; }
+        if (!AppState.settings.apiKey) { toast('⚠ No API key — open Settings'); return; }
+        pr.status = 'closed'; pr.revised = true; pr.rejectReason = 'Revised: ' + fb;
+        const nodes = pr.actions.map(a => a.nodeId);
+        SystemLog.add('pr-reject', `PR #${pr.id} sent back for revision: ${truncate(fb, 120)}`, { src: 'user', node: nodes[0], meta: { nodes, prId: pr.id } });
+        const task = this.addTask(`Revise PR #${pr.id} ("${pr.title}"). The user's feedback: ${fb}\n\nPrevious version of the changes:\n${this._diffText(pr)}\n\nProduce an improved version that addresses the feedback. Keep what the user did not object to.`,
+            { origin: 'chat', nodeIds: nodes.filter(id => findNodeInTree(id)) });
+        this._renderPRs(); this._updateBadges();
+        await this._runTask(task);
+        const np = this.prs.find(p => p.id === (task.prIds || [])[0]);
+        if (np) { np.revises = pr.id; this._renderPRs(); }
+    },
+    challengePR(prId) {
+        const pr = this.prs.find(p => p.id === prId);
+        if (!pr) return;
+        const nodes = pr.actions.map(a => a.nodeId);
+        JarvisBrain.ask(`Play devil's advocate on PR #${pr.id} ("${pr.title}"). Don't be nice and don't restate what it does. What could break? What did it assume without checking? What would you do differently, and what are the two or three things I should test by hand before merging?\n\nThe diff:\n${this._diffText(pr)}`, { focus: nodes });
+    }
+});
+
+Object.assign(JarvisBrain, {
+    openModel() { JarvisPR.openPanel(); JarvisPR.switchTab('model'); }
+});
 
 
 /* ── Global shim: map old Jarvis calls to new system ────────── */
@@ -6151,4 +6568,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-    </html>
+            </html>
