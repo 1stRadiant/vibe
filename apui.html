@@ -977,6 +977,91 @@
     .pm-add input { flex: 1; background: rgba(16,24,48,0.8); border: 1px solid rgba(65,105,225,0.3); border-radius: 4px; color: var(--text); font: 0.7rem 'Rajdhani', sans-serif; padding: 4px 8px; }
     .pm-add input:focus { outline: none; border-color: rgba(65,105,225,0.7); }
     .sl-row.t-decision { border-left-color: #ffb74d; }
+    /* ── Atlas (Map tab) ── */
+    #jpr-pane-map { overflow: hidden; }
+    .at-top { flex-shrink: 0; padding: 8px 10px 6px; border-bottom: 1px solid rgba(255,0,255,0.12); display: flex; flex-direction: column; gap: 6px; }
+    .at-scope { display: flex; gap: 4px; }
+    .at-scope button { flex: 1; background: transparent; border: 1px solid rgba(65,105,225,0.3); color: #7a8aaa; border-radius: 4px; padding: 4px 0; font: 700 0.62rem 'Fira Code', monospace; cursor: pointer; text-transform: uppercase; }
+    .at-scope button.on { color: var(--ai-edit); border-color: var(--ai-edit); background: rgba(0,255,204,0.08); }
+    .at-search { display: flex; gap: 5px; align-items: center; }
+    .at-search input { flex: 1; min-width: 0; background: rgba(16,24,48,0.8); border: 1px solid rgba(255,0,255,0.2); border-radius: 4px; color: var(--text); font: 0.75rem 'Rajdhani', sans-serif; padding: 5px 8px; }
+    .at-search input:focus { outline: none; border-color: var(--ai-glow); }
+    .at-back { background: transparent; border: none; color: var(--ai-glow); font-size: 1.1rem; cursor: pointer; padding: 0 4px; visibility: hidden; }
+    #at-pick.on { background: rgba(255,0,255,0.3); }
+    .at-body { flex: 1; overflow-y: auto; padding-bottom: 10px; }
+    .at-foot { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-top: 1px solid rgba(255,255,255,0.05); font: 0.56rem 'Fira Code', monospace; color: #556; }
+    .at-foot .jpr-btn { font-size: 0.56rem; padding: 2px 8px; }
+    .at-intro { padding: 9px 12px; font-size: 0.7rem; line-height: 1.5; color: #9aa6c4; }
+    .at-intro code, .at-where code { color: var(--ai-edit); }
+    .at-empty { padding: 14px 12px; font: 0.64rem/1.8 'Fira Code', monospace; color: #667; }
+    .at-empty a, .au-meta a { color: var(--ai-edit); cursor: pointer; text-decoration: underline; }
+    .at-sec { margin-top: 6px; }
+    .at-sec-h { padding: 6px 12px; font: 700 0.68rem 'Rajdhani', sans-serif; color: #dbe; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(8,12,24,0.6); }
+    .at-sec-h span { font: 0.56rem 'Fira Code', monospace; color: #667; text-transform: none; margin-left: 6px; }
+    .at-row { display: flex; gap: 7px; align-items: flex-start; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.035); font-size: 0.72rem; line-height: 1.45; word-break: break-word; }
+    .at-row[onclick] { cursor: pointer; }
+    .at-row[onclick]:hover { background: rgba(255,0,255,0.05); }
+    .at-row.warn { color: #ffcc80; }
+    .at-row.ok { color: #8fd19e; }
+    .at-dim { color: #6c7894; font-size: 0.64rem; }
+    .at-kind { flex-shrink: 0; font: 700 0.52rem 'Fira Code', monospace; padding: 2px 5px; border-radius: 3px; text-transform: uppercase; background: rgba(255,255,255,0.07); color: #aab; margin-top: 1px; }
+    .at-kind.k-el, .at-kind.k-html { color: var(--c-html); background: rgba(129,199,132,0.12); }
+    .at-kind.k-fn, .at-kind.k-js { color: var(--c-js); background: rgba(255,183,77,0.12); }
+    .at-kind.k-css { color: var(--c-css); background: rgba(206,147,216,0.12); }
+    .at-kind.k-tab { color: var(--c-container); background: rgba(79,195,247,0.12); }
+    .at-tag { font: 0.54rem 'Fira Code', monospace; color: #4fc3f7; background: rgba(79,195,247,0.1); border-radius: 3px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+    .at-loc { font: 0.6rem 'Fira Code', monospace; color: #87CEEB; cursor: pointer; border-bottom: 1px dotted rgba(135,206,235,0.5); white-space: nowrap; }
+    .at-loc:hover { color: #fff; }
+    .at-fn { font: 700 0.68rem 'Fira Code', monospace; color: var(--c-js); cursor: pointer; }
+    .at-fn:hover { text-decoration: underline; }
+    .at-elref { cursor: pointer; color: var(--c-html); }
+    .at-elref:hover { text-decoration: underline; }
+    .at-card-h { padding: 10px 12px 4px; font-size: 0.8rem; color: #eef; }
+    .at-label { margin-top: 3px; font-size: 0.74rem; color: #b8c0dc; font-style: italic; }
+    .at-where { padding: 2px 12px 8px; font-size: 0.66rem; color: #8a96b4; line-height: 1.7; }
+    .at-handler { padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.035); font-size: 0.7rem; }
+    .at-handler code { display: block; margin-top: 3px; font: 0.6rem 'Fira Code', monospace; color: #c9b8ff; background: rgba(0,0,0,0.25); padding: 3px 6px; border-radius: 3px; word-break: break-all; }
+    .at-warn { color: #ffb74d; font-size: 0.64rem; margin-top: 3px; }
+    .at-chain { padding: 3px 12px; font-size: 0.7rem; color: #556; }
+    .at-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 9px 12px; }
+    .at-actions .jpr-btn { font-size: 0.6rem; padding: 3px 9px; }
+    .at-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 5px; padding: 7px 10px; }
+    .at-tile { text-align: left; background: rgba(16,24,48,0.7); border: 1px solid rgba(79,195,247,0.22); border-radius: 5px; padding: 6px 8px; cursor: pointer; color: #dfe7ff; font: 0.7rem 'Rajdhani', sans-serif; }
+    .at-tile:hover { border-color: #4fc3f7; }
+    .at-tile b { display: block; font-size: 0.74rem; }
+    .at-tile span { font: 0.54rem 'Fira Code', monospace; color: #6c7894; }
+    .at-more summary { padding: 6px 12px; font-size: 0.68rem; color: #9aa6c4; cursor: pointer; }
+    .at-code { margin: 0; padding: 6px 0; background: rgba(0,0,0,0.3); font: 0.6rem/1.55 'Fira Code', monospace; color: #c8d0e8; overflow-x: auto; white-space: pre; }
+    .at-code span { display: block; padding-right: 10px; }
+    .at-code span.hit { background: rgba(255,0,255,0.16); }
+    .at-code i { display: inline-block; width: 46px; padding-right: 8px; text-align: right; color: #445; font-style: normal; user-select: none; }
+    /* ── Routines (Auto tab) ── */
+    .au-compose { flex-shrink: 0; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .au-compose textarea { width: 100%; background: rgba(16,24,48,0.8); border: 1px solid rgba(255,0,255,0.2); border-radius: 4px; color: var(--text); font: 0.74rem 'Rajdhani', sans-serif; padding: 6px 8px; resize: vertical; }
+    .au-compose textarea:focus { outline: none; border-color: var(--ai-glow); }
+    .au-compose-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .au-list { padding: 4px 0; }
+    .au-ex { display: block; margin: 4px 12px; text-align: left; white-space: normal; }
+    .au-card { margin: 8px 10px; padding: 8px 10px; border: 1px solid rgba(0,255,204,0.22); border-radius: 6px; background: rgba(0,255,204,0.03); font-size: 0.72rem; }
+    .au-card.off { opacity: 0.55; border-color: rgba(255,255,255,0.1); }
+    .au-card.running { border-color: var(--ai-glow); box-shadow: 0 0 12px rgba(255,0,255,0.25); }
+    .au-head { display: flex; align-items: center; gap: 8px; }
+    .au-head b { flex: 1; color: #eef; font-size: 0.78rem; }
+    .au-when { margin-top: 4px; color: var(--ai-edit); font: 0.62rem 'Fira Code', monospace; }
+    .au-steps { margin: 5px 0 4px 18px; padding: 0; color: #c8d0e8; line-height: 1.5; }
+    .au-meta { font: 0.58rem 'Fira Code', monospace; color: #6c7894; }
+    .au-runs { margin-top: 5px; }
+    .au-run { padding: 4px 6px; margin-top: 3px; border-left: 2px solid #66bb6a; font: 0.58rem/1.5 'Fira Code', monospace; color: #9aa6c4; }
+    .au-run.bad { border-left-color: #ef5350; }
+    .au-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .au-actions .jpr-btn { font-size: 0.58rem; padding: 2px 8px; }
+    .au-sw { position: relative; width: 28px; height: 15px; flex-shrink: 0; }
+    .au-sw input { opacity: 0; width: 0; height: 0; }
+    .au-sw span { position: absolute; inset: 0; background: #333; border-radius: 9px; cursor: pointer; transition: background .15s; }
+    .au-sw span::after { content: ''; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: #aaa; transition: transform .15s; }
+    .au-sw input:checked + span { background: rgba(0,255,204,0.45); }
+    .au-sw input:checked + span::after { transform: translateX(13px); background: #fff; }
+    .au-legacy { padding: 4px 0 12px; }
     .sl-row.t-own { border-left-color: #66bb6a; }
 </style>
 </head>
@@ -1004,6 +1089,7 @@
     <button class="btn-main" style="background: var(--ai-edit); color:#000; margin-left:8px;" onclick="pushAllToVibeTree()" title="Push all edits to Vibe System">⬆ PUSH</button>
     <button class="btn-main success" style="margin-left:6px;" onclick="downloadProject()">⬇ EXPORT</button>
     <button class="btn-icon" id="jarvis-toggle-btn" title="Talk to Jarvis" onclick="JarvisBrain.openChat()" style="margin-left:6px; font-size:1.1rem; position:relative;">🤖<span id="jv-nav-badge" class="jv-nav-badge" style="display:none"></span></button>
+    <button class="btn-icon" title="Map: who is responsible for what" onclick="Atlas.open()" style="margin-left:6px; font-size:1.05rem;">🗺</button>
     <button class="btn-icon" title="Toggle Session Tracker" onclick="toggleRSidebar()" style="margin-left:6px; font-size:1.1rem;" id="tracker-toggle-btn">📋</button>
 </div>
 
@@ -1123,6 +1209,8 @@
         <div class="jpr-tab" data-tab="prs" onclick="jarvisPRTab('prs')">PRs<span class="jpr-badge" id="jpr-badge-prs" style="display:none"></span></div>
         <div class="jpr-tab" data-tab="log" onclick="jarvisPRTab('log')">Log</div>
         <div class="jpr-tab" data-tab="model" onclick="jarvisPRTab('model')">Model<span class="jpr-badge" id="jpr-badge-model" style="display:none"></span></div>
+        <div class="jpr-tab" data-tab="map" onclick="jarvisPRTab('map')" title="Who is responsible for what: the code map">Map</div>
+        <div class="jpr-tab" data-tab="auto" onclick="jarvisPRTab('auto')" title="Automations Jarvis runs for you">Auto<span class="jpr-badge" id="jpr-badge-auto" style="display:none"></span></div>
     </div>
 
     <!-- Chat Tab -->
@@ -1187,6 +1275,33 @@
 
     <!-- Model Tab: what you decided, what you have read -->
     <div class="jpr-tab-pane" id="jpr-pane-model"><div class="pm-wrap" id="pm-wrap"></div></div>
+
+    <!-- Map Tab: the Atlas. Who is responsible for what, in this project or in the Vibe System itself -->
+    <div class="jpr-tab-pane" id="jpr-pane-map">
+        <div class="at-top">
+            <div class="at-scope">
+                <button data-scope="project" onclick="Atlas.setScope('project')">This project</button>
+                <button data-scope="system" onclick="Atlas.setScope('system')">Vibe System</button>
+            </div>
+            <div class="at-search">
+                <button class="at-back" id="at-back" onclick="Atlas.back()" title="Back">‹</button>
+                <input id="at-q" type="search" placeholder="Where is…  a label, #id, function, .class" oninput="clearTimeout(this._t);this._t=setTimeout(()=>Atlas.search(this.value),220)" onkeydown="if(event.key==='Enter'){clearTimeout(this._t);Atlas.search(this.value)}">
+                <button class="jpr-btn" id="at-pick" onclick="Atlas.pick()">🎯 Pick</button>
+            </div>
+        </div>
+        <div class="at-body" id="at-body"></div>
+        <div class="at-foot" id="at-foot"></div>
+    </div>
+
+    <!-- Auto Tab: automations (routines) Jarvis builds and you approve -->
+    <div class="jpr-tab-pane" id="jpr-pane-auto">
+        <div class="au-compose">
+            <textarea id="au-input" rows="2" placeholder="Describe an automation in plain words… e.g. “Whenever I merge a PR, test the main flow and tell me if anything broke.”"></textarea>
+            <div class="au-compose-row"><button class="jpr-btn primary" onclick="Routines.compose()">Ask Jarvis to build it</button><span class="at-dim">He drafts it as a plan; nothing runs until you approve.</span></div>
+        </div>
+        <div class="au-list" id="au-list"></div>
+        <div class="au-legacy" id="au-legacy"></div>
+    </div>
 
     <!-- Run bar -->
     <div class="jpr-run-bar">
@@ -1285,6 +1400,12 @@ window.addEventListener('message', e => {
     }
     // Runtime errors from the main app's own preview/console (parent has no node to blame)
     if (d.type === 'apui-control-result') { Bridge.resolve(d); return; }
+    // Main-app Agent events, relayed by app3.js, so automations can react to them
+    if (d.type === 'apui-system-event' && d.name) {
+        const map = { 'task-failed': 'agent-task-failed', 'task-complete': 'agent-task-complete', 'queue-complete': 'agent-queue-complete' };
+        if (map[d.name]) Routines.emit(map[d.name], { message: String(d.message || d.task || '').slice(0, 300) });
+        return;
+    }
     if (d.type === 'apui-set-pair') { ProjectStore.enqueue(async () => Pair.set({ dial: d.dial, takeFirst: typeof d.takeFirst === 'boolean' ? d.takeFirst : undefined }, { silent: true })); return; }
     if (d.type === 'apui-open-model') { ProjectStore.enqueue(async () => JarvisBrain.openModel()); return; }
     if (d.type === 'apui-outer-console-error' && d.message) {
@@ -1863,6 +1984,7 @@ function pushAllToVibeTree() {
     AppState.nodes.forEach((_, id) => updateDirtyDot(id));
     setSyncDirty(false);
     toast(`Pushed ${updates.length} update(s) to Vibe System ✓`);
+    Routines.emit('pushed', { message: updates.map(u => u.nodeId).join(', '), node: (updates[0] || {}).nodeId || '' });
 }
 
 function syncHighlight(nodeId) {
@@ -2492,6 +2614,8 @@ const JarvisPR = {
         if (tab === 'log') this._renderLog();
         if (tab === 'chat') JarvisBrain.onChatShown();
         if (tab === 'model') Pair.renderModel();
+        if (tab === 'map') Atlas.onShown();
+        if (tab === 'auto') Routines.render();
     },
 
     /* ── Task management ─────────────────────────────────── */
@@ -2643,6 +2767,7 @@ const JarvisPR = {
                 const prNodes = prActions.map(a => a.nodeId);
                 this._logEntry('pr-open', `PR #${pr.id} opened: "${pr.title.slice(0,70)}" → ${prNodes.map(n => '[' + n + ']').join(', ')}`, { node: prNodes[0], meta: { nodes: prNodes, prId: pr.id } });
                 logToChat('ai', `🔀 PR #${pr.id} ready for review: ${pr.title}`);
+                Routines.emit('pr-opened', { message: pr.title, pr: String(pr.id), node: prNodes[0] || '' });
                 if (task.origin && task.origin !== 'user' && task.origin !== 'parent') {
                     JarvisBrain.say(`🔀 **PR #${pr.id}** is ready: ${pr.title}\nIt touches ${prNodes.map(n => '[' + n + ']').join(', ')}. Review it in the PRs tab.`);
                 }
@@ -2802,6 +2927,7 @@ Plan your changes carefully, then return the JSON now.`;
         setTimeout(() => { if (!watch.hit) SystemLog.add('info', `PR #${pr.id}: no errors in the first 8s after merge`, { src: 'system' }); }, 8200);
         JarvisBrain.onEvent('merge');
         JarvisBrain.afterMerge(pr);
+        Routines.emit('pr-merged', { message: pr.title, pr: String(pr.id), node: mNodes[0] || '' });
         Ledger.markAIMerge(pr);
         this._renderPRs();
         this._updateBadges();
@@ -3084,6 +3210,10 @@ function jvRenderMd(src) {
     s = s.replace(/\[([A-Za-z0-9_\-.:]+)\]/g, (m, id) =>
         (findNodeInTree(id) && !SYSTEM_NODE_IDS.has(id))
             ? `<span class="jv-node-ref" onclick="JarvisBrain.openNode('${id}')">${id}</span>` : m);
+    // code locations from the Atlas: app3.js:4401 (system files) or node-id:12 (project nodes)
+    s = s.replace(/(^|[\s(>`'"])([\w.-]+\.(?:js|html|css)):(\d+)(?![\w:])/g, (m, pre, file, line) => `${pre}<span class="jv-node-ref" onclick="Atlas.showLoc('${file}',${line})">${file}:${line}</span>`);
+    s = s.replace(/(^|[\s(>`'"])([A-Za-z][\w-]*):(\d+)(?![\w:])/g, (m, pre, id, line) =>
+        (findNodeInTree(id) && !SYSTEM_NODE_IDS.has(id)) ? `${pre}<span class="jv-node-ref" onclick="Atlas.showLoc('${id}',${line})">${id}:${line}</span>` : m);
     s = s.replace(/\n/g, '<br>');
     return s.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[+i]);
 }
@@ -3454,7 +3584,7 @@ const JarvisBrain = {
     _lastErrMsg: '',
     _nextCollapsed: (() => { try { return localStorage.getItem('apui_jv_next_collapsed') === '1'; } catch (_) { return false; } })(),
 
-    QUICK: ['What changed recently?', "What's broken?", 'Summarize this project', 'What should I do next?'],
+    QUICK: ['What changed recently?', "What's broken?", 'Map this project for me', 'What should I do next?'],
 
     init() {
         const inp = document.getElementById('jv-input');
@@ -3509,6 +3639,9 @@ const JarvisBrain = {
         this._lastErrSay = 0; this._lastErrMsg = '';
         this.renderAll();
         this._updateNavBadge();
+        Routines.render();
+        if (document.getElementById('jpr-pane-map')?.classList.contains('active')) Atlas.home();
+        setTimeout(() => Routines.emit('project-opened', { message: ProjectStore.projectId || '' }), 1500);
     },
     onLogEntry() { /* hook for future ambient reactions */ },
     onEvent(kind) {
@@ -3582,6 +3715,8 @@ RULES
 - Plan steps run in order and stop if an action fails. At most 8 steps.
 
 ${Pair.promptSection()}
+
+${Atlas.promptSection()}
 
 TOOLS
 ${JarvisTools.catalog()}
@@ -3689,7 +3824,7 @@ Include only the fields the mode needs.`;
         const out = [];
         (Array.isArray(raw) ? raw : []).slice(0, 8).forEach(s => {
             const name = jvStr(s && s.tool, 40), def = JarvisTools.get(name);
-            if (!def || def.kind === 'read') return;
+            if (!def || def.kind === 'read' || def.routineOnly) return;
             try { out.push({ tool: name, args: def.check((s && s.args) || {}), why: jvStr(s.why, 140), checked: true, status: 'pending', result: '' }); }
             catch (_) { /* invalid step: dropped, never guessed at */ }
         });
@@ -3872,7 +4007,7 @@ Include only the fields the mode needs.`;
         const rec = ProjectStore.rec;
         switch (cmd.toLowerCase()) {
             case '/help':
-                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/test <what>` have me test the running project\n`/task <text>` queue a PR task yourself\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/edit <text>` direct edit, skips the conversation\n`/dial 0-3` how much help I give\n`/decide <text>` record a decision of yours\n`/review [node]` critique your code\n`/teach [node]` explain a node back to me\n`/model` open decisions and understanding\n`/clear` clear this conversation\n\nAnything else is a conversation: I ask first, propose a plan, and only act once you approve.');
+                this.say('**Commands**\n`/status` project snapshot\n`/log [n]` last n log entries\n`/errors` current problems\n`/notes` your tracker notes\n`/test <what>` have me test the running project\n`/task <text>` queue a PR task yourself\n`/run` run the next queued task\n`/predict` refresh next-step predictions\n`/edit <text>` direct edit, skips the conversation\n`/dial 0-3` how much help I give\n`/decide <text>` record a decision of yours\n`/review [node]` critique your code\n`/teach [node]` explain a node back to me\n`/model` open decisions and understanding\n`/clear` clear this conversation\n`/where <thing>` find a button, id, function or class (project and Vibe System)\n`/auto` list automations\n\nAnything else is a conversation: I ask first, propose a plan, and only act once you approve.');
                 break;
             case '/status': {
                 const nodes = flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).length;
@@ -3911,6 +4046,21 @@ Include only the fields the mode needs.`;
                 else { this.say('Running the next task…'); JarvisPR.runNext(); }
                 break;
             case '/predict': this.predict(true); break;
+            case '/where': {
+                if (!arg) { this.say('Usage: `/where save button`, `/where #nav`, `/where renderWiki`'); break; }
+                const pj = Atlas.project(), ph = AtlasCore.search(pj, arg, 6);
+                const fmt = (ix, hits) => hits.map(h => h.kind === 'element' ? `• <${h.ref.tag}>${h.ref.id ? '#' + h.ref.id : ''}${h.ref.label ? ' “' + h.ref.label + '”' : ''} — ${h.ref.file}:${h.ref.line}`
+                    : h.kind === 'function' ? `• ${h.ref.qual}() — ${h.ref.file}:${h.ref.line}` : h.kind === 'css' ? `• css ${h.ref.selector.slice(0, 60)} — ${h.ref.file}:${h.ref.line}` : `• tab ${h.ref.title} — ${h.ref.file}:${h.ref.line}`).join('\n');
+                this.say(`**In this project:**\n${ph.length ? fmt(pj, ph) : 'nothing'}\n\n_Searching the Vibe System…_`);
+                const m = ProjectStore.rec.chat[ProjectStore.rec.chat.length - 1];
+                Atlas.system().then(sx => {
+                    const sh = AtlasCore.search(sx, arg, 6);
+                    m.text = `**In this project:**\n${ph.length ? fmt(pj, ph) : 'nothing'}\n\n**In the Vibe System:**\n${sh.length ? fmt(sx, sh) : 'nothing'}\n\nOpen the Map tab for the full picture of any of these.`;
+                    ProjectStore.touch(); this.renderChat();
+                }).catch(() => {});
+                break;
+            }
+            case '/auto': this.say(Routines.briefLines() + '\n\nManage them in the **Auto** tab, or tell me what to automate.'); break;
             case '/clear': this.clearChat(); break;
             default: this.say(`I don't know \`${cmd}\`. Try /help.`);
         }
@@ -4000,6 +4150,9 @@ Include only the fields the mode needs.`;
         const pend = rec ? rec.chat.filter(m => m.plan && m.plan.status === 'pending') : [];
         if (pend.length) out.push("Plans awaiting the user's approval: " + pend.map(m => `"${truncate(m.plan.understanding, 100)}"`).join('; '));
         out.push(`Main app link: ${Bridge.connected ? 'connected (can switch tabs, manage triggers and the Agent queue)' : 'standalone (APUI only)'}. APUI preview: ${document.getElementById('preview-frame') ? 'open' : 'closed (opens by itself when testing)'}.`);
+
+        out.push('\n=== AUTOMATIONS (routines armed for this project) ===');
+        out.push(Routines.briefLines());
 
         out.push('\n=== USER NOTES (tracker) ===');
         const label = { neutral: 'note', works: 'WORKS', broken: 'BROKEN', todo: 'TODO' };
@@ -4130,6 +4283,7 @@ RULES: max 4, ordered by expected value. Each needs concrete evidence. Skip anyt
     /* ── ambient reactions ── */
     onError(message, nodeId) {
         const msg = truncate(String(message || ''), 220), now = Date.now();
+        Routines.emit('error', { message: msg, node: nodeId || '' });
         const w = JarvisPR._mergeWatch;
         if (w && now < w.until) {
             w.hit = true;
@@ -4235,6 +4389,13 @@ const PreviewDriver = {
 
     /* ── finding the window to drive ── */
     async getWin(target) {
+        if (target === 'system') {
+            try {
+                const w = window.parent;
+                if (w === window || !w.document || !w.document.body) throw new Error('none');
+                return w;
+            } catch (_) { throw new Error("I can't reach the Vibe System's own page from here (APUI is standalone, or not same-origin with it)."); }
+        }
         if (target === 'app') {
             try {
                 const f = window.parent.document.getElementById('website-preview');
@@ -4359,7 +4520,10 @@ const PreviewDriver = {
         if (!t) return null;
         if (/^text:/i.test(t)) return this.findByText(win, t.replace(/^text:/i, ''), mode);
         let el = null;
-        try { el = win.document.querySelector(t); } catch (_) { /* not valid CSS — treat as a label */ }
+        try {
+            const all = win.document.querySelectorAll(t);   // several matches (e.g. desktop + mobile nav): prefer a visible one
+            el = [...all].find(x => this.isVisible(x, win)) || all[0] || null;
+        } catch (_) { /* not valid CSS — treat as a label */ }
         return el || this.findByText(win, t, mode);
     },
     need(ctx, target, mode) {
@@ -4579,6 +4743,7 @@ const PreviewDriver = {
                 return 'no runtime errors';
             }
             case 'reload': {
+                if (ctx.target === 'system') throw new Error('Reloading the Vibe System would stop me mid-run, so I skipped it.');
                 if (ctx.target === 'app') { w.location.reload(); await jvSleep(300); }
                 else { const old = w.location.href; updatePreview(); await this.poll(() => w.location.href !== old, 4000); }
                 await this.waitReady(w);
@@ -4592,10 +4757,12 @@ const PreviewDriver = {
     async run(spec, onStep) {
         if (this.running) throw new Error('A test is already running.');
         this.running = true; this.aborted = false;
-        const target = spec.target === 'app' ? 'app' : 'preview';
+        const target = ['app', 'system'].includes(spec.target) ? spec.target : 'preview';
         const t0 = Date.now(), results = [];
+        let returnToApui = false;
         try {
             if (target === 'app') { try { await Bridge.call('switch_tab', { tab: 'preview' }); await jvSleep(400); } catch (_) {} }
+            if (target === 'system') { try { returnToApui = !!window.parent.document.querySelector('#apui.tab-content.active'); } catch (_) {} }
             const win = await this.getWin(target);
             if (!(await this.waitReady(win))) throw new Error('The page never finished loading.');
             const ctx = { win, target, errStart: this.errors.length };
@@ -4606,10 +4773,10 @@ const PreviewDriver = {
                 const s0 = Date.now();
                 let r;
                 try {
-                    this.installGuards(win);
+                    if (target !== 'system') this.installGuards(win);   // never leave navigation guards on the Vibe System itself
                     const b0 = (win.__jvBlocked || []).length;
                     const detail = await this.runStep(ctx, st);
-                    this.installGuards(win);
+                    if (target !== 'system') this.installGuards(win);
                     const blocked = (win.__jvBlocked || []).slice(b0);
                     r = { i, do: st.do, target: st.target || '', status: 'pass', detail: detail + (blocked.length ? ` · ⚠ ${blocked.join('; ')}` : ''), ms: Date.now() - s0 };
                 } catch (e) {
@@ -4625,11 +4792,42 @@ const PreviewDriver = {
                 skipped: results.filter(r => r.status === 'skip').length,
                 errors: this.errors.slice(ctx.errStart).map(e => e.msg)
             };
-        } finally { this.running = false; }
+        } finally {
+            this.running = false;
+            if (returnToApui) setTimeout(() => Bridge.call('switch_tab', { tab: 'apui' }).catch(() => {}), 900);
+        }
     },
 
     /** Compact text description of what's on the page, for Jarvis to plan against. */
-    async outline(target) {
+    /** The Vibe System's own UI: its tabs, and every control in one tab (hidden or not), with selectors. */
+    systemOutline(tab) {
+        const win = window.parent, doc = win.document;
+        const active = doc.querySelector('.tab-content-area .tab-content.active');
+        const pane = tab ? doc.querySelector(`.tab-content-area .tab-content#${CSS.escape(tab)}`) : active;
+        if (tab && !pane) return `There is no "${tab}" tab. Tabs: ${[...doc.querySelectorAll('.tab-content-area .tab-content')].map(x => x.id).join(', ')}`;
+        const L = [`VIBE SYSTEM · active tab: ${active ? active.id : '?'} · viewport ${win.innerWidth}×${win.innerHeight}`];
+        const tabs = [...new Set([...doc.querySelectorAll('.tab-button[data-tab]')].map(b => b.dataset.tab))];
+        L.push('TAB BUTTONS: ' + tabs.map(t => `${t} → [data-tab="${t}"]`).join(' · '));
+        if (pane && pane !== active) L.push(`NOTE: "${pane.id}" is not the active tab. Start a system test with {"do":"click","target":"[data-tab=\"${pane.id}\"]"}.`);
+        const root = pane || doc.body, shown = pane === active;
+        const inter = [...root.querySelectorAll('a[href],button,input,select,textarea,summary,[role=button],[onclick]')].filter(el => !el.closest('#apui-frame')).slice(0, 90);
+        L.push(`CONTROLS IN "${pane ? pane.id : 'page'}" (${inter.length}):`);
+        inter.forEach((el, i) => {
+            const tag = el.tagName.toLowerCase() + (el.tagName === 'INPUT' ? `[${el.type}]` : '');
+            const flags = [el.disabled ? 'disabled' : '', shown && !this.isVisible(el, win) ? 'hidden' : '', el.checked ? 'checked' : ''].filter(Boolean).join(',');
+            const val = (el.tagName === 'INPUT' && !/^(button|submit|reset|checkbox|radio)$/i.test(el.type) || el.tagName === 'TEXTAREA') && el.value ? ` value="${String(el.value).slice(0, 30)}"` : '';
+            L.push(` ${i + 1}. ${tag} "${this.labelOf(el)}"${val} → ${this.uniqueSelector(el, doc)}${flags ? ' (' + flags + ')' : ''}`);
+        });
+        const modal = [...doc.querySelectorAll('.modal.show,[role=dialog]')].find(m => this.isVisible(m, win));
+        if (modal) L.push(`OPEN DIALOG: ${this.labelOf(modal).slice(0, 80)}`);
+        L.push('TEXT: ' + this.norm((root.innerText || root.textContent || '')).slice(0, 400));
+        const errs = this.errors.slice(-3);
+        if (errs.length) L.push('RECENT ERRORS: ' + errs.map(e => e.msg).join(' | '));
+        return L.join('\n');
+    },
+
+    async outline(target, tab) {
+        if (target === 'system') { await this.getWin('system'); return this.systemOutline(tab); }
         const win = await this.getWin(target === 'app' ? 'app' : 'preview');
         await this.waitReady(win);
         this.installGuards(win);
@@ -4724,9 +4922,9 @@ const JarvisTools = {
                 const rows = SystemLog.entries.filter(e => !a.type || e.type === a.type).slice(-a.limit).map(e => `${jvRel(e.ts)} · ${e.type} · ${e.msg}`);
                 return { text: rows.length ? rows.join('\n') : 'No matching log entries.' };
             } },
-        inspect_preview: { kind: 'read', sig: '{"target":"preview|app"}', doc: 'Outline of the running page: sections, buttons, inputs (with selectors), visible text, scroll position, recent errors. Use this before writing a test.',
-            check: a => ({ target: a.target === 'app' ? 'app' : 'preview' }),
-            run: async a => ({ text: await PreviewDriver.outline(a.target) }) },
+        inspect_preview: { kind: 'read', sig: '{"target":"preview|app|system","tab":"(system only) tab id"}', doc: 'Outline of a running page: sections, buttons, inputs (with selectors), visible text, recent errors. preview = APUI preview, app = main app Preview tab, system = the Vibe System UI itself. Use this before writing a test.',
+            check: a => ({ target: ['app', 'system'].includes(a.target) ? a.target : 'preview', tab: a.target === 'system' && a.tab ? jvStr(a.tab, 40) : '' }),
+            run: async a => ({ text: await PreviewDriver.outline(a.target, a.tab) }) },
         screenshot_preview: { kind: 'read', sig: '{}', doc: 'Look at the APUI preview as an image.',
             check: () => ({}),
             run: async () => ({ text: 'Screenshot of the APUI preview attached.', image: await apuiCapturePreview() }) },
@@ -4737,7 +4935,7 @@ const JarvisTools = {
             run: async a => ({ text: jvJson(await Bridge.call('list_projects', a)) }) },
 
         /* ── tests: drive the running project ── */
-        run_test: { kind: 'test', sig: '{"name":"…","target":"preview|app","steps":[…]}', doc: 'Drive the running page like a user. See STEP TYPES.',
+        run_test: { kind: 'test', sig: '{"name":"…","target":"preview|app|system","steps":[…]}', doc: 'Drive a running page like a user (system = operate the Vibe System UI itself). See STEP TYPES.',
             check: a => {
                 const steps = (Array.isArray(a.steps) ? a.steps : []).slice(0, 30).map(s => {
                     if (!s || !TEST_ACTIONS.includes(s.do)) return null;
@@ -4750,11 +4948,14 @@ const JarvisTools = {
                     if (['click', 'check'].includes(o.do) && DESTRUCTIVE_RE.test(o.target || '')) o.risky = true;
                     return o;
                 }).filter(Boolean);
-                if (!steps.length) throw new Error('no valid test steps');
-                return { name: jvStr(a.name || 'UI test', 70), target: a.target === 'app' ? 'app' : 'preview', steps };
+                const target = ['app', 'system'].includes(a.target) ? a.target : 'preview';
+                const kept = target === 'system' ? steps.filter(s => s.do !== 'reload') : steps;
+                if (!kept.length) throw new Error('no valid test steps');
+                return { name: jvStr(a.name || 'UI test', 70), target, steps: kept };
             },
             run: async (a, ctx) => {
                 const res = await PreviewDriver.run(a, (r, i) => ctx && ctx.onStep && ctx.onStep(r, i));
+                Routines.emit(res.failed ? 'test-failed' : 'test-passed', { message: `${res.name}: ${res.passed}/${res.results.length} passed${res.failed ? ' — ' + ((res.results.find(r => r.status === 'fail') || {}).detail || '') : ''}` });
                 return { text: JarvisTools.formatTest(res), test: res };
             } },
 
@@ -4820,9 +5021,11 @@ const JarvisTools = {
     catalog() {
         const line = ([n, d]) => `- ${n} ${d.sig} — ${d.doc}`;
         const E = Object.entries(this.defs);
-        return `READ-ONLY (put these in "inspect"; they run immediately and you get the results back):\n${E.filter(([, d]) => d.kind === 'read').map(line).join('\n')}\n\nACTIONS (only ever in a "plan"; nothing runs until the user approves):\n${E.filter(([, d]) => d.kind !== 'read').map(line).join('\n')}`;
+        return `READ-ONLY (put these in "inspect"; they run immediately and you get the results back):\n${E.filter(([, d]) => d.kind === 'read').map(line).join('\n')}\n\nACTIONS (only ever in a "plan"; nothing runs until the user approves):\n${E.filter(([, d]) => d.kind !== 'read' && !d.routineOnly).map(line).join('\n')}\n\nAUTOMATION-ONLY STEPS (only inside create_routine steps):\n${E.filter(([, d]) => d.routineOnly).map(line).join('\n')}`;
     },
     describe(name, a) {
+        const own = this.get(name);
+        if (own && typeof own.describe === 'function') { try { return own.describe(a); } catch (_) { return name; } }
         switch (name) {
             case 'run_test': return `Test “${a.name}” on ${a.target === 'app' ? 'the main app Preview tab' : 'the APUI preview'} — ${a.steps.length} step${a.steps.length > 1 ? 's' : ''}`;
             case 'switch_tab': return `Switch the main app to the “${a.tab}” tab`;
@@ -6513,6 +6716,1308 @@ function loadDemoTree() {
     logToConsole('Standalone mode: demo tree loaded.', 'success');
 }
 
+
+/* ════════════════════════════════════════════════════════════════
+   ATLAS — "who is responsible for what", for you and for Jarvis.
+   Map tab in the Jarvis panel. Two scopes:
+     This project  → the open project's nodes
+     Vibe System   → the system itself (index.html, app3.js, apui.html…)
+   Search anything (a label, #id, function, .class), or 🎯 Pick an
+   element on the page, and see: its handlers → the functions that run
+   → what they change → the CSS that styles it, each with a location
+   you can open. Jarvis uses the same map through where_is,
+   explain_element, function_info, wiring_check, system_map, read_code.
+   Engine: AtlasCore (below). UI: Atlas. Hooks: jvRenderMd links
+   "file:line" / "node-id:line" to Atlas.showLoc.
+   ════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   ATLAS CORE — reads source code and works out who is responsible for
+   what: every function and where it lives, what calls what, which
+   element triggers which handler, which code touches which element,
+   which CSS rules style it, and what is broken in the wiring.
+   Static analysis only (no AI), so it is always true to the code as it
+   is right now. Used for both scopes:
+     • "project": the nodes of the open Vibe project
+     • "system":  the Vibe System itself (index.html, app3.js, apui.html…)
+   ════════════════════════════════════════════════════════════════ */
+const AtlasCore = (() => {
+    const KW = new Set(('if for while switch catch function return typeof new await async else do try finally with case void delete in of instanceof yield super class const let var import export default throw break continue get set static null true false undefined this').split(' '));
+    const REGEX_AFTER = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'void', 'yield', 'await', 'delete', 'throw', 'new']);
+    const DOM_EVENTS = /^(click|dblclick|change|input|submit|keydown|keyup|keypress|mousedown|mouseup|mouseover|mouseenter|mouseleave|mousemove|pointerdown|pointerup|pointermove|touchstart|touchend|focus|blur|load|scroll|wheel|contextmenu|drop|dragstart|dragover|dragend|paste|error|resize)$/;
+    const BUILTIN = new Set(('alert confirm prompt setTimeout setInterval clearTimeout clearInterval parseInt parseFloat isNaN isFinite Number String Boolean Array Object Math JSON Date console document window self top parent this event location history navigator localStorage sessionStorage fetch encodeURIComponent decodeURIComponent encodeURI requestAnimationFrame cancelAnimationFrame open print scrollTo scrollBy close getComputedStyle Promise Error Symbol CustomEvent Event KeyboardEvent MouseEvent InputEvent Map Set RegExp URL Blob FileReader atob btoa structuredClone queueMicrotask matchMedia void return if new typeof').split(' '));
+    const STOP = new Set(('where is are the a an of in on to for what which who does do how find show me my that this it handle handles handled responsible function functions code thing things please').split(' '));
+
+    /* ── 1. Blank out strings, comments, regex literals and template text.
+          Same length, newlines kept, so positions and line numbers still line up. ── */
+    function strip(src) {
+        const n = src.length, out = new Array(n);
+        for (let k = 0; k < n; k++) out[k] = src[k];
+        const blank = (a, b) => { for (let k = a; k < b && k < n; k++) if (out[k] !== '\n') out[k] = ' '; };
+        const tpl = [];
+        let depth = 0, lastSig = '', word = '', lastWord = '', i = 0;
+        const scanTemplate = j => {
+            const s = j;
+            while (j < n) {
+                const c = src[j];
+                if (c === '\\') { j += 2; continue; }
+                if (c === '`') { blank(s, j + 1); return j + 1; }
+                if (c === '$' && src[j + 1] === '{') { blank(s, j + 2); tpl.push(depth); return j + 2; }
+                j++;
+            }
+            blank(s, n); return n;
+        };
+        while (i < n) {
+            const c = src[i], d = src[i + 1];
+            if (c === '/' && d === '/') { let j = src.indexOf('\n', i); if (j < 0) j = n; blank(i, j); i = j; continue; }
+            if (c === '/' && d === '*') { let j = src.indexOf('*/', i + 2); j = j < 0 ? n : j + 2; blank(i, j); i = j; continue; }
+            if (c === '"' || c === "'") {
+                let j = i + 1;
+                while (j < n && src[j] !== c && src[j] !== '\n') { if (src[j] === '\\') j++; j++; }
+                blank(i + 1, j); i = j + 1; lastSig = 'a'; lastWord = ''; continue;
+            }
+            if (c === '`') { blank(i, i + 1); i = scanTemplate(i + 1); lastSig = 'a'; lastWord = ''; continue; }
+            if (c === '}' && tpl.length && tpl[tpl.length - 1] === depth) { tpl.pop(); blank(i, i + 1); i = scanTemplate(i + 1); lastSig = 'a'; continue; }
+            if (c === '/' && (lastSig === '' || '(,=:[!&|?{};+-*%<>~^'.includes(lastSig) || REGEX_AFTER.has(lastWord))) {
+                let j = i + 1, cls = false;
+                while (j < n && src[j] !== '\n') {
+                    const ch = src[j];
+                    if (ch === '\\') { j += 2; continue; }
+                    if (ch === '[') cls = true; else if (ch === ']') cls = false; else if (ch === '/' && !cls) break;
+                    j++;
+                }
+                if (src[j] === '/') { blank(i + 1, j); j++; while (j < n && /[a-z]/i.test(src[j])) j++; i = j; lastSig = 'a'; lastWord = ''; continue; }
+            }
+            if (c === '{') depth++; else if (c === '}') depth--;
+            if (/[\w$]/.test(c)) { word += c; lastSig = 'a'; }
+            else {
+                if (word) { lastWord = word; word = ''; }
+                if (!/\s/.test(c)) { lastSig = (c === ')' || c === ']') ? 'a' : c; if (c !== ')' && c !== ']') lastWord = ''; }
+            }
+            i++;
+        }
+        return out.join('');
+    }
+
+    /* ── small helpers ── */
+    const lineStarts = s => { const a = [0]; for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) a.push(i + 1); return a; };
+    const lineOf = (st, pos) => { let lo = 0, hi = st.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (st[m] <= pos) lo = m; else hi = m - 1; } return lo + 1; };
+    const nextNS = (code, i) => { while (i < code.length && /\s/.test(code[i])) i++; return i; };
+    const matchParen = (code, i) => { let d = 0; for (; i < code.length; i++) { if (code[i] === '(') d++; else if (code[i] === ')') { d--; if (!d) return i; } } return -1; };
+    function braceInfo(code) {
+        const map = new Map(), top = [], st = [];
+        for (let i = 0; i < code.length; i++) {
+            const c = code.charCodeAt(i);
+            if (c === 123) st.push(i);
+            else if (c === 125 && st.length) { const o = st.pop(); map.set(o, i); if (!st.length) top.push([o, i]); }
+        }
+        return { map, top };
+    }
+    const inRanges = (ranges, pos) => { let lo = 0, hi = ranges.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (ranges[m][1] < pos) lo = m + 1; else if (ranges[m][0] > pos) hi = m - 1; else return true; } return false; };
+    const callRe = () => /([A-Za-z_$][\w$]*(?:[ \t]*\??\.[ \t]*[A-Za-z_$][\w$]*)*)[ \t]*\(/g;
+    const normCall = t => t.replace(/\s+/g, '').replace(/\?\./g, '.');
+
+    /* ── 2. JavaScript ── */
+    function parseJS(src, file, ix, off = 0, isModule = false) {
+        const code = strip(src), starts = lineStarts(src), { map: braces, top } = braceInfo(code);
+        const L = p => lineOf(starts, p) + off;
+        ix._words.push(code);
+        const containers = [], defs = [], defPos = new Set();
+        const addC = (name, pos, topLevelDecl) => { const close = braces.get(pos); if (close != null) containers.push({ name, open: pos, close }); if (topLevelDecl && !isModule && !inRanges(top, pos - 1)) ix.globals.add(name.split('.')[0]); };
+        let m;
+        const reObj = /(?:\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)|(?:^|[^\w$.])([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*))\s*=\s*\{/g;
+        while ((m = reObj.exec(code))) addC(m[1] || m[2], m.index + m[0].length - 1, !!m[1]);
+        const reProp = /(?:^|[{,\s])([A-Za-z_$][\w$]*)\s*:\s*\{/g;
+        while ((m = reProp.exec(code))) if (!KW.has(m[1])) addC(m[1], m.index + m[0].length - 1, false);
+        const reClass = /\bclass\s+([A-Za-z_$][\w$]*)[^{]*\{/g;
+        while ((m = reClass.exec(code))) addC(m[1], m.index + m[0].length - 1, true);
+        containers.sort((a, b) => a.open - b.open);
+        // a declaration like `const X = (() => { … return {…} })()` is still a top-level global name
+        const reTopDecl = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g;
+        if (!isModule) while ((m = reTopDecl.exec(code))) if (!inRanges(top, m.index)) ix.globals.add(m[1]);
+
+        const chainAt = pos => containers.filter(c => c.open < pos && c.close > pos).map(c => c.name).join('.');
+        const push = (name, namePos, bodyFrom, kind, isMethod) => {
+            if (!name || KW.has(name) || defPos.has(namePos)) return;
+            const segs = name.split('.');
+            if (segs.length > 1 && /^on[a-z]+$/.test(segs[segs.length - 1])) return;   // el.onclick = … is a listener, handled below
+            const j = nextNS(code, bodyFrom);
+            const body = code[j] === '{' && braces.has(j) ? { open: j, close: braces.get(j) } : null;
+            const end = body ? body.close : (src.indexOf('\n', bodyFrom) < 0 ? src.length : src.indexOf('\n', bodyFrom));
+            const chain = isMethod ? chainAt(namePos) : '';
+            const container = segs.length > 1 ? segs.slice(0, -1).join('.') : chain;
+            const depth0 = !inRanges(top, namePos);
+            defPos.add(namePos);
+            defs.push({ name: segs[segs.length - 1], qual: container ? container + '.' + segs[segs.length - 1] : name, container, file, kind,
+                start: namePos, end, bodyOpen: body ? body.open : bodyFrom, line: L(namePos), endLine: L(end), module: isModule,
+                global: !isModule && depth0 && !container });
+            if (!isModule && depth0 && !container) ix.globals.add(name);
+        };
+        const reFn = /\bfunction\s*\*?\s*([A-Za-z_$][\w$]*)\s*\(/g;
+        while ((m = reFn.exec(code))) { const c = matchParen(code, m.index + m[0].length - 1); if (c > 0) push(m[1], m.index + m[0].lastIndexOf(m[1]), c + 1, 'function', false); }
+        const reAssign = /(?:\b(?:const|let|var)\s+)?([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*=(?![=>])\s*(?:async\s+)?(?:function\b\s*\*?\s*[\w$]*\s*\(|(\()|([A-Za-z_$][\w$]*)\s*=>)/g;
+        while ((m = reAssign.exec(code))) {
+            const namePos = m.index + m[0].indexOf(m[1]);
+            if (m[2]) { const c = matchParen(code, m.index + m[0].length - 1); if (c < 0) continue; const a = nextNS(code, c + 1); if (code.slice(a, a + 2) !== '=>') continue; push(m[1], namePos, a + 2, 'arrow', false); }
+            else if (m[3]) push(m[1], namePos, m.index + m[0].length, 'arrow', false);
+            else { const c = matchParen(code, m.index + m[0].length - 1); if (c > 0) push(m[1], namePos, c + 1, 'function', false); }
+        }
+        const reMeth = /(?:^|[{,;\n])[ \t]*(?:static[ \t]+)?(?:async[ \t]+)?(?:get[ \t]+|set[ \t]+)?\*?[ \t]*([A-Za-z_$][\w$]*)[ \t]*\(/g;
+        while ((m = reMeth.exec(code))) {
+            if (KW.has(m[1])) continue;
+            const namePos = m.index + m[0].lastIndexOf(m[1]);
+            const c = matchParen(code, m.index + m[0].length - 1);
+            if (c < 0 || code[nextNS(code, c + 1)] !== '{') continue;
+            if (!containers.some(k => k.open < namePos && k.close > namePos)) continue;
+            push(m[1], namePos, c + 1, 'method', true);
+        }
+        const reProp2 = /(?:^|[{,\s])([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?(?:function\b\s*\*?\s*[\w$]*\s*\(|(\()|([A-Za-z_$][\w$]*)\s*=>)/g;
+        while ((m = reProp2.exec(code))) {
+            if (KW.has(m[1])) continue;
+            const namePos = m.index + m[0].search(/[A-Za-z_$]/);
+            if (m[2]) { const c = matchParen(code, m.index + m[0].length - 1); if (c < 0) continue; const a = nextNS(code, c + 1); if (code.slice(a, a + 2) !== '=>') continue; push(m[1], namePos, a + 2, 'method', true); }
+            else if (m[3]) push(m[1], namePos, m.index + m[0].length, 'method', true);
+            else { const c = matchParen(code, m.index + m[0].length - 1); if (c > 0) push(m[1], namePos, c + 1, 'method', true); }
+        }
+
+        // register, and work out which function owns each line (innermost wins)
+        defs.sort((a, b) => a.start - b.start);
+        defs.forEach(d => { d.i = ix.fns.length; d.calls = new Set(); d.calledBy = new Set(); d.triggers = []; d.touches = []; d.raw = []; ix.fns.push(d); });
+        const owner = new Int32Array(starts.length + 2).fill(-1);
+        [...defs].sort((a, b) => (b.endLine - b.line) - (a.endLine - a.line)).forEach(f => { for (let l = f.line - off; l <= f.endLine - off; l++) owner[l] = f.i; });
+        const own = pos => { const o = owner[lineOf(starts, pos)]; return o >= 0 ? ix.fns[o] : null; };
+
+        // calls (resolved later, once every file is read)
+        const rc = callRe();
+        while ((m = rc.exec(code))) {
+            if (code[m.index - 1] === '.') continue;
+            const txt = normCall(m[1]), last = txt.split('.').pop();
+            if (KW.has(last) || txt.startsWith('function')) continue;
+            if (defPos.has(m.index + m[0].lastIndexOf(last))) continue;
+            const f = own(m.index);
+            if (f) f.raw.push(txt);
+        }
+
+        // element references (these need the real strings, so they read src)
+        const varId = new Map();
+        const reBind = /\b([A-Za-z_$][\w$]*)\s*=\s*(?:document\s*\.\s*)?(?:getElementById\(\s*['"`]([\w:.-]+)['"`]\s*\)|querySelector\(\s*['"`]#([\w-]+)['"`]\s*\))/g;
+        while ((m = reBind.exec(src))) varId.set(m[1], m[2] || m[3]);
+        const ref = (kind, value, pos, how) => {
+            if (!value || /[${}]/.test(value)) return;
+            const f = own(pos), r = { kind, value, file, line: L(pos), fn: f ? f.i : -1, how };
+            ix.refs.push(r); if (f) f.touches.push(r);
+        };
+        const reId = /getElementById\(\s*['"`]([\w:.-]+)['"`]\s*\)/g;
+        while ((m = reId.exec(src))) ref('id', m[1], m.index, 'getElementById');
+        const reQs = /(querySelector(?:All)?|closest|matches)\(\s*['"`]([^'"`$]{1,160})['"`]\s*\)/g;
+        while ((m = reQs.exec(src))) {
+            (m[2].match(/#[A-Za-z_][\w-]*/g) || []).forEach(x => ref('id', x.slice(1), m.index, m[1]));
+            (m[2].match(/\.[A-Za-z_][\w-]*/g) || []).forEach(x => ref('class', x.slice(1), m.index, m[1]));
+        }
+        const reCl = /classList\s*\.\s*(add|remove|toggle|contains|replace)\(\s*['"`]([\w-]+)['"`]/g;
+        while ((m = reCl.exec(src))) ref('class', m[2], m.index, 'classList.' + m[1]);
+        const reDyn = /(?:\.id\s*=\s*|setAttribute\(\s*['"]id['"]\s*,\s*)['"`]([\w:.-]+)['"`]/g;
+        while ((m = reDyn.exec(src))) ix.dynamicIds.add(m[1]);
+
+        // listeners: addEventListener and el.onclick = …
+        const targetId = expr => {
+            const mm = expr.match(/getElementById\(['"`]([\w:.-]+)['"`]\)/) || expr.match(/querySelector\(['"`]#([\w-]+)['"`]\)/);
+            if (mm) return mm[1];
+            return varId.get(expr.split('.')[0]) || null;
+        };
+        const handler = (pos, stop) => {
+            const j = nextNS(code, pos);
+            const nm = /^([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*[,);\n]/.exec(code.slice(j, j + 160));
+            if (nm && !KW.has(nm[1])) return { named: nm[1] };
+            const lim = Math.min(code.length, stop > 0 ? stop : j + 6000);
+            for (let k = j; k < lim; k++) if (code[k] === '{' && braces.has(k)) return { range: [k, braces.get(k)] };
+            return { range: [j, stop > 0 ? stop : Math.min(code.length, j + 300)] };
+        };
+        const addL = (mIndex, expr, event, h) => {
+            expr = normCall(expr);
+            const o = own(mIndex);
+            ix.listeners.push({ file, line: L(mIndex), event, target: expr, targetId: targetId(expr), named: h.named || null,
+                inside: o ? o.i : -1, rawCalls: h.range ? collect(code, h.range[0], h.range[1]) : [] });
+        };
+        const reAEL = /addEventListener\(\s*['"`]([\w:-]+)['"`]\s*,/g;
+        while ((m = reAEL.exec(src))) {
+            // read the target expression backwards from ".addEventListener"
+            let k = m.index - 1; while (k >= 0 && /[\s?.]/.test(src[k])) k--;
+            let e = k + 1, depthP = 0;
+            while (k >= 0) {
+                const ch = src[k];
+                if (ch === ')') depthP++; else if (ch === '(') { if (!depthP) break; depthP--; }
+                else if (!depthP && !/[\w$.?'"`#-]/.test(ch)) break;
+                k--;
+            }
+            const expr = src.slice(k + 1, e).trim() || 'document';
+            const close = matchParen(code, m.index + 'addEventListener'.length);
+            addL(m.index, expr, m[1], handler(m.index + m[0].length, close));
+        }
+        const reOn = /([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\s*['"`][^'"`]*['"`]\s*\))?)\s*\.\s*on([a-z]+)\s*=(?!=)/g;
+        while ((m = reOn.exec(src))) if (DOM_EVENTS.test(m[2])) addL(m.index, m[1], m[2], handler(m.index + m[0].length, -1));
+
+        const reWin = /\bwindow\s*\.\s*([A-Za-z_$][\w$]*)\s*=(?!=)/g;
+        while ((m = reWin.exec(code))) { ix.exposed.add(m[1]); ix.globals.add(m[1]); }
+        const reWin2 = /Object\.assign\(\s*window\s*,\s*\{([^}]*)\}/g;
+        while ((m = reWin2.exec(code))) m[1].split(',').map(s => s.split(':')[0].trim()).filter(Boolean).forEach(nm => { ix.exposed.add(nm); ix.globals.add(nm); });
+
+        // UI rendered from JS strings/templates (onclick="…" inside innerHTML etc.)
+        parseMarkup(src, file, ix, off, starts, true, own);
+    }
+    function collect(code, a, b) {
+        const out = [], re = callRe(), s = code.slice(a, b + 1);
+        let m;
+        while ((m = re.exec(s))) { if (s[m.index - 1] === '.') continue; const t = normCall(m[1]); if (!KW.has(t.split('.').pop())) out.push(t); }
+        return out;
+    }
+
+    /* ── 3. Markup: elements with ids, interactive controls, inline handlers ── */
+    function parseMarkup(src, file, ix, off, starts, inJs, own) {
+        starts = starts || lineStarts(src);
+        const reTag = /<([a-zA-Z][\w-]*)(\s[^<>]*?)?\/?>/g;
+        let m;
+        while ((m = reTag.exec(src))) {
+            const tag = m[1].toLowerCase(), attrs = m[2] || '';
+            if (/^(script|style|br|meta|link|html|head|body|path|g|circle|svg|line|rect|polyline|polygon|stop|defs)$/.test(tag)) continue;
+            const get = a => { const r = new RegExp('(?:^|\\s)' + a + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|\\\\"([^"\\\\]*)\\\\")', 'i').exec(attrs); return r ? (r[1] ?? r[2] ?? r[3] ?? '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>') : null; };
+            const id = get('id'), cls = get('class');
+            const handlers = [];
+            const reH = /\son([a-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|\\"((?:[^"\\]|\\.)*)\\")/gi;
+            let h;
+            while ((h = reH.exec(attrs))) handlers.push({ event: h[1].toLowerCase(), code: (h[2] ?? h[3] ?? h[4] ?? '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").slice(0, 300) });
+            const interactive = /^(button|a|input|select|textarea|summary|form)$/.test(tag);
+            const cleanId = id && !/[${}]/.test(id) ? id : null;
+            if (!cleanId && !handlers.length && !(interactive && !inJs)) continue;
+            const after = src.slice(m.index + m[0].length, m.index + m[0].length + 160);
+            let label = after.split('<')[0].replace(/\$\{[^}]*\}/g, '…').replace(/&amp;/g, '&').replace(/&nbsp;|&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!label || label === '…') label = get('title') || get('aria-label') || get('placeholder') || get('data-tab') || get('value') || get('name') || label || '';
+            ix.els.push({ i: ix.els.length, tag, id: cleanId, classes: cls ? cls.split(/\s+/).filter(c => c && !/[${}]/.test(c)).slice(0, 8) : [],
+                label: String(label).slice(0, 60), file, line: lineOf(starts, m.index) + off, handlers, inJs: !!inJs, tab: null,
+                type: get('type') || '', dataTab: get('data-tab'), renderedBy: own ? ((own(m.index) || {}).i ?? -1) : -1 });
+        }
+    }
+
+    /* ── 4. CSS ── */
+    function parseCSS(src, file, ix, off = 0) {
+        const code = src.replace(/\/\*[\s\S]*?\*\//g, s => s.replace(/[^\n]/g, ' '));
+        const starts = lineStarts(code);
+        let seg = 0;
+        for (let i = 0; i < code.length; i++) {
+            const c = code[i];
+            if (c === '{') {
+                const raw = code.slice(seg, i), sel = raw.trim();
+                if (sel && !sel.startsWith('@') && !/^(from|to|\d+(\.\d+)?%)(\s*,|$)/.test(sel) && sel.length < 500)
+                    ix.rules.push({ selector: sel.replace(/\s+/g, ' '), file, line: lineOf(starts, seg + raw.length - raw.trimStart().length) + off });
+                seg = i + 1;
+            } else if (c === '}' || c === ';') seg = i + 1;
+        }
+    }
+
+    /* ── 5. An HTML document or fragment ── */
+    function parseHTML(src, file, ix) {
+        const starts = lineStarts(src);
+        const blank = src.replace(/<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>/gi, s => s.replace(/[^\n]/g, ' '));
+        parseMarkup(blank, file, ix, 0, starts, false);
+        let m;
+        const reS = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+        while ((m = reS.exec(src))) {
+            if (/\bsrc\s*=/.test(m[1]) || !m[2].trim()) continue;
+            const t = (/type\s*=\s*["']([^"']+)["']/i.exec(m[1]) || [])[1];
+            if (t && !/module|javascript/i.test(t)) continue;
+            parseJS(m[2], file, ix, lineOf(starts, m.index + m[0].indexOf('>') + 1) - 1, t === 'module');
+        }
+        const reSt = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+        while ((m = reSt.exec(src))) parseCSS(m[1], file, ix, lineOf(starts, m.index + m[0].indexOf('>') + 1) - 1);
+        // tab panes of the Vibe System (div.tab-content#id): line ranges, so elements know their tab
+        const reTab = /<div\b[^>]*\bid="([\w-]+)"[^>]*\bclass="[^"]*\btab-content\b[^"]*"[^>]*>|<div\b[^>]*\bclass="[^"]*\btab-content\b[^"]*"[^>]*\bid="([\w-]+)"[^>]*>/g;
+        while ((m = reTab.exec(blank))) {
+            const id = m[1] || m[2];
+            const re = /<div\b|<\/div>/g; re.lastIndex = m.index + m[0].length;
+            let d = 1, x;
+            while (d > 0 && (x = re.exec(blank))) d += x[0] === '</div>' ? -1 : 1;
+            const titleM = new RegExp('data-tab="' + id + '"[^>]*title="([^"]*)"').exec(blank) || new RegExp('title="([^"]*)"[^>]*data-tab="' + id + '"').exec(blank);
+            const head = /<h[1-3][^>]*>([^<]{2,60})</.exec(blank.slice(m.index, x ? x.index : m.index + 4000));
+            if (!ix.tabs.some(t => t.id === id))
+                ix.tabs.push({ id, title: titleM ? titleM[1] : id, heading: head ? head[1].trim() : '', file, line: lineOf(starts, m.index), endLine: lineOf(starts, x ? x.index : m.index) });
+        }
+    }
+
+    /* ── 6. Resolve calls and wire the graph ── */
+    function resolve(ix, txt, ctx) {
+        const parts = txt.split('.'), last = parts[parts.length - 1], cands = ix.byName.get(last);
+        if (!cands) return [];
+        if (parts.length === 1) {
+            const plain = cands.filter(f => !f.container);
+            const same = plain.filter(f => ctx && f.file === ctx.file);
+            return (same.length ? same : plain).slice(0, 2);
+        }
+        let prefix = parts.slice(0, -1).join('.');
+        if (parts[0] === 'this') { if (!ctx || !ctx.container) return []; prefix = ctx.container + (parts.length > 2 ? '.' + parts.slice(1, -1).join('.') : ''); }
+        if (parts[0] === 'window' && parts.length === 2) return cands.filter(f => !f.container).slice(0, 2);
+        return cands.filter(f => f.container === prefix || f.container.endsWith('.' + prefix)).slice(0, 2);
+    }
+    function link(ix) {
+        ix.byName = new Map(); ix.byQual = new Map();
+        ix.fns.forEach(f => { (ix.byName.get(f.name) || ix.byName.set(f.name, []).get(f.name)).push(f); if (!ix.byQual.has(f.qual)) ix.byQual.set(f.qual, f); });
+        ix.fns.forEach(f => { f.raw.forEach(t => resolve(ix, t, f).forEach(g => { if (g !== f) { f.calls.add(g.i); g.calledBy.add(f.i); } })); delete f.raw; });
+        ix.elById = new Map();
+        ix.els.forEach(e => { if (e.id && !ix.elById.has(e.id)) ix.elById.set(e.id, e); });
+        ix.listeners.forEach((l, li) => {
+            const ctx = l.inside >= 0 ? ix.fns[l.inside] : null;
+            const set = new Set();
+            (l.named ? [l.named] : l.rawCalls).forEach(t => resolve(ix, t, ctx).forEach(g => set.add(g.i)));
+            l.fns = [...set]; delete l.rawCalls;
+            l.fns.forEach(i => ix.fns[i].triggers.push({ kind: 'listener', li }));
+            if (l.targetId && ix.elById.has(l.targetId)) (ix.elById.get(l.targetId).listeners = ix.elById.get(l.targetId).listeners || []).push(li);
+        });
+        // inline handlers: resolve, and check they can actually reach what they call
+        const fileModule = new Map(ix.files.map(f => [f.name, !!f.module]));
+        ix.els.forEach(e => e.handlers.forEach(h => {
+            const set = new Set(), problems = [];
+            const hc = strip(h.code);
+            collect(hc, 0, hc.length).forEach(t => {
+                const first = t.split('.')[0];
+                if (BUILTIN.has(first) || first === 'event' || /^(e|el|this)$/.test(first)) return;
+                const r = resolve(ix, t, null);
+                r.forEach(g => set.add(g.i));
+                if (!ix.globals.has(first)) {
+                    const where = (ix.byName.get(t.split('.').pop()) || []).filter(f => !f.container || f.container === first)[0];
+                    problems.push(where
+                        ? `${t}() lives in ${where.file}${where.module ? ' (an ES module)' : ''} but is not reachable from HTML — expose it with window.${first} = ${first}`
+                        : `${t}() is not defined anywhere this map can see`);
+                }
+            });
+            h.fns = [...set]; h.problems = problems;
+            h.fns.forEach(i => ix.fns[i].triggers.push({ kind: 'element', ei: e.i, event: h.event }));
+        }));
+        // which tab / node an element lives in
+        ix.els.forEach(e => { const t = ix.tabs.find(t => t.file === e.file && e.line >= t.line && e.line <= t.endLine); if (t) e.tab = t.id; });
+        // how often each word appears anywhere (for "never referenced")
+        const wc = new Map();
+        const add = s => { const re = /[A-Za-z_$][\w$]*/g; let m; while ((m = re.exec(s))) wc.set(m[0], (wc.get(m[0]) || 0) + 1); };
+        ix._words.forEach(add); ix.els.forEach(e => e.handlers.forEach(h => add(h.code)));
+        ix.wordCount = wc; delete ix._words;
+        return ix;
+    }
+
+    /** sources: [{ name, kind: 'html'|'js'|'css', text, module? }] */
+    function build(scope, sources) {
+        const t0 = Date.now();
+        const ix = { scope, files: [], fns: [], els: [], rules: [], refs: [], listeners: [], tabs: [], exposed: new Set(), globals: new Set(), dynamicIds: new Set(), _words: [] };
+        sources.forEach(s => {
+            const text = String(s.text == null ? '' : s.text);
+            ix.files.push({ name: s.name, kind: s.kind, module: !!s.module, lines: text.split('\n').length, text, label: s.label || s.name });
+            try {
+                if (s.kind === 'js') parseJS(text, s.name, ix, 0, !!s.module);
+                else if (s.kind === 'css') parseCSS(text, s.name, ix, 0);
+                else parseHTML(text, s.name, ix);
+            } catch (e) { (ix.errors = ix.errors || []).push(`${s.name}: ${e.message}`); }
+        });
+        link(ix);
+        ix.ms = Date.now() - t0;
+        ix.builtAt = Date.now();
+        return ix;
+    }
+
+    /* ════ QUERIES ════ */
+    const fnLabel = f => `${f.qual}()`;
+    const loc = (file, line) => `${file}:${line}`;
+    function rulesFor(ix, el) {
+        const keys = [];
+        if (el.id) keys.push(new RegExp('#' + el.id.replace(/[-.:]/g, '\\$&') + '(?![\\w-])'));
+        el.classes.forEach(c => keys.push(new RegExp('\\.' + c.replace(/[-.:]/g, '\\$&') + '(?![\\w-])')));
+        if (!keys.length) return [];
+        return ix.rules.filter(r => keys.some(k => k.test(r.selector))).slice(0, 14);
+    }
+    function touchersOf(ix, el) {
+        const out = new Map();
+        ix.refs.forEach(r => {
+            if (!((r.kind === 'id' && r.value === el.id) || (r.kind === 'class' && el.classes.includes(r.value)))) return;
+            const key = r.fn >= 0 ? 'f' + r.fn : r.file + ':' + r.line;
+            if (!out.has(key)) out.set(key, { fn: r.fn >= 0 ? ix.fns[r.fn] : null, file: r.file, line: r.line, how: new Set() });
+            out.get(key).how.add(r.kind === 'id' ? r.how : `${r.how} .${r.value}`);
+        });
+        return [...out.values()].slice(0, 16);
+    }
+    function handlersOf(ix, el) {
+        const out = [];
+        el.handlers.forEach(h => out.push({ via: 'inline', event: h.event, code: h.code, fns: h.fns.map(i => ix.fns[i]), problems: h.problems || [], file: el.file, line: el.line }));
+        (el.listeners || []).forEach(li => { const l = ix.listeners[li]; out.push({ via: 'listener', event: l.event, code: l.named || '(inline function)', fns: l.fns.map(i => ix.fns[i]), problems: [], file: l.file, line: l.line, inside: l.inside >= 0 ? ix.fns[l.inside] : null }); });
+        return out;
+    }
+    /** The chain of responsibility: handler fns, then what they call (two levels), deduped. */
+    function chainFrom(ix, fns, depth = 2, max = 14) {
+        const seen = new Set(), out = [];
+        const walk = (f, d) => {
+            if (seen.has(f.i) || out.length >= max) return;
+            seen.add(f.i); out.push({ f, d });
+            if (d < depth) [...f.calls].slice(0, 8).forEach(i => walk(ix.fns[i], d + 1));
+        };
+        fns.forEach(f => walk(f, 0));
+        return out;
+    }
+    function elementInfo(ix, el) {
+        const handlers = handlersOf(ix, el);
+        return { el, handlers, chain: chainFrom(ix, handlers.flatMap(h => h.fns)), touchers: touchersOf(ix, el), rules: rulesFor(ix, el) };
+    }
+    function fnInfo(ix, f) {
+        const trig = f.triggers.map(t => t.kind === 'element' ? { kind: 'element', el: ix.els[t.ei], event: t.event } : { kind: 'listener', l: ix.listeners[t.li] });
+        const touches = [];
+        const seen = new Set();
+        f.touches.forEach(r => { const k = r.kind + r.value; if (seen.has(k)) return; seen.add(k); touches.push({ r, el: r.kind === 'id' ? ix.elById.get(r.value) || null : null }); });
+        return { f, calls: [...f.calls].map(i => ix.fns[i]), calledBy: [...f.calledBy].map(i => ix.fns[i]), triggers: trig, touches: touches.slice(0, 20), referenced: (ix.wordCount.get(f.name) || 0) };
+    }
+
+    function findElement(ix, target) {
+        const t = String(target || '').trim();
+        if (!t) return null;
+        const id = t.replace(/^#/, '');
+        if (ix.elById.has(id)) return ix.elById.get(id);
+        const cls = /^\.([\w-]+)$/.exec(t);
+        if (cls) return ix.els.find(e => e.classes.includes(cls[1])) || null;
+        const lab = t.replace(/^text:/i, '').toLowerCase();
+        const hits = ix.els.filter(e => e.label && e.label.toLowerCase() === lab);
+        return hits[0] || ix.els.find(e => e.label && e.label.toLowerCase().includes(lab) && lab.length > 2) || null;
+    }
+    /** An element seen on the live page, matched to the map where possible. d: {tag,id,classes,label,onattrs:[{event,code}],tab} */
+    function liveElement(ix, d) {
+        if (d.id && ix.elById.has(d.id)) return { el: ix.elById.get(d.id), how: 'id' };
+        const tplRe = code => new RegExp('^' + code.trim().replace(/[.*+?^()|[\]\\]/g, '\\$&').replace(/\$\{[^}]*\}/g, '.*?') + '$');
+        for (const a of d.onattrs || []) {
+            const hit = ix.els.find(e => e.handlers.some(h => h.event === a.event && (h.code.trim() === a.code.trim() || (h.code.includes('${') && (() => { try { return tplRe(h.code).test(a.code.trim()); } catch (_) { return false; } })()))));
+            if (hit) return { el: hit, how: 'handler' };
+        }
+        if (d.classes && d.classes.length) {
+            const cands = ix.els.filter(e => e.tag === d.tag && e.classes.length && e.classes.every(c => d.classes.includes(c)));
+            const lab = (d.label || '').toLowerCase();
+            const best = cands.find(e => e.label && lab && e.label.toLowerCase() === lab) || cands[0];
+            if (best) return { el: best, how: 'class' };
+        }
+        // nothing static matches: describe the live element itself, resolving any inline handlers
+        const e = { i: -1, tag: d.tag, id: d.id || null, classes: d.classes || [], label: d.label || '', file: d.file || '(live page)', line: 0, handlers: [], inJs: true, tab: d.tab || null, live: true, renderedBy: -1 };
+        (d.onattrs || []).forEach(a => {
+            const hc = strip(a.code), set = new Set();
+            collect(hc, 0, hc.length).forEach(t => resolve(ix, t, null).forEach(g => set.add(g.i)));
+            e.handlers.push({ event: a.event, code: a.code, fns: [...set], problems: [] });
+        });
+        return { el: e, how: 'live' };
+    }
+    function findFn(ix, name) {
+        const n = String(name || '').trim().replace(/\(\)$/, '');
+        return ix.byQual.get(n) || (ix.byName.get(n.split('.').pop()) || [])[0] || null;
+    }
+
+    /** Fuzzy "where is…" search over elements, functions, CSS rules and tabs. */
+    function search(ix, query, limit = 30) {
+        const q = String(query || '').toLowerCase().trim();
+        if (!q) return [];
+        let words = q.split(/[^a-z0-9_$#.-]+/).filter(w => w && !STOP.has(w));
+        if (!words.length) words = q.split(/\s+/).filter(Boolean);
+        const wantTag = words.find(w => /^(button|buttons|input|link|select|textarea|field)$/.test(w));
+        if (wantTag && words.length > 1) words = words.filter(w => w !== wantTag);
+        const res = [];
+        const score = (hay, exact) => {
+            hay = hay.toLowerCase();
+            let s = 0;
+            for (const w of words) {
+                const bare = w.replace(/^[#.]/, '');
+                if (exact.some(x => x && x.toLowerCase() === bare)) s += 60;
+                else if (exact.some(x => x && x.toLowerCase().startsWith(bare))) s += 30;
+                else if (hay.includes(bare)) s += 14;
+                else return 0;
+            }
+            return s;
+        };
+        ix.els.forEach(e => {
+            const hay = [e.label, e.id, e.classes.join(' '), e.tag, e.dataTab, e.handlers.map(h => h.code).join(' ')].join(' ');
+            let s = score(hay, [e.id, e.label, e.dataTab]);
+            if (!s) return;
+            if (e.handlers.length || e.listeners) s += 8;
+            if (!e.inJs) s += 4;
+            if (wantTag) s += (e.tag === wantTag.replace(/s$/, '') || (wantTag === 'link' && e.tag === 'a') || (wantTag === 'field' && /input|textarea|select/.test(e.tag))) ? 40 : 15;
+            res.push({ kind: 'element', s, ref: e });
+        });
+        ix.fns.forEach(f => { const s = score(f.qual.replace(/([a-z])([A-Z])/g, '$1 $2') + ' ' + f.qual, [f.name, f.qual]); if (s) res.push({ kind: 'function', s: s + (f.calledBy.size || f.triggers.length ? 4 : 0), ref: f }); });
+        ix.rules.forEach(r => { const s = score(r.selector, []); if (s) res.push({ kind: 'css', s: s - 6, ref: r }); });
+        ix.tabs.forEach(t => { const s = score(t.id + ' ' + t.title + ' ' + t.heading, [t.id, t.title]); if (s) res.push({ kind: 'tab', s: s + 10, ref: t }); });
+        res.sort((a, b) => b.s - a.s);
+        return res.slice(0, limit);
+    }
+
+    /** Wiring problems: the things that leave you lost. */
+    function health(ix) {
+        const out = { unreachable: [], missingIds: [], unused: [], deadHandlers: [] };
+        ix.els.forEach(e => e.handlers.forEach(h => (h.problems || []).forEach(p => out.unreachable.push({ el: e, event: h.event, problem: p }))));
+        const seen = new Set();
+        ix.refs.forEach(r => {
+            if (r.kind !== 'id' || ix.elById.has(r.value) || ix.dynamicIds.has(r.value) || seen.has(r.value)) return;
+            seen.add(r.value);
+            out.missingIds.push(r);
+        });
+        ix.fns.forEach(f => {
+            if (f.kind === 'method' && f.container.includes('.')) return;   // deep object members are usually looked up dynamically
+            if (f.calledBy.size || f.triggers.length || ix.exposed.has(f.name)) return;
+            if ((ix.wordCount.get(f.name) || 0) > 1) return;
+            out.unused.push(f);
+        });
+        ix.listeners.forEach(l => { if (l.targetId && !ix.elById.has(l.targetId) && !ix.dynamicIds.has(l.targetId)) out.deadHandlers.push(l); });
+        return out;
+    }
+
+    /* ════ TEXT FOR JARVIS ════ */
+    function elementText(ix, info) {
+        const { el, handlers, chain, touchers, rules } = info, L = [];
+        L.push(`ELEMENT <${el.tag}>${el.id ? ' #' + el.id : ''}${el.classes.length ? ' .' + el.classes.slice(0, 3).join('.') : ''}${el.label ? ` "${el.label}"` : ''}`);
+        L.push(el.live ? `  only exists on the live page (created at runtime; no static markup found)${el.tab ? ` — in the "${el.tab}" tab` : ''}` : `  defined at ${loc(el.file, el.line)}${el.tab ? ` (inside the "${el.tab}" tab)` : ''}${el.inJs ? ' — rendered from a JS string' + (el.renderedBy >= 0 ? ` by ${fnLabel(ix.fns[el.renderedBy])} ${loc(ix.fns[el.renderedBy].file, ix.fns[el.renderedBy].line)}` : '') : ''}`);
+        if (!handlers.length) L.push('  no event handlers found in code (it may be handled by delegation, or it does nothing)');
+        handlers.forEach(h => {
+            L.push(`  on ${h.event} (${h.via} at ${loc(h.file, h.line)}): ${h.code.slice(0, 120)}`);
+            h.fns.forEach(f => L.push(`    → ${fnLabel(f)} at ${loc(f.file, f.line)}`));
+            h.problems.forEach(p => L.push(`    ⚠ ${p}`));
+        });
+        if (chain.length) {
+            L.push('  WHAT RUNS (call chain):');
+            chain.forEach(({ f, d }) => L.push(`  ${'  '.repeat(d + 1)}${fnLabel(f)} ${loc(f.file, f.line)}`));
+        }
+        if (touchers.length) { L.push('  CODE THAT READS/CHANGES IT:'); touchers.forEach(t => L.push(`    ${t.fn ? fnLabel(t.fn) : 'top-level code'} at ${loc(t.file, t.line)} via ${[...t.how].join(', ')}`)); }
+        if (rules.length) { L.push('  STYLED BY:'); rules.forEach(r => L.push(`    ${r.selector.slice(0, 90)}  ${loc(r.file, r.line)}`)); }
+        return L.join('\n');
+    }
+    function fnText(ix, info) {
+        const { f, calls, calledBy, triggers, touches } = info, L = [];
+        L.push(`FUNCTION ${fnLabel(f)} — ${loc(f.file, f.line)}–${f.endLine} (${f.endLine - f.line + 1} lines${f.module ? ', ES module scope' : f.global ? ', global' : ''}${ix.exposed.has(f.name) ? ', exposed on window' : ''})`);
+        if (triggers.length) { L.push('  TRIGGERED BY:'); triggers.slice(0, 12).forEach(t => L.push(t.kind === 'element' ? `    ${t.event} on <${t.el.tag}>${t.el.id ? '#' + t.el.id : ''}${t.el.label ? ` "${t.el.label}"` : ''} ${loc(t.el.file, t.el.line)}${t.el.tab ? ` [${t.el.tab} tab]` : ''}` : `    ${t.l.event} listener on ${t.l.target} ${loc(t.l.file, t.l.line)}`)); }
+        if (calledBy.length) L.push('  CALLED BY: ' + calledBy.slice(0, 14).map(g => `${fnLabel(g)} ${loc(g.file, g.line)}`).join(' · '));
+        if (calls.length) L.push('  CALLS: ' + calls.slice(0, 18).map(g => `${fnLabel(g)} ${loc(g.file, g.line)}`).join(' · '));
+        if (touches.length) L.push('  TOUCHES ELEMENTS: ' + touches.map(t => (t.r.kind === 'id' ? '#' : '.') + t.r.value + (t.el ? '' : t.r.kind === 'id' ? ' (not in markup)' : '')).join(', '));
+        if (!triggers.length && !calledBy.length) L.push(info.referenced > 1 ? '  (no direct callers found — probably passed as a callback or looked up by name)' : '  ⚠ nothing references it: likely dead code');
+        return L.join('\n');
+    }
+    function searchText(ix, hits) {
+        if (!hits.length) return 'No matches.';
+        return hits.map(h => {
+            if (h.kind === 'element') { const e = h.ref; return `element <${e.tag}>${e.id ? '#' + e.id : ''}${e.label ? ` "${e.label}"` : ''} — ${loc(e.file, e.line)}${e.tab ? ` [${e.tab} tab]` : ''}${e.handlers.length ? ' · ' + e.handlers.map(x => 'on' + x.event + '=' + x.code.slice(0, 50)).join(' ') : ''}`; }
+            if (h.kind === 'function') { const f = h.ref; return `function ${fnLabel(f)} — ${loc(f.file, f.line)} (${f.calledBy.size} callers, ${f.triggers.length} UI triggers)`; }
+            if (h.kind === 'css') return `css ${h.ref.selector.slice(0, 80)} — ${loc(h.ref.file, h.ref.line)}`;
+            return `tab "${h.ref.id}" (${h.ref.title}) — ${loc(h.ref.file, h.ref.line)}–${h.ref.endLine}`;
+        }).join('\n');
+    }
+    function healthText(ix, hl, max = 12) {
+        const L = [];
+        if (hl.unreachable.length) { L.push(`BROKEN HANDLERS (${hl.unreachable.length}):`); hl.unreachable.slice(0, max).forEach(u => L.push(`  ${u.event} on <${u.el.tag}>${u.el.id ? '#' + u.el.id : ''}${u.el.label ? ` "${u.el.label}"` : ''} ${loc(u.el.file, u.el.line)}: ${u.problem}`)); }
+        if (hl.missingIds.length) { L.push(`IDS USED IN CODE BUT MISSING FROM MARKUP (${hl.missingIds.length}):`); hl.missingIds.slice(0, max).forEach(r => L.push(`  #${r.value} — ${r.fn >= 0 ? fnLabel(ix.fns[r.fn]) + ' ' : ''}${loc(r.file, r.line)}`)); }
+        if (hl.unused.length) { L.push(`NEVER REFERENCED (${hl.unused.length}):`); L.push('  ' + hl.unused.slice(0, max * 2).map(f => `${fnLabel(f)} ${loc(f.file, f.line)}`).join(' · ')); }
+        return L.length ? L.join('\n') : 'No wiring problems found.';
+    }
+    function overviewText(ix) {
+        const L = [`${ix.scope.toUpperCase()} MAP: ${ix.files.length} file(s), ${ix.fns.length} functions, ${ix.els.length} elements, ${ix.listeners.length} listeners, ${ix.rules.length} CSS rules.`];
+        ix.files.forEach(f => L.push(`  ${f.label}${f.label !== f.name ? ' (' + f.name + ')' : ''} · ${f.kind}${f.module ? ' module' : ''} · ${f.lines} lines · ${ix.fns.filter(x => x.file === f.name).length} fns`));
+        if (ix.tabs.length) L.push('TABS: ' + ix.tabs.map(t => `${t.id}${t.title && t.title !== t.id ? ' (' + t.title + ')' : ''} ${loc(t.file, t.line)} · ${ix.els.filter(e => e.tab === t.id && !e.inJs).length} controls`).join(' | '));
+        return L.join('\n');
+    }
+    function tabText(ix, tabId) {
+        const t = ix.tabs.find(x => x.id === tabId);
+        if (!t) return `No tab "${tabId}".`;
+        const els = ix.els.filter(e => e.tab === t.id && !e.inJs && (e.handlers.length || e.listeners || /button|input|select|textarea|a/.test(e.tag)));
+        const L = [`TAB "${t.id}" (${t.title}) ${loc(t.file, t.line)}–${t.endLine}${t.heading ? ' — ' + t.heading : ''}`];
+        els.slice(0, 60).forEach(e => {
+            const h = handlersOf(ix, e), fns = [...new Set(h.flatMap(x => x.fns))];
+            L.push(`  <${e.tag}>${e.id ? '#' + e.id : ''}${e.label ? ` "${e.label}"` : ''}${fns.length ? ' → ' + fns.map(f => fnLabel(f) + ' ' + loc(f.file, f.line)).join(', ') : h.length ? '' : ' (no handler found)'}`);
+        });
+        return L.join('\n');
+    }
+    function snippet(ix, file, line, before = 6, after = 14) {
+        const f = ix.files.find(x => x.name === file);
+        if (!f) return null;
+        const lines = f.text.split('\n'), a = Math.max(1, line - before), b = Math.min(lines.length, line + after);
+        const out = [];
+        for (let i = a; i <= b; i++) out.push({ n: i, text: lines[i - 1], hit: i === line });
+        return out;
+    }
+
+    return { build, strip, search, liveElement, elementInfo, fnInfo, findElement, findFn, health, chainFrom, handlersOf,
+        elementText, fnText, searchText, healthText, overviewText, tabText, snippet, rulesFor };
+})();
+
+
+const atEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const atJs = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/</g, '\\x3c');
+
+const Atlas = {
+    scope: (() => { try { return localStorage.getItem('apui_atlas_scope') === 'system' ? 'system' : 'project'; } catch (_) { return 'project'; } })(),
+    _ix: { project: null, system: null },
+    _projKey: '',
+    _sysLoading: null,
+    _sysNote: '',
+    view: null,          // { kind: 'home'|'search'|'element'|'fn'|'loc'|'tab'|'file', … }
+    _back: [],
+    _picking: null,
+
+    /* ── building the maps ── */
+    projectSources() {
+        return flattenTree().filter(({ node }) => node !== vibeTree && !SYSTEM_NODE_IDS.has(node.id)).map(({ node }) => ({
+            name: node.id, label: node.id, text: jvNodeCode(node),
+            kind: node.type === 'css' ? 'css' : ['javascript', 'js-function', 'declaration'].includes(node.type) ? 'js' : 'html'
+        })).filter(s => s.text && s.text.trim());
+    },
+    project() {
+        const src = this.projectSources();
+        const key = jvHash(src.map(s => s.name + '\u0001' + s.text).join('\u0002'));
+        if (!this._ix.project || key !== this._projKey) { this._ix.project = AtlasCore.build('project', src); this._projKey = key; }
+        return this._ix.project;
+    },
+    system(force) {
+        if (this._ix.system && !force) return Promise.resolve(this._ix.system);
+        if (this._sysLoading && !force) return this._sysLoading;
+        this._sysLoading = (async () => {
+            let files = [];
+            this._sysNote = '';
+            try { const r = await Bridge.call('get_system_sources', {}, 30000); files = (r && r.files) || []; }
+            catch (e) { this._sysNote = e.message; }
+            if (!files.some(f => f.name === 'apui.html')) {
+                let text = '';
+                try { const res = await fetch(location.href.split('#')[0], { cache: 'no-store' }); if (res.ok) text = await res.text(); } catch (_) {}
+                files.push({ name: 'apui.html', kind: 'html', text: text || '<!DOCTYPE html>\n' + document.documentElement.outerHTML });
+            }
+            const ix = AtlasCore.build('system', files);
+            ix.partial = files.length < 3;
+            this._ix.system = ix; this._sysLoading = null;
+            return ix;
+        })();
+        return this._sysLoading;
+    },
+    get(scope) { return scope === 'system' ? this.system() : Promise.resolve(this.project()); },
+    ixNow() { return this.scope === 'system' ? this._ix.system : this.project(); },
+    async rescan() { if (this.scope === 'system') { this._render('<div class="at-empty">Reading the Vibe System’s source…</div>'); await this.system(true); } else this._projKey = ''; this.home(); },
+
+    /* ── panel plumbing ── */
+    open(scope, view) {
+        JarvisPR.openPanel();
+        JarvisPR.switchTab('map');
+        if (scope && scope !== this.scope) this.setScope(scope, true);
+        if (view) this._go(view, true);
+    },
+    onShown() { this._renderScope(); if (!this.view) this.home(); else this._show(); },
+    setScope(scope, quiet) {
+        this.scope = scope === 'system' ? 'system' : 'project';
+        try { localStorage.setItem('apui_atlas_scope', this.scope); } catch (_) {}
+        this._back = []; this.view = null;
+        this._renderScope();
+        if (!quiet) this.home();
+    },
+    _renderScope() {
+        document.querySelectorAll('#jpr-pane-map .at-scope button').forEach(b => b.classList.toggle('on', b.dataset.scope === this.scope));
+        const pick = document.getElementById('at-pick');
+        if (pick) pick.title = this.scope === 'system' ? 'Click anything in the Vibe System to see what is responsible for it' : 'Click anything in the live preview to see what is responsible for it';
+    },
+    _go(view, replace) { if (this.view && !replace) this._back.push(this.view); if (this._back.length > 30) this._back.shift(); this.view = view; this._show(); },
+    back() { const v = this._back.pop(); if (v) { this.view = v; this._show(); } else this.home(); },
+    home() { this._back = []; this.view = { kind: 'home' }; this._show(); },
+    search(q) {
+        q = String(q == null ? (document.getElementById('at-q') || {}).value || '' : q).trim();
+        const inp = document.getElementById('at-q'); if (inp && inp.value !== q) inp.value = q;
+        if (!q) return this.home();
+        this._go({ kind: 'search', q }, this.view && this.view.kind === 'search');
+    },
+    _render(html) { const b = document.getElementById('at-body'); if (b) { b.innerHTML = html; b.scrollTop = 0; } },
+    async _show() {
+        const v = this.view || { kind: 'home' };
+        const backBtn = document.getElementById('at-back');
+        if (backBtn) backBtn.style.visibility = this._back.length || v.kind !== 'home' ? 'visible' : 'hidden';
+        let ix;
+        if (this.scope === 'system' && !this._ix.system) this._render('<div class="at-empty">Reading the Vibe System’s own source (index.html, app3.js, apui.html)…</div>');
+        try { ix = await this.get(this.scope); } catch (e) { this._render(`<div class="at-empty">Couldn't build the map: ${atEsc(e.message)}</div>`); return; }
+        if (this.view !== v) return;
+        this._foot(ix);
+        try {
+            if (v.kind === 'home') this._render(this._homeHtml(ix));
+            else if (v.kind === 'search') this._render(this._searchHtml(ix, v.q));
+            else if (v.kind === 'element') this._render(this._elementHtml(ix, v));
+            else if (v.kind === 'fn') this._render(this._fnHtml(ix, v));
+            else if (v.kind === 'loc') this._render(this._locHtml(ix, v));
+            else if (v.kind === 'tab') this._render(this._tabHtml(ix, v.id));
+            else if (v.kind === 'file') this._render(this._fileHtml(ix, v.name));
+        } catch (e) { console.error('[Atlas]', e); this._render(`<div class="at-empty">Something went wrong drawing this: ${atEsc(e.message)}</div>`); }
+    },
+    _foot(ix) {
+        const f = document.getElementById('at-foot');
+        if (!f) return;
+        f.innerHTML = `<span>${ix.fns.length} functions · ${ix.els.length} elements · ${ix.rules.length} CSS rules${ix.partial ? ' · <b title="' + atEsc(this._sysNote || 'Only part of the system could be read') + '">partial</b>' : ''}</span><span class="jv-spacer"></span><button class="jpr-btn" onclick="Atlas.rescan()" title="Read the code again">⟳ Rescan</button>`;
+    },
+
+    /* ── small html helpers ── */
+    _locLink(file, line, label) { return `<span class="at-loc" onclick="Atlas.showLoc('${atJs(file)}',${+line || 1})">${atEsc(label || `${file}:${line}`)}</span>`; },
+    _fnLink(ix, f, extra = '') { return `<span class="at-fn" onclick="Atlas.openFn('${atJs(f.qual)}')">${atEsc(f.qual)}()</span> ${this._locLink(f.file, f.line)}${extra}`; },
+    _elName(e) { return `&lt;${atEsc(e.tag)}&gt;${e.id ? ' <b>#' + atEsc(e.id) + '</b>' : ''}${e.classes.length && !e.id ? ' .' + atEsc(e.classes.slice(0, 2).join('.')) : ''}${e.label && e.label !== '…' ? ` “${atEsc(e.label)}”` : ''}`; },
+    _elLink(e) { return e.i >= 0 ? `<span class="at-elref" onclick="Atlas.openEl(${e.i})">${this._elName(e)}</span>` : this._elName(e); },
+    _sec(title, body, sub = '') { return body ? `<div class="at-sec"><div class="at-sec-h">${title}${sub ? ` <span>${sub}</span>` : ''}</div>${body}</div>` : ''; },
+    _fileLabel(ix, name) { return ix.scope === 'project' ? `[${name}]` : name; },
+
+    /* ── views ── */
+    _homeHtml(ix) {
+        const hl = AtlasCore.health(ix);
+        const probs = hl.unreachable.length + hl.missingIds.length;
+        let h = '';
+        if (ix.scope === 'project' && !ix.files.length) return '<div class="at-empty">This project has no code yet.</div>';
+        h += `<div class="at-intro">${ix.scope === 'system'
+            ? 'A live map of the Vibe System itself, read from its source. Search, pick something on screen, or open a tab to see every control and the function behind it.'
+            : 'A live map of this project, read from the code. Search for a label, <code>#id</code>, function or <code>.class</code>, or 🎯 pick something in the preview.'}</div>`;
+        if (ix.tabs.length) h += this._sec('Tabs', `<div class="at-grid">${ix.tabs.map(t => `<button class="at-tile" onclick="Atlas._go({kind:'tab',id:'${atJs(t.id)}'})"><b>${atEsc(t.title || t.id)}</b><span>${ix.els.filter(e => e.tab === t.id && !e.inJs && (e.handlers.length || e.listeners)).length} wired controls</span></button>`).join('')}</div>`);
+        const fileRows = ix.files.map(f => {
+            const nf = ix.fns.filter(x => x.file === f.name).length, ne = ix.els.filter(x => x.file === f.name && !x.inJs).length;
+            return `<div class="at-row" onclick="Atlas._go({kind:'file',name:'${atJs(f.name)}'})"><span class="at-kind k-${f.kind}">${f.kind}${f.module ? ' mod' : ''}</span><b>${atEsc(this._fileLabel(ix, f.name))}</b><span class="at-dim">${f.lines} lines · ${nf} fn · ${ne} el</span></div>`;
+        }).join('');
+        h += this._sec(ix.scope === 'system' ? 'Files' : 'Nodes', fileRows);
+        h += this._healthHtml(ix, hl, probs);
+        return h;
+    },
+    _healthHtml(ix, hl, probs) {
+        let body = '';
+        hl.unreachable.slice(0, 20).forEach(u => { body += `<div class="at-row warn">⚠ <span>${u.event} on ${this._elLink(u.el)} ${this._locLink(u.el.file, u.el.line)}<br><span class="at-dim">${atEsc(u.problem)}</span></span></div>`; });
+        hl.missingIds.slice(0, 20).forEach(r => { body += `<div class="at-row warn">⚠ <span>Code looks for <b>#${atEsc(r.value)}</b> but no markup has it — ${r.fn >= 0 ? this._fnLink(ix, ix.fns[r.fn]) : this._locLink(r.file, r.line)}</span></div>`; });
+        if (hl.unused.length) body += `<details class="at-more"><summary>${hl.unused.length} function${hl.unused.length > 1 ? 's' : ''} nothing references (likely dead code)</summary>${hl.unused.slice(0, 60).map(f => `<div class="at-row">${this._fnLink(ix, f)}</div>`).join('')}</details>`;
+        return this._sec('Wiring check', body || '<div class="at-row ok">✓ No broken handlers or missing ids found.</div>', probs ? `${probs} problem${probs > 1 ? 's' : ''}` : '')
+            + `<div class="at-actions"><button class="jpr-btn" onclick="Atlas.ask('Run a wiring check on the ${ix.scope === 'system' ? 'Vibe System' : 'project'} and explain anything that looks broken, most important first. Cite locations.')">Ask Jarvis about these</button></div>`;
+    },
+    _searchHtml(ix, q) {
+        const hits = AtlasCore.search(ix, q, 40);
+        if (!hits.length) return `<div class="at-empty">Nothing matches “${atEsc(q)}” in the ${ix.scope === 'system' ? 'Vibe System' : 'project'}.${ix.scope === 'project' ? ' <a onclick="Atlas.setScope(\'system\',true);Atlas.search(\'' + atJs(q) + '\')">Search the Vibe System instead?</a>' : ' <a onclick="Atlas.setScope(\'project\',true);Atlas.search(\'' + atJs(q) + '\')">Search this project instead?</a>'}</div>`;
+        return hits.map(h => {
+            if (h.kind === 'element') {
+                const e = h.ref, hs = AtlasCore.handlersOf(ix, e), fns = [...new Set(hs.flatMap(x => x.fns))];
+                return `<div class="at-row" onclick="Atlas.openEl(${e.i})"><span class="at-kind k-el">el</span><span>${this._elName(e)}${e.tab ? ` <span class="at-tag">${atEsc(e.tab)} tab</span>` : ''}<br><span class="at-dim">${atEsc(this._fileLabel(ix, e.file))}:${e.line}${fns.length ? ' · runs ' + atEsc(fns.slice(0, 3).map(f => f.qual + '()').join(', ')) : hs.length ? '' : ''}</span></span></div>`;
+            }
+            if (h.kind === 'function') { const f = h.ref; return `<div class="at-row" onclick="Atlas.openFn('${atJs(f.qual)}')"><span class="at-kind k-fn">fn</span><span><b>${atEsc(f.qual)}()</b><br><span class="at-dim">${atEsc(this._fileLabel(ix, f.file))}:${f.line} · ${f.calledBy.size} caller${f.calledBy.size === 1 ? '' : 's'}${f.triggers.length ? ` · ${f.triggers.length} UI trigger${f.triggers.length > 1 ? 's' : ''}` : ''}</span></span></div>`; }
+            if (h.kind === 'css') return `<div class="at-row" onclick="Atlas.showLoc('${atJs(h.ref.file)}',${h.ref.line})"><span class="at-kind k-css">css</span><span>${atEsc(h.ref.selector.slice(0, 90))}<br><span class="at-dim">${atEsc(this._fileLabel(ix, h.ref.file))}:${h.ref.line}</span></span></div>`;
+            return `<div class="at-row" onclick="Atlas._go({kind:'tab',id:'${atJs(h.ref.id)}'})"><span class="at-kind k-tab">tab</span><span><b>${atEsc(h.ref.title)}</b><br><span class="at-dim">${atEsc(h.ref.file)}:${h.ref.line}</span></span></div>`;
+        }).join('');
+    },
+    _elementHtml(ix, v) {
+        const el = v.ei != null ? ix.els[v.ei] : v.el;
+        if (!el) return '<div class="at-empty">That element is no longer in the map.</div>';
+        const info = AtlasCore.elementInfo(ix, el);
+        const label = v.liveLabel || el.label;
+        let h = `<div class="at-card-h"><span class="at-kind k-el">element</span> &lt;${atEsc(el.tag)}&gt;${el.id ? ' <b>#' + atEsc(el.id) + '</b>' : ''}${el.classes.length ? ' <span class="at-dim">.' + atEsc(el.classes.slice(0, 3).join('.')) + '</span>' : ''}${label && label !== '…' ? `<div class="at-label">“${atEsc(label)}”</div>` : ''}</div>`;
+        const where = el.live ? `Only exists on the live page (created at runtime)${el.tab ? ` · ${atEsc(el.tab)} tab` : ''}`
+            : `${this._locLink(el.file, el.line, `${this._fileLabel(ix, el.file)}:${el.line}`)}${el.tab ? ` · inside the <b>${atEsc(el.tab)}</b> tab` : ''}${el.inJs && el.renderedBy >= 0 ? `<br>Built in code by ${this._fnLink(ix, ix.fns[el.renderedBy])}` : ''}`;
+        h += `<div class="at-where">${where}${v.how === 'class' ? '<br><span class="at-dim">(matched by its classes; there may be several like it)</span>' : ''}</div>`;
+        if (info.handlers.length) {
+            h += this._sec('What happens when you use it', info.handlers.map(x => `<div class="at-handler"><div><b>on${atEsc(x.event)}</b> <span class="at-dim">${x.via === 'inline' ? 'inline attribute' : 'listener ' + this._locLink(x.file, x.line)}${x.inside ? ' in ' + atEsc(x.inside.qual) + '()' : ''}</span></div><code>${atEsc(x.code.slice(0, 140))}</code>${x.problems.map(p => `<div class="at-warn">⚠ ${atEsc(p)}</div>`).join('')}</div>`).join(''));
+            if (info.chain.length) h += this._sec('What runs', info.chain.map(({ f, d }) => `<div class="at-chain" style="padding-left:${8 + d * 14}px">${d ? '↳ ' : '▶ '}${this._fnLink(ix, f)}</div>`).join(''), 'call chain, two levels');
+        } else h += this._sec('What happens when you use it', `<div class="at-row at-dim">No handler found in the code. It may be handled by a parent (event delegation)${el.tag === 'a' ? ', be a plain link' : ''}, or do nothing.</div>`);
+        if (info.touchers.length) h += this._sec('Code that reads or changes it', info.touchers.map(t => `<div class="at-row">${t.fn ? this._fnLink(ix, t.fn) : this._locLink(t.file, t.line, 'top-level code ' + t.file + ':' + t.line)} <span class="at-dim">${atEsc([...t.how].join(', '))}</span></div>`).join(''));
+        if (info.rules.length) h += this._sec('Styled by', info.rules.map(r => `<div class="at-row">${atEsc(r.selector.slice(0, 80))} ${this._locLink(r.file, r.line)}</div>`).join(''));
+        h += `<div class="at-actions">${el.id || el.live ? `<button class="jpr-btn" onclick="Atlas.flash(${el.i >= 0 ? el.i : -1})">👁 Show me</button>` : ''}<button class="jpr-btn primary" onclick="Atlas.askAbout()">Ask Jarvis to explain</button></div>`;
+        this._lastText = AtlasCore.elementText(ix, info);
+        return h;
+    },
+    _fnHtml(ix, v) {
+        const f = AtlasCore.findFn(ix, v.qual);
+        if (!f) return `<div class="at-empty">No function “${atEsc(v.qual)}” in the map.</div>`;
+        const info = AtlasCore.fnInfo(ix, f);
+        let h = `<div class="at-card-h"><span class="at-kind k-fn">function</span> <b>${atEsc(f.qual)}()</b></div>`;
+        h += `<div class="at-where">${this._locLink(f.file, f.line, `${this._fileLabel(ix, f.file)}:${f.line}–${f.endLine}`)} · ${f.endLine - f.line + 1} lines${f.module ? ' · ES-module scope' : f.global ? ' · global' : ''}${ix.exposed.has(f.name) ? ' · on <code>window</code>' : ''}</div>`;
+        if (info.triggers.length) h += this._sec('Triggered by', info.triggers.slice(0, 14).map(t => t.kind === 'element'
+            ? `<div class="at-row"><b>${atEsc(t.event)}</b> on ${this._elLink(t.el)}${t.el.tab ? ` <span class="at-tag">${atEsc(t.el.tab)} tab</span>` : ''}</div>`
+            : `<div class="at-row"><b>${atEsc(t.l.event)}</b> listener on <code>${atEsc(t.l.target.slice(0, 60))}</code> ${this._locLink(t.l.file, t.l.line)}</div>`).join(''));
+        if (info.calledBy.length) h += this._sec('Called by', info.calledBy.slice(0, 20).map(g => `<div class="at-row">${this._fnLink(ix, g)}</div>`).join(''), String(info.calledBy.length));
+        if (info.calls.length) h += this._sec('Calls', info.calls.slice(0, 24).map(g => `<div class="at-row">${this._fnLink(ix, g)}</div>`).join(''), String(info.calls.length));
+        if (info.touches.length) h += this._sec('Elements it touches', info.touches.map(t => `<div class="at-row">${t.el ? this._elLink(t.el) : '<b>' + (t.r.kind === 'id' ? '#' : '.') + atEsc(t.r.value) + '</b>' + (t.r.kind === 'id' ? ' <span class="at-warn">not in markup</span>' : '')} <span class="at-dim">${atEsc(t.r.how)} · line ${t.r.line}</span></div>`).join(''));
+        if (!info.triggers.length && !info.calledBy.length) h += `<div class="at-row ${info.referenced > 1 ? 'at-dim' : 'warn'}">${info.referenced > 1 ? 'No direct callers found. It is probably passed as a callback or looked up by name.' : '⚠ Nothing references it. Likely dead code.'}</div>`;
+        const snip = AtlasCore.snippet(ix, f.file, f.line, 0, Math.min(40, f.endLine - f.line));
+        if (snip) h += this._sec('Code', this._snipHtml(snip, f.file, f.line), f.endLine - f.line > 40 ? 'first 40 lines' : '');
+        h += `<div class="at-actions"><button class="jpr-btn" onclick="Atlas.showLoc('${atJs(f.file)}',${f.line})">Open</button><button class="jpr-btn primary" onclick="Atlas.askAbout()">Ask Jarvis to explain</button></div>`;
+        this._lastText = AtlasCore.fnText(ix, info);
+        return h;
+    },
+    _snipHtml(lines, file, hit) { return `<pre class="at-code">${lines.map(l => `<span class="${l.n === hit ? 'hit' : ''}"><i>${l.n}</i>${atEsc(l.text) || ' '}</span>`).join('\n')}</pre>`; },
+    _locHtml(ix, v) {
+        const snip = AtlasCore.snippet(ix, v.file, v.line, 10, 24);
+        if (!snip) return `<div class="at-empty">${atEsc(v.file)} is not in the map.</div>`;
+        const owner = ix.fns.filter(f => f.file === v.file && f.line <= v.line && f.endLine >= v.line).sort((a, b) => (a.endLine - a.line) - (b.endLine - b.line))[0];
+        let h = `<div class="at-card-h"><span class="at-kind k-${(ix.files.find(f => f.name === v.file) || {}).kind || 'js'}">code</span> <b>${atEsc(this._fileLabel(ix, v.file))}:${v.line}</b></div>`;
+        if (owner) h += `<div class="at-where">Inside ${this._fnLink(ix, owner)}</div>`;
+        h += this._snipHtml(snip, v.file, v.line);
+        h += `<div class="at-actions"><button class="jpr-btn" onclick="Atlas.copy('${atJs(v.file)}:${v.line}')">Copy location</button><button class="jpr-btn" onclick="Atlas._go({kind:'loc',file:'${atJs(v.file)}',line:${Math.max(1, v.line - 30)}},true)">▲</button><button class="jpr-btn" onclick="Atlas._go({kind:'loc',file:'${atJs(v.file)}',line:${v.line + 30}},true)">▼</button></div>`;
+        return h;
+    },
+    _tabHtml(ix, id) {
+        const t = ix.tabs.find(x => x.id === id);
+        if (!t) return '<div class="at-empty">No such tab.</div>';
+        const els = ix.els.filter(e => e.tab === t.id && !e.inJs && (e.handlers.length || e.listeners || /^(button|input|select|textarea|a)$/.test(e.tag)));
+        let h = `<div class="at-card-h"><span class="at-kind k-tab">tab</span> <b>${atEsc(t.title)}</b>${t.heading && t.heading !== t.title ? `<div class="at-label">${atEsc(t.heading)}</div>` : ''}</div><div class="at-where">${this._locLink(t.file, t.line, `${t.file}:${t.line}–${t.endLine}`)}</div>`;
+        h += this._sec('Controls and what they run', els.map(e => {
+            const fns = [...new Set(AtlasCore.handlersOf(ix, e).flatMap(x => x.fns))];
+            return `<div class="at-row" onclick="Atlas.openEl(${e.i})"><span>${this._elName(e)}<br><span class="at-dim">${fns.length ? '→ ' + atEsc(fns.slice(0, 3).map(f => f.qual + '()').join(', ')) : e.handlers.length || e.listeners ? '(handler not resolved)' : 'no handler in code'}</span></span></div>`;
+        }).join('') || '<div class="at-row at-dim">No controls found.</div>', String(els.length));
+        h += `<div class="at-actions"><button class="jpr-btn" onclick="Bridge.call('switch_tab',{tab:'${atJs(t.id)}'}).catch(e=>toast(e.message))">Go to tab</button><button class="jpr-btn primary" onclick="Atlas.ask('Walk me through the ${atJs(t.title)} tab of the Vibe System: what it is for, its main controls, and which functions do the work. Cite locations.')">Ask Jarvis for a tour</button></div>`;
+        return h;
+    },
+    _fileHtml(ix, name) {
+        const f = ix.files.find(x => x.name === name);
+        if (!f) return '<div class="at-empty">No such file.</div>';
+        const fns = ix.fns.filter(x => x.file === name).sort((a, b) => a.line - b.line);
+        const els = ix.els.filter(x => x.file === name && !x.inJs && (x.id || x.handlers.length));
+        let h = `<div class="at-card-h"><span class="at-kind k-${f.kind}">${f.kind}</span> <b>${atEsc(this._fileLabel(ix, name))}</b></div><div class="at-where">${f.lines} lines${f.module ? ' · ES module (its functions are private unless put on <code>window</code>)' : ''}${ix.scope === 'project' ? ` · <span class="at-loc" onclick="JarvisBrain.openNode('${atJs(name)}')">open node</span>` : ''}</div>`;
+        // group functions by their container for a readable outline
+        const groups = new Map();
+        fns.forEach(x => { const k = x.container.split('.')[0] || '(top level)'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+        let outline = '';
+        groups.forEach((list, k) => {
+            outline += list.length > 3 && k !== '(top level)'
+                ? `<details class="at-more"><summary><b>${atEsc(k)}</b> <span class="at-dim">${list.length} members · line ${list[0].line}</span></summary>${list.map(x => `<div class="at-row">${this._fnLink(ix, x)}</div>`).join('')}</details>`
+                : list.map(x => `<div class="at-row">${this._fnLink(ix, x)}</div>`).join('');
+        });
+        h += this._sec('Functions', outline || '<div class="at-row at-dim">None.</div>', String(fns.length));
+        if (els.length) h += this._sec('Elements with ids or handlers', els.slice(0, 80).map(e => `<div class="at-row">${this._elLink(e)} <span class="at-dim">line ${e.line}</span></div>`).join(''), String(els.length));
+        return h;
+    },
+
+    /* ── navigation targets ── */
+    openEl(i) { this._go({ kind: 'element', ei: i }); },
+    openFn(qual) { this._go({ kind: 'fn', qual }); },
+    /** Open a code location: a project node at a line, or a system file snippet. */
+    showLoc(file, line) {
+        line = Math.max(1, parseInt(line, 10) || 1);
+        if (findNodeInTree(file) && !SYSTEM_NODE_IDS.has(file)) { this.revealNodeLine(file, line); return; }
+        const scope = this._ix.system && this._ix.system.files.some(f => f.name === file) ? 'system' : this.scope;
+        this.open(scope, { kind: 'loc', file, line });
+    },
+    revealNodeLine(id, line) {
+        JarvisBrain.openNode(id);
+        setTimeout(() => {
+            const ed = document.getElementById(`ed-${id}`);
+            if (!ed) return;
+            const lines = ed.value.split('\n');
+            let pos = 0;
+            for (let i = 0; i < line - 1 && i < lines.length; i++) pos += lines[i].length + 1;
+            try { ed.focus({ preventScroll: true }); ed.setSelectionRange(pos, pos + (lines[line - 1] || '').length); } catch (_) {}
+            const lh = parseFloat(getComputedStyle(ed).lineHeight) || 16;
+            ed.scrollTop = Math.max(0, (line - 4) * lh);
+            if (typeof syncScroll === 'function') syncScroll(id);
+        }, 420);
+    },
+    copy(text) { try { navigator.clipboard.writeText(text); toast('Copied ' + text); } catch (_) { toast(text); } },
+    ask(prompt) { JarvisBrain.ask(prompt); },
+    askAbout() {
+        const t = this._lastText || '';
+        JarvisBrain.ask(`Explain this from the ${this.scope === 'system' ? 'Vibe System' : 'project'} map in plain words: what it does, the order things happen in, and the one or two places I should read first.\n\n${t.slice(0, 3000)}`);
+    },
+
+    /* ── 🎯 pick an element on the page ── */
+    async pick() {
+        if (this._picking) { this._stopPick(); return; }
+        let win;
+        if (this.scope === 'system') {
+            try { win = window.parent; if (win === window || !win.document.body) throw 0; }
+            catch (_) { toast("Can't reach the Vibe System page from APUI (not same-origin)"); return; }
+            try { await Bridge.call('switch_tab', { tab: 'start' }); } catch (_) {}
+        } else {
+            try { win = await PreviewDriver.getWin('preview'); await PreviewDriver.waitReady(win); }
+            catch (e) { toast(e.message); return; }
+            if (window.innerWidth <= 600) JarvisPR.closePanel();
+        }
+        const doc = win.document, sys = this.scope === 'system';
+        const box = doc.createElement('div');
+        box.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #ff00ff;border-radius:4px;box-shadow:0 0 14px rgba(255,0,255,.6);background:rgba(255,0,255,.06);transition:all .06s;display:none;';
+        const bar = doc.createElement('div');
+        bar.style.cssText = 'position:fixed;z-index:2147483647;left:50%;top:10px;transform:translateX(-50%);background:rgba(10,6,20,.97);border:1px solid #ff00ff;border-radius:10px;padding:7px 12px;font:600 13px/1.3 Rajdhani,system-ui,sans-serif;color:#f3d9ff;display:flex;gap:10px;align-items:center;max-width:calc(100vw - 20px);box-shadow:0 0 18px rgba(255,0,255,.3);';
+        bar.innerHTML = `<span>🎯 ${sys ? 'Tap anything in the Vibe System. Tab buttons still work, so you can go to the tab first.' : 'Tap anything in the preview'}</span><span data-jv-tip style="opacity:.7;font-weight:400"></span><button data-jv-cancel style="background:rgba(255,0,255,.22);border:1px solid #ff00ff;color:#fff;border-radius:6px;padding:2px 10px;font:inherit;cursor:pointer">Cancel</button>`;
+        doc.body.appendChild(box); doc.body.appendChild(bar);
+        const tip = bar.querySelector('[data-jv-tip]');
+        const ours = t => bar.contains(t);
+        const passThrough = t => sys && t.closest && t.closest('.tab-button,[data-tab],#jv-hud');
+        const describe = t => `${t.tagName.toLowerCase()}${t.id ? '#' + t.id : ''}${t.classList && t.classList.length ? '.' + [...t.classList].slice(0, 2).join('.') : ''}`;
+        const onMove = e => {
+            const t = e.target;
+            if (!t || ours(t) || t.nodeType !== 1) { box.style.display = 'none'; return; }
+            const r = t.getBoundingClientRect();
+            Object.assign(box.style, { display: 'block', left: r.left - 2 + 'px', top: r.top - 2 + 'px', width: r.width + 4 + 'px', height: r.height + 4 + 'px' });
+            tip.textContent = describe(t);
+        };
+        const block = e => { if (ours(e.target) || passThrough(e.target)) return; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); };
+        const onClick = e => {
+            if (ours(e.target)) { if (e.target.closest('[data-jv-cancel]')) { e.preventDefault(); this._stopPick(); } return; }
+            if (passThrough(e.target)) return;
+            block(e);
+            const t = e.target;
+            this._stopPick();
+            this._picked(t, win, sys);
+        };
+        const onKey = e => { if (e.key === 'Escape') { block(e); this._stopPick(); } };
+        const opts = { capture: true };
+        doc.addEventListener('mousemove', onMove, opts); doc.addEventListener('pointerover', onMove, opts);
+        ['pointerdown', 'mousedown', 'mouseup', 'pointerup', 'touchstart', 'touchend', 'submit'].forEach(t => doc.addEventListener(t, block, { capture: true, passive: false }));
+        doc.addEventListener('click', onClick, opts); doc.addEventListener('keydown', onKey, opts);
+        this._picking = () => {
+            doc.removeEventListener('mousemove', onMove, opts); doc.removeEventListener('pointerover', onMove, opts);
+            ['pointerdown', 'mousedown', 'mouseup', 'pointerup', 'touchstart', 'touchend', 'submit'].forEach(t => doc.removeEventListener(t, block, { capture: true, passive: false }));
+            doc.removeEventListener('click', onClick, opts); doc.removeEventListener('keydown', onKey, opts);
+            box.remove(); bar.remove();
+        };
+        const pb = document.getElementById('at-pick'); if (pb) pb.classList.add('on');
+    },
+    _stopPick() { if (this._picking) { try { this._picking(); } catch (_) {} this._picking = null; } const pb = document.getElementById('at-pick'); if (pb) pb.classList.remove('on'); },
+    async _picked(t, win, sys) {
+        // Use the element itself, or the nearest ancestor that carries meaning (id / handler / control)
+        let cur = t, best = t;
+        for (let d = 0; cur && cur.nodeType === 1 && d < 6; d++, cur = cur.parentElement) {
+            if (cur.id || [...cur.attributes].some(a => /^on/.test(a.name)) || /^(BUTTON|A|INPUT|SELECT|TEXTAREA|SUMMARY)$/.test(cur.tagName)) { best = cur; break; }
+        }
+        const d = {
+            tag: best.tagName.toLowerCase(), id: best.id || null,
+            classes: [...(best.classList || [])].filter(c => !/^(active|open|show|hover|focus|selected|on|hidden)$/.test(c)),
+            label: PreviewDriver.labelOf(best),
+            onattrs: [...best.attributes].filter(a => /^on[a-z]+$/.test(a.name)).map(a => ({ event: a.name.slice(2), code: a.value })),
+            tab: sys ? ((best.closest && best.closest('.tab-content')) || {}).id || null : null
+        };
+        if (sys) { try { await Bridge.call('switch_tab', { tab: 'apui' }); } catch (_) {} }
+        const ix = await this.get(this.scope);
+        const m = AtlasCore.liveElement(ix, d);
+        this._lastPicked = { win, el: best };
+        SystemLog.add('info', `Mapped ${d.tag}${d.id ? '#' + d.id : ''}${d.label ? ` “${truncate(d.label, 40)}”` : ''} in the ${sys ? 'Vibe System' : 'preview'}`, { src: 'user' });
+        this.open(this.scope, m.el.i >= 0 ? { kind: 'element', ei: m.el.i, how: m.how, liveLabel: d.label } : { kind: 'element', el: m.el, how: m.how, liveLabel: d.label });
+    },
+    /** Briefly ring an element on the page so you can see which one the map means. */
+    async flash(ei) {
+        const ix = this.ixNow(); const e = ei >= 0 && ix ? ix.els[ei] : null;
+        try {
+            let win, node;
+            if (this.scope === 'system') {
+                win = window.parent;
+                if (e && e.tab) { await Bridge.call('switch_tab', { tab: e.tab }); await jvSleep(350); }
+                node = e && e.id ? win.document.getElementById(e.id) : (this._lastPicked && this._lastPicked.el);
+            } else {
+                win = await PreviewDriver.getWin('preview'); await PreviewDriver.waitReady(win);
+                node = e && e.id ? win.document.getElementById(e.id) : (this._lastPicked && this._lastPicked.el);
+            }
+            if (!node) { toast('It is not on the page right now'); return; }
+            try { node.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+            await jvSleep(300);
+            for (let k = 0; k < 3; k++) { PreviewDriver.ring(win, node); await jvSleep(450); }
+            if (this.scope === 'system') setTimeout(() => Bridge.call('switch_tab', { tab: 'apui' }).catch(() => {}), 1800);
+        } catch (err) { toast(err.message || 'Could not show it'); }
+    },
+
+    /* ── Jarvis prompt section ── */
+    promptSection() {
+        return `KNOWING THE SYSTEM — the Atlas
+You have a live code map, built from the actual source (not from descriptions), of two scopes: "project" (this project's nodes) and "system" (the Vibe System you live in: index.html, app3.js, apui.html). Trust it over memory.
+- Questions like "where is…", "what does this button do", "which function handles…", "how does X work": use where_is / explain_element / function_info (and read_code for the body) BEFORE answering. Then answer as a chain in plain words: what the user does → which handler → which functions run, in order → what changes on screen.
+- Always cite locations so they are clickable: system code as file:line (app3.js:4401), project code as node-id:line (hero-js:12). Name the one or two places worth reading first. The user wants to stay oriented in their own code, so teach the map, don't just summarise it.
+- When something "does nothing" or "broke", run wiring_check: it finds onclick handlers that can't reach their function (e.g. an ES-module function never put on window), ids the code expects but the markup lacks, and dead functions.
+- To operate the Vibe System's own UI (any tab, any button, any field), use run_test with target "system". Get real selectors first with inspect_preview {"target":"system","tab":"…"} or system_map {"tab":"…"}. A system test must start by clicking the tab button [data-tab="…"] unless that tab is already active. For just changing tabs, switch_tab is enough.
+
+AUTOMATIONS — routines you build, the user approves
+- When the user says "whenever…", "every time…", "after I…", "every N minutes…", "automatically…", propose create_routine in a plan (ask first if the trigger or the steps are unclear). Nothing is armed until they approve the plan, and they can pause or delete it in the Auto tab.
+- EVENTS: ${Object.entries(ROUTINE_EVENTS).map(([k, v]) => `${k} (${v})`).join('; ')}.
+- "match" (optional) only fires when the event text contains it, e.g. an error message fragment or an Agent task name. "everyMin" is required for interval (5–1440). "project": "this" (default) or "all".
+- Steps are your normal tools with args. Good steps: run_test, add_note, save_checkpoint, wiring_check, switch_tab, queue_agent_task, ask_jarvis (I look at what happened, including earlier steps' output, and tell the user in chat). make_pr is allowed but only when the user wants fixes proposed automatically; every PR still needs their review. Never: load_project, check_and_fix_errors.
+- Text in step args may use {{message}} (the event's text), {{event}}, {{project}}, {{pr}}, {{node}}.
+- To change an automation: plan remove_routine for the old id, then create_routine for the new one. The main app's Auto-Pilot triggers (add_trigger) are a simpler, older mechanism for its Agent queue; prefer routines.`;
+    }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   ROUTINES — automations Jarvis builds and you approve.
+   WHEN an event happens (PR merged, error, test failed, Agent queue
+   finished, every N minutes…) → run a list of Jarvis tool steps.
+   Stored in localStorage (apui_routines_v1), shown in the Auto tab,
+   logged to the project's system log. Run only while the Vibe System
+   is open. Safety: events raised while a routine runs are ignored (no
+   loops), each routine is rate-limited, risky tools are refused, and
+   code changes still arrive as PRs you review.
+   ════════════════════════════════════════════════════════════════ */
+const ROUTINE_EVENTS = {
+    'manual': 'only when you press Run',
+    'project-opened': 'a project is opened in APUI',
+    'pr-opened': 'Jarvis opens a PR',
+    'pr-merged': 'a PR is merged',
+    'pushed': 'APUI edits are pushed to the Vibe System',
+    'error': 'a runtime error appears in the preview or the main app',
+    'test-failed': 'a UI test fails',
+    'test-passed': 'a UI test passes',
+    'agent-task-failed': "the main app's Agent fails a task",
+    'agent-task-complete': "the main app's Agent finishes a task",
+    'agent-queue-complete': "the main app's Agent queue finishes",
+    'interval': 'every N minutes while the Vibe System is open'
+};
+const ROUTINE_BLOCKED = new Set(['load_project', 'check_and_fix_errors', 'create_routine', 'remove_routine', 'toggle_routine', 'run_routine']);
+const ROUTINE_SAMPLE = { message: 'sample event text', event: 'manual', project: 'project', pr: '1', node: 'node' };
+
+const Routines = {
+    KEY: 'apui_routines_v1',
+    list: [],
+    running: null,
+    _queue: [],
+    _draining: false,
+    _openRuns: new Set(),
+
+    init() {
+        try { const a = JSON.parse(localStorage.getItem(this.KEY) || '[]'); if (Array.isArray(a)) this.list = a.filter(r => r && r.id && ROUTINE_EVENTS[r.when] && Array.isArray(r.steps)); } catch (_) { this.list = []; }
+        setInterval(() => this._tick(), 60000);
+        const inp = document.getElementById('au-input');
+        if (inp && !inp._bound) { inp._bound = true; inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.compose(); } }); }
+    },
+    save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.list)); } catch (_) {} this._badge(); },
+    _badge() {
+        const b = document.getElementById('jpr-badge-auto');
+        if (!b) return;
+        const n = this.list.filter(r => r.enabled && this._inScope(r)).length;
+        b.textContent = n; b.style.display = n ? 'block' : 'none';
+    },
+    _inScope(r) { return !r.projectId || r.projectId === ProjectStore.projectId; },
+    label(r) { return `WHEN ${ROUTINE_EVENTS[r.when] || r.when}${r.when === 'interval' ? ` (${r.everyMin} min)` : ''}${r.match ? ` matching “${r.match}”` : ''}`; },
+
+    /* ── templates ── */
+    _fill(v, ev) {
+        if (typeof v === 'string') return v.replace(/\{\{\s*(message|event|project|pr|node)\s*\}\}/g, (_, k) => String((ev && ev[k]) != null ? ev[k] : ''));
+        if (Array.isArray(v)) return v.map(x => this._fill(x, ev));
+        if (v && typeof v === 'object') { const o = {}; Object.keys(v).forEach(k => { o[k] = this._fill(v[k], ev); }); return o; }
+        return v;
+    },
+
+    /* ── create / change ── */
+    validate(a) {
+        const when = String(a.when || a.event || '').trim();
+        if (!ROUTINE_EVENTS[when]) throw new Error(`unknown event "${when}"`);
+        const steps = (Array.isArray(a.steps) ? a.steps : []).slice(0, 6).map((s, i) => {
+            const tool = jvStr(s && s.tool, 40), def = JarvisTools.get(tool);
+            if (!def) throw new Error(`step ${i + 1}: unknown tool "${tool}"`);
+            if (ROUTINE_BLOCKED.has(tool)) throw new Error(`step ${i + 1}: "${tool}" can't run unattended`);
+            const args = (s && s.args && typeof s.args === 'object') ? JSON.parse(JSON.stringify(s.args)) : {};
+            def.check(this._fill(args, ROUTINE_SAMPLE));
+            return { tool, args };
+        });
+        if (!steps.length) throw new Error('an automation needs at least one step');
+        return {
+            name: jvStr(a.name || 'Automation', 60) || 'Automation', when,
+            match: jvStr(a.match, 80), everyMin: when === 'interval' ? Math.max(5, Math.min(1440, parseInt(a.everyMin, 10) || 30)) : null,
+            project: a.project === 'all' ? 'all' : 'this', steps
+        };
+    },
+    add(a) {
+        const r = { id: 'auto-' + Date.now().toString(36).slice(-5), name: a.name, when: a.when, match: a.match, everyMin: a.everyMin,
+            projectId: a.project === 'all' ? null : ProjectStore.projectId, steps: a.steps, enabled: true,
+            createdAt: Date.now(), lastRun: 0, fired: 0, runs: [], recent: [] };
+        this.list.push(r); this.save(); this.render();
+        SystemLog.add('action', `Automation armed: “${r.name}” — ${this.label(r)} → ${r.steps.map(s => s.tool).join(', ')}`, { src: 'jarvis' });
+        return r;
+    },
+    describe(a) {
+        const steps = a.steps.map((s, i) => { let d = s.tool; try { d = JarvisTools.describe(s.tool, JarvisTools.get(s.tool).check(this._fill(s.args, ROUTINE_SAMPLE))); } catch (_) {} return `${i + 1}) ${d.replace(/sample event text/g, '{{message}}')}`; });
+        return `Arm automation “${a.name}”: ${this.label({ when: a.when, everyMin: a.everyMin, match: a.match })} (${a.project === 'all' ? 'every project' : 'this project'}) → ${steps.join('; ')}`;
+    },
+    find(id) { return this.list.find(r => r.id === id) || null; },
+    remove(id, ask) {
+        const r = this.find(id); if (!r) throw new Error(`No automation "${id}".`);
+        if (ask && !confirm(`Delete automation “${r.name}”?`)) return null;
+        this.list = this.list.filter(x => x.id !== id); this.save(); this.render();
+        SystemLog.add('action', `Automation removed: “${r.name}”`, { src: ask ? 'user' : 'jarvis' });
+        return r;
+    },
+    toggle(id, on) {
+        const r = this.find(id); if (!r) throw new Error(`No automation "${id}".`);
+        r.enabled = on == null ? !r.enabled : !!on; this.save(); this.render();
+        return r;
+    },
+
+    /* ── firing ── */
+    emit(event, detail = {}) {
+        if (!ROUTINE_EVENTS[event] || event === 'manual') return;
+        if (this.running || this._draining) return;   // anything a routine causes can't trigger routines (no loops)
+        const msg = String(detail.message || '');
+        const now = Date.now();
+        this.list.forEach(r => {
+            if (!r.enabled || r.when !== event || !this._inScope(r)) return;
+            if (r.match && !msg.toLowerCase().includes(r.match.toLowerCase())) return;
+            r.recent = (r.recent || []).filter(t => now - t < 3600e3);
+            if (r.lastRun && now - r.lastRun < 15000) return;
+            if (r.recent.length >= 10) { if (!r._capNoted) { r._capNoted = true; SystemLog.add('action', `Automation “${r.name}” paused itself: it fired 10 times in an hour`, { src: 'jarvis' }); } return; }
+            r._capNoted = false;
+            this._queue.push({ r, ev: Object.assign({ event, project: ProjectStore.projectId || '' }, detail) });
+        });
+        this._drain();
+    },
+    runNow(id) {
+        const r = this.find(id); if (!r) { toast('No such automation'); return; }
+        this._queue.push({ r, ev: { event: 'manual', project: ProjectStore.projectId || '', message: 'run by hand' }, manual: true });
+        this._drain();
+    },
+    _tick() {
+        const now = Date.now();
+        this.list.forEach(r => { if (r.enabled && r.when === 'interval' && this._inScope(r) && now - (r.lastRun || r.createdAt) >= r.everyMin * 60000) this._queue.push({ r, ev: { event: 'interval', project: ProjectStore.projectId || '', message: `every ${r.everyMin} min` } }); });
+        this._drain();
+    },
+    async _drain() {
+        if (this._draining) return;
+        this._draining = true;
+        try { while (this._queue.length) { const j = this._queue.shift(); await this._run(j.r, j.ev, j.manual); } }
+        finally { this._draining = false; }
+    },
+    async _waitIdle(tool) {
+        const busy = () => JarvisBrain.planRunning || PreviewDriver.running || (tool === 'make_pr' && JarvisPR.running) || (tool === 'ask_jarvis' && JarvisBrain.busy);
+        for (let t = 0; busy() && t < 80; t++) await jvSleep(1500);
+        if (busy()) throw new Error('Jarvis stayed busy for 2 minutes, so this step was skipped');
+    },
+    async _run(r, ev, manual) {
+        if (!this.find(r.id)) return;
+        const t0 = Date.now(), lines = [], outputs = [], prIds = [];
+        let ok = true;
+        this.running = r.id; this.render();
+        r.recent = (r.recent || []).concat(t0); r.lastRun = t0; r.fired = (r.fired || 0) + 1;
+        try {
+            for (let i = 0; i < r.steps.length; i++) {
+                const s = r.steps[i], def = JarvisTools.get(s.tool);
+                let label = s.tool;
+                try {
+                    if (!def) throw new Error('this tool no longer exists');
+                    await this._waitIdle(s.tool);
+                    const args = def.check(this._fill(s.args, ev));
+                    label = JarvisTools.describe(s.tool, args);
+                    const res = s.tool === 'ask_jarvis' ? await this._askJarvis(args, r, ev, outputs) : await def.run(args, {});
+                    const text = String((res && res.text) || 'done');
+                    outputs.push({ tool: s.tool, text: truncate(text, 2500) });
+                    if (res && res.prId) prIds.push(res.prId);
+                    if (res && res.test) {
+                        SystemLog.add('test', `${res.test.failed ? '❌' : '✅'} “${res.test.name}” (automation “${r.name}”): ${res.test.passed}/${res.test.results.length} steps passed`, { src: 'jarvis', meta: { target: res.test.target, failures: res.test.results.filter(x => x.status === 'fail').slice(0, 3).map(x => JarvisTools.stepLine(x)) } });
+                        if (res.test.failed) { ok = false; lines.push(`✗ ${label} → ${truncate(text.split('\n').slice(0, 2).join(' '), 160)}`); break; }
+                    }
+                    lines.push(`✓ ${label} → ${truncate(text.split('\n')[0], 120)}`);
+                } catch (e) { ok = false; lines.push(`✗ ${label} — ${e.message || e}`); break; }
+            }
+        } finally { this.running = null; }
+        r.runs = [{ ts: t0, ok, event: ev.event, message: truncate(String(ev.message || ''), 140), lines, ms: Date.now() - t0 }].concat(r.runs || []).slice(0, 8);
+        this.save();
+        SystemLog.add('action', `⚙ Automation “${r.name}” ${ok ? 'ran' : 'stopped'} (${ev.event}${ev.message && ev.event !== 'manual' ? ': ' + truncate(String(ev.message), 60) : ''}) — ${lines.map(l => truncate(l, 70)).join(' · ')}`, { src: 'jarvis' });
+        const loud = !ok || prIds.length || manual;
+        if (loud && ProjectStore.rec) {
+            JarvisBrain.say(`⚙ **${r.name}** ${ok ? 'ran' : 'stopped early'}${ev.event !== 'manual' ? ` (${ROUTINE_EVENTS[ev.event]})` : ''}\n${lines.join('\n')}`,
+                prIds.map(id => ({ kind: 'tab', label: `Review PR #${id}`, tab: 'prs', used: false })).concat(ok ? [] : [{ kind: 'ask', label: 'Look into it', prompt: `My automation “${r.name}” (${r.id}) stopped early:\n${lines.join('\n')}\nWhat went wrong, and should the automation change?`, used: false }]));
+        } else toast(`⚙ ${r.name} ✓`);
+        this.render();
+    },
+    async _askJarvis(args, r, ev, outputs) {
+        if (!AppState.settings.apiKey) throw new Error('ask_jarvis needs a Gemini API key');
+        await JarvisBrain.converse(`[Automation “${r.name}” fired — ${this.label(r)}${ev.message ? `. Event: “${truncate(String(ev.message), 300)}”` : ''}] ${args.prompt}\nStart your reply with "⚙ ${r.name}:". Anything you want to change goes in a plan for the user to approve.`,
+            { hidden: true, observations: outputs.slice(-4).map(o => ({ tool: o.tool, text: o.text })) });
+        return { text: 'Jarvis replied in chat' };
+    },
+
+    /* ── Auto tab ── */
+    compose(text) {
+        const inp = document.getElementById('au-input');
+        const v = String(text != null ? text : (inp && inp.value) || '').trim();
+        if (!v) { if (inp) inp.focus(); return; }
+        if (inp) inp.value = '';
+        JarvisBrain.ask(`Build an automation for me: ${v}`);
+    },
+    example(i) { const inp = document.getElementById('au-input'); if (inp) { inp.value = this.EXAMPLES[i]; inp.focus(); } },
+    EXAMPLES: [
+        'After every merged PR, test the main user flow in the preview and tell me if anything broke.',
+        'When a runtime error shows up, work out the likely cause and tell me what you would do.',
+        'Every 60 minutes, save a checkpoint of the project.',
+        "When the main app's Agent finishes its queue, run a wiring check and tell me about anything broken."
+    ],
+    toggleRuns(id) { this._openRuns.has(id) ? this._openRuns.delete(id) : this._openRuns.add(id); this.render(); },
+    render() {
+        this._badge();
+        const el = document.getElementById('au-list');
+        if (!el || !document.getElementById('jpr-pane-auto')?.classList.contains('active')) return;
+        const mine = this.list.filter(r => this._inScope(r)), others = this.list.length - mine.length;
+        if (!mine.length) {
+            el.innerHTML = `<div class="at-empty">No automations for this project yet. Describe one above, or start from an example:</div>` +
+                this.EXAMPLES.map((t, i) => `<button class="jv-chip au-ex" onclick="Routines.example(${i})">${atEsc(t)}</button>`).join('') +
+                (others ? `<div class="at-empty">${others} automation${others > 1 ? 's' : ''} belong${others > 1 ? '' : 's'} to other projects.</div>` : '');
+        } else {
+            el.innerHTML = mine.map(r => {
+                const last = r.runs && r.runs[0];
+                const steps = r.steps.map(s => { let d = s.tool; try { d = JarvisTools.describe(s.tool, JarvisTools.get(s.tool).check(this._fill(s.args, ROUTINE_SAMPLE))).replace(/sample event text/g, '{{message}}'); } catch (_) {} return `<li>${atEsc(d)}</li>`; }).join('');
+                const runs = this._openRuns.has(r.id) ? `<div class="au-runs">${(r.runs || []).map(x => `<div class="au-run ${x.ok ? 'ok' : 'bad'}"><b>${x.ok ? '✓' : '✗'} ${jvRel(x.ts)}</b> · ${atEsc(x.event)}${x.message ? ' · ' + atEsc(x.message) : ''}<br>${x.lines.map(atEsc).join('<br>')}</div>`).join('') || '<div class="at-dim">Never ran.</div>'}</div>` : '';
+                return `<div class="au-card${r.enabled ? '' : ' off'}${this.running === r.id ? ' running' : ''}">
+                    <div class="au-head"><label class="au-sw" title="${r.enabled ? 'Pause' : 'Resume'}"><input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="Routines.toggle('${atJs(r.id)}',this.checked)"><span></span></label><b>${atEsc(r.name)}</b><span class="at-tag">${r.projectId ? 'this project' : 'all projects'}</span></div>
+                    <div class="au-when">${atEsc(this.label(r))}</div>
+                    <ol class="au-steps">${steps}</ol>
+                    <div class="au-meta">${this.running === r.id ? '<b>running…</b>' : last ? `${last.ok ? '✓' : '✗'} last ran ${jvRel(last.ts)} · ${r.fired}×` : 'not run yet'} · <a onclick="Routines.toggleRuns('${atJs(r.id)}')">${this._openRuns.has(r.id) ? 'hide' : 'history'}</a></div>
+                    ${runs}
+                    <div class="au-actions"><button class="jpr-btn" onclick="Routines.runNow('${atJs(r.id)}')">▶ Run now</button><button class="jpr-btn" onclick="JarvisBrain.openChat('Change my automation ${atJs(r.id)} (“${atJs(r.name)}”): ')">✎ Change</button><button class="jpr-btn danger" onclick="Routines.remove('${atJs(r.id)}',true)">Delete</button></div>
+                </div>`;
+            }).join('') + (others ? `<div class="at-empty">${others} more automation${others > 1 ? 's' : ''} belong${others > 1 ? '' : 's'} to other projects.</div>` : '');
+        }
+        this._renderLegacy();
+    },
+    async _renderLegacy() {
+        const el = document.getElementById('au-legacy');
+        if (!el) return;
+        let list = [];
+        try { list = await Bridge.call('list_triggers', {}, 3000); } catch (_) { el.innerHTML = ''; return; }
+        el.innerHTML = list && list.length ? `<div class="at-sec-h">Main-app Auto-Pilot triggers <span>Agent tab</span></div>` + list.map(t => `<div class="at-row${t.enabled ? '' : ' at-dim'}">WHEN ${atEsc(t.when)} → ${atEsc(t.do)}${t.value ? ' “' + atEsc(truncate(t.value, 60)) + '”' : ''} <span class="at-dim">${t.fired}× · ${atEsc(t.id)}</span></div>`).join('') : '';
+    },
+    briefLines() {
+        const mine = this.list.filter(r => this._inScope(r));
+        return mine.length ? mine.map(r => `- ${r.id} “${r.name}” ${r.enabled ? 'ON' : 'paused'}: ${this.label(r)} → ${r.steps.map(s => s.tool).join(', ')}${r.runs && r.runs[0] ? ` (last ${r.runs[0].ok ? 'ok' : 'FAILED'} ${jvRel(r.runs[0].ts)})` : ''}`).join('\n') : 'No automations armed.';
+    }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   JARVIS TOOLS added by the Atlas and Routines layers
+   ════════════════════════════════════════════════════════════════ */
+Object.assign(JarvisTools.defs, {
+    where_is: { kind: 'read', sig: '{"query":"a label, #id, function, .class or plain words","scope":"project|system"}', doc: 'Search the live code map (elements, functions, CSS rules, tabs) with exact locations.',
+        check: a => { const q = jvStr(a.query, 120); if (q.length < 2) throw new Error('query too short'); return { query: q, scope: a.scope === 'system' ? 'system' : 'project' }; },
+        run: async a => { const ix = await Atlas.get(a.scope); return { text: AtlasCore.searchText(ix, AtlasCore.search(ix, a.query, 14)) }; } },
+    explain_element: { kind: 'read', sig: '{"target":"#id | .class | text:Label","scope":"project|system"}', doc: 'Everything responsible for one element: handlers, the functions they run (call chain), code that changes it, CSS that styles it.',
+        check: a => { const t = jvStr(a.target, 120); if (!t) throw new Error('no target'); return { target: t, scope: a.scope === 'system' ? 'system' : 'project' }; },
+        run: async a => {
+            const ix = await Atlas.get(a.scope), el = AtlasCore.findElement(ix, a.target);
+            if (!el) return { text: `No element matches "${a.target}". Closest matches:\n${AtlasCore.searchText(ix, AtlasCore.search(ix, a.target.replace(/^text:/i, ''), 6))}` };
+            return { text: AtlasCore.elementText(ix, AtlasCore.elementInfo(ix, el)) };
+        } },
+    function_info: { kind: 'read', sig: '{"name":"fnName or Obj.method","scope":"project|system"}', doc: 'Where a function lives, what triggers it, who calls it, what it calls, which elements it touches, plus its first lines of code.',
+        check: a => { const n = jvStr(a.name, 120).replace(/\(\)$/, ''); if (!n) throw new Error('no name'); return { name: n, scope: a.scope === 'system' ? 'system' : 'project' }; },
+        run: async a => {
+            const ix = await Atlas.get(a.scope), f = AtlasCore.findFn(ix, a.name);
+            if (!f) return { text: `No function "${a.name}". Closest matches:\n${AtlasCore.searchText(ix, AtlasCore.search(ix, a.name, 6))}` };
+            const snip = AtlasCore.snippet(ix, f.file, f.line, 0, Math.min(70, f.endLine - f.line)) || [];
+            return { text: AtlasCore.fnText(ix, AtlasCore.fnInfo(ix, f)) + '\nCODE:\n' + truncate(snip.map(l => `${l.n}: ${l.text}`).join('\n'), 4500) + (f.endLine - f.line > 70 ? '\n… (more in read_code)' : '') };
+        } },
+    read_code: { kind: 'read', sig: '{"file":"app3.js or a node id","line":120,"lines":60,"scope":"project|system"}', doc: 'Read source lines at a location (any file in the map, or a project node).',
+        check: a => { const f = jvStr(a.file, 120); if (!f) throw new Error('no file'); return { file: f, line: Math.max(1, parseInt(a.line, 10) || 1), lines: Math.max(5, Math.min(150, parseInt(a.lines, 10) || 60)), scope: a.scope === 'system' ? 'system' : 'project' }; },
+        run: async a => {
+            let ix = await Atlas.get(a.scope);
+            if (!ix.files.some(f => f.name === a.file)) { const other = await Atlas.get(a.scope === 'system' ? 'project' : 'system'); if (other.files.some(f => f.name === a.file)) ix = other; }
+            const snip = AtlasCore.snippet(ix, a.file, a.line, 0, a.lines - 1);
+            if (!snip) return { text: `No file "${a.file}" in either map. Files: ${ix.files.map(f => f.name).join(', ')}` };
+            return { text: `${a.file}:${a.line}–${a.line + snip.length - 1}\n` + truncate(snip.map(l => `${l.n}: ${l.text}`).join('\n'), 7000) };
+        } },
+    wiring_check: { kind: 'read', sig: '{"scope":"project|system"}', doc: "Find broken wiring: handlers that can't reach their function, ids code expects but markup lacks, functions nothing uses.",
+        check: a => ({ scope: a.scope === 'system' ? 'system' : 'project' }),
+        run: async a => { const ix = await Atlas.get(a.scope); return { text: AtlasCore.healthText(ix, AtlasCore.health(ix)) }; } },
+    system_map: { kind: 'read', sig: '{"tab":"(optional) a Vibe System tab id"}', doc: "The Vibe System's own anatomy: files and tabs, or for one tab every control and the function behind it.",
+        check: a => ({ tab: a.tab ? jvStr(a.tab, 40) : '' }),
+        run: async a => { const ix = await Atlas.system(); return { text: a.tab ? AtlasCore.tabText(ix, a.tab) : AtlasCore.overviewText(ix) + `\n${ix.exposed.size} functions are exposed on window for onclick use.` }; } },
+    list_routines: { kind: 'read', sig: '{}', doc: 'Automations armed for this project, with their last run.', check: () => ({}),
+        run: async () => ({ text: Routines.briefLines() }) },
+
+    create_routine: { kind: 'control', sig: '{"name":"…","when":"<event>","match":"(optional)","everyMin":30,"project":"this|all","steps":[{"tool":"…","args":{}}]}', doc: 'Arm an automation: WHEN event → run these steps. See AUTOMATIONS.',
+        check: a => Routines.validate(a),
+        describe: a => Routines.describe(a),
+        run: async a => { const r = Routines.add(a); return { text: `Armed automation ${r.id} “${r.name}”` }; } },
+    remove_routine: { kind: 'control', sig: '{"id":"auto-…"}', doc: 'Delete an automation.', check: a => ({ id: jvStr(a.id, 40) }),
+        describe: a => `Delete automation ${a.id}${Routines.find(a.id) ? ` “${Routines.find(a.id).name}”` : ''}`,
+        run: async a => { const r = Routines.remove(a.id); return { text: `Removed “${r.name}”` }; } },
+    toggle_routine: { kind: 'control', sig: '{"id":"auto-…","enabled":true}', doc: 'Pause or resume an automation.', check: a => ({ id: jvStr(a.id, 40), enabled: a.enabled !== false }),
+        describe: a => `${a.enabled ? 'Resume' : 'Pause'} automation ${a.id}`,
+        run: async a => { const r = Routines.toggle(a.id, a.enabled); return { text: `${r.enabled ? 'Resumed' : 'Paused'} “${r.name}”` }; } },
+    run_routine: { kind: 'control', sig: '{"id":"auto-…"}', doc: 'Run an automation once, now.', check: a => ({ id: jvStr(a.id, 40) }),
+        describe: a => `Run automation ${a.id} now`,
+        run: async a => { if (!Routines.find(a.id)) throw new Error(`No automation "${a.id}".`); setTimeout(() => Routines.runNow(a.id), 50); return { text: 'Started' }; } },
+    ask_jarvis: { kind: 'control', routineOnly: true, sig: '{"prompt":"what I should look at and tell you"}', doc: 'I look at what just happened (and the output of earlier steps) and tell you in chat. Anything I want to change comes as a plan.',
+        check: a => { const p = jvStr(a.prompt, 600); if (p.length < 4) throw new Error('prompt too short'); return { prompt: p }; },
+        describe: a => `Ask Jarvis: “${truncate(a.prompt, 90)}”`,
+        run: async () => ({ text: 'ask_jarvis only runs inside an automation' }) }
+});
+
 /* ════════════════════════════════════════════════════════════════
    BOOTSTRAP
    ════════════════════════════════════════════════════════════════ */
@@ -6555,7 +8060,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     trackerInit();
     renderTaskbar();
+    Routines.init();
     JarvisBrain.init();
+    Routines._badge();
     try { rsMode(localStorage.getItem('apui_rs_mode') === 'log' ? 'log' : 'notes'); } catch (_) {}
 
     // Note composer: Shift+Enter = newline, Enter alone = save
@@ -6568,4 +8075,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-            </html>
+    </html>
