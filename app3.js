@@ -10421,6 +10421,22 @@ async function handleApuiControl(d, e) {
                 _jvHud(`Opened project ${id}`, {});
                 return reply(true, { opened: id });
             }
+            case 'replace_tree': {
+                // Jarvis restructured the node tree (code-preserving ops, approved in a plan in APUI)
+                const t = a.tree;
+                if (!t || typeof t !== 'object' || !t.id || (t.type !== 'raw-html-container' && !Array.isArray(t.children))) throw new Error('That is not a valid vibe tree.');
+                if (vibeTree && t.id !== vibeTree.id) throw new Error('That tree belongs to a different project root.');
+                const label = String(a.label || 'Jarvis restructure').slice(0, 80);
+                let checkpoint = false;
+                if (currentProjectId) { try { await _checkpointApi.save(currentProjectId, 'Before: ' + label, vibeTree); checkpoint = true; try { _renderCheckpointPanel(); } catch (_) {} } catch (_) {} }
+                recordHistory('Before ' + label);
+                vibeTree = JSON.parse(JSON.stringify(t));
+                recordHistory(label);
+                refreshAllUI();
+                if (currentProjectId) autoSaveProject();
+                _jvHud(`Restructured: ${label}`, {});
+                return reply(true, { replaced: true, checkpoint });
+            }
             case 'get_system_sources': {
                 const want = [
                     { name: 'index.html', url: location.href.split('#')[0].split('?')[0], kind: 'html' },
@@ -10918,4 +10934,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                                       }
+                   }
