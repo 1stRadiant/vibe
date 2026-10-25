@@ -4393,17 +4393,59 @@ function renderAutoPilotTriggers() {
 
 /** Wires one delegated listener per condition type — call once at startup. */
 function initTriggerEngine() {
+    _loadTriggers();
     Object.values(AUTO_PILOT_EVENTS).forEach(conditionName => {
         vibeEventBus.addEventListener(conditionName, (e) => fireTriggersFor(conditionName, e));
     });
+    initApuiEventRelay();
 }
 
+// ── Trigger persistence: armed triggers survive a refresh ──
+const TRIGGER_STORE_KEY = 'vibe_autopilot_triggers_v1';
+let _triggersLoaded = false;
+function _loadTriggers() {
+    try {
+        const arr = JSON.parse(localStorage.getItem(TRIGGER_STORE_KEY) || '[]');
+        if (Array.isArray(arr)) {
+            const okCond = Object.values(AUTO_PILOT_EVENTS), okAct = Object.values(TRIGGER_ACTIONS);
+            triggers = arr.filter(t => t && okCond.includes(t.condition) && okAct.includes(t.actionType))
+                .map(t => ({ id: String(t.id), condition: t.condition, actionType: t.actionType, actionValue: String(t.actionValue || ''), enabled: t.enabled !== false, fireCount: 0 }));
+            triggers.forEach(t => { const n = parseInt(String(t.id).replace(/\D/g, ''), 10); if (n > _triggerIdCounter) _triggerIdCounter = n; });
+        }
+    } catch (e) { console.warn('Could not restore Auto-Pilot triggers:', e); }
+    _triggersLoaded = true;
+    renderTriggersPanel();
+}
+function _saveTriggers() {
+    if (!_triggersLoaded) return;   // never overwrite the saved list before it has been read
+    try { localStorage.setItem(TRIGGER_STORE_KEY, JSON.stringify(triggers.map(t => ({ id: t.id, condition: t.condition, actionType: t.actionType, actionValue: t.actionValue, enabled: t.enabled })))); } catch (_) {}
+}
+
+// Relay Agent events to APUI so Jarvis automations (routines) can react to them.
+function initApuiEventRelay() {
+    [AUTO_PILOT_EVENTS.TASK_FAILED, AUTO_PILOT_EVENTS.TASK_COMPLETE, AUTO_PILOT_EVENTS.QUEUE_COMPLETE].forEach(name => {
+        vibeEventBus.addEventListener(name, e => {
+            const d = (e && e.detail) || {};
+            const task = d.task ? (typeof d.task === 'string' ? d.task : (d.task.prompt || '')) : '';
+            _pairSend({ type: 'apui-system-event', name, message: String(d.message || task || '').slice(0, 400), task: String(task).slice(0, 300) });
+        });
+    });
+}
+
+let _triggerFiring = 0;
 function fireTriggersFor(conditionName, event) {
+    // A trigger's own log line dispatches AGENT_LOG synchronously; without this guard an
+    // "agent-log" trigger re-fires itself until the stack overflows.
+    if (_triggerFiring) return;
     // Don't let a queue-complete trigger re-fire while a trigger-spawned task is still running.
     if (conditionName === AUTO_PILOT_EVENTS.QUEUE_COMPLETE && isTaskQueueRunning) return;
 
-    const matching = triggers.filter(t => t.enabled && t.condition === conditionName);
-    matching.forEach(trigger => runTriggerAction(trigger, event));
+    const now = Date.now();
+    const gap = conditionName === AUTO_PILOT_EVENTS.AGENT_LOG ? 30000 : 3000;   // agent-log fires constantly: throttle hard
+    const matching = triggers.filter(t => t.enabled && t.condition === conditionName && !(t._lastFire && now - t._lastFire < gap));
+    _triggerFiring++;
+    try { matching.forEach(trigger => { trigger._lastFire = now; runTriggerAction(trigger, event); }); }
+    finally { _triggerFiring--; }
 }
 
 function runTriggerAction(trigger, event) {
@@ -4503,6 +4545,7 @@ function toggleTrigger(id) {
 
 /** Renders (or re-renders) the Triggers management panel in the Agent tab. */
 function renderTriggersPanel() {
+    _saveTriggers();   // every trigger change goes through here
     const panel = document.getElementById('trigger-panel-container');
     if (!panel) return;
 
@@ -10378,6 +10421,22 @@ async function handleApuiControl(d, e) {
                 _jvHud(`Opened project ${id}`, {});
                 return reply(true, { opened: id });
             }
+            case 'get_system_sources': {
+                const want = [
+                    { name: 'index.html', url: location.href.split('#')[0].split('?')[0], kind: 'html' },
+                    { name: 'app3.js', url: import.meta.url.split('?')[0], kind: 'js', module: true },
+                    { name: 'api.js', url: new URL('./api.js', import.meta.url).href, kind: 'js', module: true },
+                    { name: 'nervous-system.js', url: new URL('./nervous-system.js', import.meta.url).href, kind: 'js', module: true },
+                    { name: 'apui.html', url: new URL(frame.getAttribute('src') || 'apui.html', location.href).href, kind: 'html' }
+                ];
+                const files = [];
+                await Promise.all(want.map(async w => {
+                    try { const r = await fetch(w.url, { cache: 'no-store' }); if (r.ok) files.push({ name: w.name, kind: w.kind, module: !!w.module, text: await r.text() }); } catch (_) {}
+                }));
+                files.sort((x, y) => want.findIndex(w => w.name === x.name) - want.findIndex(w => w.name === y.name));
+                if (!files.some(f => f.name === 'index.html')) files.unshift({ name: 'index.html', kind: 'html', text: '<!DOCTYPE html>\n' + document.documentElement.outerHTML });
+                return reply(true, { files });
+            }
             case 'check_and_fix_errors': {
                 Promise.resolve(window.vibeCheckAndFixErrors()).catch(err => console.error('Jarvis-started error scan failed:', err));
                 _jvHud('Scanning for errors…', { tab: 'agent' });
@@ -10859,4 +10918,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                  }
+                                       }
