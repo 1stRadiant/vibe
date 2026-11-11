@@ -1,6 +1,6 @@
 // api.js
 
-export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGGYs1MZgFAvHBU9XSu-OjBKgQc8ttgCBvwA5Il7fbeW9ubSMCZLNpUOT2w2H0JwyPEg/exec';
+export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4XS8Cdj-FwCI_Pg18vewH-AN7-AAJK-ngmCeqnnvjbWpib-o_xDcZkKwbFyO54LXlKg/exec';
 
 const SAVE_RETRY_LIMIT = 3;
 const SAVE_RETRY_DELAY_MS = 2000;      // grows with each attempt (2s, 4s, ...)
