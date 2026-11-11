@@ -3,10 +3,12 @@
 export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyGGYs1MZgFAvHBU9XSu-OjBKgQc8ttgCBvwA5Il7fbeW9ubSMCZLNpUOT2w2H0JwyPEg/exec';
 
 const SAVE_RETRY_LIMIT = 3;
-const SAVE_RETRY_DELAY_MS = 2000;
+const SAVE_RETRY_DELAY_MS = 2000;      // grows with each attempt (2s, 4s, ...)
+const REQUEST_TIMEOUT_MS = 60000;
+const SAVE_TIMEOUT_MS = 300000;        // Apps Script can take a while on big projects
 
-let isSaveInProgress = false;
-let pendingSaveData = null;
+// Errors where retrying the same request cannot help.
+const NON_RETRYABLE = /Missing required parameters|not found|permission|Invalid action|API URL is not configured/i;
 
 export let onSaveError   = (msg) => console.error('[Save Error]', msg);
 export let onSaveSuccess = (info) => console.log('[Save] OK', info);
@@ -92,7 +94,7 @@ function _fmt(bytes) {
 // Core POST
 // ─────────────────────────────────────────────
 
-async function postRequest(action, payload = {}, { attempt = 1 } = {}) {
+async function postRequest(action, payload = {}, { attempt = 1, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('YOUR_APPS_SCRIPT')) {
     throw new Error('API URL is not configured.');
   }
@@ -106,14 +108,22 @@ async function postRequest(action, payload = {}, { attempt = 1 } = {}) {
   const t0 = performance.now();
 
   let response;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
     response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body,
+      signal: controller ? controller.signal : undefined,
     });
   } catch (networkErr) {
+    if (timer) clearTimeout(timer);
     const durationMs = Math.round(performance.now() - t0);
+    if (networkErr.name === 'AbortError') {
+      _diag('error', `Timeout on ${action}`, { payloadBytes, durationMs, attempt });
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s (${action}).`);
+    }
     _diag('error', `Network error on ${action}`, { payloadBytes, durationMs, attempt, error: networkErr.message });
 
     // The browser's raw "Failed to fetch" means the request never got a usable
@@ -129,6 +139,7 @@ async function postRequest(action, payload = {}, { attempt = 1 } = {}) {
     throw new Error(`Network error: could not reach the API (${networkErr.message}). ${hint}`);
   }
 
+  if (timer) clearTimeout(timer);
   const durationMs = Math.round(performance.now() - t0);
 
   if (!response.ok) {
@@ -171,62 +182,111 @@ export function deleteProject(userId, projectId)   { return postRequest('deleteP
 
 // ─────────────────────────────────────────────
 // Save with retry
+//
+// The server gzips the project and splits it across cells (a Sheets cell holds
+// at most 50,000 characters), verifies what it stored, and only then switches
+// the project over to the new copy. The client:
+//   • snapshots the project as a JSON string the moment saveProject() is called
+//   • sends its length so the server can detect a truncated upload
+//   • checks the server's reported size matches what was sent
+//   • queues saves PER PROJECT, keeping only the newest pending snapshot
+//   • returns a promise that resolves once that data (or newer data) is saved
 // ─────────────────────────────────────────────
 
-async function _saveWithRetry(userId, projectId, projectData, attempt = 1) {
+async function _saveWithRetry(userId, projectId, json, attempt = 1) {
   try {
-    // Pre-stringify projectData into a plain string BEFORE it enters the JSON envelope.
-    // This means Apps Script receives it as a string value and can call setValue() directly
-    // without re-serialising a nested object — which is where GAS silently corrupts large trees.
-    const projectDataString = typeof projectData === 'string'
-      ? projectData
-      : JSON.stringify(projectData);
-    _diag('info', `_saveWithRetry: pre-stringified projectData`, {
-      type: typeof projectDataString,
-      chars: projectDataString.length,
-      attempt,
-    });
-    await postRequest('saveProject', { userId, projectId, projectData: projectDataString }, { attempt });
+    const result = await postRequest(
+      'saveProject',
+      { userId, projectId, projectData: json, projectDataChars: json.length },
+      { attempt, timeoutMs: SAVE_TIMEOUT_MS }
+    );
+    if (result && typeof result.chars === 'number' && result.chars !== json.length) {
+      throw new Error(`Server stored ${result.chars} characters but ${json.length} were sent.`);
+    }
+    return result;
   } catch (error) {
-    if (attempt < SAVE_RETRY_LIMIT) {
-      _diag('warn', `Save attempt ${attempt} failed, retrying...`, { error: error.message });
-      await new Promise(r => setTimeout(r, SAVE_RETRY_DELAY_MS));
-      return _saveWithRetry(userId, projectId, projectData, attempt + 1);
+    if (attempt < SAVE_RETRY_LIMIT && !NON_RETRYABLE.test(error.message)) {
+      const delay = SAVE_RETRY_DELAY_MS * attempt;
+      _diag('warn', `Save attempt ${attempt} failed, retrying in ${delay}ms...`, { error: error.message });
+      await new Promise(r => setTimeout(r, delay));
+      return _saveWithRetry(userId, projectId, json, attempt + 1);
     }
     throw error;
   }
 }
 
-async function _runSave(userId, projectId, projectData) {
+// key -> { json, userId, projectId, waiters: [{resolve, reject}] }
+const _pendingSaves = new Map();
+const _saveOrder = [];          // keys waiting to run, in order
+let _saveRunning = false;
+
+async function _drainSaveQueue() {
+  if (_saveRunning) return;
+  _saveRunning = true;
   try {
-    await _saveWithRetry(userId, projectId, projectData);
-    const sizeBytes = new TextEncoder().encode(JSON.stringify(projectData)).length;
-    onSaveSuccess({ sizeFormatted: _fmt(sizeBytes) });
-  } catch (error) {
-    onSaveError(`Save failed after ${SAVE_RETRY_LIMIT} attempts: ${error.message}`);
-  } finally {
-    if (pendingSaveData) {
-      const next = pendingSaveData;
-      pendingSaveData = null;
-      setTimeout(() => _runSave(next.userId, next.projectId, next.projectData), 0);
-    } else {
-      isSaveInProgress = false;
+    while (_saveOrder.length) {
+      const key = _saveOrder.shift();
+      const job = _pendingSaves.get(key);
+      _pendingSaves.delete(key);
+      if (!job) continue;
+
+      const sizeBytes = new TextEncoder().encode(job.json).length;
+      try {
+        const result = await _saveWithRetry(job.userId, job.projectId, job.json);
+        const info = { projectId: job.projectId, sizeFormatted: _fmt(sizeBytes), ...(result || {}) };
+        onSaveSuccess(info);
+        job.waiters.forEach(w => w.resolve(info));
+      } catch (error) {
+        const msg = `Save failed after ${SAVE_RETRY_LIMIT} attempts: ${error.message}`;
+        onSaveError(msg);
+        const err = new Error(msg);
+        job.waiters.forEach(w => w.reject(err));
+      }
     }
+  } finally {
+    _saveRunning = false;
   }
 }
 
 export function saveProject(userId, projectId, projectData) {
-  const dataToSave = JSON.parse(JSON.stringify(projectData));
-  const sizeBytes  = new TextEncoder().encode(JSON.stringify(dataToSave)).length;
-  _diag('info', `saveProject called`, { sizeFormatted: _fmt(sizeBytes), projectId });
-
-  if (isSaveInProgress) {
-    _diag('info', 'Save in progress — queuing latest data');
-    pendingSaveData = { userId, projectId, projectData: dataToSave };
-  } else {
-    isSaveInProgress = true;
-    _runSave(userId, projectId, dataToSave);
+  let json;
+  try {
+    json = typeof projectData === 'string' ? projectData : JSON.stringify(projectData);
+  } catch (e) {
+    onSaveError(`Could not serialise project: ${e.message}`);
+    return Promise.reject(e);
   }
+  if (!json) {
+    const err = new Error('Nothing to save (project data is empty).');
+    onSaveError(err.message);
+    return Promise.reject(err);
+  }
+
+  const key = `${userId}|${projectId}`;
+  _diag('info', 'saveProject called', { sizeFormatted: _fmt(new TextEncoder().encode(json).length), projectId });
+
+  const promise = new Promise((resolve, reject) => {
+    const existing = _pendingSaves.get(key);
+    if (existing) {
+      // A newer snapshot replaces the queued one; everyone waiting gets this result.
+      _diag('info', 'Save already queued for this project — replacing with latest data');
+      existing.json = json;
+      existing.waiters.push({ resolve, reject });
+    } else {
+      _pendingSaves.set(key, { userId, projectId, json, waiters: [{ resolve, reject }] });
+      _saveOrder.push(key);
+    }
+  });
+  // Fire-and-forget callers (autosave) shouldn't produce "unhandled rejection" noise;
+  // failures are still reported through onSaveError, and awaiting callers still see them.
+  promise.catch(() => {});
+
+  _drainSaveQueue();
+  return promise;
+}
+
+export function hasPendingSaves() {
+  return _saveRunning || _pendingSaves.size > 0;
 }
 
 // ─────────────────────────────────────────────
@@ -256,7 +316,8 @@ export async function probePayloadSizes(userId, projectId) {
     console.log(`Testing ~${kb} KB payload (actual: ${_fmt(actualBytes)})...`);
     const t0 = performance.now();
     try {
-      await postRequest('saveProject', { userId, projectId, projectData: fakeData });
+      const json = JSON.stringify(fakeData);
+      await postRequest('saveProject', { userId, projectId, projectData: json, projectDataChars: json.length }, { timeoutMs: SAVE_TIMEOUT_MS });
       console.log(`  ✅ ${_fmt(actualBytes)} — OK in ${Math.round(performance.now()-t0)}ms`);
     } catch (err) {
       console.error(`  ❌ ${_fmt(actualBytes)} — FAILED in ${Math.round(performance.now()-t0)}ms: ${err.message}`);
@@ -279,4 +340,4 @@ export function saveFormData(userId, projectId, formId, formData) {
 
 export function loadFormData(userId, projectId, formId) {
   return postRequest('loadFormData', { userId, projectId, formId });
-                                                  }
+                               }
