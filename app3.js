@@ -100,6 +100,7 @@ function decompressProjectData(dataString) {
 function generateFullCodeString(tree, userId, projectId) {
     let cssContent = '';
     let jsContent = '';
+    const jsChunks = [];
     let htmlContent = '';
     let headContent = `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Generated Website</title>`;
 
@@ -142,7 +143,7 @@ function generateFullCodeString(tree, userId, projectId) {
             case 'js-function':
             case 'declaration':
                 // FIX: No IIFE wrapping here to preserve global scope access
-                jsContent += node.code + '\n\n';
+                if (node.code) jsChunks.push({ id: node.id, code: String(node.code) });
                 break;
         }
         if (node.children) {
@@ -154,6 +155,12 @@ function generateFullCodeString(tree, userId, projectId) {
     if (tree.children) {
         htmlContent = buildHtmlRecursive(tree.children);
     }
+
+    // All JS nodes share ONE <script>, so colliding top-level const/let/class
+    // declarations would throw and kill every script. Make them safe here.
+    const dedupeResult = dedupeSharedScopeJs(jsChunks);
+    _warnAboutJsDuplicates(dedupeResult);
+    jsContent = dedupeResult.codes.join('\n\n');
 
 const vibeDbScript = `
 <script>
@@ -2238,6 +2245,7 @@ async function handleUpdate(event) {
             console.log(`Regenerating complete subtree for container: ${node.id}`);
             const newChildren = await generateCompleteSubtree(node);
             node.children = newChildren;
+            sanitizeVibeTree(vibeTree);
             refreshAllUI();
         } else {
             console.log(`Triggering systemic update for node: ${node.id}`);
@@ -2258,8 +2266,11 @@ Full Generated Code context:
 ${fullCurrentCode}
 \`\`\``;
 
-            const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
+            const agentDecision = await _callAgentForPlan(systemPrompt, userPrompt, [], 'UpdateEngine');
+            if (agentDecision.question) {
+                alert(`AI Question: ${agentDecision.question}`);
+                return;
+            }
             
             executeAgentPlan(agentDecision, (message, type) => {
                 const cleanMessage = message.replace(/<strong>|<\/strong>/g, '');
@@ -2430,17 +2441,45 @@ function getGeminiModel() {
     return geminiModelSelect ? geminiModelSelect.value : 'gemini-2.5-flash';
 }
 
-async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null, images = []) {
-    if (!geminiApiKey) throw new Error("Gemini API key is not set.");
-    
-    const components = listComponents();
-    let libraryContext = "\n\n--- COMPONENT LIBRARY (REFERENCE ONLY) ---\n";
-    libraryContext += "Use these components ONLY if specifically requested (via @id) or if they perfectly match the design requirement. Otherwise, prioritize creating custom, unique designs tailored to the user's prompt.\n";
-    components.forEach(comp => {
-        libraryContext += `### @${comp.id}\nHTML: ${comp.html}\nCSS: ${comp.css}\nJS: ${comp.javascript}\n---\n`;
-    });
+function _getMaxOutputTokensForModel(model) {
+    const m = String(model || '').toLowerCase();
+    if (/gemini-(2\.5|3)/.test(m)) return 65536;
+    if (/gemini-(2\.0|1\.5)/.test(m)) return 8192;
+    return null; // unknown/custom model — let the API use its default
+}
 
-    const augmentedSystemPrompt = systemPrompt + libraryContext;
+/** Joins every text part (Gemini can split a reply over several parts); skips thought parts. */
+function _extractCandidateText(candidate) {
+    const parts = (candidate && candidate.content && candidate.content.parts) || [];
+    return parts.filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('');
+}
+
+/** Appends a continuation chunk, removing any overlap / re-opened fence the model added. */
+function _joinContinuation(prev, next) {
+    let add = String(next || '').replace(/^\s*```(?:json|html|javascript|js)?[ \t]*\r?\n/i, '');
+    const maxOverlap = Math.min(300, prev.length, add.length);
+    for (let len = maxOverlap; len >= 12; len--) {
+        if (prev.endsWith(add.slice(0, len))) { add = add.slice(len); break; }
+    }
+    return prev + add;
+}
+
+async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback = null, images = [], opts = {}) {
+    if (!geminiApiKey) throw new Error("Gemini API key is not set.");
+
+    let augmentedSystemPrompt = systemPrompt;
+    if (!opts.skipLibrary) {
+        const components = listComponents();
+        if (components.length) {
+            let libraryContext = "\n\n--- COMPONENT LIBRARY (REFERENCE ONLY) ---\n";
+            libraryContext += "Use these components ONLY if specifically requested (via @id) or if they perfectly match the design requirement. Otherwise, prioritize creating custom, unique designs tailored to the user's prompt.\n";
+            components.forEach(comp => {
+                libraryContext += `### @${comp.id}\nHTML: ${comp.html}\nCSS: ${comp.css}\nJS: ${comp.javascript}\n---\n`;
+            });
+            augmentedSystemPrompt += libraryContext;
+        }
+    }
+
     const model = getGeminiModel();
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
@@ -2459,44 +2498,754 @@ async function callAI(systemPrompt, userPrompt, forJson = false, streamCallback 
         });
     }
 
-    const requestBody = {
-        contents: [{ role: "user", parts }],
-        systemInstruction: { parts: [{ text: augmentedSystemPrompt }] },
-        generationConfig: forJson ? { responseMimeType: "application/json" } : {}
-    };
+    const maxOut = _getMaxOutputTokensForModel(model);
+    const contents = [{ role: "user", parts }];
+    let fullText = '';
 
-    const response = await fetch(endpoint, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(requestBody) 
-    });
-    
-    if (!response.ok) throw new Error(await response.text());
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
+    // Long JSON/HTML replies used to be silently cut off at the output limit,
+    // which is the main source of "invalid JSON". We now detect MAX_TOKENS and
+    // ask the model to continue, stitching the pieces back together.
+    const MAX_CONTINUATIONS = 3;
+    for (let round = 0; round <= MAX_CONTINUATIONS; round++) {
+        const generationConfig = {};
+        if (maxOut) generationConfig.maxOutputTokens = maxOut;
+        // JSON mode would force a continuation to start a NEW JSON value, so only use it on the first round.
+        if (forJson && round === 0) generationConfig.responseMimeType = "application/json";
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents,
+                systemInstruction: { parts: [{ text: augmentedSystemPrompt }] },
+                generationConfig
+            })
+        });
+
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        const candidate = data.candidates && data.candidates[0];
+        if (!candidate) {
+            const blockReason = data.promptFeedback && data.promptFeedback.blockReason;
+            throw new Error(blockReason ? `Gemini blocked the request (${blockReason}).` : 'Gemini returned no candidates.');
+        }
+
+        const text = _extractCandidateText(candidate);
+        fullText = round === 0 ? text : _joinContinuation(fullText, text);
+
+        if (candidate.finishReason === 'MAX_TOKENS') {
+            if (!text) {
+                throw new Error('Gemini used its whole output budget before writing anything (usually thinking tokens). Try a smaller request or a different model.');
+            }
+            if (round === MAX_CONTINUATIONS) break;
+            console.warn(`[callAI] Response hit the output token limit — requesting continuation ${round + 1}/${MAX_CONTINUATIONS}...`);
+            contents.push({ role: 'model', parts: [{ text }] });
+            contents.push({ role: 'user', parts: [{ text: 'Your previous response was cut off by the output limit. Continue EXACTLY from the last character you wrote. Do not repeat anything, do not add a preamble, and do not open a markdown fence — your reply will be appended directly to the previous one.' }] });
+            continue;
+        }
+
+        if (!fullText && candidate.finishReason && candidate.finishReason !== 'STOP') {
+            throw new Error(`Gemini stopped generating (${candidate.finishReason}).`);
+        }
+        return fullText;
+    }
+
+    console.warn('[callAI] Response was still truncated after continuations; returning what was received.');
+    return fullText;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AI OUTPUT SAFETY — robust JSON parsing/repair + JS declaration dedupe
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Appended to every system prompt that expects JSON back. Most "invalid JSON"
+ * failures come from code strings with raw newlines, unescaped quotes or
+ * regex backslashes, so the rules focus on those.
+ */
+const AI_JSON_OUTPUT_RULES = `
+
+--- JSON OUTPUT CONTRACT (STRICT) ---
+- Respond with ONE raw JSON value only. No markdown fences, no comments, no text before or after it.
+- Every "code" / "newCode" value is ONE JSON string. Inside it, escape double quotes as \\", backslashes as \\\\ (so a regex \\d becomes \\\\d), newlines as \\n and tabs as \\t.
+- Prefer single quotes or template literals inside JavaScript and single quotes for HTML attributes, to minimise escaping.
+- No trailing commas. No undefined, NaN, Infinity, functions or comments — only strings, numbers, booleans, null, arrays and objects.
+- Use exactly the field names shown in the schema.`;
+
+/** Strip a single wrapping ```lang ... ``` fence from a code string. */
+function _stripWrappingFence(text) {
+    if (typeof text !== 'string') return text;
+    const m = text.trim().match(/^```[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
+    return m ? m[1] : text;
+}
+
+/** Find the first complete {...} or [...] block, string-aware. Returns null if none. */
+function _extractBalancedJson(text, expect = 'any') {
+    const firstObj = text.indexOf('{');
+    const firstArr = text.indexOf('[');
+    let start;
+    if (expect === 'array' && firstArr !== -1) start = firstArr;
+    else if (expect === 'object' && firstObj !== -1) start = firstObj;
+    else if (firstObj === -1) start = firstArr;
+    else if (firstArr === -1) start = firstObj;
+    else start = Math.min(firstObj, firstArr);
+    if (start === -1 || start === undefined) return null;
+
+    let depth = 0, inStr = false;
+    for (let i = start; i < text.length; i++) {
+        const c = text[i];
+        if (inStr) {
+            if (c === '\\') { i++; continue; }
+            if (c === '"') inStr = false;
+            continue;
+        }
+        if (c === '"') inStr = true;
+        else if (c === '{' || c === '[') depth++;
+        else if (c === '}' || c === ']') {
+            depth--;
+            if (depth === 0) return text.slice(start, i + 1);
+        }
+    }
+    return text.slice(start); // unbalanced (probably truncated) — let the parser report it
 }
 
 /**
- * Robustly parse a JSON string returned by an AI model.
- * Strips markdown fences, finds the outermost { } or [ ], then parses.
+ * Repairs the mistakes LLMs typically make in JSON:
+ *  - raw newlines / tabs / control chars inside strings
+ *  - invalid escapes (\d, \s, \', \$ ...) from regexes and JS code
+ *  - unescaped double quotes inside code strings (heuristic)
+ *  - // and block comments, trailing commas, missing commas between values
  */
-function _parseAIJson(raw) {
-    // Fast path
-    try { return JSON.parse(raw); } catch(_) {}
-    // Strip fences
-    let s = raw.trim()
-        .replace(/^```json\s*/i, '').replace(/^```\s*/, '')
-        .replace(/\s*```$/, '').trim();
-    // Extract outermost object or array
-    const oc = s.indexOf('{'), ac = s.indexOf('[');
-    let start = -1, endChar = '';
-    if (oc !== -1 && (ac === -1 || oc < ac)) { start = oc; endChar = '}'; }
-    else if (ac !== -1)                        { start = ac; endChar = ']'; }
-    if (start !== -1) {
-        const end = s.lastIndexOf(endChar);
-        if (end > start) s = s.slice(start, end + 1);
+function _repairJsonText(s) {
+    let out = '';
+    let inStr = false;
+    const n = s.length;
+    const VALID_ESC = '"\\/bfnrt';
+    const lastNonWs = () => {
+        for (let k = out.length - 1; k >= 0; k--) {
+            if (!/\s/.test(out[k])) return out[k];
+        }
+        return '';
+    };
+
+    for (let i = 0; i < n; i++) {
+        const c = s[i];
+        if (inStr) {
+            if (c === '\\') {
+                const nx = s[i + 1];
+                if (nx === undefined) { out += '\\\\'; continue; }
+                if (nx === 'u') {
+                    if (/^[0-9a-fA-F]{4}$/.test(s.substr(i + 2, 4))) { out += s.substr(i, 6); i += 5; }
+                    else { out += '\\\\u'; i += 1; }
+                    continue;
+                }
+                if (VALID_ESC.includes(nx)) { out += c + nx; i++; continue; }
+                if (nx === "'") { out += "'"; i++; continue; }
+                if (nx === '\n') { out += '\\n'; i++; continue; }
+                out += '\\\\'; // stray backslash (regex \d etc.) — keep it literally
+                continue;
+            }
+            if (c === '"') {
+                // Is this really the end of the string? Look at what follows.
+                let j = i + 1;
+                while (j < n && /[ \t\r\n]/.test(s[j])) j++;
+                const nx = s[j];
+                let closes = nx === undefined || nx === '}' || nx === ']' || nx === ':';
+                if (nx === ',') {
+                    let k = j + 1;
+                    while (k < n && /[ \t\r\n]/.test(s[k])) k++;
+                    closes = k >= n || /["{\[\]}\-0-9tfn]/.test(s[k]);
+                }
+                if (closes) { inStr = false; out += c; }
+                else out += '\\"';
+                continue;
+            }
+            if (c === '\n') { out += '\\n'; continue; }
+            if (c === '\r') { out += '\\r'; continue; }
+            if (c === '\t') { out += '\\t'; continue; }
+            const code = c.charCodeAt(0);
+            if (code < 0x20) { out += '\\u' + code.toString(16).padStart(4, '0'); continue; }
+            out += c;
+            continue;
+        }
+
+        // ── outside a string ──
+        if (c === '/' && s[i + 1] === '/') {
+            while (i < n && s[i] !== '\n') i++;
+            continue;
+        }
+        if (c === '/' && s[i + 1] === '*') {
+            const e = s.indexOf('*/', i + 2);
+            i = e === -1 ? n : e + 1;
+            continue;
+        }
+        if (c === ',') {
+            let j = i + 1;
+            while (j < n && /\s/.test(s[j])) j++;
+            if (s[j] === '}' || s[j] === ']') continue; // trailing comma
+        }
+        if (c === '"' || c === '{' || c === '[') {
+            const prev = lastNonWs();
+            if (prev === '"' || prev === '}' || prev === ']') out += ','; // missing comma
+            if (c === '"') inStr = true;
+        }
+        out += c;
     }
-    return JSON.parse(s); // throws if still broken — caller handles
+    return out;
+}
+
+/** Robustly parse a JSON value returned by an AI model. Throws with a useful message. */
+function _parseAIJson(raw, expect = 'any') {
+    if (raw && typeof raw === 'object') return raw;
+    const text = String(raw == null ? '' : raw).replace(/^\uFEFF/, '').trim();
+    if (!text) throw new Error('The AI returned an empty response.');
+
+    try { return JSON.parse(text); } catch (_) {}
+
+    const candidates = [];
+    const fenceRe = /```(?:json|JSON)?[ \t]*\r?\n?([\s\S]*?)```/g;
+    let m;
+    while ((m = fenceRe.exec(text))) if (m[1].trim()) candidates.push(m[1].trim());
+    candidates.push(text.replace(/^```(?:json|JSON)?\s*/, '').replace(/```\s*$/, '').trim());
+
+    let firstErr = null;
+    const tried = new Set();
+    for (const c of candidates) {
+        const variants = [];
+        const balanced = _extractBalancedJson(c, expect);
+        if (balanced) variants.push(balanced);
+        const oc = c.indexOf('{'), ac = c.indexOf('[');
+        const s = (oc !== -1 && (ac === -1 || oc < ac)) ? oc : ac;
+        if (s !== -1) {
+            const e = Math.max(c.lastIndexOf('}'), c.lastIndexOf(']'));
+            if (e > s) variants.push(c.slice(s, e + 1));
+        }
+        variants.push(c);
+        for (const v of variants) {
+            for (const attempt of [v, _repairJsonText(v)]) {
+                if (tried.has(attempt)) continue;
+                tried.add(attempt);
+                try { return JSON.parse(attempt); } catch (e) { if (!firstErr) firstErr = e; }
+            }
+        }
+    }
+    throw new Error(firstErr ? firstErr.message : 'No JSON value found in the AI response.');
+}
+
+/** Light shape-coercion for common model quirks (wrapping arrays in objects, etc.). */
+function _coerceAIJsonShape(value, expect) {
+    if (expect === 'array') {
+        if (Array.isArray(value)) return value;
+        if (value && typeof value === 'object') {
+            for (const key of ['nodes', 'children', 'items', 'components', 'result', 'data']) {
+                if (Array.isArray(value[key])) return value[key];
+            }
+            const arrays = Object.values(value).filter(Array.isArray);
+            if (arrays.length === 1) return arrays[0];
+            if (value.id && value.type) return [value];
+        }
+    } else if (expect === 'object') {
+        if (Array.isArray(value) && value.length === 1 && value[0] && typeof value[0] === 'object') return value[0];
+    }
+    return value;
+}
+
+/**
+ * Calls the AI expecting JSON, parses/repairs it, validates the shape, and —
+ * if it's still broken — gives the model one chance to repair its own output.
+ *
+ * opts.expect    'object' | 'array' | 'any'
+ * opts.validate  (value) => errorMessage | null
+ * opts.shapeHint human description of the expected shape (used in the repair prompt)
+ */
+async function callAIJson(systemPrompt, userPrompt, opts = {}) {
+    const {
+        expect = 'any', images = [], streamCallback = null,
+        label = 'AI', validate = null, shapeHint = ''
+    } = opts;
+
+    let raw = await callAI(systemPrompt + AI_JSON_OUTPUT_RULES, userPrompt, true, streamCallback, images);
+    let lastErr = null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const value = _coerceAIJsonShape(_parseAIJson(raw, expect), expect);
+            if (expect === 'array' && !Array.isArray(value)) throw new Error('Expected a JSON array.');
+            if (expect === 'object' && (!value || typeof value !== 'object' || Array.isArray(value))) {
+                throw new Error('Expected a JSON object.');
+            }
+            const problem = validate ? validate(value) : null;
+            if (problem) throw new Error(problem);
+            return value;
+        } catch (e) {
+            lastErr = e;
+            if (attempt === 1) break;
+            console.warn(`[${label}] Response was not valid JSON (${e.message}). Asking the model to repair it...`);
+            const repairSystem = `You repair malformed JSON produced by another AI. Return the SAME data as one valid JSON value. Do not add, remove or rewrite content — only fix syntax (escaping, quotes, commas, brackets) and the overall shape if required.${shapeHint ? `\nThe value must be ${shapeHint}.` : ''}${AI_JSON_OUTPUT_RULES}`;
+            const repairUser = `Parser error: ${e.message}\n\nMalformed output to repair:\n${raw}`;
+            raw = await callAI(repairSystem, repairUser, true, null, [], { skipLibrary: true });
+        }
+    }
+    console.error(`[${label}] Invalid JSON after repair. Raw (first 2000 chars):`, String(raw).slice(0, 2000));
+    throw new Error(`${label} returned invalid JSON (${lastErr ? lastErr.message : 'unknown error'}). Raw output logged in the console.`);
+}
+
+// ── JS top-level declaration analysis ────────────────────────────────
+// Every javascript / js-function / declaration node is concatenated into ONE
+// <script>. Two nodes declaring the same top-level const/let/class throws
+// "Identifier 'x' has already been declared" and kills ALL scripts.
+
+const _JS_REGEX_AFTER_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+const _JS_MULTI_PUNCT = ['>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '>>>', '&&=', '||=', '??=',
+    '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '++', '--', '+=', '-=', '*=', '/=', '%=',
+    '&=', '|=', '^=', '**', '<<', '>>'];
+
+function _tokenizeJs(src) {
+    const toks = [];
+    const n = src.length;
+    let i = 0, nl = false;
+
+    const skipNested = (k) => { // k is just after "${" — skip to the matching "}"
+        let depth = 1;
+        while (k < n && depth > 0) {
+            const c = src[k];
+            if (c === '"' || c === "'") { k = skipString(k + 1, c); continue; }
+            if (c === '`') { k = skipTemplate(k + 1); continue; }
+            if (c === '/' && src[k + 1] === '/') { while (k < n && src[k] !== '\n') k++; continue; }
+            if (c === '/' && src[k + 1] === '*') { const e = src.indexOf('*/', k + 2); k = e === -1 ? n : e + 2; continue; }
+            if (c === '{') depth++;
+            else if (c === '}') depth--;
+            k++;
+        }
+        return k;
+    };
+    const skipString = (k, q) => {
+        while (k < n) {
+            if (src[k] === '\\') { k += 2; continue; }
+            if (src[k] === q || src[k] === '\n') return k + 1;
+            k++;
+        }
+        return n;
+    };
+    const skipTemplate = (k) => {
+        while (k < n) {
+            const c = src[k];
+            if (c === '\\') { k += 2; continue; }
+            if (c === '`') return k + 1;
+            if (c === '$' && src[k + 1] === '{') { k = skipNested(k + 2); continue; }
+            k++;
+        }
+        return n;
+    };
+    const regexAllowed = () => {
+        const p = toks[toks.length - 1];
+        if (!p) return true;
+        if (p.t === 'name') return _JS_REGEX_AFTER_KEYWORDS.has(p.v);
+        if (p.t === 'p') return p.v !== ')' && p.v !== ']';
+        return false;
+    };
+
+    while (i < n) {
+        const c = src[i];
+        if (c === '\n') { nl = true; i++; continue; }
+        if (/\s/.test(c)) { i++; continue; }
+        if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') i++; continue; }
+        if (c === '/' && src[i + 1] === '*') {
+            const e = src.indexOf('*/', i + 2);
+            const end = e === -1 ? n : e + 2;
+            if (src.slice(i, end).includes('\n')) nl = true;
+            i = end;
+            continue;
+        }
+        const start = i;
+        let t, v;
+        if (c === '"' || c === "'") { i = skipString(i + 1, c); t = 'str'; }
+        else if (c === '`') { i = skipTemplate(i + 1); t = 'tpl'; }
+        else if (/[A-Za-z_$\u00A0-\uFFFF]/.test(c)) {
+            while (i < n && /[A-Za-z0-9_$\u00A0-\uFFFF]/.test(src[i])) i++;
+            t = 'name'; v = src.slice(start, i);
+        } else if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+            while (i < n && /[0-9A-Za-z_.]/.test(src[i])) i++;
+            t = 'num';
+        } else if (c === '/' && regexAllowed()) {
+            let k = i + 1, inClass = false, ok = false;
+            while (k < n && src[k] !== '\n') {
+                const ch = src[k];
+                if (ch === '\\') { k += 2; continue; }
+                if (ch === '[') inClass = true;
+                else if (ch === ']') inClass = false;
+                else if (ch === '/' && !inClass) { ok = true; break; }
+                k++;
+            }
+            if (ok) {
+                i = k + 1;
+                while (i < n && /[a-z]/i.test(src[i])) i++;
+                t = 're';
+            } else { i++; t = 'p'; v = '/'; }
+        } else {
+            const op = _JS_MULTI_PUNCT.find(p => src.startsWith(p, i));
+            v = op || c;
+            i += v.length;
+            t = 'p';
+        }
+        toks.push({ t, v, s: start, e: i, nl });
+        nl = false;
+    }
+    return toks;
+}
+
+function _jsMatchClose(toks, j) {
+    let d = 0;
+    for (let k = j; k < toks.length; k++) {
+        if (toks[k].t !== 'p') continue;
+        const v = toks[k].v;
+        if (v === '(' || v === '[' || v === '{') d++;
+        else if (v === ')' || v === ']' || v === '}') { d--; if (d === 0) return k; }
+    }
+    return toks.length - 1;
+}
+
+function _jsPatternNames(toks, j, names) {
+    const end = _jsMatchClose(toks, j);
+    const isObj = toks[j].v === '{';
+    let k = j + 1;
+    while (k < end) {
+        let e = k, d = 0;
+        while (e < end) {
+            const tk = toks[e];
+            if (tk.t === 'p') {
+                if (tk.v === '(' || tk.v === '[' || tk.v === '{') d++;
+                else if (tk.v === ')' || tk.v === ']' || tk.v === '}') d--;
+                else if (tk.v === ',' && d === 0) break;
+            }
+            e++;
+        }
+        let q = k;
+        if (q < e && toks[q].v === '...') q++;
+        if (isObj) {
+            let dd = 0;
+            for (let r = q; r < e; r++) {
+                const tk = toks[r];
+                if (tk.t !== 'p') continue;
+                if (tk.v === '(' || tk.v === '[' || tk.v === '{') dd++;
+                else if (tk.v === ')' || tk.v === ']' || tk.v === '}') dd--;
+                else if (tk.v === ':' && dd === 0) { q = r + 1; break; }
+            }
+        }
+        const tk = toks[q];
+        if (q < e && tk) {
+            if (tk.t === 'p' && (tk.v === '{' || tk.v === '[')) _jsPatternNames(toks, q, names);
+            else if (tk.t === 'name') names.push(tk.v);
+        }
+        k = e + 1;
+    }
+    return end + 1;
+}
+
+const _JS_CONTINUES_AFTER = new Set(['.', '?.', '+', '-', '*', '/', '%', '=', '==', '===', '!=', '!==', '<', '>', '<=', '>=',
+    '&&', '||', '??', '?', ':', ',', '(', '[', '{', '&', '|', '^', '**', '=>', '!', '~', '...', '+=', '-=', '*=', '/=']);
+const _JS_CONTINUES_BEFORE = new Set(['.', '?.', '(', '[', '+', '-', '*', '/', '%', '&&', '||', '??', '?', ':', '==', '===',
+    '!=', '!==', '<', '>', '<=', '>=', '&', '|', '^', '**', '=>', ',']);
+
+function _jsSkipInitializer(toks, j) {
+    let d = 0;
+    for (let k = j; k < toks.length; k++) {
+        const tk = toks[k];
+        if (tk.t === 'p') {
+            if (tk.v === '(' || tk.v === '[' || tk.v === '{') { d++; continue; }
+            if (tk.v === ')' || tk.v === ']' || tk.v === '}') { if (d === 0) return k; d--; continue; }
+            if (d === 0 && (tk.v === ',' || tk.v === ';')) return k;
+        }
+        if (d === 0 && tk.nl && k > j) {
+            const prev = toks[k - 1];
+            const prevContinues = (prev.t === 'p' && _JS_CONTINUES_AFTER.has(prev.v)) ||
+                (prev.t === 'name' && ['new', 'typeof', 'await', 'void', 'delete', 'in', 'instanceof', 'yield'].includes(prev.v));
+            const curContinues = (tk.t === 'p' && _JS_CONTINUES_BEFORE.has(tk.v)) ||
+                (tk.t === 'name' && (tk.v === 'in' || tk.v === 'instanceof'));
+            if (!prevContinues && !curContinues) return k;
+        }
+    }
+    return toks.length;
+}
+
+function _jsIsStatementStart(toks, k) {
+    const prev = toks[k - 1];
+    if (!prev) return true;
+    if (prev.t === 'p' && (prev.v === ';' || prev.v === '}')) return true;
+    if (toks[k].nl) {
+        if (prev.t === 'p' && _JS_CONTINUES_AFTER.has(prev.v)) return false;
+        if (prev.t === 'name' && ['return', 'new', 'typeof', 'await', 'void', 'export', 'default', 'yield'].includes(prev.v)) return false;
+        return true;
+    }
+    return false;
+}
+
+/** Returns top-level (script-scope) declarations in a chunk of JS. */
+function findTopLevelJsDeclarations(src) {
+    const toks = _tokenizeJs(src || '');
+    const decls = [];
+    let depth = 0;
+    for (let k = 0; k < toks.length; k++) {
+        const tk = toks[k];
+        if (tk.t === 'p') {
+            if (tk.v === '(' || tk.v === '[' || tk.v === '{') depth++;
+            else if (tk.v === ')' || tk.v === ']' || tk.v === '}') depth = Math.max(0, depth - 1);
+            continue;
+        }
+        if (depth !== 0 || tk.t !== 'name') continue;
+        const prev = toks[k - 1];
+        if (prev && prev.t === 'p' && (prev.v === '.' || prev.v === '?.')) continue;
+
+        if (tk.v === 'const' || tk.v === 'let' || tk.v === 'var') {
+            const nx = toks[k + 1];
+            if (!nx) continue;
+            if (tk.v === 'let' && !(nx.t === 'name' || nx.v === '{' || nx.v === '[')) continue;
+            const names = [];
+            let j = k + 1;
+            while (j < toks.length) {
+                const b = toks[j];
+                if (b.t === 'name') { names.push(b.v); j++; }
+                else if (b.t === 'p' && (b.v === '{' || b.v === '[')) j = _jsPatternNames(toks, j, names);
+                else break;
+                if (toks[j] && toks[j].t === 'p' && toks[j].v === '=') j = _jsSkipInitializer(toks, j + 1);
+                if (toks[j] && toks[j].t === 'p' && toks[j].v === ',') { j++; continue; }
+                break;
+            }
+            if (names.length) decls.push({ kind: tk.v, names, kwStart: tk.s, kwEnd: tk.e });
+            k = j - 1;
+            continue;
+        }
+
+        if (tk.v === 'function' || (tk.v === 'async' && toks[k + 1] && toks[k + 1].v === 'function' && !toks[k + 1].nl)) {
+            const fnIdx = tk.v === 'async' ? k + 1 : k;
+            if (!_jsIsStatementStart(toks, k)) { k = fnIdx; continue; }
+            let j = fnIdx + 1;
+            if (toks[j] && toks[j].v === '*') j++;
+            if (toks[j] && toks[j].t === 'name') decls.push({ kind: 'function', names: [toks[j].v], kwStart: tk.s, kwEnd: toks[fnIdx].e });
+            k = fnIdx;
+            continue;
+        }
+
+        if (tk.v === 'class' && _jsIsStatementStart(toks, k)) {
+            const nameTok = toks[k + 1];
+            if (!nameTok || nameTok.t !== 'name' || nameTok.v === 'extends') continue;
+            let j = k + 2, d = 0;
+            for (; j < toks.length; j++) {
+                const q = toks[j];
+                if (q.t !== 'p') continue;
+                if (q.v === '{' && d === 0) break;
+                if (q.v === '(' || q.v === '[' || q.v === '{') d++;
+                else if (q.v === ')' || q.v === ']' || q.v === '}') d--;
+            }
+            if (j >= toks.length) continue;
+            const close = _jsMatchClose(toks, j);
+            decls.push({ kind: 'class', names: [nameTok.v], kwStart: tk.s, kwEnd: tk.e, bodyEnd: toks[close].e });
+            k = close; // skip class body; depth stays balanced
+        }
+    }
+    return decls;
+}
+
+/**
+ * Given JS chunks that will share one script scope, rewrite ONLY the
+ * declarations whose names collide so the script still parses:
+ *   const/let x  →  var x      (var may be redeclared; last assignment wins)
+ *   class X {}   →  var X = class X {};
+ * Function declarations may already be redeclared, so they're left alone.
+ * Exact duplicate chunks (same code twice) are dropped entirely.
+ */
+function dedupeSharedScopeJs(chunks) {
+    const seen = new Set();
+    const kept = [];
+    const droppedIds = [];
+    chunks.forEach(c => {
+        const key = (c.code || '').trim();
+        if (!key) return;
+        if (seen.has(key)) { droppedIds.push(c.id); return; }
+        seen.add(key);
+        kept.push(c);
+    });
+
+    const info = kept.map(c => {
+        try { return findTopLevelJsDeclarations(c.code); } catch (e) { return []; }
+    });
+    const owners = new Map();
+    info.forEach((decls, idx) => decls.forEach(d => d.names.forEach(nm => {
+        if (!owners.has(nm)) owners.set(nm, []);
+        owners.get(nm).push({ idx, kind: d.kind });
+    })));
+    const dupNames = new Set();
+    owners.forEach((list, nm) => {
+        if (list.length > 1 && list.some(o => o.kind === 'const' || o.kind === 'let' || o.kind === 'class')) dupNames.add(nm);
+    });
+
+    const codes = kept.map((c, idx) => {
+        if (!dupNames.size) return c.code;
+        const edits = [];
+        info[idx].forEach(d => {
+            if (!d.names.some(nm => dupNames.has(nm))) return;
+            if (d.kind === 'const' || d.kind === 'let') edits.push({ s: d.kwStart, e: d.kwEnd, text: 'var' });
+            else if (d.kind === 'class') {
+                edits.push({ s: d.kwStart, e: d.kwStart, text: `var ${d.names[0]} = ` });
+                edits.push({ s: d.bodyEnd, e: d.bodyEnd, text: ';' });
+            }
+        });
+        if (!edits.length) return c.code;
+        edits.sort((a, b) => b.s - a.s);
+        let code = c.code;
+        edits.forEach(ed => { code = code.slice(0, ed.s) + ed.text + code.slice(ed.e); });
+        return code;
+    });
+
+    const duplicates = [...dupNames].map(nm => ({
+        name: nm,
+        nodes: [...new Set(owners.get(nm).map(o => kept[o.idx].id))]
+    }));
+    return { codes, duplicates, droppedIds };
+}
+
+let _lastDedupeWarningKey = '';
+function _warnAboutJsDuplicates(result) {
+    if (!result.duplicates.length && !result.droppedIds.length) return;
+    const key = JSON.stringify(result);
+    if (key === _lastDedupeWarningKey) return;
+    _lastDedupeWarningKey = key;
+    if (result.duplicates.length) {
+        console.warn('[Vibe] Duplicate top-level JS declarations were made safe in the preview (const/let/class → var): ' +
+            result.duplicates.map(d => `${d.name} (${d.nodes.join(', ')})`).join('; ') +
+            '. Consider merging these nodes.');
+    }
+    if (result.droppedIds.length) {
+        console.warn(`[Vibe] Skipped JS nodes whose code exactly duplicates another node: ${result.droppedIds.join(', ')}`);
+    }
+}
+
+/** Summary of global JS identifiers per node, injected into agent prompts. */
+function getJsDeclarationIndexForAI(tree = vibeTree, excludeSubtreeRoot = null) {
+    if (!tree || tree.type === 'raw-html-container') return '';
+    const lines = [];
+    const walk = (node) => {
+        if (!node || node === excludeSubtreeRoot) return;
+        if (['javascript', 'js-function', 'declaration'].includes(node.type) && node.code) {
+            try {
+                const names = findTopLevelJsDeclarations(node.code).map(d => `${d.kind} ${d.names.join(', ')}`);
+                if (names.length) lines.push(`- "${node.id}": ${names.join('; ')}`);
+            } catch (_) {}
+        }
+        (node.children || []).forEach(walk);
+    };
+    walk(tree);
+    if (!lines.length) return '';
+    let text = lines.join('\n');
+    if (text.length > 6000) text = text.slice(0, 6000) + '\n- ...(truncated)';
+    return `
+
+--- EXISTING TOP-LEVEL JS DECLARATIONS ---
+All javascript / js-function nodes are concatenated into ONE shared <script>. These names are ALREADY declared:
+${text}
+NEVER re-declare any of these names in another node (that throws "Identifier has already been declared" and breaks every script). To change one, UPDATE the node that owns it. New code may freely USE them.`;
+}
+
+// ── Vibe tree sanitising ─────────────────────────────────────────────
+
+function _coerceNodeCode(code) {
+    if (code === undefined || code === null) return '';
+    if (typeof code !== 'string') {
+        try { code = JSON.stringify(code, null, 2); } catch (_) { code = String(code); }
+    }
+    return _stripWrappingFence(code);
+}
+
+function _collectIds(node, set = new Set(), skip = null) {
+    if (!node || node === skip) return set;
+    if (node.id) set.add(node.id);
+    (node.children || []).forEach(c => _collectIds(c, set, skip));
+    return set;
+}
+
+function _uniqueId(base, used) {
+    let n = 2, id = `${base}-${n}`;
+    while (used.has(id)) id = `${base}-${++n}`;
+    return id;
+}
+
+/**
+ * Cleans an AI-generated array of child nodes before it goes into the tree:
+ * drops junk entries, coerces code to strings, merges repeated ids (the last
+ * copy wins, kept in the first copy's position), and renames ids that collide
+ * with nodes elsewhere in the project.
+ */
+function normalizeGeneratedNodes(nodes, parentNode = null, label = 'AI') {
+    if (!Array.isArray(nodes)) return [];
+    const outsideIds = parentNode ? _collectIds(vibeTree, new Set(), parentNode) : new Set();
+    if (parentNode && parentNode.id) outsideIds.add(parentNode.id);
+
+    const used = new Set(outsideIds);
+    const clean = (list) => {
+        const order = [];
+        const byId = new Map();
+        list.forEach(raw => {
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+            const node = { ...raw };
+            node.id = String(node.id || `${node.type || 'node'}-${Math.random().toString(36).slice(2, 7)}`).trim();
+            node.type = node.type || 'html';
+            node.code = _coerceNodeCode(node.code);
+            if (Array.isArray(node.children)) node.children = clean(node.children);
+            else delete node.children;
+            if (byId.has(node.id)) {
+                console.warn(`[${label}] Duplicate node id "${node.id}" in AI output — keeping the latest version.`);
+                order[byId.get(node.id)] = node;
+            } else {
+                byId.set(node.id, order.length);
+                order.push(node);
+            }
+        });
+        order.forEach(node => {
+            if (used.has(node.id)) {
+                const renamed = _uniqueId(node.id, used);
+                console.warn(`[${label}] Node id "${node.id}" already exists elsewhere in the project — renamed to "${renamed}".`);
+                node.id = renamed;
+            }
+            used.add(node.id);
+        });
+        return order;
+    };
+    return clean(nodes);
+}
+
+/**
+ * Walks the whole tree after AI edits: removes exact duplicate nodes (same id,
+ * type and code) and renames any other id collisions so findNodeById() can
+ * always reach every node.
+ */
+function sanitizeVibeTree(tree = vibeTree, logger = null) {
+    if (!tree || tree.type === 'raw-html-container') return;
+    const seen = new Map(); // id -> signature
+    const used = _collectIds(tree);
+    const log = (msg) => (logger ? logger(msg, 'warn') : console.warn(`[Vibe] ${msg}`));
+    const walk = (node) => {
+        if (!Array.isArray(node.children)) return;
+        node.children = node.children.filter(child => {
+            if (!child || typeof child !== 'object') return false;
+            if (child.code !== undefined && typeof child.code !== 'string') child.code = _coerceNodeCode(child.code);
+            const sig = `${child.type}\u0000${child.code || ''}`;
+            if (seen.has(child.id)) {
+                if (seen.get(child.id) === sig && !(child.children && child.children.length)) {
+                    log(`Removed duplicate node "${child.id}".`);
+                    return false;
+                }
+                const renamed = _uniqueId(child.id, used);
+                log(`Node id "${child.id}" was used twice — renamed the second one to "${renamed}".`);
+                child.id = renamed;
+                used.add(renamed);
+            }
+            seen.set(child.id, sig);
+            walk(child);
+            return true;
+        });
+    };
+    seen.set(tree.id, `${tree.type}\u0000${tree.code || ''}`);
+    walk(tree);
 }
 
 
@@ -2930,31 +3679,23 @@ async function screenshotAndEditWorkshop() {
  */
 function parseVibeNodeArrayResponse(rawResponse, agentLabel = 'agent') {
     try {
-        let jsonResponse = rawResponse.trim();
-
-        const jsonMatch = jsonResponse.match(/```(json)?\s*([\s\S]*?)\s*```/i);
-        if (jsonMatch && jsonMatch[2]) {
-            jsonResponse = jsonMatch[2].trim();
-        }
-
-        const startIndex = jsonResponse.indexOf('[');
-        const endIndex = jsonResponse.lastIndexOf(']');
-
-        if (startIndex !== -1 && endIndex > startIndex) {
-            jsonResponse = jsonResponse.substring(startIndex, endIndex + 1);
-        }
-
-        const nodesArray = JSON.parse(jsonResponse);
+        const nodesArray = _coerceAIJsonShape(_parseAIJson(rawResponse, 'array'), 'array');
         if (!Array.isArray(nodesArray)) {
             throw new Error(`AI (${agentLabel}) did not return a valid JSON array.`);
         }
         console.log(`Successfully parsed response from ${agentLabel}.`);
-
         return nodesArray;
     } catch (e) {
         console.error(`Failed to parse JSON from ${agentLabel}:`, rawResponse);
         throw new Error(`AI (${agentLabel}) returned invalid JSON. Original response logged in console. Error: ${e.message}`);
     }
+}
+
+const _NODE_ARRAY_SHAPE = 'a JSON array of vibe node objects, each with "id", "type", "description" and "code" string fields';
+function _validateNodeArray(arr) {
+    if (!arr.length) return 'The array is empty — expected at least one node.';
+    const bad = arr.findIndex(n => !n || typeof n !== 'object' || !n.id || !n.type);
+    return bad === -1 ? null : `Item ${bad} is missing "id" or "type".`;
 }
 
 /**
@@ -3046,7 +3787,8 @@ function getBackendLogicAgentSystemPrompt() {
 2.  **Add interactivity as separate nodes.** Any event listeners, state management, animations, API calls, or logic goes into new "javascript" or "js-function" nodes — never inline <script> tags inside html nodes, never inline onclick handlers.
 3.  **One concern per JS node.** Give each JS node a clear, descriptive kebab-case id (e.g. "cart-add-item-logic", "form-validation-logic", "like-button-logic").
 4.  **Descriptive descriptions are REQUIRED.** Every new node needs a clear, specific description (2-3 sentences): what it does, what it hooks into, and any key behavior. These descriptions power the Code Wiki.
-5.  **Return everything.** Your output must include ALL of the original design nodes (html/css, unmodified except for allowed surgical hooks) PLUS your new javascript/js-function nodes, as a single flat JSON array.
+5.  **Return everything.** Your output must include ALL of the original design nodes (html/css, unmodified except for allowed surgical hooks) PLUS your new javascript/js-function nodes, as a single flat JSON array. Each id appears EXACTLY ONCE.
+6.  **Shared global scope.** Every JS node is concatenated into ONE <script>. Each top-level const/let/class/function name may be declared in only ONE node across the whole project. Put shared state and helpers in a single "app-state" (or similar) node and have other nodes use them — never re-declare them. Inside feature nodes, prefer wrapping logic in a function or an IIFE so local variables don't leak into global scope.
 
 **TASK:** Generate a valid JSON array of "vibe nodes" — the finished, fully-functional children of the given parent container. The output MUST be a JSON array [] and nothing else.
 
@@ -3128,8 +3870,11 @@ async function runDesignAgent(parentNode, streamCallback = null, refImages = [])
 
 ${referenceImages.length > 0 ? `The first ${referenceImages.length} attached image(s) are reference mobile UI kits. Use them to calibrate the visual quality bar you should hit — spacing rhythm, card styling, typographic weight, icon style, and overall polish — NOT to copy their specific branding, content, or exact layout. Design original screens for THIS app's concept that reach the same level of visual craft.` : ''}`;
 
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, combinedImages);
-    return parseVibeNodeArrayResponse(rawResponse, 'Design Agent');
+    const nodes = await callAIJson(systemPrompt, userPrompt, {
+        expect: 'array', images: combinedImages, streamCallback, label: 'Design Agent',
+        validate: _validateNodeArray, shapeHint: _NODE_ARRAY_SHAPE
+    });
+    return normalizeGeneratedNodes(nodes, parentNode, 'Design Agent');
 }
 
 /** STAGE 2 of the pipeline — adds JS logic on top of the approved design. */
@@ -3137,7 +3882,7 @@ async function runBackendLogicAgent(parentNode, designNodes, streamCallback = nu
     console.log(`[Backend Agent] Wiring up logic for parent: ${parentNode.id}`);
     if (typeof streamCallback === 'function') streamCallback('🛠️ Backend Agent is wiring up the logic...');
 
-    const systemPrompt = getBackendLogicAgentSystemPrompt();
+    const systemPrompt = getBackendLogicAgentSystemPrompt() + getJsDeclarationIndexForAI(vibeTree, parentNode);
     const userPrompt = `Add the JavaScript logic layer to the following approved UI design.
 {
     "parentId": "${parentNode.id}",
@@ -3149,8 +3894,11 @@ Approved Design Nodes (HTML/CSS) — JSON:
 ${JSON.stringify(designNodes, null, 2)}
 \`\`\``;
 
-    const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
-    return parseVibeNodeArrayResponse(rawResponse, 'Backend Agent');
+    const nodes = await callAIJson(systemPrompt, userPrompt, {
+        expect: 'array', images: refImages, streamCallback, label: 'Backend Agent',
+        validate: _validateNodeArray, shapeHint: _NODE_ARRAY_SHAPE
+    });
+    return normalizeGeneratedNodes(nodes, parentNode, 'Backend Agent');
 }
 
 /**
@@ -3185,8 +3933,11 @@ ${getImageGenerationInstructions()}
     "parentId": "${parentNode.id}",
     "newDescription": "${parentNode.description}"
 }`;
-        const rawResponse = await callAI(systemPrompt, userPrompt, true, streamCallback, refImages);
-        return parseVibeNodeArrayResponse(rawResponse, 'Combined Agent');
+        const nodes = await callAIJson(systemPrompt + getJsDeclarationIndexForAI(vibeTree, parentNode), userPrompt, {
+            expect: 'array', images: refImages, streamCallback, label: 'Combined Agent',
+            validate: _validateNodeArray, shapeHint: _NODE_ARRAY_SHAPE
+        });
+        return normalizeGeneratedNodes(nodes, parentNode, 'Combined Agent');
     }
 
     const designNodes = await runDesignAgent(parentNode, streamCallback, refImages);
@@ -3405,6 +4156,7 @@ function parseHtmlToVibeTree(fullCode) {
     });
 
     vibeTree.children = [headNode, ...htmlNodes, ...cssNodes, ...jsNodes];
+    sanitizeVibeTree(vibeTree);
     
     console.log("Client-side parsing complete. Generated Vibe Tree:", vibeTree);
     return vibeTree;
@@ -3430,6 +4182,7 @@ async function decomposeCodeIntoVibeTree(fullCode, forceClientSide = false) {
     const rawResponse = await callAI(systemPrompt, userPrompt, true);
 
     function tryParseVarious(text) {
+        try { return _parseAIJson(text, 'object'); } catch {}
         try { return JSON.parse(text.trim()); } catch {}
         const fence = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
         if (fence && fence[1]) {
@@ -4267,6 +5020,9 @@ function getAgentSystemPrompt() {
 5.  **Preserve Logic:** Do not remove existing JavaScript functions or logic unless explicitly asked. If updating JS, return the full code.
 6.  **Segmentation:** When CREATING new nodes, always split them by concern. A new UI section = one html node + one css node (+ one js-function node if interactive). Never bundle multiple sections into one node.
 7.  **Meaningful descriptions:** Every node MUST have a clear 2–3 sentence description explaining its purpose, appearance, and any interactions. These power the Code Wiki and AI context.
+8.  **Update, don't duplicate:** NEVER "create" a node whose id already exists in the Vibe Tree, and never create a second node that re-implements an existing one. If the change belongs in an existing node, use "update" on that node with its FULL new code.
+9.  **Shared global scope:** Every JS node is concatenated into ONE <script>. A top-level const/let/class/function name may be declared in only ONE node. Before declaring anything, check the EXISTING TOP-LEVEL JS DECLARATIONS list below; reuse those names instead of re-declaring them. Wrap new feature logic in a function or IIFE so its local variables stay local.
+10. **Cleanup:** If an edit makes a node redundant (e.g. you merged its logic into another node), remove it with a "delete" action. Only delete nodes when consolidating or when the user asks.
 
 **OUTPUT FORMAT:**
 Return ONLY a single, valid JSON object:
@@ -4274,7 +5030,7 @@ Return ONLY a single, valid JSON object:
   "plan": "Briefly explain exactly what you are changing (e.g., 'Updating hero HTML and adding new CSS for the gradient background').",
   "actions": [
     {
-      "actionType": "create" | "update",
+      "actionType": "create" | "update" | "delete",
       "nodeId": "id-of-node-to-act-on",
       "parentId": "parent-id-if-create",
       "newNode": {
@@ -4292,7 +5048,20 @@ Return ONLY a single, valid JSON object:
 }
 
 ${getVibeDbInstructionsForAI()}
-${getImageGenerationInstructions()}`;
+${getImageGenerationInstructions()}${getJsDeclarationIndexForAI()}`;
+}
+
+const _AGENT_PLAN_SHAPE = 'a JSON object with "plan" (string) and "actions" (array of {actionType, nodeId, parentId, newNode, newDescription, newCode}), or a JSON object with a "question" string';
+function _validateAgentDecision(v) {
+    if (v && typeof v.question === 'string' && v.question.trim()) return null;
+    if (!v || !Array.isArray(v.actions)) return 'Missing an "actions" array.';
+    return null;
+}
+function _callAgentForPlan(systemPrompt, userPrompt, images = [], label = 'Agent') {
+    return callAIJson(systemPrompt, userPrompt, {
+        expect: 'object', images, label,
+        validate: _validateAgentDecision, shapeHint: _AGENT_PLAN_SHAPE
+    });
 }
 
 // START OF CHANGE: New and refactored functions for the Task Queue system
@@ -4798,31 +5567,7 @@ async function executeSingleTask(promptContext, images = []) {
             : '';
         const userPrompt = `User Request History:\n"${promptContext}"${imageNote}\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true, null, images);
-        
-        // Robustly clean and parse the JSON response
-        let agentDecision;
-        try {
-            agentDecision = JSON.parse(rawResponse);
-        } catch(parseErr) {
-            // Strip markdown fences then retry
-            let cleaned = rawResponse.trim()
-                .replace(/^```json\s*/i, '').replace(/^```\s*/i, '')
-                .replace(/\s*```$/, '').trim();
-            // Find the first { and last } to extract just the JSON object
-            const start = cleaned.indexOf('{');
-            const end   = cleaned.lastIndexOf('}');
-            if (start !== -1 && end !== -1 && end > start) {
-                cleaned = cleaned.slice(start, end + 1);
-            }
-            try {
-                agentDecision = JSON.parse(cleaned);
-            } catch(e2) {
-                // Last resort: ask model what it meant
-                console.error('JSON parse failed even after cleaning. Raw:', rawResponse.slice(0, 300));
-                throw new Error('Agent returned invalid JSON. Try again or simplify your request.');
-            }
-        }
+        const agentDecision = await _callAgentForPlan(systemPrompt, userPrompt, images, 'Agent');
         
         if (agentDecision.question) {
             renderAgentQuestionUI(agentDecision.question);
@@ -4923,18 +5668,41 @@ async function handleFixError(errorMessage, fixButton) {
 }
 
 function executeAgentPlan(agentDecision, agentLogger) {
-    if (!agentDecision.plan || !Array.isArray(agentDecision.actions)) {
-        console.error("AI returned a malformed plan object. Check AI logs for details.");
-        throw new Error("AI returned a malformed plan object. Check console for details.");
+    if (!agentDecision || typeof agentDecision !== 'object' || !Array.isArray(agentDecision.actions)) {
+        console.error("AI returned a malformed plan object:", agentDecision);
+        throw new Error("AI returned a malformed plan object (missing an \"actions\" array). Check console for details.");
     }
 
     recordHistory('Agent plan execution');
 
-    agentLogger(`<strong>Plan:</strong> ${agentDecision.plan}`, 'plan');
+    agentLogger(`<strong>Plan:</strong> ${agentDecision.plan || '(no plan text provided)'}`, 'plan');
+
+    const JS_TYPES = ['javascript', 'js-function', 'declaration'];
+    const findJsNodeWithCode = (code) => {
+        const target = (code || '').trim();
+        if (!target) return null;
+        let hit = null;
+        const walk = (n) => {
+            if (hit || !n) return;
+            if (JS_TYPES.includes(n.type) && (n.code || '').trim() === target) { hit = n; return; }
+            (n.children || []).forEach(walk);
+        };
+        walk(vibeTree);
+        return hit;
+    };
+    const applyUpdate = (node, newDescription, newCode) => {
+        if (newDescription) node.description = newDescription;
+        if (newCode !== undefined && newCode !== null) node.code = _coerceNodeCode(newCode);
+    };
 
     for (const action of agentDecision.actions) {
-        if (action.actionType === 'update') {
-            const { nodeId, newDescription, newCode } = action;
+        if (!action || typeof action !== 'object') continue;
+        const actionType = String(action.actionType || action.type || '').toLowerCase();
+
+        if (actionType === 'update') {
+            const nodeId = action.nodeId || (action.newNode && action.newNode.id);
+            const newCode = action.newCode !== undefined ? action.newCode : (action.newNode && action.newNode.code);
+            const newDescription = action.newDescription || (action.newNode && action.newNode.description);
             const nodeToUpdate = findNodeById(nodeId);
 
             if (nodeToUpdate) {
@@ -4943,36 +5711,77 @@ function executeAgentPlan(agentDecision, agentLogger) {
                     continue;
                 }
                 agentLogger(`<strong>Updating Node:</strong> \`${nodeId}\` (${nodeToUpdate.type})`, 'action');
-                if (newDescription) nodeToUpdate.description = newDescription;
-                if (newCode !== undefined && newCode !== null) {
-                    nodeToUpdate.code = String(newCode); 
-                }
+                applyUpdate(nodeToUpdate, newDescription, newCode);
             } else {
                 agentLogger(`Warning: Agent wanted to update non-existent node \`${nodeId}\`, skipping.`, 'warn');
             }
-        } else if (action.actionType === 'create') {
-            const { parentId, newNode } = action;
-            const parentNode = findNodeById(parentId);
-            if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
-                if (!newNode || !newNode.id || findNodeById(newNode.id)) {
-                     // Auto-fix ID collision
-                     if(newNode && newNode.id) newNode.id = newNode.id + '-' + Date.now();
-                     else {
-                        agentLogger(`Warning: Invalid node creation skipped.`, 'warn');
-                        continue;
-                     }
+        } else if (actionType === 'create') {
+            const { parentId } = action;
+            const newNode = action.newNode && typeof action.newNode === 'object' ? { ...action.newNode } : null;
+            if (!newNode || !newNode.id) {
+                agentLogger(`Warning: Invalid node creation skipped (missing newNode or id).`, 'warn');
+                continue;
+            }
+            newNode.id = String(newNode.id).trim();
+            newNode.type = newNode.type || 'html';
+            newNode.code = _coerceNodeCode(newNode.code);
+            action.newNode = newNode;
+
+            // A "create" for an id that already exists is almost always the agent
+            // re-emitting a node it meant to edit. Previously this was renamed with a
+            // timestamp and pushed as a SECOND copy — which is what duplicated the
+            // declarations. Treat it as an update of the existing node instead.
+            const existing = findNodeById(newNode.id);
+            if (existing) {
+                if (existing.type !== 'container' && existing.type === newNode.type) {
+                    agentLogger(`<strong>Updating Node:</strong> \`${existing.id}\` (agent asked to create it, but it already exists)`, 'action');
+                    applyUpdate(existing, newNode.description, newNode.code);
+                    continue;
                 }
+                const used = _collectIds(vibeTree);
+                const renamed = _uniqueId(newNode.id, used);
+                agentLogger(`Warning: id \`${newNode.id}\` is taken by a different kind of node — creating as \`${renamed}\`.`, 'warn');
+                newNode.id = renamed;
+            }
+
+            // Exact copy of an existing JS node → don't add it twice.
+            if (JS_TYPES.includes(newNode.type)) {
+                const twin = findJsNodeWithCode(newNode.code);
+                if (twin) {
+                    agentLogger(`Skipped creating \`${newNode.id}\`: identical code already lives in \`${twin.id}\`.`, 'warn');
+                    continue;
+                }
+            }
+
+            const parentNode = findNodeById(parentId) || (newNode.type !== 'html' ? vibeTree : null);
+            if (parentNode && (parentNode.type === 'container' || parentNode.type === 'html')) {
                 if (!parentNode.children) parentNode.children = [];
-                agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentId}\``, 'action');
+                agentLogger(`<strong>Creating Node:</strong> \`${newNode.id}\` inside \`${parentNode.id}\``, 'action');
                 parentNode.children.push(newNode);
             } else {
                 agentLogger(`Warning: AI wanted to create node under invalid parent \`${parentId}\`. Skipping.`, 'warn');
+            }
+        } else if (actionType === 'delete') {
+            const nodeId = action.nodeId;
+            if (!nodeId || nodeId === vibeTree.id) {
+                agentLogger(`Warning: Refused to delete \`${nodeId}\`.`, 'warn');
+                continue;
+            }
+            const found = findNodeAndParentById(nodeId);
+            if (found && found.parent && Array.isArray(found.parent.children)) {
+                agentLogger(`<strong>Deleting Node:</strong> \`${nodeId}\``, 'action');
+                found.parent.children = found.parent.children.filter(c => c !== found.node);
+            } else {
+                agentLogger(`Warning: Agent wanted to delete non-existent node \`${nodeId}\`, skipping.`, 'warn');
             }
         } else {
             agentLogger(`Warning: AI returned an unknown action type: \`${action.actionType}\`. Skipping.`, 'warn');
         }
     }
-    
+
+    // Final safety net: no two nodes may share an id.
+    sanitizeVibeTree(vibeTree, (msg, type) => agentLogger(msg, type || 'warn'));
+
     refreshAllUI();
 
     // Push changed nodes to APUI so its canvas reflects the agent's edits instantly.
@@ -5828,19 +6637,11 @@ Current Vibe Tree JSON:
 ${JSON.stringify(vibeTree, null, 2)}
 \`\`\``;
 
-        const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        let newVibeTree;
-        try {
-            let jsonText = rawResponse.trim();
-            const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (match && match[1]) {
-                jsonText = match[1];
-            }
-            newVibeTree = JSON.parse(jsonText);
-        } catch (e) {
-            console.error("Failed to parse AI response for structure update:", rawResponse);
-            throw new Error("The AI returned invalid JSON. Please try rephrasing your instructions.");
-        }
+        const newVibeTree = await callAIJson(systemPrompt, userPrompt, {
+            expect: 'object', label: 'Structure Update',
+            shapeHint: 'the complete vibe tree: an object with id "whole-page", type "container" and a "children" array',
+            validate: (t) => (t && t.id === 'whole-page' && Array.isArray(t.children)) ? null : 'Root must have id "whole-page" and a "children" array.'
+        });
 
         if (!newVibeTree || newVibeTree.id !== 'whole-page' || !Array.isArray(newVibeTree.children)) {
             throw new Error("The AI returned an invalid Vibe Tree structure. The root 'id' must be 'whole-page' and it must have a 'children' array.");
@@ -5848,6 +6649,7 @@ ${JSON.stringify(vibeTree, null, 2)}
 
         recordHistory('AI Structure Update');
         vibeTree = newVibeTree;
+        sanitizeVibeTree(vibeTree);
         refreshAllUI();
         closeAiStructureModal();
         
@@ -5996,7 +6798,7 @@ async function handleAiEditorSearch() {
         const userPrompt = `Search Query: "${query}"\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const resultIds = JSON.parse(rawResponse);
+        const resultIds = _coerceAIJsonShape(_parseAIJson(rawResponse, 'array'), 'array');
         
         if (!Array.isArray(resultIds)) {
             throw new Error("AI did not return a valid array of node IDs.");
@@ -6570,7 +7372,7 @@ async function handleAiGenerateComponent() {
         console.log(`Generating component with AI from prompt: "${prompt}"`);
         
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const aiComponent = JSON.parse(rawResponse);
+        const aiComponent = _parseAIJson(rawResponse, 'object');
 
         if (!aiComponent.id || !aiComponent.name || !aiComponent.html) {
             throw new Error("AI response is missing required fields (id, name, html).");
@@ -6864,7 +7666,7 @@ async function extractAndOpenComponentModal(nodeId, buttonElement = null) {
         const userPrompt = `Extract the node with ID "${nodeId}" from the following Vibe Tree into a self-contained component.\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const extractedComponent = JSON.parse(rawResponse);
+        const extractedComponent = _parseAIJson(rawResponse, 'object');
 
         if (!extractedComponent.id || !extractedComponent.name) {
             throw new Error("AI failed to return a valid component structure with id and name.");
@@ -7163,7 +7965,7 @@ async function handleExecuteGenerateControls() {
         const userPrompt = `User Request: "${prompt}"\n\nNode Context:\n\`\`\`json\n${JSON.stringify(node, null, 2)}\n\`\`\`\n\nFull Vibe Tree:\n\`\`\`json\n${JSON.stringify(vibeTree, null, 2)}\n\`\`\``;
 
         const rawResponse = await callAI(systemPrompt, userPrompt, true);
-        const newControls = JSON.parse(rawResponse);
+        const newControls = _coerceAIJsonShape(_parseAIJson(rawResponse, 'array'), 'array');
         
         if (!Array.isArray(newControls)) {
             throw new Error("AI did not return a valid JSON array for controls.");
@@ -7652,14 +8454,14 @@ async function updateNodeByDescription(nodeId, newDescription, buttonEl = null) 
         if (node.type === 'container') {
             const newChildren = await generateCompleteSubtree(node);
             node.children = newChildren;
+            sanitizeVibeTree(vibeTree);
             refreshAllUI();
         } else {
             const systemPrompt = getAgentSystemPrompt();
             const fullTreeString = JSON.stringify(vibeTree, null, 2);
             const userPrompt = `The user has updated the description for component "${node.id}" to: "${newDescription}". Analyze this change and generate a plan to update the entire website accordingly.\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\``;
 
-            const rawResponse = await callAI(systemPrompt, userPrompt, true);
-            const agentDecision = JSON.parse(rawResponse);
+            const agentDecision = await _callAgentForPlan(systemPrompt, userPrompt, [], 'ModalUpdate');
             
             if (agentDecision.question) {
                 alert(`AI Question: ${agentDecision.question}\n\n(Please provide clearer instructions in the description field and try again.)`);
@@ -9576,6 +10378,9 @@ function exposeVibeGlobals() {
     exposeValue('switchToTab', switchToTab);
     exposeValue('showFullCode', showFullCode);
     exposeValue('refreshAllUI', refreshAllUI);
+    exposeValue('callAIJson', callAIJson);
+    exposeValue('parseAIJson', _parseAIJson);
+    exposeValue('sanitizeVibeTree', sanitizeVibeTree);
     exposeValue('applyVibes', applyVibes);
     exposeValue('populateProjectList', populateProjectList);
     exposeValue('handleLoadProject', handleLoadProject);
@@ -10745,8 +11550,7 @@ function handleApuiMessage(e) {
 
                     const userPrompt = `User Request: "${enrichedPrompt}"\n\nFull Vibe Tree:\n\`\`\`json\n${fullTreeString}\n\`\`\`\n\nFull Generated Code:\n\`\`\`html\n${fullCurrentCode}\n\`\`\``;
 
-                    const rawResponse = await callAI(systemPrompt, userPrompt, true);
-                    const agentDecision = JSON.parse(rawResponse);
+                    const agentDecision = await _callAgentForPlan(systemPrompt, userPrompt, [], 'APUI Agent');
 
                     if (agentDecision.question) {
                         // Agent needs clarification — send question back to APUI
@@ -10934,4 +11738,4 @@ function initOrRefreshNervousSystem() {
     } else {
         refreshNervousSystem(vibeTree, {});
     }
-                   }
+    }
